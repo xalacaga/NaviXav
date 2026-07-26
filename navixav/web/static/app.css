@@ -574,13 +574,13 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--high) 18%, transparent);
 }
 .shutdown-btn:hover { color: var(--low); border-color: var(--low); }
-.update-btn {
+.update-btn.available {
   color: #d8fff2;
   border-color: #2dd4bf80;
   background: #0f766e55;
   animation: update-pulse 2.2s ease-in-out infinite;
 }
-.update-btn:hover { border-color: #5eead4; background: #0f766e88; }
+.update-btn.available:hover { border-color: #5eead4; background: #0f766e88; }
 @keyframes update-pulse {
   50% { box-shadow: 0 0 0 4px #2dd4bf18; }
 }

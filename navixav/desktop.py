@@ -19,13 +19,14 @@ from pathlib import Path
 
 from navixav import __version__
 from navixav.logging_setup import configure_logging
-from navixav.paths import user_data_path
+from navixav.paths import resource_path, user_data_path
 from navixav.web.app import create_server, serve
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 LAST_PORT = 8775
 WEBVIEW2_CLIENT_ID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+APP_USER_MODEL_ID = "Galvo.NaviXav"
 
 
 def _show_error(message: str) -> None:
@@ -49,6 +50,18 @@ def _show_info(message: str) -> None:
 
 def _configure_logging() -> Path:
     return configure_logging()
+
+
+def _configure_windows_app_identity() -> None:
+    """Associe la fenêtre et la barre des tâches à l'application NaviXav."""
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(  # type: ignore[attr-defined]
+            APP_USER_MODEL_ID
+        )
+    except Exception:
+        logging.warning("Impossible de définir l'identité Windows NaviXav")
 
 
 def _webview2_version() -> str | None:
@@ -230,6 +243,7 @@ def _run_desktop_window(url: str, server: object) -> None:
             debug=False,
             private_mode=False,
             storage_path=str(user_data_path("webview")),
+            icon=str(resource_path("assets", "navixav.ico")),
         )
         logging.info("Boucle de fenêtre WebView2 terminée")
     finally:
@@ -252,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
     multiprocessing.freeze_support()
     args = _parser().parse_args(argv)
     log_file = _configure_logging()
+    _configure_windows_app_identity()
     try:
         port, already_running = _select_port(args.port)
         url = f"http://{HOST}:{port}"

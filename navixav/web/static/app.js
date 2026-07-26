@@ -91,18 +91,61 @@ async function loadStatus() {
   return status;
 }
 
-async function checkForUpdates() {
+function refreshUpdateButtonText() {
   const button = $("update-install");
+  const version = button.dataset.version;
+  button.textContent = version
+    ? `${t("update_available")} ${version}`
+    : t("check_update");
+  button.title = version ? t("update_title") : t("check_update_title");
+}
+
+async function checkForUpdates(manual = false) {
+  const button = $("update-install");
+  if (manual) {
+    button.disabled = true;
+    button.textContent = t("checking_update");
+  }
   try {
     const response = await fetch("/api/update/check", { cache: "no-store" });
     const update = await response.json();
-    if (!response.ok || !update.available) return;
-    button.dataset.version = update.latest_version;
-    button.textContent = `${t("update_available")} ${update.latest_version}`;
-    button.title = t("update_title");
-    show(button, true);
-  } catch (_error) {
+    if (!response.ok) throw new Error(update.error || t("update_check_failed"));
+    if (update.error) throw new Error(update.error);
+    if (update.available) {
+      button.dataset.version = update.latest_version;
+      button.classList.add("available");
+      refreshUpdateButtonText();
+      if (manual) {
+        showBanner(
+          "info",
+          `${t("update_available")} ${update.latest_version}`,
+          [t("update_click_to_install")]
+        );
+      }
+      return;
+    }
+    delete button.dataset.version;
+    button.classList.remove("available");
+    refreshUpdateButtonText();
+    if (manual) {
+      showBanner("info", t("up_to_date"), [t("up_to_date_body")]);
+    }
+  } catch (error) {
+    if (manual) {
+      showBanner("error", t("update_check_failed"), [String(error)]);
+    }
     // Une coupure réseau ne doit jamais gêner le démarrage ou le vol.
+  } finally {
+    button.disabled = false;
+    refreshUpdateButtonText();
+  }
+}
+
+async function handleUpdateButton() {
+  if ($("update-install").dataset.version) {
+    await installAvailableUpdate();
+  } else {
+    await checkForUpdates(true);
   }
 }
 
@@ -283,6 +326,9 @@ function renderPlan(plan) {
   show($("empty"), false);
   for (const id of ["strip", "terminal", "tabs"]) show($(id), true);
 
+  // La progression du bandeau doit utiliser la route opérationnelle complète,
+  // y compris les points de SID, STAR et d'approche.
+  flightGeometry = buildFlightGeometry(plan);
   renderStrip(plan);
   renderTerminal(plan);
   renderConstraints(plan);
@@ -307,11 +353,12 @@ function renderStrip(plan) {
   strip.innerHTML = "";
   activeRoutePointIndex = null;
 
-  const chip = (label, value, kind, routeIndex = null) => {
+  const chip = (label, value, kind, routeIndex = null, routeStage = null) => {
     const node = el("span", `chip ${kind}`);
     if (routeIndex !== null && routeIndex !== undefined) {
       node.dataset.routeIndex = String(routeIndex);
     }
+    if (routeStage) node.dataset.routeStage = routeStage;
     if (label) node.append(el("small", null, label));
     node.append(document.createTextNode(value));
     return node;
@@ -319,32 +366,95 @@ function renderStrip(plan) {
 
   const dep = plan.departure;
   const arr = plan.arrival;
-  const routePath = plan.enroute?.route_path || [];
-  let pathCursor = 1;
+  const geometryIndex = (ident, startAt = 0, fromEnd = false) => {
+    if (!ident) return -1;
+    if (fromEnd) {
+      return flightGeometry.findLastIndex((point) => point.ident === ident);
+    }
+    return flightGeometry.findIndex(
+      (point, index) => index >= startAt && point.ident === ident
+    );
+  };
+  let geometryCursor = 1;
+  const displayedFixes = new Set();
+  const appendProcedureFixes = (points, excluded = []) => {
+    const excludedFixes = new Set(excluded.filter(Boolean));
+    for (const point of points || []) {
+      const ident = point?.ident;
+      if (!ident || displayedFixes.has(ident) || excludedFixes.has(ident)) continue;
+      const index = geometryIndex(ident, geometryCursor);
+      if (index < 0) continue;
+      geometryCursor = index + 1;
+      displayedFixes.add(ident);
+      strip.append(chip(null, ident, "wpt", index));
+    }
+  };
 
   if (dep) {
-    const originIndex = routePath[0]?.ident === dep.icao ? 0 : null;
+    const originIndex = geometryIndex(dep.icao);
     strip.append(chip(null, dep.icao, "apt", originIndex));
+    displayedFixes.add(dep.icao);
     if (dep.runway?.value) strip.append(chip("rwy", dep.runway.value, "proc"));
-    if (dep.sid.value) strip.append(chip("sid", dep.sid.value, "proc"));
-    if (dep.sid_transition.value) strip.append(chip("trans", dep.sid_transition.value, "wpt"));
+    if (dep.sid.value) strip.append(chip("sid", dep.sid.value, "proc", null, "sid"));
+    appendProcedureFixes(
+      dep.sid_path,
+      [dep.icao, dep.sid_transition.value]
+    );
+    if (dep.sid_transition.value) {
+      const index = geometryIndex(dep.sid_transition.value, geometryCursor);
+      if (index >= 0) geometryCursor = index + 1;
+      strip.append(chip(
+        "trans",
+        dep.sid_transition.value,
+        "wpt",
+        index >= 0 ? index : null
+      ));
+      displayedFixes.add(dep.sid_transition.value);
+    }
   }
   for (const fix of plan.enroute.waypoints || []) {
-    const routeIndex = routePath.findIndex(
-      (point, index) => index >= pathCursor && point.ident === fix
-    );
-    if (routeIndex >= 0) pathCursor = routeIndex + 1;
-    strip.append(chip(null, fix, "wpt", routeIndex >= 0 ? routeIndex : null));
+    const index = geometryIndex(fix, geometryCursor);
+    if (index >= 0) geometryCursor = index + 1;
+    strip.append(chip(null, fix, "wpt", index >= 0 ? index : null));
+    displayedFixes.add(fix);
   }
   if (arr) {
-    if (arr.star_transition.value) strip.append(chip("trans", arr.star_transition.value, "wpt"));
-    if (arr.star.value) strip.append(chip("star", arr.star.value, "proc"));
-    if (arr.approach_transition.value) strip.append(chip("via", arr.approach_transition.value, "wpt"));
-    if (arr.approach.value) strip.append(chip("appr", arr.approach.value, "proc"));
-    if (arr.runway?.value) strip.append(chip("rwy", arr.runway.value, "proc"));
-    const destinationIndex = routePath.findLastIndex(
-      (point) => point.ident === arr.icao
+    if (arr.star_transition.value) {
+      const index = geometryIndex(arr.star_transition.value, geometryCursor);
+      if (index >= 0) geometryCursor = index + 1;
+      strip.append(chip(
+        "trans",
+        arr.star_transition.value,
+        "wpt",
+        index >= 0 ? index : null
+      ));
+      displayedFixes.add(arr.star_transition.value);
+    }
+    if (arr.star.value) strip.append(chip("star", arr.star.value, "proc", null, "star"));
+    appendProcedureFixes(
+      arr.star_path,
+      [arr.star_transition.value, arr.approach_transition.value, arr.icao]
     );
+    if (arr.approach_transition.value) {
+      const index = geometryIndex(arr.approach_transition.value, geometryCursor);
+      if (index >= 0) geometryCursor = index + 1;
+      strip.append(chip(
+        "via",
+        arr.approach_transition.value,
+        "wpt",
+        index >= 0 ? index : null
+      ));
+      displayedFixes.add(arr.approach_transition.value);
+    }
+    if (arr.approach.value) {
+      strip.append(chip("appr", arr.approach.value, "proc", null, "approach"));
+    }
+    appendProcedureFixes(
+      arr.approach_path,
+      [arr.approach_transition.value, arr.icao]
+    );
+    if (arr.runway?.value) strip.append(chip("rwy", arr.runway.value, "proc"));
+    const destinationIndex = geometryIndex(arr.icao, 0, true);
     strip.append(chip(
       null,
       arr.icao,
@@ -355,7 +465,7 @@ function renderStrip(plan) {
 }
 
 function routePointForAircraft(aircraft) {
-  const route = currentPlan?.enroute?.route_path || [];
+  const route = flightGeometry;
   if (!aircraft || !route.length) return null;
 
   const latitude = Number(aircraft.latitude);
@@ -399,11 +509,20 @@ function routePointForAircraft(aircraft) {
       nearestSegment = { index, distanceSquared };
     }
   }
+  if (nearestSegment.distanceSquared > (50 * 1852) ** 2) return null;
   return Math.min(nearestSegment.index + 1, route.length - 1);
 }
 
 function updateRouteStripProgress(aircraft) {
-  const activeIndex = routePointForAircraft(aircraft);
+  let activeIndex = routePointForAircraft(aircraft);
+  if (activeIndex !== null && activeRoutePointIndex !== null) {
+    // Un croisement de route ou deux segments proches ne doivent jamais faire
+    // reculer la progression ni sauter toute une procédure en une seconde.
+    activeIndex = Math.max(
+      activeRoutePointIndex,
+      Math.min(activeIndex, activeRoutePointIndex + 1)
+    );
+  }
   const strip = $("strip");
   for (const node of strip.querySelectorAll(".chip[data-route-index]")) {
     const index = Number(node.dataset.routeIndex);
@@ -412,6 +531,24 @@ function updateRouteStripProgress(aircraft) {
     node.classList.toggle("route-upcoming", activeIndex !== null && index > activeIndex);
     if (index === activeIndex) node.title = "Position actuelle de l’avion sur la route";
     else node.removeAttribute("title");
+  }
+  for (const node of strip.querySelectorAll(".chip[data-route-stage]")) {
+    const stage = node.dataset.routeStage;
+    const indexes = flightGeometry
+      .map((point, index) => point.stage === stage ? index : -1)
+      .filter((index) => index >= 0);
+    if (!indexes.length || activeIndex === null) {
+      node.classList.remove("route-passed", "route-active", "route-upcoming");
+      continue;
+    }
+    const first = indexes[0];
+    const last = indexes.at(-1);
+    node.classList.toggle("route-passed", activeIndex > last);
+    node.classList.toggle(
+      "route-active",
+      activeIndex >= first && activeIndex <= last
+    );
+    node.classList.toggle("route-upcoming", activeIndex < first);
   }
 
   if (activeIndex === null || activeRoutePointIndex === activeIndex) {
@@ -845,7 +982,6 @@ function updateFlightPanel(aircraft) {
 }
 
 function renderFlightPanel(plan) {
-  flightGeometry = buildFlightGeometry(plan);
   flightLog = loadFlightLog(plan);
   lastFlightLogAt = 0;
   stopFlightReplay();
@@ -2155,7 +2291,7 @@ $("sia-opacity").addEventListener("input", (event) => {
 });
 $("map-route").addEventListener("click", () => MAP.fitRoute());
 $("settings-open").addEventListener("click", openSettings);
-$("update-install").addEventListener("click", installAvailableUpdate);
+$("update-install").addEventListener("click", handleUpdateButton);
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);
@@ -2174,6 +2310,7 @@ window.addEventListener("navixav:languagechange", () => {
   if (currentPlan) renderPlan(currentPlan);
   loadStatus().catch(() => {});
   pollSimulatorStatus();
+  refreshUpdateButtonText();
 });
 
 pollSimulatorStatus();

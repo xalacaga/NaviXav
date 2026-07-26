@@ -68,6 +68,7 @@ def test_desktop_window_is_resizable_and_stops_with_the_interface(monkeypatch):
 
     assert captured["min_size"] == (720, 560)
     assert captured["start"]["gui"] == "edgechromium"
+    assert captured["start"]["icon"].endswith("assets\\navixav.ico")
     assert window.destroyed is True
     assert server.should_exit is True
 
@@ -107,7 +108,26 @@ def test_windows_distribution_uses_the_navixav_aircraft_icon():
     assert header[:4] == b"\x00\x00\x01\x00"
     assert int.from_bytes(header[4:6], "little") == 7
     assert 'icon=str(project_root / "assets" / "navixav.ico")' in spec
+    assert '(str(project_root / "assets" / "navixav.ico"), "assets")' in spec
     assert 'href="/static/navixav-icon.svg"' in html
+
+
+def test_windows_process_uses_stable_navixav_identity(monkeypatch):
+    captured = []
+    shell32 = SimpleNamespace(
+        SetCurrentProcessExplicitAppUserModelID=captured.append
+    )
+    monkeypatch.setattr(
+        desktop.ctypes,
+        "windll",
+        SimpleNamespace(shell32=shell32),
+        raising=False,
+    )
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+
+    desktop._configure_windows_app_identity()
+
+    assert captured == ["Galvo.NaviXav"]
 
 
 def test_logging_is_rotating_and_cache_wait_is_explained(tmp_path):
@@ -141,6 +161,8 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert 'id="update-install"' in html
     assert 'fetch("/api/update/check"' in javascript
     assert '"X-NaviXav-Update": "install"' in javascript
+    assert "checkForUpdates(true)" in javascript
+    assert 'class="icon-btn update-btn"' in html
 
 
 def test_vertical_profile_waits_for_descent_before_reporting_too_low():
@@ -151,3 +173,18 @@ def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     assert 'phase === "Approche"' in javascript
     assert "En attente du TOD" in javascript
     assert "Math.abs(delta) <= 500" in javascript
+
+
+def test_route_progress_uses_sid_star_and_approach_geometry():
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    assert "flightGeometry = buildFlightGeometry(plan);" in javascript
+    assert "const route = flightGeometry;" in javascript
+    assert 'routeStage = null' in javascript
+    assert 'null, "star"' in javascript
+    assert 'null, "approach"' in javascript
+    assert "activeRoutePointIndex + 1" in javascript
+    assert "appendProcedureFixes(" in javascript
+    assert "arr.star_path" in javascript
+    assert "arr.approach_path" in javascript
