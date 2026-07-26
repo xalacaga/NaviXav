@@ -1,8 +1,8 @@
 """Client SimConnect unique de NaviXav, en ctypes.
 
 Les facilities et les variables de simulation passent toutes par cette couche.
-Le paquet Python `SimConnect` sert uniquement de fournisseur de DLL lorsque le
-SDK MSFS n'est pas installé. Le protocole Facilities est le suivant :
+NaviXav utilise son propre client ctypes et la DLL officielle du SDK MSFS.
+Le protocole Facilities est le suivant :
 
     AddToFacilityDefinition(id, "OPEN AIRPORT")
     AddToFacilityDefinition(id, "LATITUDE")        champs du bloc courant
@@ -45,23 +45,12 @@ SIMCONNECT_UNUSED = 0xFFFFFFFF
 
 
 def _dll_candidates() -> tuple[Path, ...]:
-    """Emplacements possibles de SimConnect.dll, du plus fiable au plus incertain.
-
-    Le SDK Microsoft n'est pas toujours installé ; le paquet Python SimConnect,
-    s'il est présent, en embarque une copie utilisable.
-    """
-    candidates = [
+    """Emplacements possibles de la DLL officielle SimConnect."""
+    return (
         resource_path("SimConnect", "SimConnect.dll"),
         resource_path("SimConnect.dll"),
         Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"),
-    ]
-    try:
-        import SimConnect as _package  # noqa: N813 - dépendance facultative
-
-        candidates.append(Path(_package.__file__).parent / "SimConnect.dll")
-    except Exception:  # pragma: no cover - paquet absent
-        pass
-    return tuple(candidates)
+    )
 
 
 DLL_CANDIDATES = _dll_candidates()

@@ -90,8 +90,6 @@
         </span>
         <button id="map-basemap" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer le fond OpenStreetMap">Fond carte</button>
-        <button id="map-ground" class="icon-btn" aria-pressed="false"
-                title="Afficher les voies de circulation et les postes">Détails sol</button>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
@@ -123,11 +121,10 @@
         <span><i class="key route-enroute"></i>route</span>
         <span><i class="key route-star"></i>STAR</span>
         <span><i class="key route-approach"></i>approche</span>
-        <span data-ground-detail class="hidden"><i class="key taxi"></i>voie de circulation</span>
-        <span data-ground-detail class="hidden"><i class="key parking"></i>poste</span>
       </div>
-      <a class="map-attribution" href="https://www.openstreetmap.org/copyright"
-         target="_blank" rel="noopener">© OpenStreetMap</a>
+      <a id="map-attribution" class="map-attribution"
+         href="https://www.openstreetmap.org/copyright"
+         target="_blank" rel="noopener">© OpenStreetMap contributors</a>
     </div>
   </section>
 
@@ -201,6 +198,17 @@
       <label class="field" for="settings-runway-length">
         <span>Longueur de piste minimale (ft)</span>
         <input id="settings-runway-length" type="number" min="0" max="30000" />
+      </label>
+      <label class="field" for="settings-basemap">
+        <span>Fond de carte</span>
+        <select id="settings-basemap">
+          <option value="osm">OpenStreetMap Standard</option>
+          <option value="opentopo">OpenTopoMap</option>
+        </select>
+      </label>
+      <label class="field" for="settings-trail-color">
+        <span>Couleur de la trace du vol</span>
+        <input id="settings-trail-color" type="color" value="#22d3ee" />
       </label>
       <label class="switch settings-switch">
         <input type="checkbox" id="settings-rnp" />

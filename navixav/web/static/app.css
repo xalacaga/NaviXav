@@ -26,12 +26,9 @@
 
   /* Carte */
   --map-bg: #0b1120;
-  --taxi: #33405c;
   --rwy: #5d6b85;
   --rwy-active: #38bdf8;
   --rwy-centreline: #cbd5e1;
-  --parking: #475569;
-  --parking-label: #7d8db0;
   --label-bg: #1e293b;
   --label-border: rgba(148, 163, 184, 0.5);
   --label-text: #e2e8f0;
@@ -70,12 +67,9 @@
     --shadow: 0 18px 36px -22px rgba(15, 28, 51, 0.45);
 
     --map-bg: #e6ecf6;
-    --taxi: #b9c6da;
     --rwy: #64748b;
     --rwy-active: #0369a1;
     --rwy-centreline: #ffffff;
-    --parking: #94a3b8;
-    --parking-label: #64748b;
     --label-bg: #ffffff;
     --label-border: rgba(30, 58, 110, 0.3);
     --label-text: #0f1c33;
@@ -755,8 +749,6 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .key.route-enroute { background: var(--route-enroute); }
 .key.route-star { background: var(--route-star); }
 .key.route-approach { background: var(--route-approach); }
-.key.taxi { background: var(--taxi); }
-.key.parking { width: 8px; height: 8px; border-radius: 50%; background: var(--parking); }
 
 .stat-grid {
   display: grid;

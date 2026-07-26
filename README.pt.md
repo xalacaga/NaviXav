@@ -581,6 +581,28 @@ preferências, o rasto do voo e os PDF em cache permanecem na máquina. Apenas o
 pedidos necessários ao SimBrief, ao OpenStreetMap, à meteorologia e às
 publicações AIS oficiais saem do computador.
 
+## Licença
+
+O NaviXav é software livre distribuído sob a licença
+[Apache 2.0](LICENSE).
+
+Copyright 2026 Xavier BEGUE (xalacaga)
+
+Podes usar, modificar, redistribuir e integrar o NaviXav livremente, incluindo
+num projeto comercial. Em contrapartida, a licença obriga a **creditar o
+autor**:
+
+- conservar a menção de copyright e uma cópia da licença em qualquer
+  redistribuição;
+- conservar o ficheiro [NOTICE](NOTICE) e o seu conteúdo de atribuição;
+- **assinalar de forma visível qualquer ficheiro que tenhas modificado**, nos
+  termos da secção 4(b) da licença.
+
+A licença concede ainda uma licença de patentes e exclui qualquer garantia. Os
+dados de navegação, as cartas oficiais e o fundo cartográfico não são cobertos
+por esta licença: permanecem sujeitos às condições dos respetivos fornecedores,
+detalhadas no ficheiro NOTICE.
+
 ## Testes
 
 O perfil reproduzível utilizado para construir a distribuição é:

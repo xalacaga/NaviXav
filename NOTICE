@@ -1,0 +1,57 @@
+NaviXav
+Copyright 2026 Xavier BEGUE (xalacaga)
+https://github.com/xalacaga/NaviXav
+
+NaviXav is licensed under the Apache License, Version 2.0.
+This NOTICE file is informational and does not add restrictions to that
+license. When redistribution triggers section 4 of the Apache License 2.0,
+retain the notices required by that section.
+
+NaviXav est distribué sous licence Apache, version 2.0.
+Ce fichier NOTICE est informatif et n’ajoute aucune restriction à cette
+licence. Lorsqu’une redistribution relève de la section 4 de la licence
+Apache 2.0, conservez les mentions exigées par cette section.
+
+Third-party software / Logiciels tiers
+--------------------------------------
+
+The Windows distribution contains third-party software under separate
+licenses. A summary is provided in THIRD_PARTY_NOTICES. The corresponding
+license texts are installed in the "licenses/third-party" directory.
+
+La distribution Windows contient des logiciels tiers régis par leurs propres
+licences. Un récapitulatif figure dans THIRD_PARTY_NOTICES. Les textes
+correspondants sont installés dans le dossier "licenses/third-party".
+
+Microsoft components
+--------------------
+
+The distribution includes an unmodified Microsoft SimConnect.dll obtained
+from the Microsoft Flight Simulator SDK and may include the official Microsoft
+Edge WebView2 bootstrapper. These components are not licensed under the
+NaviXav Apache License and remain subject to the applicable Microsoft terms.
+Microsoft, Microsoft Flight Simulator, MSFS, Edge and WebView2 are trademarks
+of the Microsoft group of companies.
+
+La distribution inclut une DLL Microsoft SimConnect non modifiée provenant du
+SDK Microsoft Flight Simulator et peut inclure le bootstrapper officiel
+Microsoft Edge WebView2. Ces composants ne relèvent pas de la licence Apache
+de NaviXav et restent soumis aux conditions Microsoft applicables.
+
+Data and online services / Données et services en ligne
+--------------------------------------------------------
+
+Map tiles and map data are provided by OpenStreetMap contributors. The
+application displays the required "© OpenStreetMap" attribution with a link to
+https://www.openstreetmap.org/copyright. OpenStreetMap data is available under
+the Open Data Commons Open Database License (ODbL).
+
+Les données et tuiles cartographiques sont fournies par les contributeurs
+OpenStreetMap. L’application affiche l’attribution « © OpenStreetMap » avec un
+lien vers https://www.openstreetmap.org/copyright. Les données OpenStreetMap
+sont proposées sous licence Open Data Commons Open Database License (ODbL).
+
+Flight plans, weather information, MSFS navigation data and aeronautical charts
+retrieved at runtime are not part of NaviXav and remain subject to the terms of
+their respective providers, including SimBrief, national AIS authorities and
+the FAA. NaviXav does not grant rights to redistribute those documents or data.

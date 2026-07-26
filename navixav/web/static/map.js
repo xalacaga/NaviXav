@@ -20,10 +20,25 @@ const MAP = (() => {
   let routeSegments = [];
   let dragging = null;
   let basemapVisible = true;
-  let groundDetailsVisible = false;
+  let basemapKey = "osm";
+  let trailColor = "#22d3ee";
   const tileCache = new Map();
   const TILE_SIZE = 256;
   const MAX_TILE_CACHE = 320;
+  const BASEMAPS = {
+    osm: {
+      url: (zoom, x, y) => `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`,
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors",
+      attributionUrl: "https://www.openstreetmap.org/copyright",
+    },
+    opentopo: {
+      url: (zoom, x, y) => `https://a.tile.opentopomap.org/${zoom}/${x}/${y}.png`,
+      maxZoom: 17,
+      attribution: "© OpenStreetMap contributors · SRTM · OpenTopoMap",
+      attributionUrl: "https://opentopomap.org/about",
+    },
+  };
 
   /* ------------------------------------------------------------ géométrie */
 
@@ -76,9 +91,7 @@ const MAP = (() => {
     if (!chart) return;
 
     if (basemapVisible) drawBasemap();
-    if (groundDetailsVisible) drawTaxiways();
     drawRunways();
-    if (groundDetailsVisible && view.scale > 0.42) drawParkings();
     drawRoute();
     drawTrail();
     drawAircraft();
@@ -99,13 +112,13 @@ const MAP = (() => {
   function basemapZoom() {
     const latitude = chart.origin.lat * Math.PI / 180;
     const circumference = 2 * Math.PI * 6371000 * Math.cos(latitude);
-    return Math.max(3, Math.min(19,
+    return Math.max(3, Math.min(BASEMAPS[basemapKey].maxZoom,
       Math.round(Math.log2((view.scale * circumference) / TILE_SIZE))
     ));
   }
 
   function getTile(zoom, x, y) {
-    const key = `${zoom}/${x}/${y}`;
+    const key = `${basemapKey}/${zoom}/${x}/${y}`;
     let tile = tileCache.get(key);
     if (tile) return tile;
 
@@ -120,7 +133,7 @@ const MAP = (() => {
     image.onerror = () => {
       tile.failed = true;
     };
-    image.src = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+    image.src = BASEMAPS[basemapKey].url(zoom, x, y);
 
     if (tileCache.size > MAX_TILE_CACHE) {
       const oldest = tileCache.keys().next().value;
@@ -168,38 +181,6 @@ const MAP = (() => {
           Math.ceil(screenPixelsPerTile) + 1
         );
       }
-    }
-    context.restore();
-  }
-
-  function drawTaxiways() {
-    const overview = view.scale < 0.28;
-    const opacity = basemapVisible
-      ? (overview ? 0.28 : 0.48)
-      : (overview ? 0.5 : 0.72);
-
-    context.save();
-    context.strokeStyle = css("--taxi");
-    context.globalAlpha = opacity;
-    context.lineCap = "round";
-    for (const segment of chart.taxiways) {
-      const [x1, y1] = toScreen(segment.start.x, segment.start.y);
-      const [x2, y2] = toScreen(segment.end.x, segment.end.y);
-      if (
-        Math.max(x1, x2) < -20 || Math.min(x1, x2) > canvas.clientWidth + 20 ||
-        Math.max(y1, y2) < -20 || Math.min(y1, y2) > canvas.clientHeight + 20
-      ) {
-        continue;
-      }
-      // À l'échelle de l'aéroport, une voie est une ligne de repère et non
-      // une large surface opaque. Son emprise ne réapparaît qu'en zoom proche.
-      context.lineWidth = overview
-        ? 0.85
-        : Math.min(4.5, Math.max(1.1, segment.width_m * view.scale * 0.28));
-      context.beginPath();
-      context.moveTo(x1, y1);
-      context.lineTo(x2, y2);
-      context.stroke();
     }
     context.restore();
   }
@@ -277,39 +258,12 @@ const MAP = (() => {
     context.restore();
   }
 
-  function drawParkings() {
-    const showLabels = view.scale > 0.9;
-    context.save();
-    context.globalAlpha = basemapVisible ? 0.68 : 0.85;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.font = "500 10px 'Inter', system-ui, sans-serif";
-
-    for (const parking of chart.parkings) {
-      const [x, y] = toScreen(parking.position.x, parking.position.y);
-      if (x < -40 || y < -40 || x > canvas.clientWidth + 40 || y > canvas.clientHeight + 40) {
-        continue;
-      }
-      const radius = Math.min(5, Math.max(1.8, parking.radius_m * view.scale * 0.35));
-      context.fillStyle = css("--parking");
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fill();
-
-      if (showLabels && radius > 4) {
-        context.fillStyle = css("--parking-label");
-        context.fillText(parking.label, x, y + radius + 8);
-      }
-    }
-    context.restore();
-  }
-
   function drawTrail() {
     if (trail.length < 2) return;
     context.save();
-    context.strokeStyle = css("--accent");
-    context.globalAlpha = 0.45;
-    context.lineWidth = 2;
+    context.strokeStyle = trailColor;
+    context.globalAlpha = 0.9;
+    context.lineWidth = 3;
     context.lineCap = "round";
     context.lineJoin = "round";
     context.beginPath();
@@ -506,15 +460,12 @@ const MAP = (() => {
     if (button) button.classList.toggle("active", view.follow);
   }
 
-  function syncGroundButton() {
-    const button = document.getElementById("map-ground");
-    if (button) {
-      button.classList.toggle("active", groundDetailsVisible);
-      button.setAttribute("aria-pressed", String(groundDetailsVisible));
-    }
-    for (const item of document.querySelectorAll("[data-ground-detail]")) {
-      item.classList.toggle("hidden", !groundDetailsVisible);
-    }
+  function syncBasemapAttribution() {
+    const attribution = document.getElementById("map-attribution");
+    if (!attribution) return;
+    const source = BASEMAPS[basemapKey];
+    attribution.textContent = source.attribution;
+    attribution.href = source.attributionUrl;
   }
 
   /* --------------------------------------------------------------- public */
@@ -522,7 +473,6 @@ const MAP = (() => {
   return {
     setChart(data) {
       chart = data;
-      trail = [];
       aircraft = null;
       routeSegments = [];
       fit();
@@ -530,16 +480,31 @@ const MAP = (() => {
     setAircraft(position) {
       aircraft = position;
       if (position) {
-        const last = trail[trail.length - 1];
-        if (!last || Math.hypot(last[0] - position.x, last[1] - position.y) > 4) {
-          trail.push([position.x, position.y]);
-          if (trail.length > 600) trail.shift();
-        }
         if (view.follow) {
           view.centerX = position.x;
           view.centerY = position.y;
         }
       }
+      draw();
+    },
+    setTrail(points) {
+      trail = Array.isArray(points)
+        ? points.filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+          .map((point) => [point.x, point.y])
+        : [];
+      draw();
+    },
+    configure(options = {}) {
+      const nextBasemap = BASEMAPS[options.basemap] ? options.basemap : "osm";
+      const nextColor = /^#[0-9a-f]{6}$/i.test(options.trailColor || "")
+        ? options.trailColor
+        : "#22d3ee";
+      if (nextBasemap !== basemapKey) {
+        basemapKey = nextBasemap;
+        tileCache.clear();
+      }
+      trailColor = nextColor;
+      syncBasemapAttribution();
       draw();
     },
     setRoute(points) {
@@ -553,9 +518,13 @@ const MAP = (() => {
       draw();
     },
     fitRoute() {
-      if (route.length < 2) return;
-      const xs = route.map((point) => point.x);
-      const ys = route.map((point) => point.y);
+      const visiblePoints = [
+        ...route,
+        ...trail.map(([x, y]) => ({ x, y })),
+      ];
+      if (visiblePoints.length < 2) return;
+      const xs = visiblePoints.map((point) => point.x);
+      const ys = visiblePoints.map((point) => point.y);
       const width = Math.max(1000, Math.max(...xs) - Math.min(...xs));
       const height = Math.max(1000, Math.max(...ys) - Math.min(...ys));
       view.centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
@@ -570,7 +539,6 @@ const MAP = (() => {
     },
     clearAircraft() {
       aircraft = null;
-      trail = [];
       draw();
     },
     fit,
@@ -592,11 +560,6 @@ const MAP = (() => {
         button.classList.toggle("active", basemapVisible);
         button.setAttribute("aria-pressed", String(basemapVisible));
       }
-      draw();
-    },
-    toggleGroundDetails() {
-      groundDetailsVisible = !groundDetailsVisible;
-      syncGroundButton();
       draw();
     },
     get following() { return view.follow; },

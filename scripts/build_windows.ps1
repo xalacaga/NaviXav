@@ -91,7 +91,7 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
 & $VenvPython -c "import sys; assert sys.version_info >= (3, 11), sys.version"
 
 Write-Step "Contrôle des bibliothèques du projet"
-if (-not (Test-PythonImports "fastapi, requests, uvicorn, pydantic, pypdf, SimConnect")) {
+if (-not (Test-PythonImports "fastapi, requests, uvicorn, pydantic, pypdf")) {
     & $VenvPython -m pip install --disable-pip-version-check -e $ProjectRoot
 }
 if (-not (Test-PythonImports "webview")) {
@@ -132,6 +132,10 @@ New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
 $DistDir = Join-Path $ProjectRoot "dist\NaviXav"
 Get-ChildItem -LiteralPath $ProjectRoot -Filter "README*.md" -File |
     Copy-Item -Destination $DistDir -Force
+& (Join-Path $PSScriptRoot "collect_licenses.ps1") `
+    -PythonPath $VenvPython `
+    -Destination (Join-Path $DistDir "licenses")
+if ($LASTEXITCODE -ne 0) { throw "La collecte des licences a échoué." }
 $PortableArchive = Join-Path $ReleaseDir "NaviXav-$Version-windows-x64-portable.zip"
 New-PortableArchive (Join-Path $DistDir "*") $PortableArchive
 

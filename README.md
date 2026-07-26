@@ -112,10 +112,9 @@ La carte comprend :
 - une trace du déplacement ;
 - un mode de suivi automatique ;
 - le zoom, le déplacement et l’ajustement au terrain ou à la route ;
-- des détails sol optionnels pour les taxiways et les postes de stationnement.
-
-Les détails sol sont masqués par défaut pour conserver une carte lisible. Le
-bouton **Détails sol** permet de les afficher lorsque nécessaire.
+- la trace complète réellement parcourue, conservée du départ à l’arrivée ;
+- une couleur de trace personnalisable ;
+- le choix entre OpenStreetMap Standard et OpenTopoMap.
 
 ### Cartes AIS nationales officielles
 
@@ -320,8 +319,9 @@ après avoir généré ou modifié un vol dans SimBrief.
 
 ## Utilisation de la carte
 
-- **Fond carte** : affiche ou masque OpenStreetMap.
-- **Détails sol** : affiche les taxiways et les postes.
+- **Fond carte** : affiche ou masque le fond libre choisi dans les paramètres.
+- **Paramètres** : choisit OpenStreetMap Standard ou OpenTopoMap et la couleur
+  de la trace complète du vol.
 - **Calque officiel** : apparaît uniquement pour la fiche géoréférencée de
   l’aérodrome actuellement affiché et règle son opacité.
 - **Route complète** : cadre toute la route du vol.
@@ -578,6 +578,28 @@ Le service local n’écoute jamais sur le réseau extérieur. Le Pilot ID
 SimBrief, les préférences, la trace du vol et les PDF mis en cache restent sur
 la machine. Seules les requêtes nécessaires à SimBrief, OpenStreetMap, la
 météo et aux publications AIS officielles quittent l’ordinateur.
+
+## Licence
+
+NaviXav est un logiciel libre distribué sous licence
+[Apache 2.0](LICENSE).
+
+Copyright 2026 Xavier BEGUE (xalacaga)
+
+Tu peux librement utiliser, modifier, redistribuer et intégrer NaviXav, y
+compris dans un projet commercial. En contrepartie, la licence impose de
+**créditer l'auteur** :
+
+- conserver la mention de copyright et une copie de la licence dans toute
+  redistribution ;
+- conserver le fichier [NOTICE](NOTICE) et son contenu d'attribution ;
+- **signaler de manière visible tout fichier que tu as modifié**, conformément
+  à la section 4(b) de la licence.
+
+La licence accorde également une concession de brevets et exclut toute
+garantie. Les données de navigation, les cartes officielles et le fond
+cartographique ne sont pas couverts par cette licence : ils restent soumis aux
+conditions de leurs fournisseurs respectifs, détaillées dans le fichier NOTICE.
 
 ## Tests
 

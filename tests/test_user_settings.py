@@ -17,6 +17,8 @@ def test_user_settings_round_trip(tmp_path):
             "max_crosswind_kt": 28,
             "min_runway_length_ft": 5000,
             "aircraft_rnp_capable": False,
+            "map_basemap": "opentopo",
+            "map_trail_color": "#ff5500",
         }
     )
 
@@ -27,6 +29,8 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.simbrief_username == "xavier"
     assert restored.approach_preference == ("ILS", "RNAV")
     assert restored.aircraft_rnp_capable is False
+    assert restored.map_basemap == "opentopo"
+    assert restored.map_trail_color == "#ff5500"
 
 
 def test_settings_request_accepts_interface_values():
@@ -34,12 +38,19 @@ def test_settings_request_accepts_interface_values():
         simbrief_pilot_id="654321",
         approach_preference=["ILS", "GLS", "RNAV"],
         min_runway_length_ft=4500,
+        map_basemap="opentopo",
+        map_trail_color="#AABBCC",
     )
 
     assert request.simbrief_pilot_id == "654321"
     assert request.min_runway_length_ft == 4500
+    assert request.map_basemap == "opentopo"
 
 
 def test_settings_request_rejects_invalid_limits():
     with pytest.raises(ValidationError):
         SettingsRequest(max_tailwind_kt=-1)
+    with pytest.raises(ValidationError):
+        SettingsRequest(map_basemap="proprietary")
+    with pytest.raises(ValidationError):
+        SettingsRequest(map_trail_color="red")

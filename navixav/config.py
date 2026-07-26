@@ -23,6 +23,9 @@ DEFAULT_APPROACH_PREFERENCE = (
     "TACAN",
     "VISUAL",
 )
+DEFAULT_MAP_BASEMAP = "osm"
+DEFAULT_MAP_TRAIL_COLOR = "#22d3ee"
+MAP_BASEMAPS = {"osm", "opentopo"}
 
 USER_SETTINGS_FILE = user_data_path("user_settings.json")
 
@@ -70,6 +73,8 @@ class Settings:
     # Qualification RNP de l'avion : conditionne l'accès aux approches dont
     # l'approche interrompue est de type RNAV (ILS Z à LFBO, par exemple).
     aircraft_rnp_capable: bool = True
+    map_basemap: str = DEFAULT_MAP_BASEMAP
+    map_trail_color: str = DEFAULT_MAP_TRAIL_COLOR
 
     @classmethod
     def load(cls, env_file: Path | str | None = None) -> "Settings":
@@ -99,6 +104,8 @@ class Settings:
                 else None
             ),
             aircraft_rnp_capable=_env_bool("AIRCRAFT_RNP_CAPABLE", True),
+            map_basemap=DEFAULT_MAP_BASEMAP,
+            map_trail_color=DEFAULT_MAP_TRAIL_COLOR,
         )
 
     def describe_simbrief_target(self) -> str:
@@ -127,6 +134,21 @@ class Settings:
             preference = self.approach_preference
 
         raw_store = str(values.get("navdata_store", "") or "").strip()
+        raw_basemap = str(
+            values.get("map_basemap", self.map_basemap) or DEFAULT_MAP_BASEMAP
+        ).strip().lower()
+        if raw_basemap not in MAP_BASEMAPS:
+            raw_basemap = DEFAULT_MAP_BASEMAP
+        raw_trail_color = str(
+            values.get("map_trail_color", self.map_trail_color)
+            or DEFAULT_MAP_TRAIL_COLOR
+        ).strip().lower()
+        if (
+            len(raw_trail_color) != 7
+            or not raw_trail_color.startswith("#")
+            or any(character not in "0123456789abcdef" for character in raw_trail_color[1:])
+        ):
+            raw_trail_color = DEFAULT_MAP_TRAIL_COLOR
         return Settings(
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
             simbrief_username=str(values.get("simbrief_username", "") or "").strip(),
@@ -144,6 +166,8 @@ class Settings:
             aircraft_rnp_capable=bool(
                 values.get("aircraft_rnp_capable", self.aircraft_rnp_capable)
             ),
+            map_basemap=raw_basemap,
+            map_trail_color=raw_trail_color,
         )
 
     def user_values(self) -> dict[str, object]:
@@ -157,6 +181,8 @@ class Settings:
             "max_crosswind_kt": self.max_crosswind_kt,
             "min_runway_length_ft": self.min_runway_length_ft,
             "aircraft_rnp_capable": self.aircraft_rnp_capable,
+            "map_basemap": self.map_basemap,
+            "map_trail_color": self.map_trail_color,
         }
 
 

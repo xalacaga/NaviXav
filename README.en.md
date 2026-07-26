@@ -110,10 +110,9 @@ The map includes:
 - a trail of the movement;
 - an automatic follow mode;
 - zoom, panning and fitting to the airport or the route;
-- optional ground detail for taxiways and parking stands.
-
-Ground detail is hidden by default to keep the map readable. The **Ground
-detail** button displays it when needed.
+- the complete track actually flown from departure to arrival;
+- a customisable flight-track colour;
+- a choice between OpenStreetMap Standard and OpenTopoMap.
 
 ### Official national AIS charts
 
@@ -315,8 +314,9 @@ generating or modifying a flight in SimBrief.
 
 ## Using the map
 
-- **Map background**: shows or hides OpenStreetMap.
-- **Ground detail**: shows taxiways and stands.
+- **Map background**: shows or hides the open-source map selected in Settings.
+- **Settings**: selects OpenStreetMap Standard or OpenTopoMap and the colour of
+  the complete flight track.
 - **Official overlay**: appears only for the georeferenced chart of the
   aerodrome currently displayed, and adjusts its opacity.
 - **Full route**: frames the entire flight route.
@@ -564,6 +564,27 @@ The local service never listens on the external network. The SimBrief Pilot ID,
 the preferences, the flight track and the cached PDFs stay on the machine. Only
 the requests needed for SimBrief, OpenStreetMap, the weather and the official
 AIS publications leave the computer.
+
+## Licence
+
+NaviXav is free software distributed under the
+[Apache 2.0](LICENSE) licence.
+
+Copyright 2026 Xavier BEGUE (xalacaga)
+
+You may freely use, modify, redistribute and integrate NaviXav, including in a
+commercial project. In return, the licence requires that you **credit the
+author**:
+
+- retain the copyright notice and a copy of the licence in any redistribution;
+- retain the [NOTICE](NOTICE) file and its attribution content;
+- **state prominently which files you have modified**, as required by
+  section 4(b) of the licence.
+
+The licence also grants a patent licence and excludes any warranty. Navigation
+data, official charts and the map background are not covered by this licence:
+they remain subject to their respective providers' terms, detailed in the
+NOTICE file.
 
 ## Tests
 

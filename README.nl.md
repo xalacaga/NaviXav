@@ -585,6 +585,28 @@ voorkeuren, het vluchtspoor en de gecachete PDF's blijven op de machine. Alleen
 de verzoeken die nodig zijn voor SimBrief, OpenStreetMap, het weer en de
 officiële AIS-publicaties verlaten de computer.
 
+## Licentie
+
+NaviXav is vrije software, verspreid onder de licentie
+[Apache 2.0](LICENSE).
+
+Copyright 2026 Xavier BEGUE (xalacaga)
+
+Je mag NaviXav vrij gebruiken, wijzigen, verspreiden en integreren, ook in een
+commercieel project. In ruil daarvoor verplicht de licentie je om de **auteur
+te vermelden**:
+
+- de copyrightvermelding en een kopie van de licentie behouden bij elke
+  verspreiding;
+- het bestand [NOTICE](NOTICE) en de attributie-inhoud ervan behouden;
+- **duidelijk aangeven welke bestanden je hebt gewijzigd**, zoals vereist door
+  sectie 4(b) van de licentie.
+
+De licentie verleent ook een octrooilicentie en sluit elke garantie uit.
+Navigatiegegevens, officiële kaarten en de kaartachtergrond vallen niet onder
+deze licentie: daarvoor gelden de voorwaarden van de respectieve leveranciers,
+beschreven in het bestand NOTICE.
+
 ## Tests
 
 Het reproduceerbare profiel dat wordt gebruikt om de distributie te bouwen:

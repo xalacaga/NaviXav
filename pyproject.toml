@@ -1,8 +1,19 @@
 [project]
 name = "navixav"
 version = "0.3.2"
-description = "ComplÃ©teur de plan de vol IFR : SimBrief + navdata locale -> SID/STAR/approche/transitions"
+description = "Compléteur de plan de vol IFR : SimBrief + navdata locale -> SID/STAR/approche/transitions"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES"]
+authors = [{ name = "Xavier BEGUE", email = "xavier.begue@gmail.com" }]
+readme = "README.md"
+keywords = ["msfs", "simbrief", "ifr", "flight-simulator", "simconnect"]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+
 dependencies = [
     "requests>=2.31",
     "python-dotenv>=1.0",
@@ -11,15 +22,17 @@ dependencies = [
     "pydantic>=2.0",
     "uvicorn>=0.29",
     "pypdf>=5.0,<7",
-    # FenÃªtre Windows native embarquant l'interface dans Edge WebView2.
+    # Fenêtre Windows native embarquant l'interface dans Edge WebView2.
     "pywebview>=6.0,<7 ; sys_platform == 'win32'",
-    # Lecture de la position dans MSFS, et fournisseur de SimConnect.dll pour
-    # les machines dÃ©pourvues du SDK Microsoft Flight Simulator.
-    "SimConnect>=0.4.26 ; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/xalacaga/NaviXav"
+Source = "https://github.com/xalacaga/NaviXav"
+Issues = "https://github.com/xalacaga/NaviXav/issues"
 
 [project.scripts]
 navixav = "navixav.cli:main"
@@ -36,10 +49,10 @@ include = ["navixav*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Le dossier temporaire par dÃ©faut (%LOCALAPPDATA%\Temp\pytest-of-*) est
-# devenu illisible sur cette machine : pytest ne peut plus y crÃ©er les
-# rÃ©pertoires de `tmp_path`. On l'isole donc dans le projet.
+# Le dossier temporaire par défaut (%LOCALAPPDATA%\Temp\pytest-of-*) est
+# devenu illisible sur cette machine : pytest ne peut plus y créer les
+# répertoires de `tmp_path`. On l'isole donc dans le projet.
 addopts = "--basetemp=.pytest_tmp"
 markers = [
-    "live_msfs: tests d'intÃ©gration qui nÃ©cessitent MSFS dÃ©marrÃ©",
+    "live_msfs: tests d'intégration qui nécessitent MSFS démarré",
 ]

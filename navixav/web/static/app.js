@@ -223,6 +223,8 @@ async function openSettings() {
     $("settings-crosswind").value = values.max_crosswind_kt;
     $("settings-runway-length").value = values.min_runway_length_ft;
     $("settings-rnp").checked = Boolean(values.aircraft_rnp_capable);
+    $("settings-basemap").value = values.map_basemap || "osm";
+    $("settings-trail-color").value = values.map_trail_color || "#22d3ee";
     $("settings-language").value = window.I18N.getLanguage();
     $("settings-dialog").showModal();
   } catch (error) {
@@ -247,6 +249,8 @@ async function saveSettings(event) {
     max_crosswind_kt: Number($("settings-crosswind").value),
     min_runway_length_ft: Number($("settings-runway-length").value),
     aircraft_rnp_capable: $("settings-rnp").checked,
+    map_basemap: $("settings-basemap").value,
+    map_trail_color: $("settings-trail-color").value,
   };
   try {
     const response = await fetch("/api/settings", {
@@ -256,6 +260,7 @@ async function saveSettings(event) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
+    applyMapPreferences(result);
     message.textContent = t("saved");
     const status = await loadStatus();
     if (status.simbrief_configured) {
@@ -821,8 +826,39 @@ function saveFlightLog() {
   try {
     localStorage.setItem(flightLogStorageKey(currentPlan), JSON.stringify(flightLog));
   } catch (_error) {
-    flightLog = flightLog.slice(-Math.floor(FLIGHT_LOG_MAX_POINTS / 2));
+    // Conserver tout le trajet en espaçant les anciens relevés plutôt qu'en
+    // supprimant le départ du vol.
+    flightLog = flightLog.filter(
+      (_point, index) => index % 2 === 0 || index === flightLog.length - 1
+    );
+    try {
+      localStorage.setItem(flightLogStorageKey(currentPlan), JSON.stringify(flightLog));
+    } catch (_secondError) {
+      // Le suivi en direct continue même si le stockage local est indisponible.
+    }
   }
+}
+
+function compactFlightLog() {
+  if (flightLog.length <= FLIGHT_LOG_MAX_POINTS) return;
+  flightLog = flightLog.filter(
+    (_point, index) => index % 2 === 0 || index === flightLog.length - 1
+  );
+}
+
+function syncMapTrail() {
+  if (!currentChart) return;
+  MAP.setTrail(
+    flightLog
+      .map((point) => {
+        const latitude = Number(point.latitude);
+        const longitude = Number(point.longitude);
+        return Number.isFinite(latitude) && Number.isFinite(longitude)
+          ? projectToChart(latitude, longitude)
+          : null;
+      })
+      .filter(Boolean)
+  );
 }
 
 function recordFlightPoint(aircraft) {
@@ -834,8 +870,9 @@ function recordFlightPoint(aircraft) {
     ...aircraft,
     recorded_at: new Date(now).toISOString(),
   });
-  if (flightLog.length > FLIGHT_LOG_MAX_POINTS) flightLog.shift();
+  compactFlightLog();
   saveFlightLog();
+  syncMapTrail();
   updateRecorderStatus();
 }
 
@@ -1050,6 +1087,7 @@ function renderFlightPanel(plan) {
     stopFlightReplay();
     flightLog = [];
     saveFlightLog();
+    syncMapTrail();
     updateRecorderStatus();
   });
   actions.append(toggle, replay, stop, clear);
@@ -2134,6 +2172,7 @@ async function loadChart(icao, runway, mapRole) {
       }),
     }));
     MAP.setRouteSegments(routeSegments);
+    syncMapTrail();
     MAP.resize();
     updateHud(null);
 
@@ -2156,6 +2195,19 @@ function projectToChart(latitude, longitude) {
     Math.cos((origin.lat * Math.PI) / 180);
   const y = ((latitude - origin.lat) * Math.PI / 180) * EARTH_RADIUS_M;
   return { x, y };
+}
+
+function applyMapPreferences(values) {
+  MAP.configure({
+    basemap: values?.map_basemap || "osm",
+    trailColor: values?.map_trail_color || "#22d3ee",
+  });
+}
+
+async function loadMapPreferences() {
+  const response = await fetch("/api/settings");
+  if (!response.ok) return;
+  applyMapPreferences(await response.json());
 }
 
 function setLiveState(online, text) {
@@ -2283,7 +2335,6 @@ $("map-zoom-in").addEventListener("click", () => MAP.zoomIn());
 $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
-$("map-ground").addEventListener("click", () => MAP.toggleGroundDetails());
 $("map-sia").addEventListener("click", () => toggleSiaMapOverlay());
 $("sia-overlay-close").addEventListener("click", () => toggleSiaMapOverlay(false));
 $("sia-opacity").addEventListener("input", (event) => {
@@ -2320,6 +2371,7 @@ async function initialiseApplication() {
   try {
     $("demo-toggle").checked = false;
     const status = await loadStatus();
+    await loadMapPreferences();
     checkForUpdates();
     if (status.simbrief_configured) await buildPlan();
   } catch (error) {

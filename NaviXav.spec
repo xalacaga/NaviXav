@@ -5,7 +5,6 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 project_root = Path(SPECPATH)
-simconnect_datas, simconnect_binaries, simconnect_hidden = collect_all("SimConnect")
 webview_datas, webview_binaries, webview_hidden = collect_all("webview")
 sdk_simconnect = Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll")
 if not sdk_simconnect.is_file():
@@ -14,16 +13,10 @@ if not sdk_simconnect.is_file():
         "construire la distribution."
     )
 
-# Le paquet Python fournit une DLL ancienne suffisante pour quelques SimVars,
-# mais dépourvue de l'API Facilities nécessaire à NaviXav. La distribution
-# embarque donc la DLL du SDK MSFS installée sur la machine de construction.
-simconnect_binaries = [
-    entry
-    for entry in simconnect_binaries
-    if Path(entry[0]).name.lower() != "simconnect.dll"
-]
-simconnect_binaries.append((str(sdk_simconnect), "SimConnect"))
-simconnect_binaries += webview_binaries
+# NaviXav utilise son propre client ctypes et la DLL officielle du SDK MSFS.
+# Le paquet Python SimConnect n'est volontairement pas distribué : il est AGPL.
+app_binaries = [(str(sdk_simconnect), "SimConnect")]
+app_binaries += webview_binaries
 
 datas = [
     (str(project_root / "navixav" / "web" / "static"), "navixav/web/static"),
@@ -31,7 +24,6 @@ datas = [
     (str(project_root / "tests" / "data" / "ofp_lfst_lfbo.json"), "tests/data"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),
 ]
-datas += simconnect_datas
 datas += webview_datas
 
 hiddenimports = [
@@ -41,13 +33,12 @@ hiddenimports = [
     "uvicorn.protocols.websockets.auto",
     "uvicorn.lifespan.on",
 ]
-hiddenimports += simconnect_hidden
 hiddenimports += webview_hidden
 
 a = Analysis(
     ["navixav/desktop.py"],
     pathex=[str(project_root)],
-    binaries=simconnect_binaries,
+    binaries=app_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

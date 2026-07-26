@@ -1,0 +1,56 @@
+NaviXav third-party software notices
+====================================
+
+This file identifies the principal software components included in the
+NaviXav Windows distribution. Exact copyright notices, license conditions and
+disclaimers are reproduced from the installed packages under
+"licenses/third-party". Those original texts control if this summary differs.
+
+Python runtime
+  Python Software Foundation License (PSF-2.0)
+  https://www.python.org/
+
+Python application dependencies
+  annotated-doc                 MIT
+  annotated-types               MIT
+  anyio                         MIT
+  bottle                        MIT
+  certifi                       Mozilla Public License 2.0
+  cffi                          MIT No Attribution (MIT-0)
+  charset-normalizer            MIT
+  click                         BSD 3-Clause
+  clr-loader                    MIT
+  colorama                      BSD 3-Clause
+  fastapi                       MIT
+  h11                           MIT
+  idna                          BSD 3-Clause
+  markdown-it-py                MIT
+  mdurl                         MIT
+  proxy-tools                   BSD 2-Clause
+  pycparser                     BSD 3-Clause
+  pydantic                      MIT
+  pydantic-core                 MIT
+  Pygments                      BSD 2-Clause
+  pypdf                         BSD 3-Clause
+  python-dotenv                 BSD 3-Clause
+  pythonnet                     MIT
+  pywebview                     BSD 3-Clause
+  requests                      Apache License 2.0
+  rich                          MIT
+  starlette                     BSD 3-Clause
+  typing-extensions             PSF-2.0
+  typing-inspection             MIT
+  urllib3                       MIT
+  uvicorn                       BSD 3-Clause
+
+Build component
+  PyInstaller                   GPL-2.0-or-later with the PyInstaller
+                                bootloader exception
+  https://pyinstaller.org/
+
+Microsoft components
+  Microsoft SimConnect.dll      Microsoft Flight Simulator SDK terms
+  Microsoft Edge WebView2       Microsoft software license terms
+
+The Python package named "SimConnect" is not included. NaviXav uses its own
+ctypes client with the official Microsoft SDK DLL.

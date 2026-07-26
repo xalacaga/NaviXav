@@ -116,10 +116,9 @@ Die Karte umfasst:
 - eine Spur der Bewegung;
 - einen automatischen Folgemodus;
 - Zoom, Verschieben und Einpassen auf Flughafen oder Route;
-- optionale Bodendetails für Rollwege und Abstellpositionen.
-
-Die Bodendetails sind standardmäßig ausgeblendet, damit die Karte lesbar
-bleibt. Die Schaltfläche **Bodendetails** blendet sie bei Bedarf ein.
+- die vollständige tatsächlich geflogene Spur von Abflug bis Ankunft;
+- eine frei wählbare Farbe der Flugspur;
+- die Wahl zwischen OpenStreetMap Standard und OpenTopoMap.
 
 ### Amtliche nationale AIS-Karten
 
@@ -328,8 +327,10 @@ nachdem ein Flug in SimBrief erzeugt oder geändert wurde.
 
 ## Verwendung der Karte
 
-- **Kartenhintergrund**: blendet OpenStreetMap ein oder aus.
-- **Bodendetails**: zeigt Rollwege und Abstellpositionen.
+- **Kartenhintergrund**: blendet die in den Einstellungen gewählte freie Karte
+  ein oder aus.
+- **Einstellungen**: wählt OpenStreetMap Standard oder OpenTopoMap sowie die
+  Farbe der vollständigen Flugspur.
 - **Amtliche Überlagerung**: erscheint nur für das georeferenzierte Blatt des
   aktuell angezeigten Flugplatzes und regelt dessen Deckkraft.
 - **Gesamte Route**: rahmt die vollständige Flugroute ein.
@@ -594,6 +595,28 @@ SimBrief-Pilot-ID, die Einstellungen, die Flugspur und die zwischengespeicherten
 PDFs verbleiben auf dem Rechner. Nur die für SimBrief, OpenStreetMap, das
 Wetter und die amtlichen AIS-Veröffentlichungen erforderlichen Anfragen
 verlassen den Computer.
+
+## Lizenz
+
+NaviXav ist freie Software und wird unter der Lizenz
+[Apache 2.0](LICENSE) verbreitet.
+
+Copyright 2026 Xavier BEGUE (xalacaga)
+
+Du darfst NaviXav frei verwenden, ändern, weitergeben und einbinden, auch in
+einem kommerziellen Projekt. Im Gegenzug verlangt die Lizenz, den **Autor zu
+nennen**:
+
+- den Copyright-Hinweis und eine Kopie der Lizenz bei jeder Weitergabe
+  beibehalten;
+- die Datei [NOTICE](NOTICE) und ihren Attributionsinhalt beibehalten;
+- **jede von dir geänderte Datei deutlich kennzeichnen**, gemäß Abschnitt 4(b)
+  der Lizenz.
+
+Die Lizenz gewährt außerdem eine Patentlizenz und schließt jede Gewährleistung
+aus. Navigationsdaten, amtliche Karten und der Kartenhintergrund fallen nicht
+unter diese Lizenz: Für sie gelten weiterhin die Bedingungen ihrer jeweiligen
+Anbieter, die in der Datei NOTICE aufgeführt sind.
 
 ## Tests
 
