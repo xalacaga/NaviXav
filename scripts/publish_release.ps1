@@ -140,8 +140,10 @@ if ($Resume) {
 $Tag = "v$Version"
 $HeadCommit = & git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw "Impossible de lire le commit courant." }
-$ExistingTagCommit = & git rev-list -n 1 $Tag 2>$null
+$null = & git show-ref --verify --quiet "refs/tags/$Tag"
 if ($LASTEXITCODE -eq 0) {
+    $ExistingTagCommit = & git rev-list -n 1 $Tag
+    if ($LASTEXITCODE -ne 0) { throw "Impossible de lire le tag $Tag." }
     if ($ExistingTagCommit -ne $HeadCommit) {
         throw "Le tag $Tag existe déjà sur un autre commit."
     }
