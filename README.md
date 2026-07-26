@@ -336,6 +336,16 @@ terrain d’arrivée.
 
 ## Fenêtre et affichage responsive
 
+### Téléphone et tablette sur le réseau local
+
+Active **Accès téléphone et tablette** dans **Paramètres**, enregistre puis
+redémarre NaviXav. L’adresse protégée affichée sur le PC s’ouvre depuis un
+téléphone ou une tablette connecté au même Wi-Fi. L’interface mobile donne
+accès au suivi temps réel, à la carte, aux contraintes, au MCDU, aux données
+avion et aux cartes officielles. Les réglages, l’arrêt et les mises à jour
+restent réservés au PC. Si Windows le demande, autorise NaviXav uniquement sur
+les réseaux privés.
+
 NaviXav adapte automatiquement son interface au redimensionnement :
 
 - au-dessus de 1100 px, les cartes Départ, Route et Arrivée peuvent être

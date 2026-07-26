@@ -30,6 +30,7 @@ let flightRecording = true;
 let lastFlightLogAt = 0;
 let replayTimer = null;
 let replayActive = false;
+let latestStatus = null;
 const siaRequests = new Map();
 const officialAirportRequests = new Map();
 const siaOverlayCandidates = new Map();
@@ -80,6 +81,7 @@ function needsCheck(choice) {
 
 async function loadStatus() {
   const status = await fetch("/api/status").then((r) => r.json());
+  latestStatus = status;
 
   $("footer-version").textContent = `NaviXav ${status.version}`;
   $("footer-source").textContent = `SimBrief ${status.simbrief_target} · METAR ${status.metar_source}`;
@@ -88,6 +90,12 @@ async function loadStatus() {
     $("empty-hint").textContent = t("no_simbrief");
   }
   if (status.demo_available) $("demo-toggle").disabled = false;
+  document.body.classList.toggle("remote-client", Boolean(status.remote_client));
+  show($("mobile-mode"), Boolean(status.remote_client));
+  if ($("settings-lan-url")) {
+    $("settings-lan-url").value = status.lan_url || "";
+    show($("settings-lan-access"), Boolean(status.lan_url));
+  }
   return status;
 }
 
@@ -225,6 +233,9 @@ async function openSettings() {
     $("settings-rnp").checked = Boolean(values.aircraft_rnp_capable);
     $("settings-basemap").value = values.map_basemap || "osm";
     $("settings-trail-color").value = values.map_trail_color || "#22d3ee";
+    $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
+    show($("settings-lan-access"), Boolean(values.lan_enabled));
+    $("settings-lan-url").value = latestStatus?.lan_url || "";
     $("settings-language").value = window.I18N.getLanguage();
     $("settings-dialog").showModal();
   } catch (error) {
@@ -251,6 +262,7 @@ async function saveSettings(event) {
     aircraft_rnp_capable: $("settings-rnp").checked,
     map_basemap: $("settings-basemap").value,
     map_trail_color: $("settings-trail-color").value,
+    lan_enabled: $("settings-lan-enabled").checked,
   };
   try {
     const response = await fetch("/api/settings", {
@@ -261,7 +273,9 @@ async function saveSettings(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
     applyMapPreferences(result);
-    message.textContent = t("saved");
+    message.textContent = result.lan_restart_required
+      ? t("lan_restart_required")
+      : t("saved");
     const status = await loadStatus();
     if (status.simbrief_configured) {
       $("demo-toggle").checked = false;
@@ -2204,7 +2218,11 @@ function applyMapPreferences(values) {
   });
 }
 
-async function loadMapPreferences() {
+async function loadMapPreferences(status = latestStatus) {
+  if (status?.remote_client) {
+    applyMapPreferences(status);
+    return;
+  }
   const response = await fetch("/api/settings");
   if (!response.ok) return;
   applyMapPreferences(await response.json());
@@ -2349,11 +2367,25 @@ $("settings-form").addEventListener("submit", saveSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
 });
+$("settings-lan-enabled").addEventListener("change", (event) => {
+  show($("settings-lan-access"), event.target.checked);
+});
+$("settings-lan-copy").addEventListener("click", async () => {
+  const value = $("settings-lan-url").value;
+  if (!value) return;
+  await navigator.clipboard.writeText(value);
+  $("settings-message").textContent = t("lan_url_copied");
+});
 $("shutdown").addEventListener("click", shutdownApplication);
 $("sim-status").addEventListener("click", pollSimulatorStatus);
 $("terminal-toggle").addEventListener("click", toggleTerminal);
 
-setTerminalCollapsed(localStorage.getItem(TERMINAL_COLLAPSED_KEY) === "true");
+const storedTerminalState = localStorage.getItem(TERMINAL_COLLAPSED_KEY);
+setTerminalCollapsed(
+  storedTerminalState === null
+    ? window.matchMedia("(max-width: 760px)").matches
+    : storedTerminalState === "true"
+);
 window.I18N.apply();
 
 window.addEventListener("navixav:languagechange", () => {
@@ -2371,8 +2403,8 @@ async function initialiseApplication() {
   try {
     $("demo-toggle").checked = false;
     const status = await loadStatus();
-    await loadMapPreferences();
-    checkForUpdates();
+    await loadMapPreferences(status);
+    if (!status.remote_client) checkForUpdates();
     if (status.simbrief_configured) await buildPlan();
   } catch (error) {
     showBanner("error", "Initialisation impossible", [String(error)]);

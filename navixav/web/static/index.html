@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>NaviXav</title>
   <link rel="stylesheet" href="/static/app.css?v=__NAVIXAV_VERSION__" />
   <link rel="icon" type="image/svg+xml" href="/static/navixav-icon.svg?v=__NAVIXAV_VERSION__" />
@@ -24,6 +27,7 @@
     <span class="nav-source" title="Navigation et procédures récupérées directement par SimConnect">
       Source · MSFS
     </span>
+    <span id="mobile-mode" class="mobile-mode hidden">Mode mobile</span>
     <label class="switch" title="Utiliser le vol de démonstration LFST → LFBO">
       <input type="checkbox" id="demo-toggle" />
       <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -215,6 +219,19 @@
         <span class="switch-track"><span class="switch-thumb"></span></span>
         <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
       </label>
+      <label class="switch settings-switch lan-switch">
+        <input type="checkbox" id="settings-lan-enabled" />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label" id="settings-lan-label">Accès téléphone et tablette</span>
+      </label>
+      <div id="settings-lan-access" class="lan-access hidden">
+        <span id="settings-lan-title">Adresse sur le réseau local</span>
+        <div class="lan-url-row">
+          <input id="settings-lan-url" readonly />
+          <button id="settings-lan-copy" class="icon-btn" type="button">Copier</button>
+        </div>
+        <small id="settings-lan-help">Même Wi-Fi requis. Redémarre NaviXav puis autorise le réseau privé si Windows le demande.</small>
+      </div>
     </div>
     <p id="settings-message" class="settings-message"></p>
     <div class="settings-actions">

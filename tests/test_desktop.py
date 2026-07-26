@@ -179,6 +179,29 @@ def test_silent_update_restarts_navixav():
     assert "skipifsilent" not in run_entry
 
 
+def test_mobile_lan_interface_is_protected_and_responsive():
+    project = Path(desktop.__file__).parent.parent
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    server = (Path(desktop.__file__).parent / "web" / "app.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="settings-lan-enabled"' in html
+    assert 'id="settings-lan-url"' in html
+    assert 'name="mobile-web-app-capable"' in html
+    assert "env(safe-area-inset-bottom)" in css
+    assert "body.remote-client" in css
+    assert 'document.body.classList.toggle("remote-client"' in javascript
+    assert '"navixav_lan"' in server
+    assert "secrets.compare_digest" in server
+    assert '"0.0.0.0" if settings.lan_enabled' in (
+        project / "navixav" / "desktop.py"
+    ).read_text(encoding="utf-8")
+
+
 def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     javascript = (
         Path(desktop.__file__).parent / "web" / "static" / "app.js"

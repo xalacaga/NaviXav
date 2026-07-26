@@ -95,6 +95,8 @@ body {
     var(--bg);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
@@ -583,6 +585,15 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   color: var(--text-dim); background: var(--surface-raised);
   border: 1px solid var(--border); font-size: 0.74rem;
 }
+.mobile-mode {
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
 
 .settings-dialog {
   width: min(720px, calc(100vw - 28px));
@@ -611,6 +622,24 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   background: var(--surface-raised); color: var(--text); font: inherit;
 }
 .settings-switch { align-self: end; min-height: 38px; }
+.lan-access {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.lan-access > span {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.lan-url-row { display: flex; gap: 8px; }
+.lan-url-row input { min-width: 0; font-family: var(--mono); }
+.lan-access small { color: var(--text-dim); line-height: 1.45; }
 .settings-message { min-height: 20px; color: var(--high); font-size: 0.8rem; }
 .settings-message.error { color: var(--low); }
 .settings-actions { justify-content: flex-end; margin-top: 10px; }
@@ -994,7 +1023,11 @@ pre {
 }
 
 @media (max-width: 760px) {
-  .topbar { position: relative; padding: 10px 12px; }
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .topbar {
+    position: sticky;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  }
   .brand { gap: 10px; }
   .brand-mark { width: 28px; height: 28px; }
   .brand h1 { font-size: 1rem; }
@@ -1010,12 +1043,28 @@ pre {
     align-items: flex-start;
   }
   .tabs {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: 0;
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: 5px;
-    scrollbar-width: thin;
+    gap: 4px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    backdrop-filter: blur(18px) saturate(150%);
+    box-shadow: 0 -12px 32px #0005;
+    scrollbar-width: none;
   }
-  .tabs button { flex: 0 0 auto; padding: 8px 13px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 9px 14px;
+    border-radius: 12px;
+  }
   .row {
     grid-template-columns: minmax(72px, 0.7fr) minmax(0, 1fr) auto;
     gap: 8px;
@@ -1047,6 +1096,28 @@ pre {
   .aircraft-identity { align-items: flex-start; padding: 14px; }
   .aircraft-mark { width: 58px; height: 58px; border-radius: 14px; }
   table { display: block; overflow-x: auto; white-space: nowrap; }
+  button, .icon-btn, .btn-primary, select, input { min-height: 44px; }
+  .settings-dialog {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .settings-dialog form {
+    min-height: 100%;
+    padding: calc(18px + env(safe-area-inset-top)) 16px
+      calc(18px + env(safe-area-inset-bottom));
+  }
+  .settings-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 12px 0;
+    background: var(--surface-solid);
+  }
+  .lan-url-row { flex-direction: column; }
 }
 
 @media (max-width: 520px) {
@@ -1064,6 +1135,35 @@ pre {
     left: 6px;
     right: 6px;
     flex-wrap: wrap;
+  }
+}
+
+body.remote-client #settings-open,
+body.remote-client #update-install,
+body.remote-client #shutdown,
+body.remote-client #refresh,
+body.remote-client .toolbar > .switch {
+  display: none;
+}
+
+body.remote-client .toolbar {
+  width: auto;
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  body.remote-client .topbar {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  body.remote-client .toolbar {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+  body.remote-client main { padding-top: 10px; }
+  body.remote-client .map-stage {
+    height: min(68dvh, 720px);
+    border-radius: 14px;
   }
 }
 

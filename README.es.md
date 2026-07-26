@@ -339,6 +339,15 @@ de llegada.
 
 ## Ventana y visualización adaptable
 
+### Acceso desde teléfono y tableta en la red local
+
+Activa **Acceso para teléfono y tableta** en **Ajustes**, guarda y reinicia
+NaviXav. Abre la dirección protegida mostrada en el PC desde un dispositivo
+conectado al mismo Wi-Fi. La interfaz móvil ofrece seguimiento en tiempo real,
+mapa, restricciones, datos del MCDU, del avión y cartas oficiales. Los ajustes,
+el cierre y las actualizaciones quedan reservados al PC. Si Windows lo solicita,
+autoriza NaviXav solo en redes privadas.
+
 NaviXav adapta automáticamente su interfaz al redimensionar:
 
 - por encima de 1100 px, las tarjetas Salida, Ruta y Llegada pueden mostrarse

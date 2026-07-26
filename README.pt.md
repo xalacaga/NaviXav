@@ -340,6 +340,15 @@ de chegada.
 
 ## Janela e apresentação adaptável
 
+### Acesso por telefone e tablet na rede local
+
+Ative **Acesso por telefone e tablet** em **Configuração**, guarde e reinicie o
+NaviXav. Abra o endereço protegido apresentado no PC num dispositivo ligado ao
+mesmo Wi-Fi. A interface móvel disponibiliza seguimento em tempo real, mapa,
+restrições, dados do MCDU, da aeronave e cartas oficiais. A configuração, o
+encerramento e as atualizações permanecem reservados ao PC. Se o Windows
+perguntar, autorize o NaviXav apenas em redes privadas.
+
 O NaviXav adapta automaticamente a sua interface ao redimensionamento:
 
 - acima de 1100 px, os cartões Partida, Rota e Chegada podem ser apresentados

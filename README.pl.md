@@ -339,6 +339,15 @@ lotniskiem przylotu.
 
 ## Okno i widok responsywny
 
+### Dostęp z telefonu i tabletu w sieci lokalnej
+
+Włącz **Dostęp z telefonu i tabletu** w **Ustawieniach**, zapisz i uruchom
+NaviXav ponownie. Otwórz chroniony adres wyświetlany na komputerze na urządzeniu
+podłączonym do tej samej sieci Wi-Fi. Interfejs mobilny udostępnia śledzenie na
+żywo, mapę, ograniczenia, dane MCDU, samolotu i oficjalne mapy. Ustawienia,
+zamykanie i aktualizacje pozostają dostępne tylko na komputerze. Jeśli Windows
+zapyta, zezwól NaviXav wyłącznie w sieciach prywatnych.
+
 NaviXav automatycznie dostosowuje interfejs przy zmianie rozmiaru:
 
 - powyżej 1100 px karty Odlot, Trasa i Przylot mogą być wyświetlane obok

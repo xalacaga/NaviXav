@@ -18,6 +18,7 @@ import urllib.request
 from pathlib import Path
 
 from navixav import __version__
+from navixav.config import Settings, load_user_settings
 from navixav.logging_setup import configure_logging
 from navixav.paths import resource_path, user_data_path
 from navixav.web.app import create_server, serve
@@ -103,22 +104,22 @@ def _running_navixav(port: int) -> bool:
         return False
 
 
-def _port_available(port: int) -> bool:
+def _port_available(port: int, host: str = HOST) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         try:
-            probe.bind((HOST, port))
+            probe.bind((host, port))
         except OSError:
             return False
     return True
 
 
-def _select_port(preferred: int) -> tuple[int, bool]:
+def _select_port(preferred: int, bind_host: str = HOST) -> tuple[int, bool]:
     """Retourne le port et indique si une instance NaviXav l'utilise déjà."""
     if _running_navixav(preferred):
         return preferred, True
     candidates = [preferred, *range(DEFAULT_PORT, LAST_PORT + 1)]
     for port in dict.fromkeys(candidates):
-        if _port_available(port):
+        if _port_available(port, bind_host):
             return port, False
     raise RuntimeError(
         f"Aucun port local libre entre {DEFAULT_PORT} et {LAST_PORT}. "
@@ -268,7 +269,9 @@ def main(argv: list[str] | None = None) -> int:
     log_file = _configure_logging()
     _configure_windows_app_identity()
     try:
-        port, already_running = _select_port(args.port)
+        settings = load_user_settings(Settings.load())
+        bind_host = "0.0.0.0" if settings.lan_enabled else HOST
+        port, already_running = _select_port(args.port, bind_host)
         url = f"http://{HOST}:{port}"
         if already_running:
             if not args.no_open:
@@ -277,9 +280,9 @@ def main(argv: list[str] | None = None) -> int:
 
         logging.info("Démarrage de NaviXav %s sur %s", __version__, url)
         if args.no_open:
-            serve(host=HOST, port=port)
+            serve(host=bind_host, port=port, settings=settings)
         else:
-            server = create_server(host=HOST, port=port)
+            server = create_server(host=bind_host, port=port, settings=settings)
             _run_desktop_window(url, server)
         logging.info("Arrêt normal, port %s libéré", port)
         if not args.no_open and sys.platform == "win32":

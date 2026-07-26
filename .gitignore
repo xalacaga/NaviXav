@@ -32,6 +32,7 @@ release/
 installer/assets/MicrosoftEdgeWebView2Setup.exe
 .pytest_cache/
 .pytest_tmp/
+.pytest-*/
 .test-run-*/
 
 # Données d'exécution locales

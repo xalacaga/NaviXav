@@ -336,6 +336,15 @@ partenza a quello di arrivo.
 
 ## Finestra e visualizzazione adattiva
 
+### Accesso da telefono e tablet sulla rete locale
+
+Attivare **Accesso telefono e tablet** nelle **Impostazioni**, salvare e
+riavviare NaviXav. Aprire l’indirizzo protetto mostrato sul PC da un dispositivo
+connesso allo stesso Wi-Fi. L’interfaccia mobile offre tracciamento in tempo
+reale, mappa, vincoli, dati MCDU, dati dell’aereo e carte ufficiali.
+Impostazioni, arresto e aggiornamenti restano riservati al PC. Se Windows lo
+richiede, autorizzare NaviXav solo sulle reti private.
+
 NaviXav adatta automaticamente la sua interfaccia al ridimensionamento:
 
 - oltre 1100 px, le schede Partenza, Rotta e Arrivo possono essere affiancate;

@@ -345,6 +345,15 @@ Zielflugplatz.
 
 ## Fenster und responsive Darstellung
 
+### Zugriff über Telefon und Tablet im lokalen Netzwerk
+
+**Zugriff für Telefon und Tablet** in den **Einstellungen** aktivieren,
+speichern und NaviXav neu starten. Die auf dem PC angezeigte geschützte Adresse
+wird auf einem Gerät im selben WLAN geöffnet. Die mobile Oberfläche bietet
+Live-Verfolgung, Karte, Einschränkungen, MCDU-, Flugzeug- und amtliche
+Kartendaten. Einstellungen, Beenden und Updates bleiben dem PC vorbehalten.
+Wenn Windows fragt, NaviXav nur für private Netzwerke zulassen.
+
 NaviXav passt seine Oberfläche beim Skalieren automatisch an:
 
 - über 1100 px können die Karten Abflug, Route und Ankunft nebeneinander

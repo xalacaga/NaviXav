@@ -19,6 +19,7 @@ def test_user_settings_round_trip(tmp_path):
             "aircraft_rnp_capable": False,
             "map_basemap": "opentopo",
             "map_trail_color": "#ff5500",
+            "lan_enabled": True,
         }
     )
 
@@ -31,6 +32,8 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.aircraft_rnp_capable is False
     assert restored.map_basemap == "opentopo"
     assert restored.map_trail_color == "#ff5500"
+    assert restored.lan_enabled is True
+    assert len(restored.lan_access_token) >= 24
 
 
 def test_settings_request_accepts_interface_values():
@@ -40,11 +43,13 @@ def test_settings_request_accepts_interface_values():
         min_runway_length_ft=4500,
         map_basemap="opentopo",
         map_trail_color="#AABBCC",
+        lan_enabled=True,
     )
 
     assert request.simbrief_pilot_id == "654321"
     assert request.min_runway_length_ft == 4500
     assert request.map_basemap == "opentopo"
+    assert request.lan_enabled is True
 
 
 def test_settings_request_rejects_invalid_limits():

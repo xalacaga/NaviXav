@@ -7,15 +7,18 @@ contenu du dispatch, qui n'ont pas à sortir de la machine.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import math
+import secrets
+import socket
 import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -98,10 +101,43 @@ class SettingsRequest(BaseModel):
     aircraft_rnp_capable: bool = True
     map_basemap: str = Field(default="osm", pattern="^(osm|opentopo)$")
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
+    lan_enabled: bool = False
+
+
+def _is_loopback(host: str | None) -> bool:
+    if not host:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host in {"localhost", "testclient"}
+
+
+def _local_ipv4() -> str | None:
+    """Retourne l'adresse privée utilisée pour joindre le PC sur le LAN."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("192.0.2.1", 9))
+            candidate = probe.getsockname()[0]
+        address = ipaddress.ip_address(candidate)
+        if address.is_private and not address.is_loopback:
+            return candidate
+    except OSError:
+        pass
+    try:
+        for candidate in socket.gethostbyname_ex(socket.gethostname())[2]:
+            address = ipaddress.ip_address(candidate)
+            if address.is_private and not address.is_loopback:
+                return candidate
+    except OSError:
+        pass
+    return None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
+    lan_active = settings.lan_enabled
+    lan_token = settings.lan_access_token
     app = FastAPI(title="NaviXav", version=__version__, docs_url="/api/docs")
     tracker = LiveTracker()
     sia = SiaClient()
@@ -116,6 +152,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.middleware("http")
     async def log_relevant_requests(request: Request, call_next):
         """Journalise les lenteurs et erreurs sans saturer le fichier."""
+        remote_client = not _is_loopback(request.client.host if request.client else None)
+        grant_cookie = False
+        if lan_active and remote_client:
+            supplied = request.query_params.get("access", "")
+            cookie = request.cookies.get("navixav_lan", "")
+            valid_query = bool(lan_token) and secrets.compare_digest(supplied, lan_token)
+            valid_cookie = bool(lan_token) and secrets.compare_digest(cookie, lan_token)
+            if not valid_query and not valid_cookie:
+                return PlainTextResponse(
+                    "Accès NaviXav refusé. Utilise le lien affiché sur le PC.",
+                    status_code=403,
+                )
+            grant_cookie = valid_query
+            if request.url.path in {
+                "/api/settings",
+                "/api/update/install",
+                "/api/shutdown",
+            }:
+                return PlainTextResponse(
+                    "Cette commande est réservée à l’application sur le PC.",
+                    status_code=403,
+                )
         started = time.monotonic()
         try:
             response = await call_next(request)
@@ -140,6 +198,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.url.path == "/" or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-store, max-age=0"
             response.headers["Pragma"] = "no-cache"
+        if grant_cookie:
+            response.set_cookie(
+                "navixav_lan",
+                lan_token,
+                httponly=True,
+                samesite="strict",
+                max_age=60 * 60 * 24 * 30,
+            )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
     @app.on_event("shutdown")
@@ -178,7 +246,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.get("/api/status")
-    def status() -> dict[str, Any]:
+    def status(request: Request) -> dict[str, Any]:
         provider = MsfsProvider(settings.navdata_store, allow_fetch=False)
         try:
             navdata = {
@@ -192,6 +260,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             provider.close()
 
+        remote_client = not _is_loopback(request.client.host if request.client else None)
+        address = _local_ipv4() if lan_active and not remote_client else None
+        port = request.url.port or 80
         return {
             "version": __version__,
             "simbrief_configured": bool(
@@ -201,12 +272,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "metar_source": settings.metar_source,
             "rnp_capable": settings.aircraft_rnp_capable,
             "demo_available": DEMO_OFP.is_file(),
+            "remote_client": remote_client,
+            "lan_active": lan_active,
+            "lan_url": (
+                f"http://{address}:{port}/?access={lan_token}"
+                if address and lan_token
+                else ""
+            ),
+            "map_basemap": settings.map_basemap,
+            "map_trail_color": settings.map_trail_color,
             "navdata": navdata,
         }
 
     @app.get("/api/settings")
     def get_settings() -> dict[str, object]:
-        return settings.user_values()
+        values = settings.user_values()
+        values.pop("lan_access_token", None)
+        return values
 
     @app.get("/api/update/check")
     def check_update() -> dict[str, object]:
@@ -263,7 +345,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             bool(settings.simbrief_pilot_id or settings.simbrief_username),
             settings.metar_source,
         )
-        return settings.user_values()
+        values = settings.user_values()
+        values.pop("lan_access_token", None)
+        values["lan_restart_required"] = settings.lan_enabled != lan_active
+        return values
 
     @app.post("/api/plan")
     def build_plan(request: PlanRequest) -> dict[str, Any]:

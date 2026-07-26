@@ -331,6 +331,15 @@ arrival aerodrome.
 
 ## Window and responsive display
 
+### Phone and tablet access on the local network
+
+Enable **Phone and tablet access** in **Settings**, save, then restart NaviXav.
+Open the protected address shown on the PC from a phone or tablet connected to
+the same Wi-Fi. The mobile interface provides live tracking, the map,
+constraints, MCDU data, aircraft data and official charts. Settings, shutdown
+and updates remain restricted to the PC. If Windows asks, allow NaviXav on
+private networks only.
+
 NaviXav adapts its interface automatically when resized:
 
 - above 1100 px, the Departure, Route and Arrival cards can be shown side by

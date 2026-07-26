@@ -339,6 +339,15 @@ aankomstluchthaven.
 
 ## Venster en responsieve weergave
 
+### Toegang via telefoon en tablet op het lokale netwerk
+
+Schakel **Toegang voor telefoon en tablet** in bij **Instellingen**, sla op en
+start NaviXav opnieuw. Open het beveiligde adres dat op de pc wordt getoond op
+een apparaat in hetzelfde wifi-netwerk. De mobiele interface toont live
+vluchtvolging, kaart, beperkingen, MCDU-, vliegtuig- en officiële kaartgegevens.
+Instellingen, afsluiten en updates blijven voorbehouden aan de pc. Sta NaviXav,
+als Windows dit vraagt, alleen toe op privénetwerken.
+
 NaviXav past de interface automatisch aan bij het schalen:
 
 - boven 1100 px kunnen de kaarten Vertrek, Route en Aankomst naast elkaar
