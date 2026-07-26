@@ -7,7 +7,9 @@ premier accès demande donc MSFS en fonctionnement ; les suivants non.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
+import time
 from pathlib import Path
 
 from navixav.msfs.client import SimConnectClient, SimConnectError
@@ -23,6 +25,8 @@ from navixav.navdata.base import (
     Transition,
     normalise_runway,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 class MsfsProvider:
@@ -114,9 +118,21 @@ class MsfsProvider:
                 f"{key} absent de la base NaviXav",
                 "lance « navixav import » avec le simulateur ouvert",
             )
+        started = time.monotonic()
+        LOGGER.info("Mise en cache MSFS d'un aérodrome démarrée")
         extracted = extract_airport(self._client_or_open(), key)
         msfs_store.store_airport(self._conn, extracted)
         self._fetched.add(key)
+        LOGGER.info(
+            "Mise en cache MSFS d'un aérodrome terminée en %.2f s "
+            "(%s piste(s), %s procédure(s))",
+            time.monotonic() - started,
+            len(extracted.get("runways", [])),
+            sum(
+                len(extracted.get(group, []))
+                for group in ("departures", "arrivals", "approaches")
+            ),
+        )
         return True
 
     def _has(self, icao: str) -> bool:

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 from navixav.msfs.fields import TYPE_NAMES, Field
+from navixav.paths import resource_path
 
 RECV_ID_EXCEPTION = 1
 RECV_ID_QUIT = 3
@@ -49,7 +50,11 @@ def _dll_candidates() -> tuple[Path, ...]:
     Le SDK Microsoft n'est pas toujours installé ; le paquet Python SimConnect,
     s'il est présent, en embarque une copie utilisable.
     """
-    candidates = [Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll")]
+    candidates = [
+        resource_path("SimConnect", "SimConnect.dll"),
+        resource_path("SimConnect.dll"),
+        Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"),
+    ]
     try:
         import SimConnect as _package  # noqa: N813 - dépendance facultative
 

@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.0",
     "uvicorn>=0.29",
     "pypdf>=5.0,<7",
+    # Fenêtre Windows native embarquant l'interface dans Edge WebView2.
+    "pywebview>=6.0,<7 ; sys_platform == 'win32'",
     # Lecture de la position dans MSFS, et fournisseur de SimConnect.dll pour
     # les machines dépourvues du SDK Microsoft Flight Simulator.
     "SimConnect>=0.4.26 ; sys_platform == 'win32'",
@@ -38,3 +40,6 @@ testpaths = ["tests"]
 # devenu illisible sur cette machine : pytest ne peut plus y créer les
 # répertoires de `tmp_path`. On l'isole donc dans le projet.
 addopts = "--basetemp=.pytest_tmp"
+markers = [
+    "live_msfs: tests d'intégration qui nécessitent MSFS démarré",
+]

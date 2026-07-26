@@ -28,8 +28,11 @@ venv/
 *.egg-info/
 build/
 dist/
+release/
+installer/assets/MicrosoftEdgeWebView2Setup.exe
 .pytest_cache/
 .pytest_tmp/
+.test-run-*/
 
 # Données d'exécution locales
 data/navixav.sqlite

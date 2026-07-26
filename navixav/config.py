@@ -9,6 +9,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from navixav.paths import user_data_path
+
 DEFAULT_APPROACH_PREFERENCE = (
     "ILS",
     "GLS",
@@ -22,7 +24,7 @@ DEFAULT_APPROACH_PREFERENCE = (
     "VISUAL",
 )
 
-USER_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "data" / "user_settings.json"
+USER_SETTINGS_FILE = user_data_path("user_settings.json")
 
 
 def _env(name: str, default: str = "") -> str:
@@ -50,7 +52,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 def default_navdata_store() -> Path:
     """Emplacement de la base NaviXav, alimentée depuis MSFS."""
-    return Path(__file__).resolve().parent.parent / "data" / "navixav.sqlite"
+    return user_data_path("navixav.sqlite")
 
 
 @dataclass(frozen=True)

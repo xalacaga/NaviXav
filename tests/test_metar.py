@@ -12,6 +12,8 @@ def test_parse_wind_standard():
     assert wind.speed_kt == 8
     assert wind.gust_kt is None
     assert not wind.variable
+    assert wind.qnh_hpa == 1018
+    assert wind.altimeter_inhg == pytest.approx(30.06, abs=0.01)
 
 
 def test_parse_wind_with_gust():
@@ -41,6 +43,18 @@ def test_parse_wind_metres_per_second():
 def test_parse_wind_absent():
     assert parse_wind(None).direction_deg is None
     assert parse_wind("").raw_metar is None
+
+
+def test_us_altimeter_is_converted_to_qnh():
+    wind = parse_wind("KJFK 261051Z 22008KT 10SM FEW040 24/16 A2992")
+    assert wind.qnh_hpa == 1013
+    assert wind.altimeter_inhg == 29.92
+
+
+def test_qnh_is_kept_when_wind_is_missing():
+    wind = parse_wind("LFBO 261100Z AUTO /////KT CAVOK 22/12 Q1017")
+    assert wind.direction_deg is None
+    assert wind.qnh_hpa == 1017
 
 
 @pytest.mark.parametrize(

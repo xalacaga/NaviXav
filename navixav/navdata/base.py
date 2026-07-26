@@ -110,8 +110,8 @@ class Procedure:
     def missed_approach_altitude_ft(self) -> int | None:
         """Altitude de remise de gaz, publiée ou reconstituée.
 
-        Le champ dédié n'est renseigné que par certaines bases (100 % dans les
-        données MSFS 2024, 0 % dans un cycle Navigraph). À défaut, on retient
+        Le champ dédié n'est renseigné que par certaines sources. À défaut,
+        on retient
         l'altitude la plus haute imposée aux segments d'approche interrompue,
         qui redonne la valeur publiée sur les cas vérifiables.
         """

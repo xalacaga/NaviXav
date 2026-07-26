@@ -144,6 +144,19 @@ def test_approach_includes_its_via_legs(provider, settings, ofp):
     assert "RW32R" in labels
 
 
+def test_selected_procedures_expose_their_map_paths(provider, settings, ofp):
+    plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
+    assert plan.departure.sid_path
+    assert plan.arrival.star_path
+    assert plan.arrival.approach_path
+    for point in [
+        *plan.departure.sid_path,
+        *plan.arrival.star_path,
+        *plan.arrival.approach_path,
+    ]:
+        assert {"ident", "lat", "lon"} <= point.keys()
+
+
 def test_missed_approach_altitude_is_reported(provider, settings, ofp):
     plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
     assert plan.arrival.missed_approach_altitude_ft == 5000
@@ -152,9 +165,9 @@ def test_missed_approach_altitude_is_reported(provider, settings, ofp):
 def test_missed_altitude_differs_between_variants(provider):
     """ILS Y remonte à 4000 ft, ILS Z à 5000 ft.
 
-    Le cycle Navigraph ne renseigne pas le champ dédié : la valeur est alors
-    reconstituée depuis les segments d'approche interrompue, et doit redonner
-    exactement celle publiée par les données MSFS 2024.
+    Si la source ne renseigne pas le champ dédié, la valeur est reconstituée
+    depuis les segments d'approche interrompue et doit redonner exactement
+    celle publiée par les données MSFS.
     """
     approaches = {
         p.display_name: p

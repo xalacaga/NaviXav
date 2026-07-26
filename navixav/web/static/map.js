@@ -17,6 +17,7 @@ const MAP = (() => {
   let aircraft = null;
   let trail = [];
   let route = [];
+  let routeSegments = [];
   let dragging = null;
   let basemapVisible = true;
   let groundDetailsVisible = false;
@@ -322,34 +323,46 @@ const MAP = (() => {
   }
 
   function drawRoute() {
-    if (route.length < 2) return;
+    if (!routeSegments.length && route.length < 2) return;
     context.save();
-    context.strokeStyle = css("--accent");
-    context.lineWidth = 3;
-    context.lineJoin = "round";
-    context.setLineDash([10, 5]);
-    context.beginPath();
-    route.forEach((point, index) => {
-      const [x, y] = toScreen(point.x, point.y);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    });
-    context.stroke();
-    context.setLineDash([]);
-
-    for (const point of route) {
-      const [x, y] = toScreen(point.x, point.y);
-      if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) {
-        continue;
-      }
-      context.fillStyle = css("--accent");
+    const segments = routeSegments.length
+      ? routeSegments
+      : [{ stage: "enroute", points: route }];
+    const colours = {
+      sid: "--route-sid",
+      enroute: "--route-enroute",
+      star: "--route-star",
+      approach: "--route-approach",
+    };
+    for (const segment of segments) {
+      if (segment.points.length < 2) continue;
+      context.strokeStyle = css(colours[segment.stage] || "--accent");
+      context.lineWidth = segment.stage === "approach" ? 4 : 3;
+      context.lineJoin = "round";
+      context.setLineDash(segment.stage === "enroute" ? [10, 5] : []);
       context.beginPath();
-      context.arc(x, y, 5, 0, Math.PI * 2);
-      context.fill();
-      context.font = "650 11px 'Inter', system-ui, sans-serif";
-      context.textAlign = "center";
-      context.fillStyle = css("--label-text");
-      context.fillText(point.ident, x, y - 10);
+      segment.points.forEach((point, index) => {
+        const [x, y] = toScreen(point.x, point.y);
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
+      context.stroke();
+      context.setLineDash([]);
+
+      for (const point of segment.points) {
+        const [x, y] = toScreen(point.x, point.y);
+        if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) {
+          continue;
+        }
+        context.fillStyle = css(colours[segment.stage] || "--accent");
+        context.beginPath();
+        context.arc(x, y, segment.stage === "approach" ? 5 : 4, 0, Math.PI * 2);
+        context.fill();
+        context.font = "650 11px 'Inter', system-ui, sans-serif";
+        context.textAlign = "center";
+        context.fillStyle = css("--label-text");
+        context.fillText(point.ident, x, y - 10);
+      }
     }
     context.restore();
   }
@@ -511,6 +524,7 @@ const MAP = (() => {
       chart = data;
       trail = [];
       aircraft = null;
+      routeSegments = [];
       fit();
     },
     setAircraft(position) {
@@ -530,6 +544,12 @@ const MAP = (() => {
     },
     setRoute(points) {
       route = points || [];
+      routeSegments = [];
+      draw();
+    },
+    setRouteSegments(segments) {
+      routeSegments = (segments || []).filter((segment) => segment.points?.length);
+      route = routeSegments.flatMap((segment) => segment.points);
       draw();
     },
     fitRoute() {

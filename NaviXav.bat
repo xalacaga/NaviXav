@@ -67,14 +67,14 @@ if not exist ".env" (
 )
 
 REM ----------------------------------------------------------------- run
-echo   Demarrage de l'application web...
-echo   Le navigateur s'ouvre automatiquement. Ctrl+C pour arreter.
+echo   Demarrage de l'application NaviXav...
+echo   L'interface s'ouvre dans sa propre fenetre.
 echo.
 
-"%PY%" -m navixav.cli web %*
+"%PY%" -m navixav.desktop %*
 set "CODE=%ERRORLEVEL%"
 
-REM Sorties normales : arret propre, Ctrl+C, ou processus interrompu.
+REM Sorties normales : fermeture de la fenetre ou processus interrompu.
 if "%CODE%"=="0" goto :done
 if "%CODE%"=="-1073741510" goto :done
 if "%CODE%"=="-1" goto :done

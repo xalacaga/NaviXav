@@ -1,6 +1,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+const t = (key) => window.I18N.t(key);
 
 const CONFIDENCE_CLASS = {
   "élevée": "high",
@@ -18,12 +19,26 @@ const SOURCE_LABEL = {
 let currentPlan = null;
 let currentChart = null;
 let currentIcao = null;
+let currentMapRole = null;
 let liveTimer = null;
 let simulatorTimer = null;
+let activeRoutePointIndex = null;
+let latestAircraft = null;
+let flightGeometry = [];
+let flightLog = [];
+let flightRecording = true;
+let lastFlightLogAt = 0;
+let replayTimer = null;
+let replayActive = false;
 const siaRequests = new Map();
+const officialAirportRequests = new Map();
+const siaOverlayCandidates = new Map();
+let siaOverlayKey = null;
 
 const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
+const FLIGHT_LOG_INTERVAL_MS = 5000;
+const FLIGHT_LOG_MAX_POINTS = 3600;
 const TERMINAL_COLLAPSED_KEY = "navixav-terminal-collapsed";
 
 /* ------------------------------------------------------------------ utils */
@@ -43,7 +58,7 @@ function setTerminalCollapsed(collapsed) {
   const terminal = $("terminal");
   const button = $("terminal-toggle");
   terminal.classList.toggle("collapsed", collapsed);
-  button.textContent = collapsed ? "Développer" : "Réduire";
+  button.textContent = collapsed ? t("expand") : t("collapse");
   button.setAttribute("aria-expanded", String(!collapsed));
 }
 
@@ -70,10 +85,10 @@ async function loadStatus() {
   $("footer-source").textContent = `SimBrief ${status.simbrief_target} · METAR ${status.metar_source}`;
 
   if (!status.simbrief_configured) {
-    $("empty-hint").textContent =
-      "Aucun compte SimBrief configuré. Ouvre Paramètres, ou active le mode Démo.";
+    $("empty-hint").textContent = t("no_simbrief");
   }
   if (status.demo_available) $("demo-toggle").disabled = false;
+  return status;
 }
 
 async function pollSimulatorStatus() {
@@ -82,30 +97,32 @@ async function pollSimulatorStatus() {
     const status = await fetch("/api/simulator", { cache: "no-store" }).then((r) => r.json());
     indicator.classList.toggle("online", Boolean(status.connected));
     indicator.classList.toggle("offline", !status.connected);
-    $("sim-status-text").textContent = status.connected ? "MSFS connecté" : "MSFS hors ligne";
+    $("sim-status-text").textContent = status.connected ? t("sim_connected") : t("sim_offline");
     indicator.title = status.connected
       ? `Connexion directe active · ${status.source || "SimConnect"}`
       : (status.reason || "Microsoft Flight Simulator ne répond pas");
   } catch (_error) {
     indicator.classList.remove("online");
     indicator.classList.add("offline");
-    $("sim-status-text").textContent = "Serveur arrêté";
+    $("sim-status-text").textContent = t("server_stopped");
   }
 }
 
 async function shutdownApplication() {
   const button = $("shutdown");
   button.disabled = true;
-  button.textContent = "Arrêt…";
+  button.textContent = t("stopping");
   try {
     const response = await fetch("/api/shutdown", { method: "POST" });
     if (!response.ok) throw new Error("Le serveur n’a pas accepté l’arrêt");
     clearInterval(simulatorTimer);
-    document.body.innerHTML =
-      '<main class="empty"><h2>NaviXav est arrêté</h2><p>Le processus et le port 8765 ont été libérés. Tu peux fermer cette fenêtre.</p></main>';
+    document.body.innerHTML = "";
+    const stopped = el("main", "empty");
+    stopped.append(el("h2", null, t("stopped_title")), el("p", null, t("stopped_body")));
+    document.body.append(stopped);
   } catch (error) {
     button.disabled = false;
-    button.textContent = "Quitter";
+    button.textContent = t("quit");
     showBanner("error", "Impossible d’arrêter NaviXav", [String(error)]);
   }
 }
@@ -126,6 +143,7 @@ async function openSettings() {
     $("settings-crosswind").value = values.max_crosswind_kt;
     $("settings-runway-length").value = values.min_runway_length_ft;
     $("settings-rnp").checked = Boolean(values.aircraft_rnp_capable);
+    $("settings-language").value = window.I18N.getLanguage();
     $("settings-dialog").showModal();
   } catch (error) {
     showBanner("error", "Impossible d’ouvrir les paramètres", [String(error)]);
@@ -135,7 +153,7 @@ async function openSettings() {
 async function saveSettings(event) {
   event.preventDefault();
   const message = $("settings-message");
-  message.textContent = "Enregistrement…";
+  message.textContent = t("saving");
   message.className = "settings-message";
   const payload = {
     simbrief_pilot_id: $("settings-pilot-id").value.trim(),
@@ -158,8 +176,12 @@ async function saveSettings(event) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
-    message.textContent = "Paramètres enregistrés.";
-    await loadStatus();
+    message.textContent = t("saved");
+    const status = await loadStatus();
+    if (status.simbrief_configured) {
+      $("demo-toggle").checked = false;
+      await buildPlan();
+    }
     setTimeout(() => $("settings-dialog").close(), 500);
   } catch (error) {
     message.textContent = String(error);
@@ -172,8 +194,8 @@ async function saveSettings(event) {
 async function buildPlan() {
   const button = $("refresh");
   button.disabled = true;
-  button.querySelector("span").textContent = "Calcul…";
-  hideBanner();
+  button.querySelector("span").textContent = t("loading_plan");
+  showBanner("info", t("cache_title"), [t("cache_body")]);
 
   try {
     const response = await fetch("/api/plan", {
@@ -194,7 +216,7 @@ async function buildPlan() {
     showBanner("error", "Erreur réseau", [String(error)]);
   } finally {
     button.disabled = false;
-    button.querySelector("span").textContent = "Compléter le plan";
+    button.querySelector("span").textContent = t("complete");
   }
 }
 
@@ -218,14 +240,19 @@ function hideBanner() {
 /* --------------------------------------------------------------- rendering */
 
 function renderPlan(plan) {
+  siaOverlayCandidates.clear();
+  clearSiaMapOverlay();
+  hideBanner();
   show($("empty"), false);
   for (const id of ["strip", "terminal", "tabs"]) show($(id), true);
 
   renderStrip(plan);
   renderTerminal(plan);
   renderConstraints(plan);
+  renderFlightPanel(plan);
   renderDispatch(plan);
   renderAircraft(plan);
+  renderOfficialCharts(plan);
   renderMcdu(plan);
   renderMapBar(plan);
   startLiveLoop();
@@ -241,9 +268,13 @@ function renderPlan(plan) {
 function renderStrip(plan) {
   const strip = $("strip");
   strip.innerHTML = "";
+  activeRoutePointIndex = null;
 
-  const chip = (label, value, kind) => {
+  const chip = (label, value, kind, routeIndex = null) => {
     const node = el("span", `chip ${kind}`);
+    if (routeIndex !== null && routeIndex !== undefined) {
+      node.dataset.routeIndex = String(routeIndex);
+    }
     if (label) node.append(el("small", null, label));
     node.append(document.createTextNode(value));
     return node;
@@ -251,15 +282,22 @@ function renderStrip(plan) {
 
   const dep = plan.departure;
   const arr = plan.arrival;
+  const routePath = plan.enroute?.route_path || [];
+  let pathCursor = 1;
 
   if (dep) {
-    strip.append(chip(null, dep.icao, "apt"));
+    const originIndex = routePath[0]?.ident === dep.icao ? 0 : null;
+    strip.append(chip(null, dep.icao, "apt", originIndex));
     if (dep.runway?.value) strip.append(chip("rwy", dep.runway.value, "proc"));
     if (dep.sid.value) strip.append(chip("sid", dep.sid.value, "proc"));
     if (dep.sid_transition.value) strip.append(chip("trans", dep.sid_transition.value, "wpt"));
   }
   for (const fix of plan.enroute.waypoints || []) {
-    strip.append(chip(null, fix, "wpt"));
+    const routeIndex = routePath.findIndex(
+      (point, index) => index >= pathCursor && point.ident === fix
+    );
+    if (routeIndex >= 0) pathCursor = routeIndex + 1;
+    strip.append(chip(null, fix, "wpt", routeIndex >= 0 ? routeIndex : null));
   }
   if (arr) {
     if (arr.star_transition.value) strip.append(chip("trans", arr.star_transition.value, "wpt"));
@@ -267,8 +305,569 @@ function renderStrip(plan) {
     if (arr.approach_transition.value) strip.append(chip("via", arr.approach_transition.value, "wpt"));
     if (arr.approach.value) strip.append(chip("appr", arr.approach.value, "proc"));
     if (arr.runway?.value) strip.append(chip("rwy", arr.runway.value, "proc"));
-    strip.append(chip(null, arr.icao, "apt"));
+    const destinationIndex = routePath.findLastIndex(
+      (point) => point.ident === arr.icao
+    );
+    strip.append(chip(
+      null,
+      arr.icao,
+      "apt",
+      destinationIndex >= 0 ? destinationIndex : null
+    ));
   }
+}
+
+function routePointForAircraft(aircraft) {
+  const route = currentPlan?.enroute?.route_path || [];
+  if (!aircraft || !route.length) return null;
+
+  const latitude = Number(aircraft.latitude);
+  const longitude = Number(aircraft.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  const scaleX = EARTH_RADIUS_M * Math.cos(latitude * Math.PI / 180);
+  const scaleY = EARTH_RADIUS_M;
+  const relative = (point) => ({
+    x: (Number(point.lon) - longitude) * Math.PI / 180 * scaleX,
+    y: (Number(point.lat) - latitude) * Math.PI / 180 * scaleY,
+  });
+
+  let nearestPoint = { index: 0, distanceSquared: Infinity };
+  route.forEach((point, index) => {
+    const projected = relative(point);
+    const distanceSquared = projected.x ** 2 + projected.y ** 2;
+    if (distanceSquared < nearestPoint.distanceSquared) {
+      nearestPoint = { index, distanceSquared };
+    }
+  });
+  if (aircraft.on_ground && nearestPoint.distanceSquared <= 10_000 ** 2) {
+    return nearestPoint.index;
+  }
+  if (route.length === 1) return 0;
+
+  let nearestSegment = { index: 0, distanceSquared: Infinity };
+  for (let index = 0; index < route.length - 1; index += 1) {
+    const start = relative(route[index]);
+    const end = relative(route[index + 1]);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx ** 2 + dy ** 2;
+    const progress = lengthSquared
+      ? Math.max(0, Math.min(1, -(start.x * dx + start.y * dy) / lengthSquared))
+      : 0;
+    const x = start.x + progress * dx;
+    const y = start.y + progress * dy;
+    const distanceSquared = x ** 2 + y ** 2;
+    if (distanceSquared < nearestSegment.distanceSquared) {
+      nearestSegment = { index, distanceSquared };
+    }
+  }
+  return Math.min(nearestSegment.index + 1, route.length - 1);
+}
+
+function updateRouteStripProgress(aircraft) {
+  const activeIndex = routePointForAircraft(aircraft);
+  const strip = $("strip");
+  for (const node of strip.querySelectorAll(".chip[data-route-index]")) {
+    const index = Number(node.dataset.routeIndex);
+    node.classList.toggle("route-passed", activeIndex !== null && index < activeIndex);
+    node.classList.toggle("route-active", activeIndex !== null && index === activeIndex);
+    node.classList.toggle("route-upcoming", activeIndex !== null && index > activeIndex);
+    if (index === activeIndex) node.title = "Position actuelle de l’avion sur la route";
+    else node.removeAttribute("title");
+  }
+
+  if (activeIndex === null || activeRoutePointIndex === activeIndex) {
+    activeRoutePointIndex = activeIndex;
+    return;
+  }
+  activeRoutePointIndex = activeIndex;
+  const active = strip.querySelector(`.chip[data-route-index="${activeIndex}"]`);
+  if (active) {
+    strip.scrollTo({
+      left: Math.max(0, active.offsetLeft - strip.clientWidth / 2 + active.clientWidth / 2),
+      behavior: "smooth",
+    });
+  }
+}
+
+/* --------------------------------------------------------- suivi du vol */
+
+function haversineNm(first, second) {
+  const lat1 = Number(first.lat ?? first.latitude) * Math.PI / 180;
+  const lat2 = Number(second.lat ?? second.latitude) * Math.PI / 180;
+  const deltaLat = lat2 - lat1;
+  const deltaLon = (
+    Number(second.lon ?? second.longitude)
+    - Number(first.lon ?? first.longitude)
+  ) * Math.PI / 180;
+  const value = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return (2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(value)))) / 1852;
+}
+
+function flightStagePaths(plan) {
+  const route = plan.enroute?.route_path || [];
+  const origin = route[0];
+  const destination = route.at(-1);
+  const sid = [...(plan.departure?.sid_path || [])];
+  const star = [...(plan.arrival?.star_path || [])];
+  const approach = [...(plan.arrival?.approach_path || [])];
+
+  if (origin && sid.length) sid.unshift(origin);
+  const departureEnd = sid.at(-1) || origin;
+  const arrivalStart = star[0] || approach[0] || destination;
+  const enroute = [
+    departureEnd,
+    ...route.slice(1, -1),
+    arrivalStart,
+  ].filter(Boolean).filter((point, index, points) => (
+    index === 0
+    || point.ident !== points[index - 1].ident
+    || point.lat !== points[index - 1].lat
+    || point.lon !== points[index - 1].lon
+  ));
+  if (star.length && approach.length) approach.unshift(star.at(-1));
+
+  if (destination) {
+    if (approach.length) approach.push(destination);
+    else if (star.length) star.push(destination);
+  }
+  return [
+    { stage: "sid", points: sid },
+    { stage: "enroute", points: enroute },
+    { stage: "star", points: star },
+    { stage: "approach", points: approach },
+  ].filter((segment) => segment.points.length);
+}
+
+function buildFlightGeometry(plan) {
+  const geometry = [];
+  for (const segment of flightStagePaths(plan)) {
+    for (const point of segment.points) {
+      if (!Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lon))) continue;
+      const entry = {
+        ident: point.ident || segment.stage,
+        lat: Number(point.lat),
+        lon: Number(point.lon),
+        stage: segment.stage,
+      };
+      const previous = geometry[geometry.length - 1];
+      if (
+        previous
+        && previous.ident === entry.ident
+        && previous.lat === entry.lat
+        && previous.lon === entry.lon
+      ) {
+        previous.stage = segment.stage;
+        continue;
+      }
+      geometry.push(entry);
+    }
+  }
+  return geometry;
+}
+
+function projectAircraftOnFlightPath(aircraft) {
+  if (!aircraft || flightGeometry.length < 2) return null;
+  const latitude = Number(aircraft.latitude);
+  const longitude = Number(aircraft.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  const scaleX = EARTH_RADIUS_M * Math.cos(latitude * Math.PI / 180);
+  const scaleY = EARTH_RADIUS_M;
+  const relative = (point) => ({
+    x: (point.lon - longitude) * Math.PI / 180 * scaleX,
+    y: (point.lat - latitude) * Math.PI / 180 * scaleY,
+  });
+  let best = null;
+  for (let index = 0; index < flightGeometry.length - 1; index += 1) {
+    const start = relative(flightGeometry[index]);
+    const end = relative(flightGeometry[index + 1]);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx ** 2 + dy ** 2;
+    const progress = lengthSquared
+      ? Math.max(0, Math.min(1, -(start.x * dx + start.y * dy) / lengthSquared))
+      : 0;
+    const x = start.x + progress * dx;
+    const y = start.y + progress * dy;
+    const distanceSquared = x ** 2 + y ** 2;
+    if (!best || distanceSquared < best.distanceSquared) {
+      best = { index, progress, distanceSquared };
+    }
+  }
+  if (!best) return null;
+
+  const segmentLength = haversineNm(
+    flightGeometry[best.index],
+    flightGeometry[best.index + 1]
+  );
+  let remainingNm = segmentLength * (1 - best.progress);
+  for (let index = best.index + 1; index < flightGeometry.length - 1; index += 1) {
+    remainingNm += haversineNm(flightGeometry[index], flightGeometry[index + 1]);
+  }
+  return {
+    segmentIndex: best.index,
+    segmentProgress: best.progress,
+    activeIndex: best.index + 1,
+    activePoint: flightGeometry[best.index + 1],
+    crossTrackNm: Math.sqrt(best.distanceSquared) / 1852,
+    distanceToActiveNm: segmentLength * (1 - best.progress),
+    remainingNm,
+  };
+}
+
+function distanceFromProjectionToIndex(projection, targetIndex) {
+  if (!projection || targetIndex <= projection.segmentIndex) return 0;
+  let distance = haversineNm(
+    flightGeometry[projection.segmentIndex],
+    flightGeometry[projection.segmentIndex + 1]
+  ) * (1 - projection.segmentProgress);
+  for (let index = projection.segmentIndex + 1; index < targetIndex; index += 1) {
+    distance += haversineNm(flightGeometry[index], flightGeometry[index + 1]);
+  }
+  return distance;
+}
+
+function constraintAltitudeFt(text, currentAltitude) {
+  const values = String(text || "").match(/\d[\d ]*/g)
+    ?.map((value) => Number(value.replaceAll(" ", "")))
+    .filter(Number.isFinite) || [];
+  if (!values.length) return null;
+  if (String(text).startsWith("entre") && values.length >= 2) {
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    if (currentAltitude < low) return low;
+    if (currentAltitude > high) return high;
+    return Math.round(currentAltitude);
+  }
+  return values[0];
+}
+
+function nextFlightConstraint(plan, projection, aircraft) {
+  if (!projection) return null;
+  const groups = [
+    ["sid", plan.departure?.sid_constraints || []],
+    ["star", plan.arrival?.star_constraints || []],
+    ["approach", plan.arrival?.approach_constraints || []],
+  ];
+  const candidates = [];
+  for (const [stage, rows] of groups) {
+    let cursor = 0;
+    for (const row of rows) {
+      if (!row.is_fix) continue;
+      const index = flightGeometry.findIndex(
+        (point, pointIndex) => (
+          pointIndex >= cursor
+          && point.stage === stage
+          && point.ident === row.label
+        )
+      );
+      if (index < 0) continue;
+      cursor = index + 1;
+      if (index < projection.activeIndex || (!row.altitude && !row.speed)) continue;
+      candidates.push({
+        ...row,
+        stage,
+        pathIndex: index,
+        distanceNm: distanceFromProjectionToIndex(projection, index),
+        altitudeFt: constraintAltitudeFt(row.altitude, Number(aircraft.altitude_ft || 0)),
+      });
+    }
+  }
+  candidates.sort((first, second) => first.pathIndex - second.pathIndex);
+  return candidates[0] || null;
+}
+
+function detectFlightPhase(aircraft, projection) {
+  if (!aircraft) return "Hors connexion";
+  const speed = Number(aircraft.ground_speed_kt || 0);
+  const verticalSpeed = Number(aircraft.vertical_speed_fpm || 0);
+  if (aircraft.on_ground) {
+    if (projection?.remainingNm < 5) return speed > 35 ? "Atterrissage" : "Roulage arrivée";
+    return speed > 45 ? "Décollage" : "Roulage départ";
+  }
+  if (projection?.activePoint?.stage === "approach" || projection?.remainingNm < 25) {
+    return "Approche";
+  }
+  if (verticalSpeed > 300) return "Montée";
+  if (verticalSpeed < -300) return "Descente";
+  const cruise = Number(currentPlan?.enroute?.cruise_altitude_ft || 0);
+  if (cruise && Math.abs(Number(aircraft.altitude_ft) - cruise) < 1200) return "Croisière";
+  return "En route";
+}
+
+function descentGuidance(plan, aircraft, projection) {
+  if (!aircraft || !projection) return null;
+  const currentAltitude = Number(aircraft.altitude_ft || 0);
+  const interceptText = plan.arrival?.glide_intercept_altitude;
+  const targetAltitude = constraintAltitudeFt(interceptText, currentAltitude) || 3000;
+  const finalDistance = Number(plan.arrival?.final_approach_distance_nm || 8);
+  const distanceToIntercept = Math.max(0, projection.remainingNm - finalDistance);
+  const altitudeToLose = Math.max(0, currentAltitude - targetAltitude);
+  const descentDistance = altitudeToLose / 318;
+  const todInNm = distanceToIntercept - descentDistance;
+  const groundSpeed = Math.max(120, Number(aircraft.ground_speed_kt || 0));
+  const requiredVsFpm = -Math.round((groundSpeed * 318) / 60 / 50) * 50;
+  const expectedAltitude = Math.min(
+    Number(plan.enroute?.cruise_altitude_ft || Infinity),
+    targetAltitude + distanceToIntercept * 318
+  );
+  return {
+    targetAltitude,
+    todInNm,
+    requiredVsFpm,
+    expectedAltitude,
+    profileDeltaFt: Math.round(currentAltitude - expectedAltitude),
+  };
+}
+
+function flightLogStorageKey(plan) {
+  return [
+    "navixav-flight-log",
+    plan.departure?.icao || "----",
+    plan.arrival?.icao || "----",
+    plan.callsign || "flight",
+    plan.source?.simbrief_generated_at || "session",
+  ].join(":");
+}
+
+function loadFlightLog(plan) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(flightLogStorageKey(plan)) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function saveFlightLog() {
+  if (!currentPlan) return;
+  try {
+    localStorage.setItem(flightLogStorageKey(currentPlan), JSON.stringify(flightLog));
+  } catch (_error) {
+    flightLog = flightLog.slice(-Math.floor(FLIGHT_LOG_MAX_POINTS / 2));
+  }
+}
+
+function recordFlightPoint(aircraft) {
+  if (!flightRecording || replayActive || !aircraft) return;
+  const now = Date.now();
+  if (now - lastFlightLogAt < FLIGHT_LOG_INTERVAL_MS) return;
+  lastFlightLogAt = now;
+  flightLog.push({
+    ...aircraft,
+    recorded_at: new Date(now).toISOString(),
+  });
+  if (flightLog.length > FLIGHT_LOG_MAX_POINTS) flightLog.shift();
+  saveFlightLog();
+  updateRecorderStatus();
+}
+
+function updateRecorderStatus() {
+  const status = $("flight-recorder-status");
+  if (!status) return;
+  const mode = replayActive ? "rejeu" : flightRecording ? "enregistrement actif" : "en pause";
+  status.textContent = `${mode} · ${flightLog.length} points`;
+  const toggle = $("flight-record-toggle");
+  if (toggle) toggle.textContent = flightRecording ? "Mettre en pause" : "Reprendre";
+}
+
+function stopFlightReplay() {
+  if (replayTimer) clearInterval(replayTimer);
+  replayTimer = null;
+  replayActive = false;
+  updateRecorderStatus();
+}
+
+function startFlightReplay() {
+  if (flightLog.length < 2) return;
+  stopFlightReplay();
+  replayActive = true;
+  let index = 0;
+  replayTimer = setInterval(() => {
+    if (index >= flightLog.length) {
+      stopFlightReplay();
+      return;
+    }
+    applyAircraftState(flightLog[index], false);
+    index += 1;
+  }, 300);
+  updateRecorderStatus();
+}
+
+function liveValue(id, value, status = "") {
+  const node = $(id);
+  if (!node) return;
+  node.textContent = value;
+  node.closest(".flight-live-stat")?.setAttribute("data-status", status);
+}
+
+function updateFlightPanel(aircraft) {
+  const projection = projectAircraftOnFlightPath(aircraft);
+  const phase = detectFlightPhase(aircraft, projection);
+  const constraint = nextFlightConstraint(currentPlan, projection, aircraft || {});
+  const descent = descentGuidance(currentPlan, aircraft, projection);
+
+  liveValue("flight-phase", phase);
+  liveValue(
+    "flight-next-fix",
+    projection?.activePoint?.ident || "—",
+    projection ? "good" : ""
+  );
+  liveValue(
+    "flight-next-distance",
+    projection ? `${projection.distanceToActiveNm.toFixed(1)} NM` : "—"
+  );
+  const deviation = projection?.crossTrackNm;
+  liveValue(
+    "flight-deviation",
+    deviation !== undefined ? `${deviation.toFixed(1)} NM` : "—",
+    deviation > 5 ? "danger" : deviation > 2 ? "warning" : "good"
+  );
+  liveValue(
+    "flight-remaining",
+    projection ? `${projection.remainingNm.toFixed(0)} NM` : "—"
+  );
+  liveValue(
+    "flight-ground-speed",
+    aircraft?.ground_speed_kt !== null && aircraft?.ground_speed_kt !== undefined
+      ? `${Math.round(aircraft.ground_speed_kt)} kt`
+      : "—"
+  );
+  liveValue(
+    "flight-air-speed",
+    aircraft?.indicated_airspeed_kt !== null
+      && aircraft?.indicated_airspeed_kt !== undefined
+      ? `${Math.round(aircraft.indicated_airspeed_kt)} kt`
+      : "—"
+  );
+  liveValue(
+    "flight-next-constraint",
+    constraint
+      ? `${constraint.label} · ${[constraint.altitude, constraint.speed].filter(Boolean).join(" · ")}`
+      : "Aucune"
+  );
+  liveValue(
+    "flight-constraint-distance",
+    constraint ? `${constraint.distanceNm.toFixed(1)} NM` : "—"
+  );
+
+  let requiredVs = null;
+  if (constraint?.altitudeFt && constraint.distanceNm > 0.2 && aircraft) {
+    const minutes = constraint.distanceNm / Math.max(60, Number(aircraft.ground_speed_kt || 0)) * 60;
+    requiredVs = Math.round(
+      (constraint.altitudeFt - Number(aircraft.altitude_ft || 0)) / minutes / 50
+    ) * 50;
+  }
+  liveValue(
+    "flight-required-vs",
+    requiredVs !== null ? `${requiredVs > 0 ? "+" : ""}${requiredVs} ft/min` : "—"
+  );
+
+  if (descent) {
+    const todText = descent.todInNm > 2
+      ? `dans ${descent.todInNm.toFixed(0)} NM`
+      : descent.todInNm >= -2
+        ? "maintenant"
+        : `dépassé de ${Math.abs(descent.todInNm).toFixed(0)} NM`;
+    liveValue("flight-tod", todText, descent.todInNm < -2 ? "warning" : "good");
+    liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
+    const delta = descent.profileDeltaFt;
+    liveValue(
+      "flight-vertical-profile",
+      Math.abs(delta) <= 300
+        ? "Profil correct"
+        : delta > 0
+          ? `Trop haut de ${Math.abs(delta)} ft`
+          : `Trop bas de ${Math.abs(delta)} ft`,
+      Math.abs(delta) <= 300 ? "good" : Math.abs(delta) <= 1000 ? "warning" : "danger"
+    );
+  } else {
+    for (const id of ["flight-tod", "flight-descent-vs", "flight-vertical-profile"]) {
+      liveValue(id, "—");
+    }
+  }
+}
+
+function renderFlightPanel(plan) {
+  flightGeometry = buildFlightGeometry(plan);
+  flightLog = loadFlightLog(plan);
+  lastFlightLogAt = 0;
+  stopFlightReplay();
+  const panel = $("panel-flight");
+  panel.innerHTML = "";
+  const header = el("div", "flight-panel-head");
+  const title = el("div");
+  title.append(el("div", "card-kicker", "Guidage et progression"));
+  title.append(el("h2", null, "Suivi du vol en temps réel"));
+  header.append(title);
+  const phase = el("span", "flight-phase-pill", "Hors connexion");
+  phase.id = "flight-phase";
+  header.append(phase);
+  panel.append(header);
+
+  const grid = el("div", "flight-live-grid");
+  const item = (label, id, note = "") => {
+    const node = el("article", "flight-live-stat");
+    node.append(el("div", "stat-label", label));
+    const value = el("div", "stat-value", "—");
+    value.id = id;
+    node.append(value);
+    if (note) node.append(el("div", "stat-note", note));
+    grid.append(node);
+  };
+  item("Prochain point", "flight-next-fix");
+  item("Distance du point", "flight-next-distance");
+  item("Écart latéral", "flight-deviation", "Distance par rapport au segment actif");
+  item("Distance restante", "flight-remaining");
+  item(t("ground_speed"), "flight-ground-speed", t("ground_speed_note"));
+  item(t("air_speed"), "flight-air-speed", t("air_speed_note"));
+  item("Prochaine contrainte", "flight-next-constraint");
+  item("Distance contrainte", "flight-constraint-distance");
+  item("Taux requis", "flight-required-vs", "Pour respecter la prochaine altitude");
+  item("Top of Descent", "flight-tod");
+  item("Descente indicative", "flight-descent-vs", "Base 3° · à confirmer");
+  item("Profil vertical", "flight-vertical-profile");
+  panel.append(grid);
+
+  const recorder = el("section", "flight-recorder");
+  const recorderHead = el("div");
+  recorderHead.append(el("div", "card-kicker", "Journal local"));
+  recorderHead.append(el("h2", null, "Enregistrement et rejeu"));
+  const recorderStatus = el("span", "badge");
+  recorderStatus.id = "flight-recorder-status";
+  const recorderTop = el("div", "flight-recorder-head");
+  recorderTop.append(recorderHead, recorderStatus);
+  recorder.append(recorderTop);
+  const actions = el("div", "flight-recorder-actions");
+  const toggle = el("button", "icon-btn");
+  toggle.id = "flight-record-toggle";
+  toggle.type = "button";
+  toggle.addEventListener("click", () => {
+    flightRecording = !flightRecording;
+    updateRecorderStatus();
+  });
+  const replay = el("button", "btn-primary", "Rejouer");
+  replay.type = "button";
+  replay.addEventListener("click", startFlightReplay);
+  const stop = el("button", "icon-btn", "Arrêter le rejeu");
+  stop.type = "button";
+  stop.addEventListener("click", stopFlightReplay);
+  const clear = el("button", "icon-btn", "Effacer le journal");
+  clear.type = "button";
+  clear.addEventListener("click", () => {
+    stopFlightReplay();
+    flightLog = [];
+    saveFlightLog();
+    updateRecorderStatus();
+  });
+  actions.append(toggle, replay, stop, clear);
+  recorder.append(actions);
+  panel.append(recorder);
+  updateRecorderStatus();
+  updateFlightPanel(latestAircraft);
 }
 
 function choiceRow(label, choice, note) {
@@ -297,7 +896,11 @@ function terminalCard(block, kicker, extraRows) {
   left.append(el("div", "card-name", block.name || ""));
   head.append(left);
 
-  const right = el("div", "card-wind", windLabel(block.wind));
+  const right = el("div", "card-weather");
+  right.append(
+    el("div", "card-wind", windLabel(block.wind)),
+    el("div", "card-qnh", qnhLabel(block.wind))
+  );
   head.append(right);
   card.append(head);
 
@@ -324,6 +927,13 @@ function windLabel(wind) {
   }
   const gust = wind.gust_kt ? `G${wind.gust_kt}` : "";
   return `${String(wind.direction_deg).padStart(3, "0")}°/${wind.speed_kt}${gust} kt`;
+}
+
+function qnhLabel(wind) {
+  if (wind?.qnh_hpa !== null && wind?.qnh_hpa !== undefined) {
+    return `QNH ${Math.round(wind.qnh_hpa)} hPa`;
+  }
+  return "QNH —";
 }
 
 function runwayNote(runway) {
@@ -782,13 +1392,69 @@ function fetchSiaApproach(plan) {
     runway: arrival.runway?.value || "",
     approach: arrival.approach?.value || "",
   });
-  const request = fetch(`/api/sia/approach?${params}`).then(async (response) => {
+  const request = fetch(`/api/charts/approach?${params}`).then(async (response) => {
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || "Carte SIA indisponible.");
+    if (!response.ok) throw new Error(payload.detail || "Carte officielle indisponible.");
     return payload;
   });
   siaRequests.set(key, request);
+  request.catch(() => siaRequests.delete(key));
   return request;
+}
+
+function clearSiaMapOverlay(key) {
+  if (key && siaOverlayKey === key) return;
+  siaOverlayKey = null;
+  $("map-sia").classList.add("hidden");
+  $("map-sia").classList.remove("active");
+  $("map-sia").setAttribute("aria-pressed", "false");
+  $("sia-map-overlay").classList.add("hidden");
+  $("sia-map-frame").removeAttribute("src");
+}
+
+function officialProviderName(data) {
+  if (data?.provider === "sia") return "SIA";
+  if (data?.provider === "faa") return "FAA";
+  if (data?.provider === "enaire") return "ENAIRE";
+  if (data?.provider === "lvnl") return "LVNL";
+  return String(data?.provider || "AIS").toUpperCase();
+}
+
+function syncSiaMapOverlay() {
+  const candidate = siaOverlayCandidates.get(currentMapRole);
+  if (!candidate?.chart?.georeferenced) {
+    clearSiaMapOverlay();
+    return;
+  }
+  const key = `${currentMapRole}:${currentIcao}:${candidate.chart.filename}`;
+  if (siaOverlayKey !== key) {
+    toggleSiaMapOverlay(false);
+    siaOverlayKey = key;
+    $("sia-map-frame").src = candidate.pdf_url;
+  }
+  const provider = officialProviderName(candidate);
+  $("map-sia").textContent = `Calque ${provider}`;
+  $("map-sia").title = `Afficher la carte ${provider} géoréférencée de cet aérodrome`;
+  $("sia-overlay-title").textContent = `Calque ${provider}`;
+  $("map-sia").classList.remove("hidden");
+}
+
+function setSiaMapCandidate(role, icao, data) {
+  const key = String(role || "").toLowerCase();
+  const airport = String(icao || "").toUpperCase();
+  if (!key || !airport) return;
+  if (data?.chart?.georeferenced) siaOverlayCandidates.set(key, data);
+  else siaOverlayCandidates.delete(key);
+  if (currentMapRole === key && currentIcao === airport) syncSiaMapOverlay();
+}
+
+function toggleSiaMapOverlay(forceVisible) {
+  if (!siaOverlayKey) return;
+  const overlay = $("sia-map-overlay");
+  const visible = forceVisible ?? overlay.classList.contains("hidden");
+  overlay.classList.toggle("hidden", !visible);
+  $("map-sia").classList.toggle("active", visible);
+  $("map-sia").setAttribute("aria-pressed", String(visible));
 }
 
 function siaApproachCard(plan) {
@@ -796,7 +1462,7 @@ function siaApproachCard(plan) {
   const head = el("div", "sia-card-head");
   const title = el("div");
   title.append(el("div", "card-kicker", "Source officielle"));
-  title.append(el("h2", null, "Carte d’approche SIA"));
+  title.append(el("h2", null, "Carte d’approche officielle"));
   head.append(title);
   const status = el("span", "badge", "Recherche…");
   head.append(status);
@@ -814,7 +1480,9 @@ function siaApproachCard(plan) {
   }
 
   fetchSiaApproach(plan).then((data) => {
-    status.textContent = `AIRAC ${data.chart.effective_date}`;
+    if (currentPlan !== plan) return;
+    setSiaMapCandidate("arrival", arrival.icao, data);
+    status.textContent = `${officialProviderName(data)} · AIRAC ${data.chart.effective_date}`;
     content.innerHTML = "";
     content.append(el("p", "sia-chart-title", data.chart.title.replaceAll("_", " ")));
 
@@ -852,7 +1520,7 @@ function siaApproachCard(plan) {
     details.append(el("summary", null, "Afficher la carte officielle"));
     const frame = el("iframe");
     frame.src = data.pdf_url;
-    frame.title = `Carte SIA ${data.chart.title}`;
+    frame.title = `Carte ${officialProviderName(data)} ${data.chart.title}`;
     frame.loading = "lazy";
     details.append(frame);
     content.append(details);
@@ -867,6 +1535,178 @@ function siaApproachCard(plan) {
     content.append(el("p", "stat-note", String(error.message || error)));
   });
   return wrapper;
+}
+
+function fetchOfficialAirport(icao) {
+  const key = String(icao || "").toUpperCase();
+  if (officialAirportRequests.has(key)) return officialAirportRequests.get(key);
+  const request = fetch(`/api/charts/airport/${encodeURIComponent(key)}`).then(async (response) => {
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Catalogue officiel indisponible.");
+    return payload;
+  });
+  officialAirportRequests.set(key, request);
+  request.catch(() => officialAirportRequests.delete(key));
+  return request;
+}
+
+function normaliseChartText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "");
+}
+
+function preferredOfficialChartIndex(charts, role, airport) {
+  const runway = normaliseChartText(airport?.runway?.value);
+  const sid = normaliseChartText(airport?.sid?.value);
+  const star = normaliseChartText(airport?.star?.value);
+  const approach = String(airport?.approach?.value || "").toUpperCase();
+  const approachType = ["ILS", "RNP", "RNAV", "LOC", "VOR", "NDB"]
+    .find((kind) => approach.includes(kind));
+  const approachVariant = approach.match(/\b(?:ILS|RNP|RNAV|LOC|VOR|NDB)\s+([XYZ])\b/)?.[1];
+
+  const scores = charts.map((chart) => {
+    const title = normaliseChartText(
+      `${chart.title} ${chart.filename} ${chart.procedure_ident || ""}`
+    );
+    let score = 0;
+    if (role === "Départ") {
+      if (chart.category === "Départs SID") score += 120;
+      if (chart.category === "Aérodrome et roulage") score += 30;
+      if (sid && title.includes(sid)) score += 220;
+    } else {
+      if (chart.category === "Approches IAC") score += 150;
+      if (chart.category === "Arrivées STAR") score += 70;
+      if (chart.category === "Aérodrome et roulage") score += 20;
+      if (star && title.includes(star)) score += 120;
+      if (approachType && title.includes(approachType)) score += 90;
+      if (approachVariant && title.includes(`${approachType}${approachVariant}`)) score += 45;
+    }
+    if (runway && (
+      title.includes(`RWY${runway}`)
+      || title.includes(`R${runway}`)
+      || title.includes(`I${runway}`)
+    )) score += 100;
+    return score;
+  });
+  return scores.reduce(
+    (best, score, index) => score > scores[best] ? index : best,
+    0
+  );
+}
+
+function officialAirportLibrary(icao, role, mapRole, airport, plan) {
+  const card = el("article", "sia-airport-library");
+  const head = el("div", "sia-library-head");
+  const heading = el("div");
+  heading.append(el("div", "card-kicker", role), el("h2", null, icao));
+  const status = el("span", "badge", "Chargement…");
+  head.append(heading, status);
+  card.append(head, el("p", "stat-note", "Recherche des publications officielles en vigueur."));
+
+  fetchOfficialAirport(icao).then((data) => {
+    if (currentPlan !== plan) return;
+    card.replaceChildren(head);
+    status.textContent = `${officialProviderName(data)} · AIRAC ${data.effective_date}`;
+    if (!data.charts.length) {
+      card.append(el("p", "stat-note", "Aucun document publié pour cet aérodrome."));
+      return;
+    }
+
+    const controls = el("div", "sia-document-controls");
+    const field = el("label", "field");
+    field.append(el("span", null, "Document"));
+    const select = el("select");
+    const groups = new Map();
+    data.charts.forEach((chart, index) => {
+      if (!groups.has(chart.category)) {
+        const group = document.createElement("optgroup");
+        group.label = chart.category;
+        groups.set(chart.category, group);
+        select.append(group);
+      }
+      const option = el("option", null, chart.title.replaceAll("_", " "));
+      option.value = String(index);
+      groups.get(chart.category).append(option);
+    });
+    select.value = String(preferredOfficialChartIndex(data.charts, role, airport));
+    field.append(select);
+
+    const actions = el("div", "sia-document-actions");
+    const display = el("button", "btn-primary", "Afficher le PDF");
+    display.type = "button";
+    const external = el("a", "icon-btn", "Ouvrir dans un nouvel onglet");
+    external.target = "_blank";
+    external.rel = "noopener";
+    actions.append(display, external);
+    controls.append(field, actions);
+
+    const availability = el("p", "stat-note");
+    const frame = el("iframe", "sia-document-frame hidden");
+    frame.loading = "lazy";
+
+    const updateSelection = () => {
+      const chart = data.charts[Number(select.value)];
+      external.href = chart.pdf_url;
+      setSiaMapCandidate(mapRole, icao, {
+        provider: data.provider,
+        source: data.source,
+        chart,
+        pdf_url: chart.pdf_url,
+      });
+      availability.textContent = chart.georeferenced
+        ? `Calque disponible lorsque la carte affiche ${role.toLowerCase()} ${icao}.`
+        : `PDF ${officialProviderName(data)} consultable. Aucun calque proposé : ce document n’a pas de géoréférencement validé.`;
+      if (!frame.classList.contains("hidden")) {
+        frame.src = chart.pdf_url;
+        frame.title = `Carte ${officialProviderName(data)} ${chart.title}`;
+      }
+    };
+    select.addEventListener("change", updateSelection);
+    display.addEventListener("click", () => {
+      const chart = data.charts[Number(select.value)];
+      frame.src = chart.pdf_url;
+      frame.title = `Carte ${officialProviderName(data)} ${chart.title}`;
+      frame.classList.remove("hidden");
+    });
+    card.append(controls, availability, frame);
+    updateSelection();
+  }).catch((error) => {
+    status.textContent = "Indisponible";
+    card.append(el("p", "stat-note", String(error.message || error)));
+  });
+  return card;
+}
+
+function renderOfficialCharts(plan) {
+  const panel = $("panel-sia");
+  panel.innerHTML = "";
+  const intro = el("div", "section-head");
+  const title = el("div");
+  title.append(
+    el("div", "card-kicker", "Sources AIS nationales officielles · FAA d-TPP"),
+    el("h2", null, "Cartes des aérodromes du vol")
+  );
+  intro.append(title);
+  panel.append(
+    intro,
+    el("p", "stat-note", "Le document proposé par défaut correspond au plan courant. Vous pouvez ensuite choisir un autre PDF du départ ou de l’arrivée. Le calque n’apparaît que pour un document géoréférencé et pour l’aérodrome actuellement affiché.")
+  );
+  const grid = el("div", "sia-library-grid");
+  for (const [role, mapRole, airport] of [
+    ["Départ", "departure", plan.departure],
+    ["Arrivée", "arrival", plan.arrival],
+  ]) {
+    const icao = airport?.icao;
+    if (!icao) continue;
+    grid.append(officialAirportLibrary(icao, role, mapRole, airport, plan));
+  }
+  if (!grid.childElementCount) {
+    grid.append(el("p", "stat-note", "Chargez un plan contenant un départ et une arrivée."));
+  }
+  panel.append(grid);
 }
 
 function minimaEditor(plan, minima) {
@@ -1003,6 +1843,7 @@ function renderMcdu(plan) {
     arr &&
       mcduPage("PERF APPR", [
         arr.wind && mcduLine("WIND", windLabel(arr.wind)),
+        arr.wind?.qnh_hpa && mcduLine("QNH", `${Math.round(arr.wind.qnh_hpa)} hPa`),
         minima.category && mcduLine("CAT", minima.category),
         minima.mode === "RADIO" && minima.dh_ft &&
           mcduLine("RADIO", `${minima.dh_ft} ft`, "DH carte"),
@@ -1049,6 +1890,7 @@ function renderMapBar(plan) {
       icao: plan.departure.icao,
       runway: plan.departure.runway?.value || null,
       role: "départ",
+      mapRole: "departure",
     });
   }
   if (plan.arrival) {
@@ -1056,23 +1898,28 @@ function renderMapBar(plan) {
       icao: plan.arrival.icao,
       runway: plan.arrival.runway?.value || null,
       role: "arrivée",
+      mapRole: "arrival",
     });
   }
 
   for (const entry of entries) {
     const button = el("button", "airport-btn");
+    button.dataset.mapRole = entry.mapRole;
     button.textContent = entry.icao;
     button.append(el("small", null, entry.runway ? `${entry.role} · ${entry.runway}` : entry.role));
-    button.addEventListener("click", () => loadChart(entry.icao, entry.runway));
+    button.addEventListener("click", () => loadChart(entry.icao, entry.runway, entry.mapRole));
     bar.append(button);
   }
 
-  if (entries.length) loadChart(entries[0].icao, entries[0].runway);
+  if (entries.length) loadChart(entries[0].icao, entries[0].runway, entries[0].mapRole);
 }
 
-async function loadChart(icao, runway) {
+async function loadChart(icao, runway, mapRole) {
   for (const button of document.querySelectorAll(".airport-btn")) {
-    button.classList.toggle("active", button.textContent.startsWith(icao));
+    button.classList.toggle(
+      "active",
+      button.textContent.startsWith(icao) && button.dataset.mapRole === mapRole
+    );
   }
 
   const params = new URLSearchParams();
@@ -1087,12 +1934,17 @@ async function loadChart(icao, runway) {
     }
     currentChart = await response.json();
     currentIcao = icao;
+    currentMapRole = mapRole;
+    syncSiaMapOverlay();
     MAP.setChart(currentChart);
-    const route = (currentPlan?.enroute?.route_path || []).map((point) => {
-      const projected = projectToChart(point.lat, point.lon);
-      return { ...projected, ident: point.ident, via: point.via };
-    });
-    MAP.setRoute(route);
+    const routeSegments = flightStagePaths(currentPlan).map((segment) => ({
+      stage: segment.stage,
+      points: segment.points.map((point) => {
+        const projected = projectToChart(point.lat, point.lon);
+        return { ...projected, ident: point.ident, via: point.via };
+      }),
+    }));
+    MAP.setRouteSegments(routeSegments);
     MAP.resize();
     updateHud(null);
 
@@ -1162,8 +2014,24 @@ function updateHud(aircraft) {
   }
 }
 
+function applyAircraftState(aircraft, shouldRecord = true) {
+  latestAircraft = aircraft;
+  if (currentChart) {
+    const point = projectToChart(aircraft.latitude, aircraft.longitude);
+    MAP.setAircraft({
+      x: point.x,
+      y: point.y,
+      heading: aircraft.heading_true_deg,
+    });
+  }
+  updateHud(aircraft);
+  updateRouteStripProgress(aircraft);
+  updateFlightPanel(aircraft);
+  if (shouldRecord) recordFlightPoint(aircraft);
+}
+
 async function pollLive() {
-  if (!currentChart) return;
+  if (replayActive || !currentChart) return;
 
   const params = new URLSearchParams({
     demo: $("demo-toggle").checked ? "1" : "0",
@@ -1177,15 +2045,18 @@ async function pollLive() {
       setLiveState(false, data.reason || "Simulateur non connecté");
       MAP.clearAircraft();
       updateHud(null);
+      updateRouteStripProgress(null);
+      latestAircraft = null;
+      updateFlightPanel(null);
       return;
     }
     const aircraft = data.aircraft;
-    const point = projectToChart(aircraft.latitude, aircraft.longitude);
     setLiveState(true, `${aircraft.source} · en direct`);
-    MAP.setAircraft({ x: point.x, y: point.y, heading: aircraft.heading_true_deg });
-    updateHud(aircraft);
+    applyAircraftState(aircraft, true);
   } catch (error) {
     setLiveState(false, "Erreur de liaison");
+    updateRouteStripProgress(null);
+    updateFlightPanel(null);
   }
 }
 
@@ -1201,7 +2072,7 @@ function selectTab(name) {
   for (const button of document.querySelectorAll(".tabs button")) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
-  for (const key of ["map", "constraints", "dispatch", "aircraft", "mcdu", "raw"]) {
+  for (const key of ["map", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "raw"]) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
@@ -1224,18 +2095,44 @@ $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-ground").addEventListener("click", () => MAP.toggleGroundDetails());
+$("map-sia").addEventListener("click", () => toggleSiaMapOverlay());
+$("sia-overlay-close").addEventListener("click", () => toggleSiaMapOverlay(false));
+$("sia-opacity").addEventListener("input", (event) => {
+  $("sia-map-frame").style.opacity = String(Number(event.target.value) / 100);
+});
 $("map-route").addEventListener("click", () => MAP.fitRoute());
 $("settings-open").addEventListener("click", openSettings);
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);
+$("settings-language").addEventListener("change", (event) => {
+  window.I18N.setLanguage(event.target.value);
+});
 $("shutdown").addEventListener("click", shutdownApplication);
 $("sim-status").addEventListener("click", pollSimulatorStatus);
 $("terminal-toggle").addEventListener("click", toggleTerminal);
 
 setTerminalCollapsed(localStorage.getItem(TERMINAL_COLLAPSED_KEY) === "true");
+window.I18N.apply();
+
+window.addEventListener("navixav:languagechange", () => {
+  setTerminalCollapsed(localStorage.getItem(TERMINAL_COLLAPSED_KEY) === "true");
+  if (currentPlan) renderPlan(currentPlan);
+  loadStatus().catch(() => {});
+  pollSimulatorStatus();
+});
 
 pollSimulatorStatus();
 simulatorTimer = setInterval(pollSimulatorStatus, 2500);
 
-loadStatus();
+async function initialiseApplication() {
+  try {
+    $("demo-toggle").checked = false;
+    const status = await loadStatus();
+    if (status.simbrief_configured) await buildPlan();
+  } catch (error) {
+    showBanner("error", "Initialisation impossible", [String(error)]);
+  }
+}
+
+initialiseApplication();

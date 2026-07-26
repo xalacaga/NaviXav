@@ -17,10 +17,12 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 import requests
 
+from navixav.paths import user_data_path
+
 AIRAC_ANCHOR = date(2020, 1, 2)
 AIRAC_INTERVAL_DAYS = 28
 SIA_ROOT = "https://www.sia.aviation-civile.gouv.fr/media/dvd"
-DEFAULT_CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "cache" / "sia"
+DEFAULT_CACHE_DIR = user_data_path("cache", "sia")
 USER_AGENT = "NaviXav/0.1 (local flight simulation tool)"
 
 
@@ -40,6 +42,11 @@ class SiaChart:
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("local_path", None)
+        payload["category"] = chart_category(self.title)
+        payload["georeferenced"] = bool(
+            self.local_path
+            and self.local_path.with_suffix(".georef.json").is_file()
+        )
         return payload
 
 
@@ -100,6 +107,25 @@ def _issue_root(effective: date) -> str:
 
 def _normalise(value: str) -> str:
     return re.sub(r"[^A-Z0-9]+", "_", value.upper()).strip("_")
+
+
+def chart_category(title: str) -> str:
+    name = f"_{_normalise(title)}_"
+    if "_IAC_" in name:
+        return "Approches IAC"
+    if "_SID_" in name:
+        return "Départs SID"
+    if "_STAR_" in name:
+        return "Arrivées STAR"
+    if any(token in name for token in ("_ADC_", "_APDC_", "_GMC_")):
+        return "Aérodrome et roulage"
+    if "_AOC_" in name:
+        return "Obstacles"
+    if "_DATA_" in name:
+        return "Données"
+    if "_VAC_" in name:
+        return "Approches à vue"
+    return "Autres cartes"
 
 
 def _chart_score(chart: SiaChart, runway: str, approach: str) -> int:
@@ -272,7 +298,12 @@ class SiaClient:
             decoded_href = unquote(href)
             filename = Path(urlsplit(decoded_href).path).name
             normalised = _normalise(title or filename)
-            if "_IAC_" not in f"_{normalised}_" or "_FNA_" not in f"_{normalised}_":
+            href_path = urlsplit(decoded_href).path.replace("\\", "/").upper()
+            if (
+                not filename.lower().endswith(".pdf")
+                or f"CARTES/{icao}/" not in href_path
+                or f"_{icao}_" not in f"_{normalised}_"
+            ):
                 continue
             charts.append(
                 SiaChart(
@@ -285,6 +316,42 @@ class SiaClient:
             )
         return charts
 
+    def list_airport_charts(self, icao: str) -> tuple[date, list[SiaChart]]:
+        """Toutes les cartes PDF du dernier eAIP disponible pour un aérodrome."""
+        icao = icao.strip().upper()
+        if not re.fullmatch(r"[A-Z]{4}", icao):
+            raise SiaError("Code OACI invalide.")
+        for effective in self._issues():
+            charts = self._catalogue(icao, effective)
+            if charts:
+                return effective, charts
+        raise SiaError(f"Aucune publication SIA trouvée pour {icao}.")
+
+    def has_georeference(self, chart: SiaChart) -> bool:
+        """Indique si un alignement contrôlé existe à côté du PDF en cache."""
+        sidecar = (
+            self.cache_dir
+            / chart.effective_date
+            / chart.icao
+            / chart.filename
+        ).with_suffix(".georef.json")
+        return sidecar.is_file()
+
+    def get_airport_chart(self, icao: str, filename: str) -> SiaChart:
+        """Résout un document du catalogue, sans accepter de chemin arbitraire."""
+        safe_name = Path(filename).name
+        if safe_name != filename or not safe_name.lower().endswith(".pdf"):
+            raise SiaError("Nom de carte SIA invalide.")
+        _effective, charts = self.list_airport_charts(icao)
+        selected = next(
+            (chart for chart in charts if chart.filename == safe_name),
+            None,
+        )
+        if selected is None:
+            raise SiaError("Carte absente du catalogue SIA courant.")
+        local_path = self._download(selected)
+        return self._with_local_path(selected, local_path)
+
     def find_approach(
         self, icao: str, runway: str, approach: str
     ) -> tuple[SiaChart, SiaMinima | None]:
@@ -296,15 +363,17 @@ class SiaClient:
             raise SiaError("Piste ou approche absente.")
 
         for effective in self._issues():
-            charts = self._catalogue(icao, effective)
+            charts = [
+                chart
+                for chart in self._catalogue(icao, effective)
+                if "_IAC_" in f"_{_normalise(chart.title)}_"
+                and "_FNA_" in f"_{_normalise(chart.title)}_"
+            ]
             selected = choose_chart(charts, runway, approach)
             if selected is None:
                 continue
             local_path = self._download(selected)
-            selected = SiaChart(
-                **selected.to_dict(),
-                local_path=local_path,
-            )
+            selected = self._with_local_path(selected, local_path)
             minima = (
                 extract_primary_ils_minima(local_path)
                 if re.search(r"\bILS\b", approach.upper())
@@ -313,6 +382,17 @@ class SiaClient:
             return selected, minima
         raise SiaError(
             f"Aucune carte finale SIA trouvée pour {icao}, RWY {runway}, {approach}."
+        )
+
+    @staticmethod
+    def _with_local_path(chart: SiaChart, local_path: Path) -> SiaChart:
+        return SiaChart(
+            icao=chart.icao,
+            title=chart.title,
+            filename=chart.filename,
+            url=chart.url,
+            effective_date=chart.effective_date,
+            local_path=local_path,
         )
 
     def _download(self, chart: SiaChart) -> Path:

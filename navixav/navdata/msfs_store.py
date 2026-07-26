@@ -16,7 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-DEFAULT_STORE = Path(__file__).resolve().parents[2] / "data" / "navixav.sqlite"
+from navixav.paths import user_data_path
+
+DEFAULT_STORE = user_data_path("navixav.sqlite")
 SCHEMA_VERSION = 1
 
 EARTH_RADIUS_M = 6378137.0

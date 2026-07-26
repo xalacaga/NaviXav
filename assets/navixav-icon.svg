@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="background" x1="28" y1="18" x2="224" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102441"/>
+      <stop offset="1" stop-color="#07111f"/>
+    </linearGradient>
+    <linearGradient id="aircraft" x1="76" y1="38" x2="174" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67d8ff"/>
+      <stop offset="1" stop-color="#149ee8"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#background)"/>
+  <path
+    fill="url(#aircraft)"
+    d="M128 30c-10 0-17 9-17 19v63L35 158v27l76-25v36l-25 17v19l42-12 42 12v-19l-25-17v-36l76 25v-27l-76-46V49c0-10-7-19-17-19Z"
+  />
+  <path fill="#dff7ff" opacity=".55" d="M123 48h10v157l-5-2-5 2Z"/>
+</svg>

@@ -1,4 +1,4 @@
-"""La fiche MCDU doit parler Airbus, pas Navigraph.
+"""La fiche MCDU emploie le vocabulaire Airbus.
 
 Le point critique est le couple VIA / TRANS de la page ARRIVAL : ce sont deux
 transitions différentes, aux deux extrémités de la STAR.

@@ -46,6 +46,8 @@ class WindInfo:
     speed_kt: int | None = None
     gust_kt: int | None = None
     variable: bool = False
+    qnh_hpa: int | None = None
+    altimeter_inhg: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -87,6 +89,7 @@ class DepartureBlock:
     sid_transition: Choice = field(default_factory=Choice)
     transition_altitude_ft: int | None = None
     sid_constraints: list[ConstraintRow] = field(default_factory=list)
+    sid_path: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -98,6 +101,7 @@ class DepartureBlock:
             "sid_transition": self.sid_transition.to_dict(),
             "transition_altitude_ft": self.transition_altitude_ft,
             "sid_constraints": [c.to_dict() for c in self.sid_constraints],
+            "sid_path": self.sid_path,
         }
 
 
@@ -121,6 +125,8 @@ class ArrivalBlock:
     transition_level_ft: int | None = None
     star_constraints: list[ConstraintRow] = field(default_factory=list)
     approach_constraints: list[ConstraintRow] = field(default_factory=list)
+    star_path: list[dict[str, Any]] = field(default_factory=list)
+    approach_path: list[dict[str, Any]] = field(default_factory=list)
     missed_approach_altitude_ft: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -143,6 +149,8 @@ class ArrivalBlock:
             "transition_level_ft": self.transition_level_ft,
             "star_constraints": [c.to_dict() for c in self.star_constraints],
             "approach_constraints": [c.to_dict() for c in self.approach_constraints],
+            "star_path": self.star_path,
+            "approach_path": self.approach_path,
             "missed_approach_altitude_ft": self.missed_approach_altitude_ft,
         }
 

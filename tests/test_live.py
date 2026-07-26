@@ -38,6 +38,7 @@ def test_position_and_speed_units():
     assert units["PLANE LONGITUDE"] == "Degrees"
     assert units["PLANE ALTITUDE"] == "Feet"
     assert units["GROUND VELOCITY"] == "Knots"
+    assert units["AIRSPEED INDICATED"] == "Knots"
     assert units["VERTICAL SPEED"] == "Feet per minute"
 
 
@@ -60,6 +61,7 @@ def test_simconnect_source_maps_direct_values(monkeypatch):
                 "PLANE HEADING DEGREES TRUE": 371.5,
                 "PLANE HEADING DEGREES MAGNETIC": -2.0,
                 "GROUND VELOCITY": 185.0,
+                "AIRSPEED INDICATED": 172.0,
                 "VERTICAL SPEED": -700.0,
                 "SIM ON GROUND": 0.0,
             }
@@ -80,6 +82,7 @@ def test_simconnect_source_maps_direct_values(monkeypatch):
     assert state.heading_true_deg == 11.5
     assert state.heading_magnetic_deg == 358.0
     assert state.ground_speed_kt == 185.0
+    assert state.indicated_airspeed_kt == 172.0
     assert state.vertical_speed_fpm == -700.0
     assert not state.on_ground
     assert state.source == "SimConnect"

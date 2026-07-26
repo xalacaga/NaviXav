@@ -1,0 +1,409 @@
+"use strict";
+
+/*
+ * Interface translations are intentionally kept in the front end: the selected
+ * language is a display preference and never changes flight-planning data.
+ * Add a locale by extending TRANSLATIONS and the language selector in index.html.
+ */
+(() => {
+  const STORAGE_KEY = "navixav-language";
+  const TRANSLATIONS = {
+    fr: {
+      subtitle: "Compléteur de plan de vol IFR",
+      source_title: "Navigation et procédures récupérées directement par SimConnect",
+      source: "Source · MSFS",
+      demo_title: "Utiliser le vol de démonstration LFST → LFBO",
+      demo: "Démo",
+      settings: "Paramètres",
+      settings_title: "Configurer NaviXav",
+      sim_title: "État de la connexion à Microsoft Flight Simulator",
+      sim_offline: "MSFS hors ligne",
+      quit: "Quitter",
+      quit_title: "Arrêter NaviXav et libérer le port",
+      complete: "Compléter le plan",
+      terminal_title: "Départ · Route · Arrivée",
+      collapse: "Réduire",
+      tab_map: "Carte",
+      tab_flight: "Suivi du vol",
+      tab_constraints: "Contraintes",
+      tab_dispatch: "Dispatch",
+      tab_aircraft: "Avion",
+      tab_charts: "Cartes officielles",
+      tab_mcdu: "Fiche MCDU",
+      tab_json: "JSON",
+      searching_sim: "Recherche du simulateur…",
+      basemap: "Fond carte",
+      basemap_title: "Afficher ou masquer le fond OpenStreetMap",
+      ground: "Détails sol",
+      ground_title: "Afficher les voies de circulation et les postes",
+      overlay: "Calque officiel",
+      overlay_title: "Afficher la carte officielle géoréférencée de cet aérodrome",
+      full_route: "Route complète",
+      full_route_title: "Voir toute la route",
+      follow: "Suivre",
+      follow_title: "Suivre l’avion",
+      fit: "Ajuster",
+      fit_title: "Voir tout le terrain",
+      zoom_out: "Dézoomer",
+      zoom_in: "Zoomer",
+      opacity: "Opacité",
+      close: "Fermer",
+      overlay_valid: "Calque géoréférencé validé",
+      legend_runway: "piste",
+      legend_selected_runway: "piste retenue",
+      legend_route: "route",
+      legend_approach: "approche",
+      legend_taxiway: "voie de circulation",
+      legend_parking: "poste",
+      no_plan: "Aucun plan chargé",
+      loading_latest: "Recherche automatique de ton dernier OFP SimBrief…",
+      settings_saved_local: "Enregistrés localement sur cet ordinateur.",
+      language: "Langue de l’interface",
+      pilot_username: "SimBrief username",
+      pilot_username_placeholder: "alternative au Pilot ID",
+      metar_source: "Source METAR",
+      live_metar: "METAR en direct",
+      approach_preference: "Préférence d’approche",
+      max_tailwind: "Vent arrière maximal (kt)",
+      max_crosswind: "Vent traversier maximal (kt)",
+      min_runway: "Longueur de piste minimale (ft)",
+      rnp_aircraft: "Avion compatible RNP",
+      cancel: "Annuler",
+      save: "Enregistrer",
+      expand: "Développer",
+      sim_connected: "MSFS connecté",
+      server_stopped: "Serveur arrêté",
+      stopping: "Arrêt…",
+      calculating: "Calcul…",
+      no_simbrief: "Aucun compte SimBrief configuré. Ouvre Paramètres, ou active le mode Démo.",
+      saving: "Enregistrement…",
+      saved: "Paramètres enregistrés.",
+      stopped_title: "NaviXav est arrêté",
+      stopped_body: "Le processus et le port 8765 ont été libérés. Tu peux fermer cette fenêtre.",
+      loading_plan: "SimBrief · cache MSFS…",
+      cache_title: "Préparation du plan en cours",
+      cache_body: "Lors du premier chargement d’un aérodrome ou d’une procédure, NaviXav remplit son cache depuis MSFS. Cette étape peut prendre plusieurs dizaines de secondes ; les chargements suivants seront plus rapides.",
+      ground_speed: "Vitesse sol",
+      ground_speed_note: "GS mesurée par MSFS",
+      air_speed: "Vitesse air",
+      air_speed_note: "Vitesse indiquée IAS",
+    },
+    en: {
+      subtitle: "IFR flight plan assistant",
+      source_title: "Navigation and procedures retrieved directly through SimConnect",
+      source: "Source · MSFS",
+      demo_title: "Use the LFST → LFBO demonstration flight",
+      demo: "Demo",
+      settings: "Settings",
+      settings_title: "Configure NaviXav",
+      sim_title: "Microsoft Flight Simulator connection status",
+      sim_offline: "MSFS offline",
+      quit: "Quit",
+      quit_title: "Stop NaviXav and release the port",
+      complete: "Complete flight plan",
+      terminal_title: "Departure · Route · Arrival",
+      collapse: "Collapse",
+      tab_map: "Map",
+      tab_flight: "Flight tracking",
+      tab_constraints: "Constraints",
+      tab_dispatch: "Dispatch",
+      tab_aircraft: "Aircraft",
+      tab_charts: "Official charts",
+      tab_mcdu: "MCDU sheet",
+      tab_json: "JSON",
+      searching_sim: "Searching for simulator…",
+      basemap: "Base map",
+      basemap_title: "Show or hide the OpenStreetMap base map",
+      ground: "Ground details",
+      ground_title: "Show taxiways and parking stands",
+      overlay: "Official overlay",
+      overlay_title: "Show this airport’s georeferenced official chart",
+      full_route: "Full route",
+      full_route_title: "Show the complete route",
+      follow: "Follow",
+      follow_title: "Follow the aircraft",
+      fit: "Fit",
+      fit_title: "Show the whole airport",
+      zoom_out: "Zoom out",
+      zoom_in: "Zoom in",
+      opacity: "Opacity",
+      close: "Close",
+      overlay_valid: "Validated georeferenced overlay",
+      legend_runway: "runway",
+      legend_selected_runway: "selected runway",
+      legend_route: "route",
+      legend_approach: "approach",
+      legend_taxiway: "taxiway",
+      legend_parking: "stand",
+      no_plan: "No flight plan loaded",
+      loading_latest: "Automatically retrieving your latest SimBrief OFP…",
+      settings_saved_local: "Saved locally on this computer.",
+      language: "Interface language",
+      pilot_username: "SimBrief username",
+      pilot_username_placeholder: "alternative to Pilot ID",
+      metar_source: "METAR source",
+      live_metar: "Live METAR",
+      approach_preference: "Approach preference",
+      max_tailwind: "Maximum tailwind (kt)",
+      max_crosswind: "Maximum crosswind (kt)",
+      min_runway: "Minimum runway length (ft)",
+      rnp_aircraft: "RNP-capable aircraft",
+      cancel: "Cancel",
+      save: "Save",
+      expand: "Expand",
+      sim_connected: "MSFS connected",
+      server_stopped: "Server stopped",
+      stopping: "Stopping…",
+      calculating: "Calculating…",
+      no_simbrief: "No SimBrief account is configured. Open Settings or enable Demo mode.",
+      saving: "Saving…",
+      saved: "Settings saved.",
+      stopped_title: "NaviXav has stopped",
+      stopped_body: "The process and port 8765 have been released. You may close this window.",
+      loading_plan: "SimBrief · MSFS cache…",
+      cache_title: "Preparing flight plan",
+      cache_body: "When an airport or procedure is loaded for the first time, NaviXav fills its cache from MSFS. This may take several tens of seconds; subsequent loads will be faster.",
+      ground_speed: "Ground speed",
+      ground_speed_note: "GS reported by MSFS",
+      air_speed: "Airspeed",
+      air_speed_note: "Indicated airspeed (IAS)",
+    },
+  };
+
+  Object.assign(TRANSLATIONS, {
+    de: {
+      subtitle: "IFR-Flugplanassistent", source_title: "Navigation und Verfahren direkt über SimConnect",
+      source: "Quelle · MSFS", demo_title: "Demoflug LFST → LFBO verwenden", demo: "Demo",
+      settings: "Einstellungen", settings_title: "NaviXav konfigurieren", sim_title: "Verbindungsstatus zu Microsoft Flight Simulator",
+      sim_offline: "MSFS offline", quit: "Beenden", quit_title: "NaviXav beenden und Port freigeben",
+      complete: "Flugplan vervollständigen", terminal_title: "Abflug · Route · Ankunft", collapse: "Einklappen",
+      tab_map: "Karte", tab_flight: "Flugverfolgung", tab_constraints: "Beschränkungen", tab_dispatch: "Dispatch",
+      tab_aircraft: "Flugzeug", tab_charts: "Offizielle Karten", tab_mcdu: "MCDU-Daten", tab_json: "JSON",
+      searching_sim: "Simulator wird gesucht…", basemap: "Grundkarte", ground: "Bodendetails",
+      overlay: "Offizielles Overlay", full_route: "Gesamte Route", follow: "Folgen", fit: "Anpassen",
+      opacity: "Deckkraft", close: "Schließen", no_plan: "Kein Flugplan geladen",
+      loading_latest: "Letzter SimBrief-OFP wird automatisch abgerufen…",
+      settings_saved_local: "Lokal auf diesem Computer gespeichert.", language: "Oberflächensprache",
+      pilot_username: "SimBrief-Benutzername", pilot_username_placeholder: "Alternative zur Pilot ID",
+      metar_source: "METAR-Quelle", live_metar: "Live-METAR", approach_preference: "Bevorzugter Anflug",
+      max_tailwind: "Maximaler Rückenwind (kt)", max_crosswind: "Maximaler Seitenwind (kt)",
+      min_runway: "Minimale Pistenlänge (ft)", rnp_aircraft: "RNP-fähiges Flugzeug",
+      cancel: "Abbrechen", save: "Speichern",
+    },
+    es: {
+      subtitle: "Asistente de plan de vuelo IFR", source_title: "Navegación y procedimientos obtenidos directamente mediante SimConnect",
+      source: "Fuente · MSFS", demo_title: "Usar el vuelo de demostración LFST → LFBO", demo: "Demo",
+      settings: "Ajustes", settings_title: "Configurar NaviXav", sim_title: "Estado de conexión con Microsoft Flight Simulator",
+      sim_offline: "MSFS desconectado", quit: "Salir", quit_title: "Detener NaviXav y liberar el puerto",
+      complete: "Completar plan de vuelo", terminal_title: "Salida · Ruta · Llegada", collapse: "Contraer",
+      tab_map: "Mapa", tab_flight: "Seguimiento", tab_constraints: "Restricciones", tab_dispatch: "Despacho",
+      tab_aircraft: "Avión", tab_charts: "Cartas oficiales", tab_mcdu: "Ficha MCDU", tab_json: "JSON",
+      searching_sim: "Buscando el simulador…", basemap: "Mapa base", ground: "Detalles de tierra",
+      overlay: "Capa oficial", full_route: "Ruta completa", follow: "Seguir", fit: "Ajustar",
+      opacity: "Opacidad", close: "Cerrar", no_plan: "Ningún plan cargado",
+      loading_latest: "Recuperando automáticamente tu último OFP de SimBrief…",
+      settings_saved_local: "Guardados localmente en este equipo.", language: "Idioma de la interfaz",
+      pilot_username: "Usuario de SimBrief", pilot_username_placeholder: "alternativa al Pilot ID",
+      metar_source: "Fuente METAR", live_metar: "METAR en directo", approach_preference: "Preferencia de aproximación",
+      max_tailwind: "Viento de cola máximo (kt)", max_crosswind: "Viento cruzado máximo (kt)",
+      min_runway: "Longitud mínima de pista (ft)", rnp_aircraft: "Avión compatible con RNP",
+      cancel: "Cancelar", save: "Guardar",
+    },
+    it: {
+      subtitle: "Assistente al piano di volo IFR", source_title: "Navigazione e procedure recuperate direttamente tramite SimConnect",
+      source: "Fonte · MSFS", demo_title: "Usa il volo dimostrativo LFST → LFBO", demo: "Demo",
+      settings: "Impostazioni", settings_title: "Configura NaviXav", sim_title: "Stato connessione a Microsoft Flight Simulator",
+      sim_offline: "MSFS non connesso", quit: "Esci", quit_title: "Arresta NaviXav e libera la porta",
+      complete: "Completa piano di volo", terminal_title: "Partenza · Rotta · Arrivo", collapse: "Riduci",
+      tab_map: "Mappa", tab_flight: "Monitoraggio volo", tab_constraints: "Vincoli", tab_dispatch: "Dispatch",
+      tab_aircraft: "Aeromobile", tab_charts: "Carte ufficiali", tab_mcdu: "Scheda MCDU", tab_json: "JSON",
+      searching_sim: "Ricerca del simulatore…", basemap: "Mappa di base", ground: "Dettagli a terra",
+      overlay: "Sovrapposizione ufficiale", full_route: "Rotta completa", follow: "Segui", fit: "Adatta",
+      opacity: "Opacità", close: "Chiudi", no_plan: "Nessun piano caricato",
+      loading_latest: "Recupero automatico dell’ultimo OFP SimBrief…",
+      settings_saved_local: "Salvati localmente su questo computer.", language: "Lingua dell’interfaccia",
+      pilot_username: "Nome utente SimBrief", pilot_username_placeholder: "alternativa al Pilot ID",
+      metar_source: "Fonte METAR", live_metar: "METAR in diretta", approach_preference: "Preferenza di avvicinamento",
+      max_tailwind: "Vento in coda massimo (kt)", max_crosswind: "Vento al traverso massimo (kt)",
+      min_runway: "Lunghezza minima pista (ft)", rnp_aircraft: "Aeromobile abilitato RNP",
+      cancel: "Annulla", save: "Salva",
+    },
+    pt: {
+      subtitle: "Assistente de plano de voo IFR", source_title: "Navegação e procedimentos obtidos diretamente pelo SimConnect",
+      source: "Fonte · MSFS", demo_title: "Usar o voo de demonstração LFST → LFBO", demo: "Demo",
+      settings: "Definições", settings_title: "Configurar NaviXav", sim_title: "Estado da ligação ao Microsoft Flight Simulator",
+      sim_offline: "MSFS offline", quit: "Sair", quit_title: "Parar NaviXav e libertar a porta",
+      complete: "Completar plano de voo", terminal_title: "Partida · Rota · Chegada", collapse: "Recolher",
+      tab_map: "Mapa", tab_flight: "Acompanhamento", tab_constraints: "Restrições", tab_dispatch: "Despacho",
+      tab_aircraft: "Aeronave", tab_charts: "Cartas oficiais", tab_mcdu: "Ficha MCDU", tab_json: "JSON",
+      searching_sim: "A procurar o simulador…", basemap: "Mapa base", ground: "Detalhes de solo",
+      overlay: "Sobreposição oficial", full_route: "Rota completa", follow: "Seguir", fit: "Ajustar",
+      opacity: "Opacidade", close: "Fechar", no_plan: "Nenhum plano carregado",
+      loading_latest: "A obter automaticamente o último OFP SimBrief…",
+      settings_saved_local: "Guardado localmente neste computador.", language: "Idioma da interface",
+      pilot_username: "Utilizador SimBrief", pilot_username_placeholder: "alternativa ao Pilot ID",
+      metar_source: "Fonte METAR", live_metar: "METAR em direto", approach_preference: "Preferência de aproximação",
+      max_tailwind: "Vento de cauda máximo (kt)", max_crosswind: "Vento cruzado máximo (kt)",
+      min_runway: "Comprimento mínimo da pista (ft)", rnp_aircraft: "Aeronave com capacidade RNP",
+      cancel: "Cancelar", save: "Guardar",
+    },
+    nl: {
+      subtitle: "IFR-vluchtplanassistent", source_title: "Navigatie en procedures rechtstreeks opgehaald via SimConnect",
+      source: "Bron · MSFS", demo_title: "Demovlucht LFST → LFBO gebruiken", demo: "Demo",
+      settings: "Instellingen", settings_title: "NaviXav instellen", sim_title: "Verbindingsstatus met Microsoft Flight Simulator",
+      sim_offline: "MSFS offline", quit: "Afsluiten", quit_title: "NaviXav stoppen en poort vrijgeven",
+      complete: "Vluchtplan aanvullen", terminal_title: "Vertrek · Route · Aankomst", collapse: "Inklappen",
+      tab_map: "Kaart", tab_flight: "Vlucht volgen", tab_constraints: "Beperkingen", tab_dispatch: "Dispatch",
+      tab_aircraft: "Vliegtuig", tab_charts: "Officiële kaarten", tab_mcdu: "MCDU-blad", tab_json: "JSON",
+      searching_sim: "Simulator zoeken…", basemap: "Basiskaart", ground: "Gronddetails",
+      overlay: "Officiële overlay", full_route: "Volledige route", follow: "Volgen", fit: "Passend maken",
+      opacity: "Dekking", close: "Sluiten", no_plan: "Geen vluchtplan geladen",
+      loading_latest: "Je laatste SimBrief-OFP wordt automatisch opgehaald…",
+      settings_saved_local: "Lokaal opgeslagen op deze computer.", language: "Interfacetaal",
+      pilot_username: "SimBrief-gebruikersnaam", pilot_username_placeholder: "alternatief voor Pilot ID",
+      metar_source: "METAR-bron", live_metar: "Live METAR", approach_preference: "Naderingsvoorkeur",
+      max_tailwind: "Maximale rugwind (kt)", max_crosswind: "Maximale zijwind (kt)",
+      min_runway: "Minimale baanlengte (ft)", rnp_aircraft: "RNP-geschikt vliegtuig",
+      cancel: "Annuleren", save: "Opslaan",
+    },
+    pl: {
+      subtitle: "Asystent planu lotu IFR", source_title: "Nawigacja i procedury pobierane bezpośrednio przez SimConnect",
+      source: "Źródło · MSFS", demo_title: "Użyj lotu demonstracyjnego LFST → LFBO", demo: "Demo",
+      settings: "Ustawienia", settings_title: "Skonfiguruj NaviXav", sim_title: "Stan połączenia z Microsoft Flight Simulator",
+      sim_offline: "MSFS offline", quit: "Zakończ", quit_title: "Zatrzymaj NaviXav i zwolnij port",
+      complete: "Uzupełnij plan lotu", terminal_title: "Odlot · Trasa · Przylot", collapse: "Zwiń",
+      tab_map: "Mapa", tab_flight: "Śledzenie lotu", tab_constraints: "Ograniczenia", tab_dispatch: "Dispatch",
+      tab_aircraft: "Samolot", tab_charts: "Oficjalne mapy", tab_mcdu: "Karta MCDU", tab_json: "JSON",
+      searching_sim: "Wyszukiwanie symulatora…", basemap: "Mapa bazowa", ground: "Szczegóły naziemne",
+      overlay: "Oficjalna nakładka", full_route: "Pełna trasa", follow: "Śledź", fit: "Dopasuj",
+      opacity: "Krycie", close: "Zamknij", no_plan: "Nie wczytano planu lotu",
+      loading_latest: "Automatyczne pobieranie ostatniego OFP SimBrief…",
+      settings_saved_local: "Zapisano lokalnie na tym komputerze.", language: "Język interfejsu",
+      pilot_username: "Nazwa użytkownika SimBrief", pilot_username_placeholder: "alternatywa dla Pilot ID",
+      metar_source: "Źródło METAR", live_metar: "METAR na żywo", approach_preference: "Preferowane podejście",
+      max_tailwind: "Maksymalny wiatr tylny (kt)", max_crosswind: "Maksymalny wiatr boczny (kt)",
+      min_runway: "Minimalna długość pasa (ft)", rnp_aircraft: "Samolot z obsługą RNP",
+      cancel: "Anuluj", save: "Zapisz",
+    },
+  });
+
+  const ELEMENTS = {
+    ".brand-sub": "subtitle",
+    ".nav-source": "source",
+    ".switch-label": "demo",
+    "#settings-open": "settings",
+    "#sim-status-text": "sim_offline",
+    "#shutdown": "quit",
+    "#refresh span": "complete",
+    ".terminal-toolbar > span": "terminal_title",
+    "#terminal-toggle": "collapse",
+    '[data-tab="map"]': "tab_map",
+    '[data-tab="flight"]': "tab_flight",
+    '[data-tab="constraints"]': "tab_constraints",
+    '[data-tab="dispatch"]': "tab_dispatch",
+    '[data-tab="aircraft"]': "tab_aircraft",
+    '[data-tab="sia"]': "tab_charts",
+    '[data-tab="mcdu"]': "tab_mcdu",
+    '[data-tab="raw"]': "tab_json",
+    "#live-text": "searching_sim",
+    "#map-basemap": "basemap",
+    "#map-ground": "ground",
+    "#map-sia": "overlay",
+    "#map-route": "full_route",
+    "#map-follow": "follow",
+    "#map-fit": "fit",
+    "#sia-overlay-title": "overlay",
+    ".sia-overlay-controls label": "opacity",
+    "#sia-overlay-close": "close",
+    ".sia-overlay-warning": "overlay_valid",
+    ".map-legend span:nth-child(1)": "legend_runway",
+    ".map-legend span:nth-child(2)": "legend_selected_runway",
+    ".map-legend span:nth-child(4)": "legend_route",
+    ".map-legend span:nth-child(6)": "legend_approach",
+    ".map-legend span:nth-child(7)": "legend_taxiway",
+    ".map-legend span:nth-child(8)": "legend_parking",
+    "#empty h2": "no_plan",
+    "#empty-hint": "loading_latest",
+    ".settings-head h2": "settings",
+    ".settings-head p": "settings_saved_local",
+    'label[for="settings-language"] span': "language",
+    'label[for="settings-username"] span': "pilot_username",
+    'label[for="settings-metar"] span': "metar_source",
+    '#settings-metar option[value="live"]': "live_metar",
+    'label[for="settings-approaches"] span': "approach_preference",
+    'label[for="settings-tailwind"] span': "max_tailwind",
+    'label[for="settings-crosswind"] span': "max_crosswind",
+    'label[for="settings-runway-length"] span': "min_runway",
+    "#settings-rnp-label": "rnp_aircraft",
+    "#settings-cancel": "cancel",
+    '#settings-form button[type="submit"]': "save",
+  };
+
+  const TITLES = {
+    ".nav-source": "source_title",
+    ".toolbar .switch": "demo_title",
+    "#settings-open": "settings_title",
+    "#sim-status": "sim_title",
+    "#shutdown": "quit_title",
+    "#map-basemap": "basemap_title",
+    "#map-ground": "ground_title",
+    "#map-sia": "overlay_title",
+    "#map-route": "full_route_title",
+    "#map-follow": "follow_title",
+    "#map-fit": "fit_title",
+    "#map-zoom-out": "zoom_out",
+    "#map-zoom-in": "zoom_in",
+  };
+
+  function normalise(value) {
+    return Object.prototype.hasOwnProperty.call(TRANSLATIONS, value) ? value : "fr";
+  }
+
+  function getLanguage() {
+    return normalise(localStorage.getItem(STORAGE_KEY) || "fr");
+  }
+
+  function t(key) {
+    const language = getLanguage();
+    return TRANSLATIONS[language][key] || TRANSLATIONS.en[key] || TRANSLATIONS.fr[key] || key;
+  }
+
+  function setNodeText(node, value) {
+    if (!node.children.length) {
+      node.textContent = value;
+      return;
+    }
+    const textNode = Array.from(node.childNodes).find(
+      (child) => child.nodeType === Node.TEXT_NODE && child.nodeValue.trim()
+    );
+    if (textNode) textNode.nodeValue = value;
+    else node.append(document.createTextNode(value));
+  }
+
+  function apply() {
+    const language = getLanguage();
+    document.documentElement.lang = language;
+    for (const [selector, key] of Object.entries(ELEMENTS)) {
+      const node = document.querySelector(selector);
+      if (node) setNodeText(node, t(key));
+    }
+    for (const [selector, key] of Object.entries(TITLES)) {
+      const node = document.querySelector(selector);
+      if (node) node.title = t(key);
+    }
+    const close = document.querySelector("#settings-close");
+    if (close) close.setAttribute("aria-label", t("close"));
+    const username = document.querySelector("#settings-username");
+    if (username) username.placeholder = t("pilot_username_placeholder");
+    const select = document.querySelector("#settings-language");
+    if (select) select.value = language;
+  }
+
+  function setLanguage(language) {
+    localStorage.setItem(STORAGE_KEY, normalise(language));
+    apply();
+    window.dispatchEvent(new CustomEvent("navixav:languagechange"));
+  }
+
+  window.I18N = { apply, getLanguage, setLanguage, t };
+})();

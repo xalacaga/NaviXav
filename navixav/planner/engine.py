@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 from navixav.config import Settings
-from navixav.constraints import format_altitude, procedure_constraints
+from navixav.constraints import format_altitude, procedure_constraints, procedure_path
 from navixav.geo import distance_nm
 from navixav.models import (
     ArrivalBlock,
@@ -212,6 +212,12 @@ class CompletionEngine:
             block.sid_constraints = procedure_constraints(
                 selected, block.sid_transition.value, transition_first=False
             )
+            block.sid_path = procedure_path(
+                selected,
+                block.sid_transition.value,
+                transition_first=False,
+                position_lookup=self.provider.fix_position,
+            )
         return block
 
     def _choose_departure_procedure(
@@ -387,6 +393,12 @@ class CompletionEngine:
                 block.star_constraints = procedure_constraints(
                     selected_star, block.star_transition.value, transition_first=True
                 )
+                block.star_path = procedure_path(
+                    selected_star,
+                    block.star_transition.value,
+                    transition_first=True,
+                    position_lookup=self.provider.fix_position,
+                )
         else:
             self._warn(f"Aucune STAR publiée pour {icao} dans la base.")
             block.star = Choice(None, Confidence.NONE, reason="aucune STAR en base")
@@ -416,6 +428,12 @@ class CompletionEngine:
                     selected_approach,
                     block.approach_transition.value,
                     transition_first=True,
+                )
+                block.approach_path = procedure_path(
+                    selected_approach,
+                    block.approach_transition.value,
+                    transition_first=True,
+                    position_lookup=self.provider.fix_position,
                 )
                 block.missed_approach_altitude_ft = (
                     selected_approach.missed_approach_altitude_ft

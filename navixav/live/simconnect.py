@@ -23,6 +23,7 @@ _VARIABLES = (
     ("PLANE HEADING DEGREES TRUE", "Degrees"),
     ("PLANE HEADING DEGREES MAGNETIC", "Degrees"),
     ("GROUND VELOCITY", "Knots"),
+    ("AIRSPEED INDICATED", "Knots"),
     ("VERTICAL SPEED", "Feet per minute"),
     ("SIM ON GROUND", "Bool"),
 )
@@ -90,6 +91,7 @@ class SimConnectSource:
                 heading_true_deg=values["PLANE HEADING DEGREES TRUE"] % 360,
                 heading_magnetic_deg=values["PLANE HEADING DEGREES MAGNETIC"] % 360,
                 ground_speed_kt=values["GROUND VELOCITY"],
+                indicated_airspeed_kt=values["AIRSPEED INDICATED"],
                 vertical_speed_fpm=values["VERTICAL SPEED"],
                 on_ground=bool(values["SIM ON GROUND"]),
                 source=self.name,

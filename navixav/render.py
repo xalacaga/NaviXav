@@ -1,4 +1,4 @@
-"""Rendu terminal du plan complété, dans l'esprit du panneau Navigraph."""
+"""Rendu terminal du plan complété sous forme de panneau de préparation IFR."""
 
 from __future__ import annotations
 

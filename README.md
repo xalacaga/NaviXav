@@ -1,395 +1,545 @@
 # NaviXav
 
-Compléteur de plan de vol IFR. Récupère le dernier OFP généré dans SimBrief,
-puis reconstitue localement ce que SimBrief ne fournit pas de façon fiable :
-**piste en service, SID, STAR, approche et transitions** — le contenu du panneau
-gauche de Navigraph, sans Navigraph.
+**Documentation :** Français · [English](README.en.md) ·
+[Deutsch](README.de.md) · [Español](README.es.md) ·
+[Italiano](README.it.md) · [Português](README.pt.md) ·
+[Nederlands](README.nl.md) · [Polski](README.pl.md)
 
-```text
-DÉPART   LFST · Entzheim
-Piste    05              élevée    [SimBrief] face +6 kt · trav. 1 kt · ILS ENT
-SID      EPIK8M          élevée    [SimBrief] SID filée par SimBrief et validée en base
-Trans.   EPIKO           élevée    [calculé]  point de sortie de la SID ; rejoint la route
+NaviXav est une application locale d’assistance au vol IFR pour Microsoft
+Flight Simulator. Elle récupère le dernier plan de vol SimBrief, complète les
+informations terminales avec les données du simulateur et les présente dans
+une interface adaptée à la préparation du vol et à la saisie du MCDU.
 
-ROUTE    EPIK8M EPIKO LIRKO MOKIP GERVA AFRIC AFRI8N
+L’application possède sa propre fenêtre Windows. Son interface est rendue par
+Microsoft WebView2 et communique uniquement avec un service local lié à
+`127.0.0.1`. Aucun navigateur externe n’est ouvert. Les réglages, la base de
+navigation et les caches restent sur l’ordinateur.
 
-ARRIVÉE  LFBO · Blagnac
-Piste    32R             modérée   [calculé]  face +8 kt · configuration préférentielle
-STAR     AFRI8N          élevée    [SimBrief] STAR filée par SimBrief et validée en base
-Trans.   AFRIC           élevée    [calculé]  point d'entrée de la STAR
-Approche ILS Z RWY 32R   élevée    [calculé]  préférence ILS et transition depuis ADIMO
-Tr. app. ADIMO           élevée    [calculé]  transition partant de la sortie de la STAR
-ILS      108.35 MHz
-```
+La fenêtre est entièrement redimensionnable. L’interface réorganise ses
+panneaux, ses commandes, ses onglets et la hauteur de la carte selon l’espace
+disponible, jusqu’à une taille minimale de 720 × 560 pixels.
 
-## Principe
+> NaviXav est destiné à la simulation de vol uniquement. Les informations
+> affichées doivent être vérifiées avec les publications officielles et les
+> instructions ATC applicables.
 
-Le chaînage est celui d'un FMS, par égalité de points de raccord :
+## Fonctionnalités
 
-```text
-SID  --[fix de sortie]-->  premier point en route
-dernier point en route  --[fix d'entrée]-->  STAR
-STAR --[fix de sortie]-->  transition d'approche  -->  approche
-```
+### Plan de vol SimBrief
 
-Sur l'exemple LFST → LFBO : la STAR `AFRI8N` se termine à **ADIMO**, et
-`ILS Z RWY 32R` publie précisément une transition **ADIMO**. Le maillon est
-exact, donc la confiance est élevée.
+- récupération automatique du dernier OFP au démarrage ;
+- prise en charge du Pilot ID ou du nom d’utilisateur SimBrief ;
+- affichage de la route complète, de l’origine à la destination ;
+- mise en évidence du prochain point de route selon la position réelle de
+  l’avion, avec atténuation des points déjà franchis ;
+- masses, carburant, temps de vol, dégagement et données de dispatch ;
+- informations sur l’appareil, l’immatriculation et l’équipement déclaré.
 
-Chaque élément retenu porte sa **source** (`SimBrief`, `calculé`, `imposé`), sa
-**justification** et un **niveau de confiance** :
+### Préparation IFR
 
-| Confiance | Signification |
-|-----------|---------------|
-| élevée    | maillon retrouvé par égalité de fix, ou valeur SimBrief validée en base |
-| modérée   | reconstitué par proximité géographique, ou choix serré |
-| faible    | aucun lien trouvé ; à vérifier avant utilisation |
+NaviXav complète et présente :
 
-Le moteur ne masque jamais un choix incertain, et liste les alternatives dans
-la sortie JSON.
+- la piste de départ et la piste d’arrivée ;
+- la SID et sa transition ;
+- la STAR et sa transition ;
+- l’approche et sa VIA ;
+- la fréquence et l’identifiant ILS ;
+- les contraintes d’altitude et de vitesse ;
+- l’altitude de transition et le niveau de transition ;
+- l’altitude d’interception de l’approche ;
+- l’altitude d’approche interrompue ;
+- la justification et le niveau de confiance de chaque choix.
 
-## Démarrage rapide
+Les blocs **Départ · Route · Arrivée** peuvent être réduits afin de libérer de
+l’espace dans l’interface.
 
-Double-cliquer sur **`NaviXav.bat`**. Au premier lancement il crée
-l'environnement virtuel, installe les dépendances et génère `.env` ; ensuite il
-démarre directement l'application et ouvre le navigateur.
+### Suivi du vol
 
-Il accepte les mêmes options que la commande `web` :
+L’onglet **Suivi du vol** exploite la position MSFS en temps réel pour afficher :
 
-```powershell
-NaviXav.bat --port 9000
-NaviXav.bat --no-open
-```
+- la phase de vol détectée automatiquement ;
+- la vitesse sol (GS) et la vitesse air indiquée (IAS) fournies par MSFS ;
+- le prochain point et sa distance ;
+- l’écart latéral par rapport au segment actif ;
+- la distance restante ;
+- la prochaine contrainte d’altitude ou de vitesse ;
+- le taux vertical nécessaire pour atteindre cette contrainte ;
+- le Top of Descent et un taux de descente indicatif sur une pente de 3° ;
+- l’écart par rapport au profil vertical prévu.
 
-## Application web locale
+La trace du vol est enregistrée localement toutes les cinq secondes. Elle peut
+être mise en pause, effacée ou rejouée depuis l’interface. Aucun historique
+n’est envoyé vers un service externe.
 
-```powershell
-navixav web
-```
+### Fiche MCDU
 
-Ouvre `http://127.0.0.1:8765` — le serveur n'écoute que sur la boucle locale,
-le Pilot ID et le dispatch ne quittent pas la machine.
+L’onglet **Fiche MCDU** regroupe les informations à saisir dans un FMS Airbus :
 
-- **Onglet Carte** : plan de terrain et suivi de l'avion en temps réel.
-- **Bandeau de route** : la chaîne complète en pastilles, de `LFST` à `LFBO`,
-  comme le fil d'Ariane de Navigraph.
-- **Trois cartes terminales** : départ, route, arrivée. Chaque élément porte une
-  pastille de confiance et sa justification.
-- **Onglet Contraintes** : altitudes et vitesses publiées de la SID, de la STAR
-  et de l'approche, VIA comprise.
-- **Onglet Dispatch** : masses et carburant de l'OFP, avec jauges de marge par
-  rapport aux maximums.
-- **Onglet Fiche MCDU** : rendu écran vert, prêt à recopier.
-- **Onglet JSON** : la sortie brute.
+- `FROM/TO`, numéro de vol et dégagement ;
+- Cost Index et niveau de croisière ;
+- ZFW, carburant bloc, roulage, trajet et réserves ;
+- piste, SID, transition et altitude de transition ;
+- route `VIA/TO` ;
+- STAR, transition, approche et VIA ;
+- QNH, température, vent, fréquence ILS et axe final ;
+- minima RADIO ou BARO et RVR.
 
-Le commutateur **Démo** charge le vol de référence LFST → LFBO, utile tant
-qu'aucun OFP n'existe sur le compte SimBrief.
+### Connexion directe à MSFS
 
-Options : `--port`, `--host`, `--no-open`.
+NaviXav utilise SimConnect pour :
 
-## Fiche de saisie MCDU
+- détecter la présence du simulateur ;
+- afficher un voyant vert ou rouge dans la barre supérieure ;
+- suivre la position de l’avion en temps réel ;
+- lire l’altitude, la hauteur sol, le cap, la vitesse sol et la vitesse
+  verticale ;
+- récupérer les aéroports, pistes, procédures, repères et installations radio ;
+- constituer progressivement une base locale dans `data/navixav.sqlite`.
 
-`navixav plan --mcdu` traduit le plan dans le vocabulaire du FMS Airbus, prêt à
-être saisi à la main après un import SimBrief dans l'EFB.
+Le simulateur doit être lancé avec un vol chargé pour récupérer de nouvelles
+données. Les informations déjà mises en cache restent disponibles hors ligne.
 
-```text
-F-PLN › ARRIVAL
-RWY         32R ⚠             330°/8 kt
-APPR        ILS Z RWY 32R
-VIA         ADIMO             transition d'APPROCHE
-STAR        AFRI8N
-TRANS       AFRIC             transition d'entrée de STAR
+### Carte
 
-À confirmer à l'ATIS avant saisie : piste arrivée
-```
+La carte comprend :
 
-Le piège de la page ARRIVAL est là : **`VIA` et `TRANS` sont deux transitions
-différentes, aux deux extrémités de la STAR.**
+- un fond OpenStreetMap ;
+- la route SimBrief dessinée avec ses points ;
+- des couleurs distinctes pour la SID, la partie en route, la STAR et
+  l’approche ;
+- les pistes et la piste sélectionnée ;
+- la position et le cap de l’avion ;
+- une trace du déplacement ;
+- un mode de suivi automatique ;
+- le zoom, le déplacement et l’ajustement au terrain ou à la route ;
+- des détails sol optionnels pour les taxiways et les postes de stationnement.
 
-| Champ MCDU | Contenu | Exemple |
-|---|---|---|
-| `APPR` | procédure d'approche | ILS Z RWY 32R |
-| `VIA` | transition d'**approche** — fin de STAR vers l'approche | ADIMO |
-| `STAR` | arrivée normalisée | AFRI8N |
-| `TRANS` | transition d'**entrée de STAR** — depuis la route | AFRIC |
+Les détails sol sont masqués par défaut pour conserver une carte lisible. Le
+bouton **Détails sol** permet de les afficher lorsque nécessaire.
 
-Le marqueur ⚠ signale les éléments dont la confiance ne suffit pas pour saisir
-sans vérifier l'ATIS — ici la piste, retenue par départage entre 32R et 32L.
+### Cartes AIS nationales officielles
 
-## Carte et suivi temps réel
+NaviXav interroge directement les publications des autorités nationales, sans
+passer par EUROCONTROL/EAD :
 
-L'onglet **Carte** dessine le plan du terrain depuis la navdata — pistes, voies
-de circulation, postes de stationnement — et y superpose ta position réelle,
-rafraîchie chaque seconde.
+- France : SIA eAIP (`LF`) ;
+- Espagne et Canaries : ENAIRE AIP (`LE`, `GC`, `GE`) ;
+- Pays-Bas : LVNL eAIP (`EH`) ;
+- États-Unis et territoires couverts : FAA d-TPP.
 
-- La **piste retenue par le moteur** est mise en évidence : on voit d'un coup
-  d'œil vers quel seuil rouler.
-- Molette pour zoomer, glisser pour déplacer, **Suivre** pour centrer sur
-  l'avion, **Ajuster** pour revoir tout le terrain.
-- Une trace suit le roulage, avec échelle et rose des vents.
+Pour ces aérodromes, NaviXav peut :
 
-### Source de position
+- présenter dans l’onglet **Cartes officielles** tous les PDF du départ et de
+  l’arrivée, classés par type ;
+- ouvrir chaque document dans l’interface ou séparément ;
+- sélectionner par défaut la SID, la STAR ou l’approche correspondant au vol
+  courant ;
+- retrouver automatiquement la carte d’approche correspondant à la piste et au
+  type d’approche retenus ;
+- télécharger à la demande uniquement les PDF consultés ;
+- conserver la publication dans le cache AIRAC local ;
+- afficher la carte officielle dans la fiche MCDU ;
+- extraire les minima ILS CAT I SIA lorsque le format est reconnu ;
+- proposer la DA, la DH et la RVR avant validation.
 
-Une seule source, sans configuration : **SimConnect**, en lecture directe dans
-MSFS. Rien à installer côté simulateur et aucune application intermédiaire.
+Les valeurs extraites ne sont jamais appliquées silencieusement : elles doivent
+être validées dans l’interface. Le bouton **Calque officiel** n’est proposé que pour
+un document possédant un géoréférencement validé. Il suit le choix de carte :
+le PDF du départ ne peut être superposé que sur le départ, et celui de l’arrivée
+que sur l’arrivée. Cette règle est identique pour toutes les sources.
 
-Sans simulateur, la carte reste utilisable et l'état est annoncé clairement.
-Le commutateur **Démo** rejoue un roulage du parking vers le seuil de piste.
+Un pays n’est ajouté à la liste automatique qu’après validation d’un accès
+direct et stable à ses PDF officiels. Une source absente n’est donc jamais
+remplacée silencieusement par un agrégateur tiers.
 
-### Géométrie du sol
+## Prérequis
 
-Les pistes, voies de circulation et parkings sont récupérés directement depuis
-MSFS et conservés dans le cache local NaviXav.
+- Windows 10 ou Windows 11 en 64 bits ;
+- Microsoft WebView2 Runtime, installé automatiquement par l’installateur ;
+- Microsoft Flight Simulator pour les données et le suivi en temps réel ;
+- un compte SimBrief avec un OFP généré ;
+- une connexion Internet pour SimBrief, le fond cartographique et les
+  publications AIS nationales ou FAA.
 
-## Choisir entre ILS X, Y et Z
+L’installateur inclut Python, les bibliothèques, pywebview, le connecteur
+SimConnect autonome de NaviXav et le bootstrapper Microsoft WebView2 signé. Aucun de ces outils
+n’est à installer séparément. MSFS n’est pas obligatoire pour essayer le mode
+Démo ou consulter les données déjà enregistrées.
 
-Quand plusieurs procédures du même type desservent la même piste, l'OACI les
-distingue par une lettre attribuée **en partant de Z, à rebours** : Z, puis Y,
-puis X. Deux conséquences contre-intuitives :
+SimConnect n’est jamais installé ni réinstallé dans Windows par NaviXav.
+L’application embarque une copie privée de la DLL moderne dans son propre
+dossier. Si la machine possède déjà SimConnect, son installation, sa version et
+ses réglages ne sont ni remplacés ni modifiés. Cette DLL privée dialogue avec le
+service SimConnect de MSFS : seul le simulateur doit être installé et lancé pour
+recevoir les données en direct.
 
-- **Z est la première publiée, pas la dernière.**
-- **La lettre ne porte aucune notion de priorité.** Elle n'est qu'un identifiant.
+### Langues de l’interface
 
-NaviXav ne s'y fie donc jamais. Il classe sur la **structure**, que la base
-décrit précisément. À LFBO piste 32R :
+La langue se choisit dans **Paramètres**, s’applique immédiatement et reste
+mémorisée sur l’ordinateur. NaviXav fournit les interfaces française, anglaise,
+allemande, espagnole, italienne, portugaise, néerlandaise et polonaise. Les
+abréviations aéronautiques, identifiants de procédures, METAR et valeurs MCDU
+restent volontairement dans leur notation internationale.
 
-| | **ILS Z RWY 32R** | **ILS Y RWY 32R** |
-|---|---|---|
-| Entrée | `IO32R` — IAF publié | `CF32R` — repère d'interception fictif |
-| Transitions | ADIMO, AGENO, FUZAP, OGRIL, SULIT | aucune |
-| Approche interrompue | 5 legs `TF` publiés | `CA` puis `VM` — montée dans l'axe, puis vecteurs |
-| Équipement | **RNP 1 requis** | aucune exigence |
+## Installation rapide sous Windows
 
-La raison d'être de Y est dans la dernière ligne : permettre à un avion non RNP
-de faire l'ILS avec une remise de gaz conventionnelle.
+1. Télécharger `NaviXav-Setup-0.1.0.exe`.
+2. Lancer l’installateur.
+3. Vérifier la page de contrôle des prérequis.
+4. Conserver ou modifier le dossier proposé, puis cliquer sur **Installer**.
+5. Lancer NaviXav depuis le menu Démarrer ou le raccourci facultatif du bureau.
 
-Le classement applique donc, dans l'ordre :
+L’installateur vérifie Microsoft WebView2 et l’installe automatiquement s’il
+manque. L’installation se fait pour l’utilisateur courant et ne demande
+normalement pas de droits administrateur.
 
-1. **Équipement** — une approche exigeant le RNP est éliminée si l'avion n'est
-   pas qualifié (`AIRCRAFT_RNP_CAPABLE`, ou `--no-rnp`).
-2. **Raccord à la STAR** — la STAR `AFRI8N` finit à ADIMO, que seule Z publie.
-3. **Mode d'arrivée** — avec une STAR on veut une entrée publiée ; sans STAR on
-   sera vectoré, donc la variante à repère d'interception.
-4. **Type d'approche** — `APPROACH_PREFERENCE`.
+Une archive portable est également disponible : extraire
+`NaviXav-0.1.0-windows-x64-portable.zip`, puis lancer `NaviXav.exe`. Sur une
+machine dépourvue de WebView2, utiliser d’abord l’installateur complet.
 
-La lettre n'intervient qu'en tout dernier ressort, pour rendre le tri
-déterministe, jamais comme préférence.
-
-## Base de navigation NaviXav
-
-NaviXav lit **directement MSFS 2024** par l'API Facilities de SimConnect, et
-constitue sa propre base. Ni Navigraph, ni Little Navmap.
-
-```powershell
-navixav import LFST LFBO
-```
-
-```text
-┌──────┬───────────┬────────┬─────┬──────┬───────────┬───────┐
-│ OACI │ Terrain   │ Pistes │ SID │ STAR │ Approches │   Sol │
-├──────┼───────────┼────────┼─────┼──────┼───────────┼───────┤
-│ LFST │ Entzheim  │      2 │  13 │   13 │         7 │   378 │
-│ LFBO │ Blagnac   │      4 │  23 │   14 │        14 │ 2 953 │
-└──────┴───────────┴────────┴─────┴──────┴───────────┴───────┘
-```
-
-**À la demande, pas en masse.** Importer les 84 000 terrains prendrait des
-heures pour une base qui vieillit aussitôt. Un vol en concerne deux ou trois,
-récupérés en **0,4 s chacun** avec le simulateur ouvert, puis conservés dans
-`data/navixav.sqlite` et consultables simulateur fermé.
-
-Les repères, installations radio et routes aériennes se résolvent de la même
-façon, au fil des besoins.
-
-### Champs établis par sondage
-
-Le SDK MSFS installé ne contient aucune documentation locale. Les définitions de
-[navixav/msfs/fields.py](navixav/msfs/fields.py) ont donc été obtenues en
-interrogeant le simulateur champ par champ, le type étant déduit de la taille de
-réponse. Trois pièges que la supposition aurait manqués :
-
-- **Tout est en mètres**, les fréquences en hertz, les suffixes de procédure en
-  code ASCII (48 = pas de suffixe).
-- Les blocs enfants arrivent en **messages distincts et typés**, pas dans la
-  charge du parent.
-- **Une transition de piste n'a ni nom ni type** : elle s'identifie par la piste.
-  Les trois sortes de transition n'ont pas la même forme.
-
-Le décodeur **vérifie la taille de charge** avant tout découpage : un champ
-refusé décalerait sinon toutes les valeurs suivantes, sans le dire.
-
-### Reconstruction des procédures
-
-MSFS ne publie aucun segment au niveau de la procédure : tout est réparti dans
-les transitions de piste. Mesuré sur LFPO : une SID en a exactement **une** (216
-sur 216), une STAR en a **trois** (32 sur 32). NaviXav reconstitue donc le tronc
-commun et ne conserve en branches que ce qui diverge — d'où `AGOP2A → sortie
-AGOPA` et `AMB9E → entrée AMB`, conformes à la convention de nommage.
-
-### Validation
-
-L'extraction a été confrontée à Little Navmap sur LFPO : **zéro divergence** sur
-le nom, la position, l'altitude, l'altitude de transition, les six extrémités de
-piste, les 216 SID et les 32 STAR. Les fréquences ILS et les positions de
-repères se recoupent également au chiffre près.
-
-## Installation
+### Depuis les sources
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[dev]"
-copy .env.example .env
+git clone https://github.com/xalacaga/NaviXav.git
+cd NaviXav
+.\NaviXav.bat
 ```
 
-Renseigner ensuite `SIMBRIEF_PILOT_ID` dans `.env` (SimBrief → *Account
-Settings* → *SimBrief Pilot ID*). Le fichier `.env` est ignoré par git : le
-Pilot ID n'est jamais versionné.
+Au premier lancement, le script :
 
-## Utilisation
+1. recherche Python ;
+2. crée l’environnement virtuel `.venv` ;
+3. installe NaviXav et ses dépendances ;
+4. démarre le service local privé ;
+5. ouvre l’interface dans la fenêtre NaviXav.
+
+Les lancements suivants réutilisent l’environnement déjà installé.
+
+### Construire une distribution
+
+Depuis PowerShell, dans le dossier du projet :
 
 ```powershell
-# Compléter le dernier OFP SimBrief
-navixav plan
-
-# Fiche de saisie MCDU (vocabulaire Airbus)
-navixav plan --mcdu
-
-# Sortie JSON, ou fichier
-navixav plan --json
-navixav plan --out plan.json
-
-# Travailler hors ligne sur un OFP enregistré
-navixav plan --save-ofp ofp.json
-navixav plan --ofp ofp.json
-
-# Forcer un élément
-navixav plan --arr-rwy 14L --approach "ILS Z RWY 14L"
-navixav plan --metar-arr "LFBO 260730Z 14015KT CAVOK 21/11 Q1018"
-
-# Alimenter et inspecter la base (simulateur ouvert pour l'import)
-navixav import LFST LFBO
-navixav navdata
-navixav airport LFBO --runway 32R
+.\scripts\build_windows.ps1
 ```
+
+Le script :
+
+1. contrôle Windows 64 bits, Python et le SDK SimConnect ;
+2. installe les outils de construction manquants ;
+3. récupère le bootstrapper WebView2 officiel et vérifie sa signature
+   Microsoft ;
+4. exécute les tests hors intégration MSFS en direct ;
+5. produit l’installateur, l’archive portable et leurs sommes SHA-256 dans
+   `release\`.
+
+Le SDK SimConnect mentionné à l’étape 1 concerne uniquement la machine qui
+construit NaviXav. Il n’est pas installé sur les machines des utilisateurs.
+
+### Fichiers de distribution
+
+Après une construction réussie :
+
+| Fichier | Usage |
+|---|---|
+| `release\NaviXav-Setup-0.1.0.exe` | installateur Windows recommandé |
+| `release\NaviXav-0.1.0-windows-x64-portable.zip` | version portable |
+| `release\*.sha256` | empreintes de contrôle des fichiers distribués |
+
+Le dossier `release\` est volontairement ignoré par Git. Les exécutables sont
+des artefacts de construction à publier dans une version GitHub, pas des
+sources à versionner.
+
+## Installation manuelle
+
+Depuis PowerShell, dans le dossier du projet :
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m navixav.desktop
+```
+
+Cette commande ouvre la fenêtre NaviXav. Pour un diagnostic du service local
+sans fenêtre :
+
+```powershell
+.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+```
+
+Le service reste alors accessible uniquement sur `http://127.0.0.1:8765`.
 
 ## Configuration
 
-Tout est dans `.env` (voir [.env.example](.env.example)) :
+La configuration courante se fait depuis le bouton **Paramètres** de
+l’interface.
 
-| Variable | Rôle |
-|----------|------|
-| `SIMBRIEF_PILOT_ID` | identifiant SimBrief (ou `SIMBRIEF_USERNAME`) |
-| `NAVDATA_STORE` | base NaviXav ; vide = `data/navixav.sqlite` |
-| `METAR_SOURCE` | `simbrief` (METAR de l'OFP), `awc` (temps réel), `none` |
-| `AIRCRAFT_RNP_CAPABLE` | qualification RNP de l'avion |
-| `APPROACH_PREFERENCE` | ordre de préférence des approches |
-| `MAX_TAILWIND_KT`, `MAX_CROSSWIND_KT` | limites de vent |
-| `MIN_RUNWAY_LENGTH_FT` | longueur minimale exigée |
-| `AIRPORT_PREFERENCES` | fichier des configurations préférentielles |
+### Compte SimBrief
 
-### Configurations préférentielles
+Renseigner l’un des deux champs :
 
-Le vent et la longueur ne suffisent pas à reproduire la réalité opérationnelle.
-À LFBO, 32L est plus longue que 32R, mais les **arrivées** se font en 32R et les
-**départs** en 32L. Cette répartition ne figure dans aucun cycle AIRAC ; elle est
-déclarée dans [data/airport_preferences.json](data/airport_preferences.json) :
+- **Pilot ID SimBrief** : identifiant numérique affiché dans les paramètres du
+  compte SimBrief ;
+- **Nom d’utilisateur SimBrief** : alias du compte.
 
-```json
-{
-  "LFBO": {
-    "arrival":   ["32R", "14L"],
-    "departure": ["32L", "14R"],
-    "note": "arrivées sur la piste sud-est, départs sur la piste nord-ouest"
-  }
-}
+Le Pilot ID est recommandé. Après enregistrement, NaviXav récupère
+immédiatement le dernier OFP disponible. À chaque nouveau démarrage, ce dernier
+plan est chargé automatiquement.
+
+### Réglages disponibles
+
+L’interface permet également de configurer :
+
+- la source METAR ;
+- l’ordre de préférence des approches ;
+- la composante maximale de vent arrière ;
+- la composante maximale de vent traversier ;
+- la longueur minimale de piste ;
+- la capacité RNP de l’appareil.
+
+Dans la version installée, les valeurs sont conservées dans
+`%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+## Première utilisation
+
+1. Générer un plan de vol dans SimBrief.
+2. Lancer Microsoft Flight Simulator et charger un vol.
+3. Démarrer NaviXav depuis le menu Démarrer, ou avec `NaviXav.bat` en mode
+   développement.
+4. Ouvrir **Paramètres** et enregistrer le Pilot ID SimBrief.
+5. Attendre le chargement automatique du dernier OFP.
+6. Vérifier le voyant **MSFS connecté** en haut à droite.
+7. Contrôler les choix de piste, SID, STAR et approche.
+8. Consulter les contraintes et la carte officielle.
+9. Valider les minima avant de les recopier dans le MCDU.
+
+Le bouton **Compléter le plan** permet de récupérer à nouveau le dernier OFP
+après avoir généré ou modifié un vol dans SimBrief.
+
+## Utilisation de la carte
+
+- **Fond carte** : affiche ou masque OpenStreetMap.
+- **Détails sol** : affiche les taxiways et les postes.
+- **Calque officiel** : apparaît uniquement pour la fiche géoréférencée de
+  l’aérodrome actuellement affiché et règle son opacité.
+- **Route complète** : cadre toute la route du vol.
+- **Suivre** : maintient l’avion au centre.
+- **Ajuster** : cadre l’aéroport sélectionné.
+- **+ / −** : modifie le niveau de zoom.
+- **Molette** : zoome sous le pointeur.
+- **Glisser** : déplace la carte.
+
+Les boutons d’aéroport permettent de passer rapidement du terrain de départ au
+terrain d’arrivée.
+
+## Fenêtre et affichage responsive
+
+NaviXav adapte automatiquement son interface au redimensionnement :
+
+- au-dessus de 1100 px, les cartes Départ, Route et Arrivée peuvent être
+  présentées côte à côte ;
+- sous 1100 px, ces cartes passent sur une seule colonne ;
+- sous 980 px, la barre d’outils et les commandes de carte occupent toute la
+  largeur disponible ;
+- sous 760 px, les onglets deviennent défilables, les boutons se redistribuent
+  et les tableaux restent consultables horizontalement ;
+- sous 520 px, les statistiques et les panneaux complexes passent en colonne.
+
+La carte écoute chaque changement de taille de la fenêtre et recalcule
+immédiatement son canevas. La taille minimale de la fenêtre native est
+720 × 560 pixels.
+
+## Mode Démo
+
+Le commutateur **Démo** charge un vol d’exemple et simule un déplacement au
+sol. Il permet de découvrir l’interface sans compte SimBrief ou sans
+simulateur.
+
+Le mode Démo est toujours désactivé au démarrage afin que NaviXav privilégie le
+dernier plan SimBrief.
+
+## Arrêt de l’application
+
+Utiliser le bouton **Quitter** dans la barre supérieure. NaviXav arrête
+proprement le serveur, ferme la fenêtre et la connexion SimConnect, puis libère
+le port `8765`. Fermer directement la fenêtre produit le même résultat.
+
+En mode diagnostic `--no-open`, la combinaison `Ctrl+C` dans la console
+effectue également un arrêt normal.
+
+## Options de démarrage
+
+Le lanceur Windows accepte les options suivantes :
+
+```powershell
+.\NaviXav.bat --port 9000
+.\NaviXav.bat --no-open
 ```
 
-La préférence n'intervient qu'**en départage**. Elle ne retiendra jamais une
-piste hors limites de vent : avec un vent de 140°/25 kt à LFBO, le moteur bascule
-en 14 malgré la préférence.
+- `--port` change le port local ;
+- `--no-open` lance uniquement le service local, pour le diagnostic.
 
-## Architecture
+L’adresse d’écoute reste volontairement fixée à `127.0.0.1`.
 
-```text
-navixav/
-├── config.py            variables d'environnement et réglages de l'interface
-├── models.py            plan de vol, Choice (valeur + confiance + justification)
-├── constraints.py       contraintes d'altitude et de vitesse (ARINC 424)
-├── preferences.py       configurations préférentielles de pistes
-├── chart.py             plan de terrain projeté en mètres locaux
-├── geo.py · format.py   distance orthodromique, mise en forme
-├── simbrief/
-│   ├── client.py        endpoint « dernier OFP », sans clé API
-│   └── parser.py        normalisation du JSON, dispatch, points de raccord
-├── weather/metar.py     lecture du vent (METAR = nord vrai)
-├── msfs/                extraction depuis MSFS
-│   ├── client.py        client ctypes unique : Facilities + variables de vol
-│   ├── fields.py        champs et types établis par sondage
-│   └── extract.py       aéroport, installations radio, repères, routes
-├── navdata/
-│   ├── base.py          types + protocole NavdataProvider
-│   ├── msfs_store.py    schéma et écriture de la base NaviXav
-│   └── msfs.py          lecture, complétée à la demande depuis le simulateur
-├── live/                position temps réel (SimConnect, source de démo)
-├── planner/
-│   ├── runway.py        composantes de vent, score, préférences
-│   └── engine.py        chaînage SID / STAR / approche / transitions
-├── render.py · mcdu.py  panneau terminal, fiche de saisie Airbus
-├── web/                 API locale et interface (FastAPI + canvas)
-└── cli.py               plan / import / navdata / airport / web
+## Commandes complémentaires
+
+NaviXav peut aussi être utilisé depuis PowerShell :
+
+```powershell
+# Afficher le dernier plan SimBrief
+.\.venv\Scripts\navixav.exe plan
+
+# Générer une fiche MCDU textuelle
+.\.venv\Scripts\navixav.exe plan --mcdu
+
+# Produire une sortie JSON
+.\.venv\Scripts\navixav.exe plan --json
+
+# Importer des aéroports depuis MSFS
+.\.venv\Scripts\navixav.exe import LFBO LFPO
+
+# Examiner la base locale
+.\.venv\Scripts\navixav.exe navdata
+
+# Afficher les informations d’un aéroport
+.\.venv\Scripts\navixav.exe airport LFBO --runway 32R
 ```
 
-## Diagnostic
+## Données locales
 
-SimBrief renvoie ses erreurs métier avec un code HTTP 400 et le détail dans le
-corps JSON. NaviXav lit ce corps et traduit les cas courants :
+NaviXav utilise les emplacements suivants :
 
-| Réponse SimBrief | Cause |
-|------------------|-------|
-| `No flight plan on file for the specified user` | Le Pilot ID est **correct** — SimBrief le renvoie dans sa réponse. Mais aucun OFP n'existe sur le compte. L'endpoint ne fait que relire le dernier plan produit : il faut d'abord générer un vol sur simbrief.com. |
-| `Unknown UserID` | Pilot ID inexistant. Vérifier *Account Settings → SimBrief Pilot ID*. Pour un alias, utiliser `SIMBRIEF_USERNAME`. |
+| Emplacement | Contenu |
+|---|---|
+| `%LOCALAPPDATA%\NaviXav\user_settings.json` | configuration de la version installée |
+| `%LOCALAPPDATA%\NaviXav\navixav.sqlite` | base de navigation construite depuis MSFS |
+| `%LOCALAPPDATA%\NaviXav\cache\` | cartes AIS nationales et FAA mises en cache |
+| `%LOCALAPPDATA%\NaviXav\webview\` | stockage local de la fenêtre WebView2 |
+| `%LOCALAPPDATA%\NaviXav\logs\navixav.log` | journal de la version installée |
+| `data\` et `.venv\` | données et environnement du mode développement |
 
-Pour distinguer les deux, comparer le champ `fetch.userid` de la réponse : s'il
-contient l'identifiant envoyé, celui-ci est reconnu.
+Ces données locales, les secrets et les caches ne sont pas destinés à être
+versionnés.
 
-## Points d'attention
+Le journal enregistre les démarrages et arrêts, erreurs, appels API lents,
+durées de récupération SimBrief, temps de complétion MSFS et remplissages du
+cache. Il n’enregistre ni le Pilot ID, ni le nom d’utilisateur, ni la route
+complète. Sa taille est limitée à 2 Mo avec cinq anciennes versions conservées
+(`navixav.log.1` à `navixav.log.5`).
 
-- **Le vent METAR est référencé au nord vrai**, contrairement au vent annoncé
-  par la tour ou l'ATIS qui est magnétique. Les caps de piste de la base étant
-  eux aussi vrais, la comparaison est cohérente.
-- **Les rafales sont prises en compte** dans le calcul des composantes : le
-  choix de piste est volontairement conservateur.
-- **L'approche réelle peut changer** avec la météo ou l'ATC après le calcul du
-  plan. Le niveau de confiance signale les cas incertains, mais ne remplace
-  pas la vérification de l'ATIS.
-- **Décalage de cycle AIRAC** : si le cycle SimBrief diffère de la base locale,
-  un avertissement est émis. Une procédure peut avoir été renommée ou supprimée
-  entre deux cycles.
+Lors d’un premier accès à un aérodrome ou à une procédure, l’interface prévient
+que le cache MSFS est en cours de remplissage et que l’opération peut prendre
+plusieurs dizaines de secondes. Les accès suivants réutilisent les données
+locales.
+
+## Versionnement Git
+
+Le dépôt source est prévu pour être hébergé sur :
+`https://github.com/xalacaga/NaviXav.git`.
+
+Le fichier `.gitignore` exclut notamment :
+
+- `.env`, les réglages utilisateur et les bases locales ;
+- `.claude/`, `CLAUDE.md`, `.codex/`, `AGENTS.md` et `CODEX.md` ;
+- les données Graphify et `graphify-out/` ;
+- les environnements Python, caches de tests et sorties de construction ;
+- `dist\`, `build\` et `release\`.
+
+Les mémoires Claude/Codex peuvent donc être maintenues localement sans être
+publiées dans le dépôt Git.
+
+## Dépannage
+
+### Le port 8765 est déjà utilisé
+
+Une instance de NaviXav est probablement encore ouverte. Fermer sa fenêtre ou
+cliquer sur **Quitter** dans l’interface. L’exécutable détecte une instance
+existante ; si une autre application occupe 8765, il choisit automatiquement
+un port libre entre 8766 et 8775.
+
+Pour identifier le processus :
+
+```powershell
+Get-NetTCPConnection -LocalPort 8765 -State Listen
+```
+
+Il est aussi possible de démarrer l’application sur un autre port :
+
+```powershell
+.\NaviXav.bat --port 9000
+```
+
+### La fenêtre NaviXav ne s’ouvre pas
+
+- relancer l’installateur complet afin qu’il contrôle WebView2 ;
+- vérifier que Windows et Microsoft Edge WebView2 Runtime sont à jour ;
+- consulter `%LOCALAPPDATA%\NaviXav\logs\navixav.log` ;
+- vérifier qu’un antivirus ne bloque pas `NaviXav.exe` ou les processus
+  `msedgewebview2.exe`.
+
+L’archive portable ne peut pas installer elle-même WebView2. Sur une machine
+qui ne possède pas ce composant, utiliser `NaviXav-Setup-0.1.0.exe`.
+
+### Le voyant MSFS reste rouge
+
+- vérifier que le simulateur est lancé ;
+- charger complètement un vol ;
+- attendre quelques secondes puis cliquer sur le voyant ;
+- relancer l’installateur si la copie privée de `SimConnect.dll` livrée avec
+  NaviXav a été supprimée ou mise en quarantaine par un antivirus.
+
+### Aucun plan SimBrief n’est chargé
+
+- vérifier le Pilot ID ou le nom d’utilisateur dans **Paramètres** ;
+- générer un OFP sur SimBrief avant de relancer la récupération ;
+- vérifier la connexion Internet.
+
+### Une carte officielle n’est pas disponible
+
+- vérifier que le préfixe OACI est couvert par SIA, ENAIRE, LVNL ou FAA ;
+- vérifier la connexion Internet ;
+- confirmer que la piste et l’approche ont été déterminées ;
+- utiliser la saisie manuelle des minima si l’extraction n’est pas disponible.
+
+## Limites actuelles
+
+- la procédure réellement autorisée peut différer du plan selon l’ATIS, la
+  météo et les instructions ATC ;
+- les minima dépendent de la catégorie de l’avion, de son équipement et des
+  conditions opérationnelles ;
+- l’extraction automatique des minima est limitée aux formats SIA reconnus ;
+- un PDF sans géoréférencement validé reste consultable, mais ne peut pas être
+  utilisé comme calque ;
+- les nouvelles données MSFS nécessitent que le simulateur soit accessible.
+
+Toujours confirmer les informations importantes avant leur saisie dans le
+simulateur.
+
+## Architecture et confidentialité
+
+- `navixav/desktop.py` gère la fenêtre native et le cycle de vie du processus ;
+- `navixav/web/app.py` fournit l’API FastAPI liée uniquement à
+  `127.0.0.1` ;
+- `navixav/web/static/` contient l’interface responsive HTML/CSS/JavaScript ;
+- `navixav/planner/` complète le plan IFR ;
+- `navixav/navdata/` construit et interroge la base issue de MSFS ;
+- `navixav/live/` assure le suivi SimConnect ;
+- `navixav/sia.py`, `navixav/faa.py` et `navixav/national_aip.py` gèrent les
+  publications officielles.
+
+Le service local n’écoute jamais sur le réseau extérieur. Le Pilot ID
+SimBrief, les préférences, la trace du vol et les PDF mis en cache restent sur
+la machine. Seules les requêtes nécessaires à SimBrief, OpenStreetMap, la
+météo et aux publications AIS officielles quittent l’ordinateur.
 
 ## Tests
 
-```powershell
-.venv\Scripts\python.exe -m pytest
-```
-
-161 tests, sans simulateur ni réseau : ils s'appuient sur
-[tests/data/navdata_test.sqlite](tests/data/navdata_test.sqlite), une base
-NaviXav de référence contenant LFST, LFBO et LFPO extraits de MSFS 2024. Les
-tests qui interrogent réellement le simulateur s'ignorent proprement s'il est
-fermé.
-
-Le test de bout en bout [tests/test_engine.py](tests/test_engine.py) vérifie que
-l'OFP de référence LFST → LFBO reproduit exactement le panneau cible.
-
-Pour régénérer la base de test :
+Le profil reproductible utilisé pour construire la distribution est :
 
 ```powershell
-navixav import LFST LFBO LFPO --store tests\data\navdata_test.sqlite --refresh
+.\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
 ```
 
-## Suites possibles
-
-- Export `.pln` (MSFS), `.fms` (X-Plane), format Fenix / PMDG
-- Injection directe du plan dans le simulateur via SimConnect
-- Calcul de route sur le graphe des airways, pour se passer aussi de la route
-  SimBrief
+Les tests marqués `live_msfs` interrogent un simulateur réellement démarré et
+ne font donc pas partie du contrôle automatique de l’installateur.

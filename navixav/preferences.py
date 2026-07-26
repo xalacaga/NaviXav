@@ -24,9 +24,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-DEFAULT_PREFERENCES_FILE = (
-    Path(__file__).resolve().parent.parent / "data" / "airport_preferences.json"
-)
+from navixav.paths import resource_path
+
+DEFAULT_PREFERENCES_FILE = resource_path("data", "airport_preferences.json")
 
 
 @dataclass

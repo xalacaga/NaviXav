@@ -1,4 +1,4 @@
-"""Application web locale de NaviXav."""
+"""Interface locale embarquée dans la fenêtre native NaviXav."""
 
 from __future__ import annotations
 

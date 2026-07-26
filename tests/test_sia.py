@@ -1,14 +1,17 @@
 """Catalogue officiel SIA, sélection de carte et minima publiés."""
 
 from datetime import date
+import pytest
 
 from navixav.sia import (
     SiaChart,
     SiaClient,
+    SiaError,
     _decode_sia_glyphs,
     _issue_root,
     _minima_from_items,
     airac_effective_date,
+    chart_category,
     choose_chart,
 )
 
@@ -19,7 +22,7 @@ def test_current_airac_cycle():
     assert "AIRAC-2026-07-09" in _issue_root(date(2026, 7, 9))
 
 
-def test_catalogue_keeps_only_final_approach_charts(tmp_path):
+def test_catalogue_keeps_all_airport_charts(tmp_path):
     effective = date(2026, 7, 9)
     catalogue = tmp_path / effective.isoformat() / "LFBO" / "catalogue.html"
     catalogue.parent.mkdir(parents=True)
@@ -39,8 +42,58 @@ def test_catalogue_keeps_only_final_approach_charts(tmp_path):
         "LFBO", effective
     )
     assert [chart.title for chart in charts] == [
-        "AD_2_LFBO_IAC_RWY32R_FNA_ILS_Z_LOC_Z"
+        "AD_2_LFBO_IAC_RWY32R_FNA_ILS_Z_LOC_Z",
+        "AD_2_LFBO_IAC_RWY32R_INA_GNSS",
+        "AD_2_LFBO_ADC_01",
     ]
+
+
+def test_chart_categories_are_suitable_for_the_interface():
+    assert chart_category("AD_2_LFBO_IAC_RWY32R_FNA_ILS_Z") == "Approches IAC"
+    assert chart_category("AD_2_LFBO_SID_RWY14") == "Départs SID"
+    assert chart_category("AD_2_LFBO_STAR_RWY32") == "Arrivées STAR"
+    assert chart_category("AD_2_LFBO_ADC_01") == "Aérodrome et roulage"
+
+
+def test_georeference_is_reported_only_when_a_sidecar_exists(tmp_path):
+    chart = SiaChart(
+        "LFBO",
+        "AD_2_LFBO_ADC_01",
+        "AD_2_LFBO_ADC_01.pdf",
+        "https://sia.test/chart.pdf",
+        "2026-07-09",
+    )
+    client = SiaClient(tmp_path)
+    assert client.has_georeference(chart) is False
+    sidecar = (
+        tmp_path / chart.effective_date / chart.icao / chart.filename
+    ).with_suffix(".georef.json")
+    sidecar.parent.mkdir(parents=True)
+    sidecar.write_text("{}", encoding="utf-8")
+    assert client.has_georeference(chart) is True
+
+
+def test_airport_document_is_resolved_from_catalogue(monkeypatch, tmp_path):
+    chart = SiaChart(
+        "LFBO",
+        "AD_2_LFBO_ADC_01",
+        "AD_2_LFBO_ADC_01.pdf",
+        "https://sia.test/chart.pdf",
+        "2026-07-09",
+    )
+    client = SiaClient(tmp_path)
+    local_path = tmp_path / chart.filename
+    monkeypatch.setattr(
+        client,
+        "list_airport_charts",
+        lambda _icao: (date(2026, 7, 9), [chart]),
+    )
+    monkeypatch.setattr(client, "_download", lambda _chart: local_path)
+
+    resolved = client.get_airport_chart("LFBO", chart.filename)
+    assert resolved.local_path == local_path
+    with pytest.raises(SiaError, match="invalide"):
+        client.get_airport_chart("LFBO", "../secret.pdf")
 
 
 def test_exact_runway_and_approach_variant_are_selected():

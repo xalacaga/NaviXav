@@ -224,6 +224,7 @@ def sim_provider(tmp_path_factory):
     provider.close()
 
 
+@pytest.mark.live_msfs
 def test_live_airport_matches_published_values(sim_provider):
     airport = sim_provider.airport("LFPO")
     assert airport.name == "Orly"
@@ -231,11 +232,13 @@ def test_live_airport_matches_published_values(sim_provider):
     assert airport.transition_altitude_ft == 5000
 
 
+@pytest.mark.live_msfs
 def test_live_runways_are_complete(sim_provider):
     names = {runway.name for runway in sim_provider.runways("LFPO")}
     assert names == {"02", "20", "06", "24", "07", "25"}
 
 
+@pytest.mark.live_msfs
 def test_live_procedures_have_connection_points(sim_provider):
     """Sans point de raccord, le moteur ne peut pas chaîner la procédure."""
     sids = sim_provider.procedures("LFPO", ProcedureKind.SID)
@@ -245,6 +248,7 @@ def test_live_procedures_have_connection_points(sim_provider):
     assert all(procedure.entry_fix for procedure in stars)
 
 
+@pytest.mark.live_msfs
 def test_live_transitions_are_fixes_not_runways(sim_provider):
     """Une transition de piste n'est pas une transition de route."""
     for procedure in sim_provider.procedures("LFPO", ProcedureKind.SID):
@@ -252,12 +256,14 @@ def test_live_transitions_are_fixes_not_runways(sim_provider):
             assert not ident.strip().isdigit()
 
 
+@pytest.mark.live_msfs
 def test_live_ils_frequency(sim_provider):
     frequency = sim_provider.ils_frequency("LFPO", "02")
     assert frequency is not None
     assert 108.0 <= frequency <= 112.0
 
 
+@pytest.mark.live_msfs
 def test_live_fix_position(sim_provider):
     position = sim_provider.fix_position("EPIKO")
     assert position is not None
@@ -265,6 +271,7 @@ def test_live_fix_position(sim_provider):
     assert round(position[1], 3) == 6.687
 
 
+@pytest.mark.live_msfs
 def test_unknown_fix_is_remembered_as_missing(sim_provider):
     assert sim_provider.fix_position("ZZZZZ") is None
     assert sim_provider._missed("ZZZZZ", "waypoint")

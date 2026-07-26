@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NaviXav</title>
   <link rel="stylesheet" href="/static/app.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛫</text></svg>" />
+  <link rel="icon" type="image/svg+xml" href="/static/navixav-icon.svg" />
 </head>
 <body>
 
@@ -68,9 +68,11 @@
 
   <nav class="tabs hidden" id="tabs">
     <button data-tab="map" class="active">Carte</button>
+    <button data-tab="flight">Suivi du vol</button>
     <button data-tab="constraints">Contraintes</button>
     <button data-tab="dispatch">Dispatch</button>
     <button data-tab="aircraft">Avion</button>
+    <button data-tab="sia">Cartes officielles</button>
     <button data-tab="mcdu">Fiche MCDU</button>
     <button data-tab="raw">JSON</button>
   </nav>
@@ -86,6 +88,8 @@
                 title="Afficher ou masquer le fond OpenStreetMap">Fond carte</button>
         <button id="map-ground" class="icon-btn" aria-pressed="false"
                 title="Afficher les voies de circulation et les postes">Détails sol</button>
+        <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
+                title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
         <button id="map-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
         <button id="map-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
@@ -95,10 +99,26 @@
     </div>
     <div class="map-stage">
       <canvas id="chart-canvas"></canvas>
+      <div id="sia-map-overlay" class="sia-map-overlay hidden">
+        <iframe id="sia-map-frame" title="Calque de la carte officielle"></iframe>
+        <div class="sia-overlay-controls">
+          <strong id="sia-overlay-title">Calque officiel</strong>
+          <label>
+            Opacité
+            <input id="sia-opacity" type="range" min="15" max="90" value="52" />
+          </label>
+          <button id="sia-overlay-close" class="icon-btn" type="button">Fermer</button>
+        </div>
+        <span class="sia-overlay-warning">Calque géoréférencé validé</span>
+      </div>
       <div class="map-hud" id="map-hud"></div>
       <div class="map-legend">
         <span><i class="key rwy"></i>piste</span>
         <span><i class="key rwy-active"></i>piste retenue</span>
+        <span><i class="key route-sid"></i>SID</span>
+        <span><i class="key route-enroute"></i>route</span>
+        <span><i class="key route-star"></i>STAR</span>
+        <span><i class="key route-approach"></i>approche</span>
         <span data-ground-detail class="hidden"><i class="key taxi"></i>voie de circulation</span>
         <span data-ground-detail class="hidden"><i class="key parking"></i>poste</span>
       </div>
@@ -107,9 +127,11 @@
     </div>
   </section>
 
+  <section id="panel-flight" class="panel hidden"></section>
   <section id="panel-constraints" class="panel hidden"></section>
   <section id="panel-dispatch" class="panel hidden"></section>
   <section id="panel-aircraft" class="panel hidden"></section>
+  <section id="panel-sia" class="panel hidden"></section>
   <section id="panel-mcdu" class="panel hidden"></section>
   <section id="panel-raw" class="panel hidden"></section>
 
@@ -118,7 +140,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>
     </div>
     <h2>Aucun plan chargé</h2>
-    <p id="empty-hint">Lance « Compléter le plan » pour récupérer ton dernier OFP SimBrief.</p>
+    <p id="empty-hint">Recherche automatique de ton dernier OFP SimBrief…</p>
   </section>
 </main>
 
@@ -132,41 +154,54 @@
       <button type="button" id="settings-close" class="icon-btn" aria-label="Fermer">×</button>
     </div>
     <div class="settings-grid">
+      <label class="field" for="settings-language">
+        <span>Langue de l’interface</span>
+        <select id="settings-language">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+        </select>
+      </label>
       <label class="field">
         <span>SimBrief Pilot ID</span>
         <input id="settings-pilot-id" autocomplete="off" placeholder="ex. 123456" />
       </label>
-      <label class="field">
+      <label class="field" for="settings-username">
         <span>SimBrief username</span>
         <input id="settings-username" autocomplete="off" placeholder="alternative au Pilot ID" />
       </label>
-      <label class="field">
+      <label class="field" for="settings-metar">
         <span>Source METAR</span>
         <select id="settings-metar">
           <option value="simbrief">SimBrief</option>
           <option value="live">METAR en direct</option>
         </select>
       </label>
-      <label class="field">
+      <label class="field" for="settings-approaches">
         <span>Préférence d’approche</span>
         <input id="settings-approaches" placeholder="ILS, GLS, LOC, RNAV…" />
       </label>
-      <label class="field">
+      <label class="field" for="settings-tailwind">
         <span>Vent arrière maximal (kt)</span>
         <input id="settings-tailwind" type="number" min="0" max="50" />
       </label>
-      <label class="field">
+      <label class="field" for="settings-crosswind">
         <span>Vent traversier maximal (kt)</span>
         <input id="settings-crosswind" type="number" min="0" max="100" />
       </label>
-      <label class="field">
+      <label class="field" for="settings-runway-length">
         <span>Longueur de piste minimale (ft)</span>
         <input id="settings-runway-length" type="number" min="0" max="30000" />
       </label>
       <label class="switch settings-switch">
         <input type="checkbox" id="settings-rnp" />
         <span class="switch-track"><span class="switch-thumb"></span></span>
-        <span class="switch-label">Avion compatible RNP</span>
+        <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
       </label>
     </div>
     <p id="settings-message" class="settings-message"></p>
@@ -182,6 +217,7 @@
   <span id="footer-version"></span>
 </footer>
 
+<script src="/static/i18n.js"></script>
 <script src="/static/map.js"></script>
 <script src="/static/app.js"></script>
 </body>

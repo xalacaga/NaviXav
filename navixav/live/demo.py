@@ -63,6 +63,7 @@ class DemoSource:
             heading_true_deg=heading,
             heading_magnetic_deg=heading,
             ground_speed_kt=TAXI_SPEED_KT if moving else 0.0,
+            indicated_airspeed_kt=0.0,
             vertical_speed_fpm=0.0,
             on_ground=True,
             title="Démonstration",

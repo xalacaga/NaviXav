@@ -6,12 +6,15 @@ contenu du dispatch, qui n'ont pas à sortir de la machine.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import math
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -23,18 +26,31 @@ from navixav.config import (
     load_user_settings,
     save_user_settings,
 )
+from navixav.faa import FaaClient, FaaError
 from navixav.live import LiveTracker, PositionUnavailable
 from navixav.live.demo import DemoSource
+from navixav.national_aip import (
+    NATIONAL_AIP_SOURCES,
+    NationalAipClient,
+    NationalAipError,
+    national_source_for_icao,
+)
 from navixav.navdata.base import NavdataError, ProcedureKind
 from navixav.navdata.msfs import MsfsProvider
+from navixav.paths import resource_path
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.preferences import AirportPreferences
 from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 from navixav.sia import SiaClient, SiaError
 
-STATIC_DIR = Path(__file__).parent / "static"
-DEMO_OFP = Path(__file__).resolve().parents[2] / "tests" / "data" / "ofp_lfst_lfbo.json"
+STATIC_DIR = resource_path("navixav", "web", "static")
+DEMO_OFP = resource_path("tests", "data", "ofp_lfst_lfbo.json")
+FAA_ICAO_PREFIXES = {
+    "PA", "PF", "PG", "PH", "PJ", "PM", "PO", "PW",
+    "NS", "TI", "TJ",
+}
+LOGGER = logging.getLogger(__name__)
 
 
 class PlanRequest(BaseModel):
@@ -86,12 +102,67 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="NaviXav", version=__version__, docs_url="/api/docs")
     tracker = LiveTracker()
     sia = SiaClient()
+    faa = FaaClient()
+    national_aip = {
+        source.provider: NationalAipClient(source)
+        for source in NATIONAL_AIP_SOURCES
+    }
     demo_state: dict[str, Any] = {}
+
+    @app.middleware("http")
+    async def log_relevant_requests(request: Request, call_next):
+        """Journalise les lenteurs et erreurs sans saturer le fichier."""
+        started = time.monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            LOGGER.exception(
+                "Erreur API non gérée sur %s %s", request.method, request.url.path
+            )
+            raise
+        elapsed = time.monotonic() - started
+        if (
+            request.url.path == "/api/plan"
+            or response.status_code >= 400
+            or elapsed >= 2.0
+        ):
+            LOGGER.info(
+                "API %s %s -> %s en %.2f s",
+                request.method,
+                request.url.path,
+                response.status_code,
+                elapsed,
+            )
+        return response
 
     @app.on_event("shutdown")
     def _close_tracker() -> None:
+        LOGGER.info("Fermeture des connexions et sessions NaviXav")
         tracker.close()
         sia.session.close()
+        faa.session.close()
+        for client in national_aip.values():
+            client.session.close()
+
+    def official_chart_backend(
+        airport: str,
+    ) -> tuple[str, str, Any, type[Exception]]:
+        if airport.startswith("LF"):
+            return "sia", "SIA France · eAIP officiel", sia, SiaError
+        if airport.startswith("K") or airport[:2] in FAA_ICAO_PREFIXES:
+            return "faa", "FAA · d-TPP officiel", faa, FaaError
+        source = national_source_for_icao(airport)
+        if source is not None:
+            return (
+                source.provider,
+                source.source,
+                national_aip[source.provider],
+                NationalAipError,
+            )
+        raise HTTPException(
+            404,
+            f"Aucune source AIS nationale officielle intégrée pour {airport}.",
+        )
 
     def open_provider() -> MsfsProvider:
         try:
@@ -137,25 +208,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             save_user_settings(settings)
         except OSError as exc:
+            LOGGER.exception("Échec d'enregistrement des paramètres")
             raise HTTPException(
                 500, f"Impossible d'enregistrer les paramètres : {exc}"
             ) from exc
+        LOGGER.info(
+            "Paramètres enregistrés (SimBrief configuré=%s, source METAR=%s)",
+            bool(settings.simbrief_pilot_id or settings.simbrief_username),
+            settings.metar_source,
+        )
         return settings.user_values()
 
     @app.post("/api/plan")
     def build_plan(request: PlanRequest) -> dict[str, Any]:
+        total_started = time.monotonic()
+        LOGGER.info("Calcul du plan démarré (démo=%s)", request.demo)
         if request.demo:
             if not DEMO_OFP.is_file():
                 raise HTTPException(404, "Jeu de démonstration introuvable.")
             raw = SimBriefClient.from_file(DEMO_OFP)
         else:
+            simbrief_started = time.monotonic()
             try:
                 raw = SimBriefClient(
                     pilot_id=settings.simbrief_pilot_id,
                     username=settings.simbrief_username,
                 ).fetch_latest()
             except SimBriefError as exc:
+                LOGGER.warning(
+                    "Récupération SimBrief refusée après %.2f s (%s)",
+                    time.monotonic() - simbrief_started,
+                    type(exc).__name__,
+                )
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
+            LOGGER.info(
+                "OFP SimBrief reçu en %.2f s",
+                time.monotonic() - simbrief_started,
+            )
 
         ofp = parse_ofp(raw)
         if not ofp.origin_icao or not ofp.destination_icao:
@@ -163,6 +252,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         provider = open_provider()
         try:
+            cache_before = provider.stats()
+            completion_started = time.monotonic()
             engine = CompletionEngine(
                 provider, settings, AirportPreferences.load(
                     settings.airport_preferences_path
@@ -172,7 +263,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload = plan.to_dict()
             payload["atc_route"] = plan.atc_route()
             payload["demo"] = request.demo
+            LOGGER.info(
+                "Complétion MSFS terminée en %.2f s "
+                "(cache avant: %s terrain(s), %s procédure(s); total %.2f s)",
+                time.monotonic() - completion_started,
+                cache_before.get("airports", 0),
+                cache_before.get("procedures", 0),
+                time.monotonic() - total_started,
+            )
             return payload
+        except HTTPException:
+            raise
+        except Exception:
+            LOGGER.exception(
+                "Échec de la complétion du plan après %.2f s",
+                time.monotonic() - total_started,
+            )
+            raise
         finally:
             provider.close()
 
@@ -248,6 +355,148 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "requires_confirmation": True,
         }
 
+    @app.get("/api/charts/approach")
+    def official_approach_chart(
+        icao: str,
+        runway: str,
+        approach: str,
+    ) -> dict[str, Any]:
+        airport = icao.strip().upper()
+        provider, source, client, error_type = official_chart_backend(airport)
+        if provider == "sia":
+            try:
+                chart_data, minima = client.find_approach(
+                    airport, runway, approach
+                )
+            except error_type as exc:
+                raise HTTPException(404, str(exc)) from exc
+        else:
+            try:
+                chart_data = client.find_approach(airport, runway, approach)
+            except error_type as exc:
+                raise HTTPException(404, str(exc)) from exc
+            minima = None
+        query = urlencode({
+            "provider": provider,
+            "icao": airport,
+            "chart": chart_data.filename,
+        })
+        chart = chart_data.to_dict()
+        chart["provider"] = provider
+        return {
+            "source": source,
+            "provider": provider,
+            "chart": chart,
+            "minima": minima.to_dict() if minima else None,
+            "pdf_url": f"/api/charts/document?{query}",
+            "requires_confirmation": True,
+        }
+
+    @app.get("/api/sia/airport/{icao}")
+    def sia_airport(icao: str) -> dict[str, Any]:
+        try:
+            effective_date, charts = sia.list_airport_charts(icao)
+        except SiaError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+        documents = []
+        for chart_data in charts:
+            query = urlencode({
+                "icao": icao.upper(),
+                "chart": chart_data.filename,
+            })
+            document = chart_data.to_dict()
+            document["georeferenced"] = sia.has_georeference(chart_data)
+            document["pdf_url"] = f"/api/sia/document?{query}"
+            documents.append(document)
+        documents.sort(key=lambda item: (item["category"], item["title"]))
+        return {
+            "icao": icao.upper(),
+            "source": "SIA France · eAIP officiel",
+            "effective_date": effective_date.isoformat(),
+            "charts": documents,
+        }
+
+    @app.get("/api/charts/airport/{icao}")
+    def official_airport_charts(icao: str) -> dict[str, Any]:
+        airport = icao.strip().upper()
+        provider, source, client, error_type = official_chart_backend(airport)
+
+        try:
+            effective_date, charts = client.list_airport_charts(airport)
+        except error_type as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+        documents = []
+        for chart_data in charts:
+            query = urlencode({
+                "provider": provider,
+                "icao": airport,
+                "chart": chart_data.filename,
+            })
+            document = chart_data.to_dict()
+            document["provider"] = provider
+            document["georeferenced"] = client.has_georeference(chart_data)
+            document["pdf_url"] = f"/api/charts/document?{query}"
+            documents.append(document)
+        documents.sort(key=lambda item: (item["category"], item["title"]))
+        return {
+            "icao": airport,
+            "provider": provider,
+            "source": source,
+            "effective_date": effective_date.isoformat(),
+            "charts": documents,
+        }
+
+    @app.get("/api/charts/document")
+    def official_chart_document(
+        provider: str,
+        icao: str,
+        chart: str,
+    ) -> FileResponse:
+        if provider == "sia":
+            client = sia
+            error_type = SiaError
+        elif provider == "faa":
+            client = faa
+            error_type = FaaError
+        elif provider in national_aip:
+            client = national_aip[provider]
+            error_type = NationalAipError
+        else:
+            raise HTTPException(400, "Fournisseur de cartes inconnu.")
+        try:
+            chart_data = client.get_airport_chart(icao, chart)
+        except error_type as exc:
+            raise HTTPException(404, str(exc)) from exc
+        if chart_data.local_path is None:
+            raise HTTPException(500, "Carte officielle absente du cache.")
+        return FileResponse(
+            chart_data.local_path,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{chart_data.filename}"',
+                "Cache-Control": "private, max-age=86400",
+            },
+        )
+
+    @app.get("/api/sia/document")
+    def sia_document(icao: str, chart: str) -> FileResponse:
+        try:
+            chart_data = sia.get_airport_chart(icao, chart)
+        except SiaError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        if chart_data.local_path is None:
+            raise HTTPException(500, "Carte SIA absente du cache.")
+        return FileResponse(
+            chart_data.local_path,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{chart_data.filename}"',
+                "Cache-Control": "private, max-age=86400",
+            },
+        )
+
     @app.get("/api/sia/pdf")
     def sia_pdf(icao: str, runway: str, approach: str) -> FileResponse:
         try:
@@ -288,11 +537,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"connected": True, "source": state.source}
 
     @app.post("/api/shutdown")
-    def shutdown(background_tasks: BackgroundTasks) -> dict[str, bool]:
+    async def shutdown() -> dict[str, bool]:
         callback = getattr(app.state, "request_shutdown", None)
         if not callable(callback):
             raise HTTPException(503, "Arrêt contrôlé indisponible.")
-        background_tasks.add_task(callback)
+
+        async def stop_after_response() -> None:
+            await asyncio.sleep(0.1)
+            callback()
+
+        asyncio.create_task(stop_after_response())
         return {"stopping": True}
 
     def _ensure_demo_source(icao: str | None, runway: str | None) -> None:
@@ -362,15 +616,34 @@ def _to_latlon(origin: dict[str, float], point: dict[str, float]) -> tuple[float
     return (latitude, longitude)
 
 
+def create_server(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    settings: Settings | None = None,
+) -> Any:
+    import uvicorn
+
+    application = create_app(settings)
+    # L'exécutable Windows n'a pas de stdout : la configuration colorée par
+    # défaut d'Uvicorn tenterait d'appeler ``isatty()`` sur une valeur nulle.
+    # La version installée écrit déjà son journal dans LOCALAPPDATA.
+    config = uvicorn.Config(
+        application,
+        host=host,
+        port=port,
+        log_level="warning",
+        log_config=None,
+        access_log=False,
+    )
+    server = uvicorn.Server(config)
+    application.state.request_shutdown = lambda: setattr(server, "should_exit", True)
+    return server
+
+
 def serve(
     host: str = "127.0.0.1",
     port: int = 8765,
     settings: Settings | None = None,
 ) -> None:
-    import uvicorn
-
-    application = create_app(settings)
-    config = uvicorn.Config(application, host=host, port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    application.state.request_shutdown = lambda: setattr(server, "should_exit", True)
+    server = create_server(host=host, port=port, settings=settings)
     server.run()

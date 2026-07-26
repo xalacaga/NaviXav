@@ -84,12 +84,14 @@ def build_parser() -> argparse.ArgumentParser:
     navdata.add_argument("--store", metavar="FICHIER", help="base NaviXav à consulter")
 
     web = subparsers.add_parser(
-        "web", parents=[common], help="lancer l'application web locale"
+        "web",
+        parents=[common],
+        help="lancer le service web de diagnostic (développement)",
     )
     web.add_argument("--host", default="127.0.0.1", help="défaut : 127.0.0.1")
     web.add_argument("--port", type=int, default=8765, help="défaut : 8765")
     web.add_argument(
-        "--no-open", action="store_true", help="ne pas ouvrir le navigateur"
+        "--no-open", action="store_true", help="ne pas ouvrir le navigateur de diagnostic"
     )
 
     importer = subparsers.add_parser(

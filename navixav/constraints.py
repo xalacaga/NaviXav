@@ -1,6 +1,6 @@
 """Contraintes d'altitude et de vitesse publiées le long d'une procédure.
 
-Les descripteurs suivent l'ARINC 424, tels que stockés par Little Navmap :
+Les descripteurs suivent l'ARINC 424, tels que conservés dans la base MSFS :
 
     '+'  au niveau ou au-dessus de altitude1
     '-'  au niveau ou en dessous de altitude1
@@ -14,7 +14,7 @@ le descripteur. Les vitesses publiées sont toujours des maximums.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from navixav.navdata.base import Procedure, ProcedureLeg, Transition
 
@@ -138,3 +138,43 @@ def procedure_constraints(
     else:
         legs = [*procedure.legs, *transition_legs]
     return rows_from_legs(legs)
+
+
+def procedure_path(
+    procedure: Procedure,
+    transition_ident: str | None = None,
+    transition_first: bool = False,
+    position_lookup: Callable[[str], tuple[float, float] | None] | None = None,
+) -> list[dict[str, object]]:
+    """Points géographiques ordonnés d'une procédure et de sa transition."""
+    transition: Transition | None = (
+        procedure.find_transition(transition_ident) if transition_ident else None
+    )
+    transition_legs: Sequence[ProcedureLeg] = transition.legs if transition else ()
+    if transition_first:
+        legs = [*transition_legs, *procedure.legs]
+    else:
+        legs = [*procedure.legs, *transition_legs]
+
+    path: list[dict[str, object]] = []
+    for leg in legs:
+        if leg.is_missed:
+            continue
+        position = (
+            (leg.lat, leg.lon)
+            if leg.lat is not None and leg.lon is not None
+            else position_lookup(leg.fix_ident)
+            if position_lookup and leg.fix_ident
+            else None
+        )
+        if position is None:
+            continue
+        point = {
+            "ident": leg.fix_ident or leg.leg_type or "segment",
+            "lat": position[0],
+            "lon": position[1],
+        }
+        if path and path[-1] == point:
+            continue
+        path.append(point)
+    return path
