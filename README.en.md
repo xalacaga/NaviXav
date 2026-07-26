@@ -1,102 +1,201 @@
 # NaviXav
 
-**Documentation:** [Français](README.md) · English · [Deutsch](README.de.md) ·
-[Español](README.es.md) · [Italiano](README.it.md) ·
-[Português](README.pt.md) · [Nederlands](README.nl.md) ·
-[Polski](README.pl.md)
+**Documentation:** [Français](README.md) · English ·
+[Deutsch](README.de.md) · [Español](README.es.md) ·
+[Italiano](README.it.md) · [Português](README.pt.md) ·
+[Nederlands](README.nl.md) · [Polski](README.pl.md)
 
-NaviXav is a local IFR flight assistant for Microsoft Flight Simulator. It
-retrieves the latest SimBrief OFP, completes terminal information with data
-read from the simulator, and presents everything required for flight
-preparation and MCDU entry.
+NaviXav is a local IFR flight assistance application for Microsoft Flight
+Simulator. It retrieves the latest SimBrief flight plan, completes the terminal
+information using simulator data, and presents everything in an interface
+designed for flight preparation and MCDU entry.
 
-NaviXav runs in its own responsive Windows window using Microsoft WebView2.
-It does not open an external browser. Its private local service listens only
-on `127.0.0.1`; settings, navigation data, charts and caches remain on the
-computer.
+The application has its own Windows window. Its interface is rendered by
+Microsoft WebView2 and communicates only with a local service bound to
+`127.0.0.1`. No external browser is opened. Settings, the navigation database
+and caches all stay on the computer.
 
-> NaviXav is intended for flight simulation only. Always verify its output
-> against current official publications and applicable ATC instructions.
+The window is fully resizable. The interface rearranges its panels, controls,
+tabs and map height according to the space available, down to a minimum size of
+720 × 560 pixels.
 
-## Main features
+> NaviXav is intended for flight simulation only. The information displayed
+> must be checked against official publications and applicable ATC
+> instructions.
 
-- automatically retrieves the latest SimBrief flight plan;
-- supports a SimBrief Pilot ID or username configured in the interface;
-- displays the complete route and highlights aircraft progress;
-- selects and explains runways, SID, STAR, transitions and approach;
-- shows altitude/speed constraints, transition altitude/level, ILS data,
-  interception and missed-approach altitudes;
-- provides aircraft, dispatch, fuel, weight and MCDU-entry information;
-- displays QNH below wind information;
-- follows MSFS in real time and records a local replayable flight track;
-- displays MSFS ground speed (GS) and indicated airspeed (IAS);
-- draws the route over an OpenStreetMap base map;
-- gives direct access to official airport PDF charts for the current departure
-  and arrival;
-- offers an official-chart overlay only when a validated georeference exists;
-- obtains navigation and procedure data directly from MSFS, without
-  Little Navmap, Navigraph or EUROCONTROL.
+## Features
+
+### SimBrief flight plan
+
+- automatic retrieval of the latest OFP at startup;
+- support for either the SimBrief Pilot ID or username;
+- display of the complete route, from origin to destination;
+- highlighting of the next route point based on the aircraft's actual position,
+  with already-passed points dimmed;
+- weights, fuel, flight time, alternate and dispatch data;
+- aircraft information, registration and declared equipment.
+
+### IFR preparation
+
+NaviXav completes and presents:
+
+- the departure runway and the arrival runway;
+- the SID and its transition;
+- the STAR and its transition;
+- the approach and its VIA;
+- the ILS frequency and identifier;
+- altitude and speed constraints;
+- the transition altitude and transition level;
+- the approach intercept altitude;
+- the missed approach altitude;
+- the rationale and confidence level behind every choice.
+
+The **Departure · Route · Arrival** blocks can be collapsed to free up space in
+the interface.
+
+### Flight tracking
+
+The **Flight tracking** tab uses the real-time MSFS position to display:
+
+- the automatically detected flight phase;
+- the ground speed (GS) and indicated airspeed (IAS) reported by MSFS;
+- the next point and its distance;
+- the lateral deviation from the active segment;
+- the remaining distance;
+- the next altitude or speed constraint;
+- the vertical rate required to meet that constraint;
+- the Top of Descent and an indicative descent rate on a 3° path;
+- the deviation from the planned vertical profile.
+
+The flight track is recorded locally every five seconds. It can be paused,
+cleared or replayed from the interface. No history is sent to any external
+service.
+
+### MCDU card
+
+The **MCDU card** tab gathers the information to be entered into an Airbus FMS:
+
+- `FROM/TO`, flight number and alternate;
+- Cost Index and cruise level;
+- ZFW, block, taxi, trip and reserve fuel;
+- runway, SID, transition and transition altitude;
+- `VIA/TO` route;
+- STAR, transition, approach and VIA;
+- QNH, temperature, wind, ILS frequency and final course;
+- RADIO or BARO minima and RVR.
+
+### Direct connection to MSFS
+
+NaviXav uses SimConnect to:
+
+- detect the presence of the simulator;
+- show a green or red indicator in the top bar;
+- track the aircraft position in real time;
+- read altitude, height above ground, heading, ground speed and vertical speed;
+- retrieve airports, runways, procedures, waypoints and radio navigation aids;
+- progressively build a local database in `data/navixav.sqlite`.
+
+The simulator must be running with a flight loaded in order to retrieve new
+data. Information already cached remains available offline.
+
+### Map
+
+The map includes:
+
+- an OpenStreetMap background;
+- the SimBrief route drawn with its waypoints;
+- distinct colours for the SID, the enroute portion, the STAR and the approach;
+- the runways and the selected runway;
+- the aircraft position and heading;
+- a trail of the movement;
+- an automatic follow mode;
+- zoom, panning and fitting to the airport or the route;
+- optional ground detail for taxiways and parking stands.
+
+Ground detail is hidden by default to keep the map readable. The **Ground
+detail** button displays it when needed.
+
+### Official national AIS charts
+
+NaviXav queries national authority publications directly, without going through
+EUROCONTROL/EAD:
+
+- France: SIA eAIP (`LF`);
+- Spain and the Canary Islands: ENAIRE AIP (`LE`, `GC`, `GE`);
+- Netherlands: LVNL eAIP (`EH`);
+- United States and covered territories: FAA d-TPP.
+
+For these aerodromes, NaviXav can:
+
+- present every departure and arrival PDF in the **Official charts** tab, sorted
+  by type;
+- open each document inside the interface or separately;
+- select by default the SID, STAR or approach matching the current flight;
+- automatically find the approach chart matching the selected runway and
+  approach type;
+- download on demand only the PDFs actually consulted;
+- keep the publication in the local AIRAC cache;
+- display the official chart in the MCDU card;
+- extract SIA ILS CAT I minima when the format is recognised;
+- propose the DA, DH and RVR before validation.
+
+Extracted values are never applied silently: they must be validated in the
+interface. The **Official overlay** button is offered only for a document with
+validated georeferencing. It follows the chart selection: the departure PDF can
+only be overlaid on the departure, and the arrival PDF only on the arrival.
+This rule is identical for every source.
+
+A country is only added to the automatic list after direct, stable access to
+its official PDFs has been validated. A missing source is therefore never
+silently replaced by a third-party aggregator.
 
 ## Requirements
 
-- 64-bit Windows 10 or Windows 11;
-- Microsoft Flight Simulator for live and navigation data;
-- a SimBrief account with an already generated OFP;
-- Internet access for SimBrief, map tiles and official AIS/FAA publications.
+- Windows 10 or Windows 11, 64-bit;
+- Microsoft WebView2 Runtime, installed automatically by the installer;
+- Microsoft Flight Simulator for data and real-time tracking;
+- a SimBrief account with a generated OFP;
+- an Internet connection for SimBrief, the map background and the national AIS
+  or FAA publications.
 
-Python, application libraries and the autonomous NaviXav SimConnect connector
-are included. The installer checks Microsoft WebView2 and installs it only when
-it is missing.
+The installer includes Python, the libraries, pywebview, NaviXav's standalone
+SimConnect connector and the signed Microsoft WebView2 bootstrapper. None of
+these tools need to be installed separately. MSFS is not required to try the
+Demo mode or to consult data already saved.
 
-### SimConnect
+SimConnect is never installed or reinstalled into Windows by NaviXav. The
+application ships a private copy of the modern DLL in its own folder. If the
+machine already has SimConnect, its installation, version and settings are
+neither replaced nor modified. This private DLL talks to the MSFS SimConnect
+service: only the simulator needs to be installed and running to receive live
+data.
 
-NaviXav never installs, registers, reinstalls or replaces system SimConnect.
-It carries a modern private `SimConnect.dll` inside its own application
-directory. Any SimConnect installation already present on the computer remains
-untouched. The private connector communicates with the SimConnect service
-provided by MSFS, so the simulator must be running to receive live data.
+### Interface languages
 
-## Windows installation
+The language is chosen in **Settings**, applies immediately and is remembered on
+the computer. NaviXav provides French, English, German, Spanish, Italian,
+Portuguese, Dutch and Polish interfaces. Aeronautical abbreviations, procedure
+identifiers, METAR and MCDU values deliberately remain in their international
+notation.
 
-1. Download `NaviXav-Setup-<version>.exe` from the latest
+## Quick installation on Windows
+
+1. Download the `NaviXav-Setup-<version>.exe` file from the latest
    [GitHub Release](https://github.com/xalacaga/NaviXav/releases/latest).
 2. Run the installer.
-3. Review the prerequisite check page.
-4. Select the installation folder and choose **Install**.
+3. Check the prerequisites verification page.
+4. Keep or change the proposed folder, then click **Install**.
 5. Start NaviXav from the Start menu or the optional desktop shortcut.
 
-A portable archive is also available:
-`NaviXav-<version>-windows-x64-portable.zip`. Extract it and run `NaviXav.exe`.
-Use the complete installer on computers where WebView2 may be missing.
+The installer checks Microsoft WebView2 and installs it automatically if
+missing. Installation is done for the current user and normally does not
+require administrator rights.
 
-## First configuration
+A portable archive is also available: extract
+`NaviXav-<version>-windows-x64-portable.zip`, then run `NaviXav.exe`. On a
+machine without WebView2, use the full installer first.
 
-Open **Settings** in the top-right corner:
-
-1. select the interface language;
-2. enter the SimBrief Pilot ID or username;
-3. choose the METAR source;
-4. set approach, runway and aircraft preferences;
-5. save the settings.
-
-The language applies immediately and is stored locally. French, English,
-German, Spanish, Italian, Portuguese, Dutch and Polish are provided.
-Aviation identifiers, METAR and MCDU notation remain international.
-
-At startup NaviXav automatically retrieves the latest available SimBrief OFP.
-Flight-plan generation remains on the SimBrief website.
-
-## Official charts
-
-The **Official charts** tab proposes current-flight documents for the departure
-and arrival. Supported sources include French SIA, Spanish ENAIRE, Dutch LVNL
-and US FAA d-TPP, subject to the availability of their public services.
-
-PDFs can be opened inside NaviXav. The overlay button is hidden when automatic
-alignment has not been validated, preventing a visually misleading overlay.
-All operational values must still be checked on the official chart.
-
-## Run from source
+### From source
 
 ```powershell
 git clone https://github.com/xalacaga/NaviXav.git
@@ -104,137 +203,375 @@ cd NaviXav
 .\NaviXav.bat
 ```
 
-The launcher creates an isolated `.venv`, installs missing dependencies and
-opens the dedicated NaviXav window.
+On first launch, the script:
 
-## Build a distribution
+1. looks for Python;
+2. creates the `.venv` virtual environment;
+3. installs NaviXav and its dependencies;
+4. starts the private local service;
+5. opens the interface in the NaviXav window.
+
+Subsequent launches reuse the environment already installed.
+
+### Building a distribution
+
+From PowerShell, in the project folder:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
+.\scripts\build_windows.ps1
 ```
 
-The build machine requires Python 3.11 or later, the modern MSFS SimConnect SDK,
-PyInstaller and Inno Setup. The script checks prerequisites, runs the automated
-tests and creates the installer, portable archive and SHA-256 checksums in
-`release\`.
+The script:
 
-## Troubleshooting
+1. checks 64-bit Windows, Python and the SimConnect SDK;
+2. installs any missing build tools;
+3. downloads the official WebView2 bootstrapper and verifies its Microsoft
+   signature;
+4. runs the tests excluding live MSFS integration;
+5. produces the installer, the portable archive and their SHA-256 checksums in
+   `release\`.
 
-- **No plan:** check the Pilot ID/username, generate an OFP in SimBrief and
-  verify Internet access.
-- **MSFS indicator is red:** start MSFS, fully load a flight and wait a few
-  seconds. Reinstall NaviXav if its private DLL was quarantined.
-- **Window does not open:** run the complete installer to repair WebView2 and
-  review `%LOCALAPPDATA%\NaviXav\logs\navixav.log`.
-- **Port 8765 is occupied:** close the previous NaviXav instance. The **Quit**
-  button and window close action normally release the process and port.
+The SimConnect SDK mentioned in step 1 concerns only the machine that builds
+NaviXav. It is not installed on user machines.
 
-The diagnostic log is stored at
-`%LOCALAPPDATA%\NaviXav\logs\navixav.log`. It records startup/shutdown, errors,
-slow API calls and SimBrief/MSFS/cache timings, but never the Pilot ID,
-username or complete route. It rotates at 2 MB and keeps five backups.
+### Distribution files
 
-## Detailed operation
+After a successful build:
 
-### Flight-plan completion
+| File | Purpose |
+|---|---|
+| `release\NaviXav-Setup-<version>.exe` | recommended Windows installer |
+| `release\NaviXav-<version>-windows-x64-portable.zip` | portable version |
+| `release\*.sha256` | checksums of the distributed files |
 
-NaviXav retrieves the latest generated SimBrief OFP at startup. It reads the
-departure, destination, alternate, route, aircraft, fuel, weights, cruise
-level and embedded METAR. Flight-plan generation itself remains on SimBrief.
-Terminal procedures are completed from MSFS data and may be overridden in the
-interface when ATIS or ATC assigns another runway or procedure.
+The `release\` folder is deliberately ignored by Git. The executables are build
+artefacts to be published in a GitHub Release, not sources to be versioned.
 
-The departure and arrival summary can be collapsed. The route strip shows
-runway, SID, transitions, en-route points, STAR and approach. The active route
-point changes colour as the aircraft progresses.
+## Manual installation
 
-### Guidance, approach and MCDU
+From PowerShell, in the project folder:
 
-The flight panel shows distance, bearing, desired altitude, next constraint,
-ground speed (GS) and indicated airspeed (IAS). Approach information includes
-ILS frequency and course when available, glide angle, intercept altitude,
-threshold elevation, minima and missed-approach altitude. These values assist
-simulation setup and never replace the current chart or ATC clearance.
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m navixav.desktop
+```
 
-The MCDU sheet groups the values normally entered on INIT, F-PLN, RAD NAV,
-PERF TAKEOFF and PERF APPR pages: origin/destination, company route, flight
-number, cost index, cruise level, runways, SID/STAR, transitions, approach,
-ILS, QNH, wind, temperature, minima and take-off reference data when known.
+This command opens the NaviXav window. To diagnose the local service without a
+window:
 
-### Map and live tracking
+```powershell
+.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+```
 
-The map draws the complete SimBrief route over OpenStreetMap. SID, en-route,
-STAR and approach segments use distinct styles. Airport ground geometry is
-filtered by zoom to avoid unreadable taxiway and parking-line clutter. The
-aircraft can be followed live, centred manually or shown with the whole route.
-The local flight recorder keeps a replayable track and does not upload it.
+The service then remains reachable only at `http://127.0.0.1:8765`.
 
-### Official AIS documents
+## Configuration
 
-The current flight’s departure and arrival are selected by default. Airport
-and approach PDFs are obtained from supported national AIS sources: SIA
-France, ENAIRE Spain, LVNL Netherlands and FAA d-TPP for the United States.
-Availability depends on each authority’s public catalogue.
+Day-to-day configuration is done from the **Settings** button in the interface.
 
-PDFs are displayed in the dedicated interface. An **Official overlay** button
-is offered only for a chart with a validated georeferencing sidecar. A normal
-PDF is still available for reading but is never overlaid approximately.
+### SimBrief account
 
-### Local data and cache
+Fill in one of the two fields:
 
-Settings are stored in
-`%LOCALAPPDATA%\NaviXav\user_settings.json`, navigation data in
-`%LOCALAPPDATA%\NaviXav\navixav.sqlite`, downloaded documents under the local
-cache and logs under `%LOCALAPPDATA%\NaviXav\logs`. The first request for a new
-airport or procedure can take several tens of seconds while the MSFS cache is
-filled. Later requests reuse the local database.
+- **SimBrief Pilot ID**: the numeric identifier shown in the SimBrief account
+  settings;
+- **SimBrief username**: the account alias.
 
-## Automatic updates and Releases
+The Pilot ID is recommended. After saving, NaviXav immediately retrieves the
+latest available OFP. On every subsequent startup, that last plan is loaded
+automatically.
 
-At startup NaviXav checks the latest public Release of
-`xalacaga/NaviXav`. If a newer semantic version exists, an **Update** button
-appears. Installation starts only after confirmation. The installer is
-downloaded to `%LOCALAPPDATA%\NaviXav\updates`, verified against the SHA-256
-digest published by GitHub, then launched while NaviXav closes cleanly. A
-network or GitHub outage never prevents normal startup.
+### Available settings
 
-The repository is public for read access: anyone can inspect the source and
-download Releases without a GitHub account, while write access remains limited
-to authorised collaborators.
+The interface also lets you configure:
 
-Versions use `MAJOR.MINOR.PATCH`. Conventional commits drive the automatic
-bump: `feat:` for minor, `fix:` for patch, and `BREAKING CHANGE` or `!:` for
-major. Other changes default to patch. Release notes are generated into
-`RELEASE_NOTES.md` and accumulated in `CHANGELOG.md`.
+- the METAR source;
+- the approach preference order;
+- the maximum tailwind component;
+- the maximum crosswind component;
+- the minimum runway length;
+- the aircraft's RNP capability.
+
+In the installed version, the values are kept in
+`%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+## First use
+
+1. Generate a flight plan in SimBrief.
+2. Start Microsoft Flight Simulator and load a flight.
+3. Start NaviXav from the Start menu, or with `NaviXav.bat` in development
+   mode.
+4. Open **Settings** and save the SimBrief Pilot ID.
+5. Wait for the latest OFP to load automatically.
+6. Check the **MSFS connected** indicator in the top right.
+7. Review the runway, SID, STAR and approach choices.
+8. Consult the constraints and the official chart.
+9. Validate the minima before copying them into the MCDU.
+
+The **Complete the plan** button retrieves the latest OFP again after
+generating or modifying a flight in SimBrief.
+
+## Using the map
+
+- **Map background**: shows or hides OpenStreetMap.
+- **Ground detail**: shows taxiways and stands.
+- **Official overlay**: appears only for the georeferenced chart of the
+  aerodrome currently displayed, and adjusts its opacity.
+- **Full route**: frames the entire flight route.
+- **Follow**: keeps the aircraft centred.
+- **Fit**: frames the selected airport.
+- **+ / −**: changes the zoom level.
+- **Wheel**: zooms under the pointer.
+- **Drag**: pans the map.
+
+The airport buttons make it quick to switch between the departure and the
+arrival aerodrome.
+
+## Window and responsive display
+
+NaviXav adapts its interface automatically when resized:
+
+- above 1100 px, the Departure, Route and Arrival cards can be shown side by
+  side;
+- below 1100 px, these cards move to a single column;
+- below 980 px, the toolbar and map controls take the full available width;
+- below 760 px, the tabs become scrollable, buttons are redistributed and
+  tables remain readable horizontally;
+- below 520 px, statistics and complex panels switch to a column layout.
+
+The map listens for every window size change and recomputes its canvas
+immediately. The minimum size of the native window is 720 × 560 pixels.
+
+## Demo mode
+
+The **Demo** switch loads a sample flight and simulates movement on the ground.
+It lets you explore the interface without a SimBrief account or a simulator.
+
+Demo mode is always disabled at startup so that NaviXav gives priority to the
+latest SimBrief plan.
+
+## Stopping the application
+
+Use the **Quit** button in the top bar. NaviXav shuts the server down cleanly,
+closes the window and the SimConnect connection, then releases port `8765`.
+Closing the window directly produces the same result.
+
+In `--no-open` diagnostic mode, `Ctrl+C` in the console also performs a normal
+shutdown.
+
+## Startup options
+
+The Windows launcher accepts the following options:
+
+```powershell
+.\NaviXav.bat --port 9000
+.\NaviXav.bat --no-open
+```
+
+- `--port` changes the local port;
+- `--no-open` starts only the local service, for diagnostics.
+
+The listening address deliberately stays fixed at `127.0.0.1`.
+
+## Additional commands
+
+NaviXav can also be used from PowerShell:
+
+```powershell
+# Show the latest SimBrief plan
+.\.venv\Scripts\navixav.exe plan
+
+# Generate a text MCDU card
+.\.venv\Scripts\navixav.exe plan --mcdu
+
+# Produce JSON output
+.\.venv\Scripts\navixav.exe plan --json
+
+# Import airports from MSFS
+.\.venv\Scripts\navixav.exe import LFBO LFPO
+
+# Examine the local database
+.\.venv\Scripts\navixav.exe navdata
+
+# Show an airport's information
+.\.venv\Scripts\navixav.exe airport LFBO --runway 32R
+```
+
+## Local data
+
+NaviXav uses the following locations:
+
+| Location | Contents |
+|---|---|
+| `%LOCALAPPDATA%\NaviXav\user_settings.json` | configuration of the installed version |
+| `%LOCALAPPDATA%\NaviXav\navixav.sqlite` | navigation database built from MSFS |
+| `%LOCALAPPDATA%\NaviXav\cache\` | cached national AIS and FAA charts |
+| `%LOCALAPPDATA%\NaviXav\webview\` | local storage of the WebView2 window |
+| `%LOCALAPPDATA%\NaviXav\logs\navixav.log` | log of the installed version |
+| `data\` and `.venv\` | development-mode data and environment |
+
+This local data, the secrets and the caches are not meant to be versioned.
+
+The log records startups and shutdowns, errors, slow API calls, SimBrief
+retrieval times, MSFS completion times and cache fills. It records neither the
+Pilot ID, nor the username, nor the complete route. Its size is capped at 2 MB
+with five older versions kept (`navixav.log.1` to `navixav.log.5`).
+
+On first access to an aerodrome or a procedure, the interface warns that the
+MSFS cache is being filled and that the operation may take several tens of
+seconds. Subsequent accesses reuse the local data.
+
+## Git versioning
+
+The source repository is intended to be hosted at:
+`https://github.com/xalacaga/NaviXav.git`.
+
+The `.gitignore` file excludes in particular:
+
+- `.env`, user settings and local databases;
+- `.claude/`, `CLAUDE.md`, `.codex/`, `AGENTS.md` and `CODEX.md`;
+- Graphify data and `graphify-out/`;
+- Python environments, test caches and build outputs;
+- `dist\`, `build\` and `release\`.
+
+Claude/Codex memories can therefore be maintained locally without being
+published in the Git repository.
+
+### Automatic updates
+
+At startup, NaviXav queries only the latest public Release of the
+`xalacaga/NaviXav` repository. If its version is higher than the installed one,
+an **Update** button appears in the top bar. Installation starts only after the
+user confirms.
+
+The installer is downloaded to `%LOCALAPPDATA%\NaviXav\updates\`, then its
+SHA-256 checksum is compared with the one published by GitHub. If the checksum
+is missing or different, the file is deleted and never executed. A GitHub or
+Internet outage blocks neither startup nor the flight functions.
+
+The repository is publicly readable. A user can browse the code and download
+Releases without a GitHub account, but only authorised collaborators can write
+to the repository.
+
+### Version and Release notes
+
+The version follows the semantic format `MAJOR.MINOR.PATCH`. Conventional
+commit messages automatically determine the next level:
+
+- `feat:` normally produces a minor version;
+- `fix:` produces a patch version;
+- `BREAKING CHANGE` or `!:` produces a major version;
+- other changes produce a patch version.
+
+Prepare the version and its notes locally:
 
 ```powershell
 .\scripts\prepare_release.ps1 -Bump auto
+```
+
+Publish the installer, the portable archive, their checksums and the notes in a
+GitHub Release:
+
+```powershell
 .\scripts\publish_release.ps1 -Bump auto
 ```
 
-The publishing script requires a clean repository and an authenticated GitHub
-CLI. It tests and builds NaviXav, commits the version files, creates and pushes
-the tag, then publishes the installer, portable archive, SHA-256 files and
-release notes.
+The second script requires a clean repository and an authenticated GitHub CLI.
+It runs the tests, builds the deliverables, creates the version commit and tag,
+pushes `main` and the tag, then creates the GitHub Release. `CHANGELOG.md`
+keeps the history and `RELEASE_NOTES.md` contains the current version's notes.
 
-## Command-line and maintenance commands
+## Troubleshooting
+
+### Port 8765 is already in use
+
+A NaviXav instance is probably still open. Close its window or click **Quit** in
+the interface. The executable detects an existing instance; if another
+application occupies 8765, it automatically picks a free port between 8766 and
+8775.
+
+To identify the process:
 
 ```powershell
-# Dedicated desktop window
-.\NaviXav.bat
+Get-NetTCPConnection -LocalPort 8765 -State Listen
+```
 
-# Local server without a window, for diagnostics
-.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+It is also possible to start the application on another port:
 
-# Build and validate Windows distribution
-.\scripts\build_windows.ps1
+```powershell
+.\NaviXav.bat --port 9000
+```
 
-# Run tests without a live MSFS instance
+### The NaviXav window does not open
+
+- run the full installer again so that it checks WebView2;
+- make sure Windows and Microsoft Edge WebView2 Runtime are up to date;
+- consult `%LOCALAPPDATA%\NaviXav\logs\navixav.log`;
+- check that an antivirus is not blocking `NaviXav.exe` or the
+  `msedgewebview2.exe` processes.
+
+The portable archive cannot install WebView2 by itself. On a machine that does
+not have this component, use `NaviXav-Setup-<version>.exe`.
+
+### The MSFS indicator stays red
+
+- check that the simulator is running;
+- load a flight completely;
+- wait a few seconds then click the indicator;
+- run the installer again if the private copy of `SimConnect.dll` shipped with
+  NaviXav has been deleted or quarantined by an antivirus.
+
+### No SimBrief plan is loaded
+
+- check the Pilot ID or username in **Settings**;
+- generate an OFP on SimBrief before retrying the retrieval;
+- check the Internet connection.
+
+### An official chart is unavailable
+
+- check that the ICAO prefix is covered by SIA, ENAIRE, LVNL or FAA;
+- check the Internet connection;
+- confirm that the runway and the approach have been determined;
+- use manual entry of the minima if extraction is unavailable.
+
+## Current limitations
+
+- the procedure actually cleared may differ from the plan depending on the
+  ATIS, the weather and ATC instructions;
+- minima depend on the aircraft category, its equipment and operational
+  conditions;
+- automatic extraction of minima is limited to recognised SIA formats;
+- a PDF without validated georeferencing remains readable, but cannot be used
+  as an overlay;
+- new MSFS data requires the simulator to be reachable.
+
+Always confirm important information before entering it into the simulator.
+
+## Architecture and privacy
+
+- `navixav/desktop.py` manages the native window and the process lifecycle;
+- `navixav/web/app.py` provides the FastAPI API bound only to `127.0.0.1`;
+- `navixav/web/static/` contains the responsive HTML/CSS/JavaScript interface;
+- `navixav/planner/` completes the IFR plan;
+- `navixav/navdata/` builds and queries the database derived from MSFS;
+- `navixav/live/` handles SimConnect tracking;
+- `navixav/sia.py`, `navixav/faa.py` and `navixav/national_aip.py` handle the
+  official publications.
+
+The local service never listens on the external network. The SimBrief Pilot ID,
+the preferences, the flight track and the cached PDFs stay on the machine. Only
+the requests needed for SimBrief, OpenStreetMap, the weather and the official
+AIS publications leave the computer.
+
+## Tests
+
+The reproducible profile used to build the distribution is:
+
+```powershell
 .\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
 ```
 
-## Privacy
-
-NaviXav has no central account and sends no telemetry. It contacts only the
-services needed for SimBrief, OpenStreetMap and the requested official
-publications. User settings, caches and flight history stay on the computer.
+Tests marked `live_msfs` query a simulator that is actually running and are
+therefore not part of the installer's automatic check.
