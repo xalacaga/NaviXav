@@ -132,3 +132,12 @@ def test_logging_is_rotating_and_cache_wait_is_explained(tmp_path):
 
     logging.getLogger().removeHandler(handler)
     handler.close()
+
+
+def test_interface_checks_and_installs_verified_github_updates():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    assert 'id="update-install"' in html
+    assert 'fetch("/api/update/check"' in javascript
+    assert '"X-NaviXav-Update": "install"' in javascript

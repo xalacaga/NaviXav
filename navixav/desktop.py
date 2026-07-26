@@ -9,6 +9,7 @@ import logging
 import multiprocessing
 import os
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -176,6 +177,38 @@ def _run_desktop_window(url: str, server: object) -> None:
             except Exception:
                 pass
 
+        def install_update(installer: Path) -> None:
+            """Lance l'installateur vérifié, puis ferme l'instance courante."""
+            def launch() -> None:
+                try:
+                    flags = (
+                        subprocess.CREATE_NEW_PROCESS_GROUP
+                        | subprocess.DETACHED_PROCESS
+                    )
+                    subprocess.Popen(
+                        [
+                            str(installer),
+                            "/SILENT",
+                            "/SP-",
+                            "/CLOSEAPPLICATIONS",
+                            "/RESTARTAPPLICATIONS",
+                        ],
+                        close_fds=True,
+                        creationflags=flags,
+                    )
+                    logging.info(
+                        "Installateur de mise à jour lancé : %s",
+                        installer.name,
+                    )
+                    stop_from_interface()
+                except Exception:
+                    logging.exception(
+                        "Impossible de lancer l'installateur de mise à jour"
+                    )
+
+            # Laisse le temps à la réponse HTTP d'atteindre l'interface.
+            threading.Timer(0.8, launch).start()
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -185,6 +218,7 @@ def _run_desktop_window(url: str, server: object) -> None:
 
         window.events.closed += stop_server
         server.config.app.state.request_shutdown = stop_from_interface
+        server.config.app.state.request_update_install = install_update
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

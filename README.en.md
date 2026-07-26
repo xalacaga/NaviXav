@@ -58,14 +58,15 @@ provided by MSFS, so the simulator must be running to receive live data.
 
 ## Windows installation
 
-1. Download `NaviXav-Setup-0.1.0.exe`.
+1. Download `NaviXav-Setup-<version>.exe` from the latest
+   [GitHub Release](https://github.com/xalacaga/NaviXav/releases/latest).
 2. Run the installer.
 3. Review the prerequisite check page.
 4. Select the installation folder and choose **Install**.
 5. Start NaviXav from the Start menu or the optional desktop shortcut.
 
 A portable archive is also available:
-`NaviXav-0.1.0-windows-x64-portable.zip`. Extract it and run `NaviXav.exe`.
+`NaviXav-<version>-windows-x64-portable.zip`. Extract it and run `NaviXav.exe`.
 Use the complete installer on computers where WebView2 may be missing.
 
 ## First configuration
@@ -132,6 +133,105 @@ The diagnostic log is stored at
 `%LOCALAPPDATA%\NaviXav\logs\navixav.log`. It records startup/shutdown, errors,
 slow API calls and SimBrief/MSFS/cache timings, but never the Pilot ID,
 username or complete route. It rotates at 2 MB and keeps five backups.
+
+## Detailed operation
+
+### Flight-plan completion
+
+NaviXav retrieves the latest generated SimBrief OFP at startup. It reads the
+departure, destination, alternate, route, aircraft, fuel, weights, cruise
+level and embedded METAR. Flight-plan generation itself remains on SimBrief.
+Terminal procedures are completed from MSFS data and may be overridden in the
+interface when ATIS or ATC assigns another runway or procedure.
+
+The departure and arrival summary can be collapsed. The route strip shows
+runway, SID, transitions, en-route points, STAR and approach. The active route
+point changes colour as the aircraft progresses.
+
+### Guidance, approach and MCDU
+
+The flight panel shows distance, bearing, desired altitude, next constraint,
+ground speed (GS) and indicated airspeed (IAS). Approach information includes
+ILS frequency and course when available, glide angle, intercept altitude,
+threshold elevation, minima and missed-approach altitude. These values assist
+simulation setup and never replace the current chart or ATC clearance.
+
+The MCDU sheet groups the values normally entered on INIT, F-PLN, RAD NAV,
+PERF TAKEOFF and PERF APPR pages: origin/destination, company route, flight
+number, cost index, cruise level, runways, SID/STAR, transitions, approach,
+ILS, QNH, wind, temperature, minima and take-off reference data when known.
+
+### Map and live tracking
+
+The map draws the complete SimBrief route over OpenStreetMap. SID, en-route,
+STAR and approach segments use distinct styles. Airport ground geometry is
+filtered by zoom to avoid unreadable taxiway and parking-line clutter. The
+aircraft can be followed live, centred manually or shown with the whole route.
+The local flight recorder keeps a replayable track and does not upload it.
+
+### Official AIS documents
+
+The current flight’s departure and arrival are selected by default. Airport
+and approach PDFs are obtained from supported national AIS sources: SIA
+France, ENAIRE Spain, LVNL Netherlands and FAA d-TPP for the United States.
+Availability depends on each authority’s public catalogue.
+
+PDFs are displayed in the dedicated interface. An **Official overlay** button
+is offered only for a chart with a validated georeferencing sidecar. A normal
+PDF is still available for reading but is never overlaid approximately.
+
+### Local data and cache
+
+Settings are stored in
+`%LOCALAPPDATA%\NaviXav\user_settings.json`, navigation data in
+`%LOCALAPPDATA%\NaviXav\navixav.sqlite`, downloaded documents under the local
+cache and logs under `%LOCALAPPDATA%\NaviXav\logs`. The first request for a new
+airport or procedure can take several tens of seconds while the MSFS cache is
+filled. Later requests reuse the local database.
+
+## Automatic updates and Releases
+
+At startup NaviXav checks the latest public Release of
+`xalacaga/NaviXav`. If a newer semantic version exists, an **Update** button
+appears. Installation starts only after confirmation. The installer is
+downloaded to `%LOCALAPPDATA%\NaviXav\updates`, verified against the SHA-256
+digest published by GitHub, then launched while NaviXav closes cleanly. A
+network or GitHub outage never prevents normal startup.
+
+The repository is public for read access: anyone can inspect the source and
+download Releases without a GitHub account, while write access remains limited
+to authorised collaborators.
+
+Versions use `MAJOR.MINOR.PATCH`. Conventional commits drive the automatic
+bump: `feat:` for minor, `fix:` for patch, and `BREAKING CHANGE` or `!:` for
+major. Other changes default to patch. Release notes are generated into
+`RELEASE_NOTES.md` and accumulated in `CHANGELOG.md`.
+
+```powershell
+.\scripts\prepare_release.ps1 -Bump auto
+.\scripts\publish_release.ps1 -Bump auto
+```
+
+The publishing script requires a clean repository and an authenticated GitHub
+CLI. It tests and builds NaviXav, commits the version files, creates and pushes
+the tag, then publishes the installer, portable archive, SHA-256 files and
+release notes.
+
+## Command-line and maintenance commands
+
+```powershell
+# Dedicated desktop window
+.\NaviXav.bat
+
+# Local server without a window, for diagnostics
+.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+
+# Build and validate Windows distribution
+.\scripts\build_windows.ps1
+
+# Run tests without a live MSFS instance
+.\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
+```
 
 ## Privacy
 

@@ -87,6 +87,14 @@
       ground_speed_note: "GS mesurée par MSFS",
       air_speed: "Vitesse air",
       air_speed_note: "Vitesse indiquée IAS",
+      update_available: "Mise à jour",
+      update_title: "Télécharger et installer la nouvelle version",
+      update_confirm: "Installer NaviXav {version} maintenant ? L’application redémarrera automatiquement.",
+      update_downloading: "Téléchargement…",
+      update_restarting: "Redémarrage…",
+      update_ready: "Mise à jour vérifiée",
+      update_restart_body: "NaviXav va se fermer, installer la nouvelle version puis redémarrer.",
+      update_failed: "Échec de la mise à jour",
     },
     en: {
       subtitle: "IFR flight plan assistant",
@@ -167,6 +175,14 @@
       ground_speed_note: "GS reported by MSFS",
       air_speed: "Airspeed",
       air_speed_note: "Indicated airspeed (IAS)",
+      update_available: "Update",
+      update_title: "Download and install the new version",
+      update_confirm: "Install NaviXav {version} now? The application will restart automatically.",
+      update_downloading: "Downloading…",
+      update_restarting: "Restarting…",
+      update_ready: "Update verified",
+      update_restart_body: "NaviXav will close, install the new version, then restart.",
+      update_failed: "Update failed",
     },
   };
 
@@ -189,6 +205,7 @@
       max_tailwind: "Maximaler Rückenwind (kt)", max_crosswind: "Maximaler Seitenwind (kt)",
       min_runway: "Minimale Pistenlänge (ft)", rnp_aircraft: "RNP-fähiges Flugzeug",
       cancel: "Abbrechen", save: "Speichern",
+      update_available: "Update", update_downloading: "Download…", update_restarting: "Neustart…",
     },
     es: {
       subtitle: "Asistente de plan de vuelo IFR", source_title: "Navegación y procedimientos obtenidos directamente mediante SimConnect",
@@ -208,6 +225,7 @@
       max_tailwind: "Viento de cola máximo (kt)", max_crosswind: "Viento cruzado máximo (kt)",
       min_runway: "Longitud mínima de pista (ft)", rnp_aircraft: "Avión compatible con RNP",
       cancel: "Cancelar", save: "Guardar",
+      update_available: "Actualizar", update_downloading: "Descargando…", update_restarting: "Reiniciando…",
     },
     it: {
       subtitle: "Assistente al piano di volo IFR", source_title: "Navigazione e procedure recuperate direttamente tramite SimConnect",
@@ -227,6 +245,7 @@
       max_tailwind: "Vento in coda massimo (kt)", max_crosswind: "Vento al traverso massimo (kt)",
       min_runway: "Lunghezza minima pista (ft)", rnp_aircraft: "Aeromobile abilitato RNP",
       cancel: "Annulla", save: "Salva",
+      update_available: "Aggiorna", update_downloading: "Download…", update_restarting: "Riavvio…",
     },
     pt: {
       subtitle: "Assistente de plano de voo IFR", source_title: "Navegação e procedimentos obtidos diretamente pelo SimConnect",
@@ -246,6 +265,7 @@
       max_tailwind: "Vento de cauda máximo (kt)", max_crosswind: "Vento cruzado máximo (kt)",
       min_runway: "Comprimento mínimo da pista (ft)", rnp_aircraft: "Aeronave com capacidade RNP",
       cancel: "Cancelar", save: "Guardar",
+      update_available: "Atualizar", update_downloading: "A transferir…", update_restarting: "A reiniciar…",
     },
     nl: {
       subtitle: "IFR-vluchtplanassistent", source_title: "Navigatie en procedures rechtstreeks opgehaald via SimConnect",
@@ -265,6 +285,7 @@
       max_tailwind: "Maximale rugwind (kt)", max_crosswind: "Maximale zijwind (kt)",
       min_runway: "Minimale baanlengte (ft)", rnp_aircraft: "RNP-geschikt vliegtuig",
       cancel: "Annuleren", save: "Opslaan",
+      update_available: "Bijwerken", update_downloading: "Downloaden…", update_restarting: "Herstarten…",
     },
     pl: {
       subtitle: "Asystent planu lotu IFR", source_title: "Nawigacja i procedury pobierane bezpośrednio przez SimConnect",
@@ -284,6 +305,7 @@
       max_tailwind: "Maksymalny wiatr tylny (kt)", max_crosswind: "Maksymalny wiatr boczny (kt)",
       min_runway: "Minimalna długość pasa (ft)", rnp_aircraft: "Samolot z obsługą RNP",
       cancel: "Anuluj", save: "Zapisz",
+      update_available: "Aktualizacja", update_downloading: "Pobieranie…", update_restarting: "Ponowne uruchamianie…",
     },
   });
 
@@ -292,6 +314,7 @@
     ".nav-source": "source",
     ".switch-label": "demo",
     "#settings-open": "settings",
+    "#update-install": "update_available",
     "#sim-status-text": "sim_offline",
     "#shutdown": "quit",
     "#refresh span": "complete",
@@ -343,6 +366,7 @@
     ".nav-source": "source_title",
     ".toolbar .switch": "demo_title",
     "#settings-open": "settings_title",
+    "#update-install": "update_title",
     "#sim-status": "sim_title",
     "#shutdown": "quit_title",
     "#map-basemap": "basemap_title",

@@ -103,3 +103,76 @@ benaderd.
 Het roterende diagnoselogboek staat in
 `%LOCALAPPDATA%\NaviXav\logs\navixav.log`. Het bevat fouten en tijdmetingen,
 maar geen SimBrief-ID en geen volledige route.
+
+## Gedetailleerde werking
+
+### Vluchtplan en procedures
+
+Bij het starten haalt NaviXav de laatst gemaakte SimBrief-OFP op: vertrek,
+bestemming, uitwijkhaven, route, kruishoogte, vliegtuig, brandstof, gewichten
+en METAR. Het vluchtplan zelf wordt nog op SimBrief gemaakt. Gegevens die
+rechtstreeks uit MSFS komen vullen baan, SID, transitie, STAR en nadering aan;
+een andere ATIS- of ATC-toewijzing kan in de interface worden opgelegd. Het
+blok Vertrek–Route–Aankomst kan worden ingeklapt en het actieve routepunt
+verandert van kleur.
+
+### Begeleiding, nadering en MCDU
+
+De begeleiding toont afstand, peiling, gewenste hoogte, volgende beperking,
+grondsnelheid (GS) en indicated airspeed (IAS). Indien beschikbaar worden
+ILS-frequentie en -koers, glijhoek, interceptiehoogte, baandrempelhoogte,
+minima en missed-approachhoogte getoond. De officiële kaart en ATC blijven
+leidend.
+
+Het MCDU-blad groepeert waarden voor INIT, F-PLN, RAD NAV, PERF TAKEOFF en PERF
+APPR: luchthavens, vluchtnummer, cost index, cruise, banen, procedures,
+transities, ILS, QNH, wind, temperatuur, minima en bekende startgegevens.
+
+### Kaart, opname en officiële documenten
+
+De SimBrief-route wordt over OpenStreetMap getekend met aparte stijlen voor
+SID, route, STAR en nadering. Gronddetails worden op zoomniveau gefilterd. Het
+lokale vluchtspoor kan worden afgespeeld en wordt nooit geüpload.
+
+Vertrek en aankomst zijn vooraf geselecteerd voor officiële pdf’s. Ondersteund
+zijn SIA Frankrijk, ENAIRE Spanje, LVNL Nederland en FAA d-TPP Verenigde
+Staten. De overlayknop verschijnt alleen bij gevalideerde georeferentie; een
+gewone pdf blijft leesbaar, maar wordt niet bij benadering uitgelijnd.
+
+### Lokale gegevens en cache
+
+Instellingen staan in `%LOCALAPPDATA%\NaviXav\user_settings.json`,
+navigatiegegevens in `%LOCALAPPDATA%\NaviXav\navixav.sqlite` en logboeken onder
+`%LOCALAPPDATA%\NaviXav\logs`. De eerste keer dat een luchthaven of procedure
+wordt geladen kan het vullen van de MSFS-cache tientallen seconden duren.
+
+## Automatische updates en Releases
+
+Bij het starten controleert NaviXav de nieuwste openbare Release van
+`xalacaga/NaviXav`. Bij een nieuwere versie verschijnt **Bijwerken**. Na
+bevestiging wordt de installer naar `%LOCALAPPDATA%\NaviXav\updates`
+gedownload, met de gepubliceerde SHA-256 gecontroleerd en gestart. Een
+netwerkfout blokkeert de vluchtfuncties niet.
+
+De repository is openbaar leesbaar; alleen bevoegde medewerkers mogen
+schrijven. Versies volgen `MAJOR.MINOR.PATCH`: `feat:` verhoogt minor, `fix:`
+patch en `BREAKING CHANGE` of `!:` major. Notities staan in
+`RELEASE_NOTES.md` en de geschiedenis in `CHANGELOG.md`.
+
+```powershell
+.\scripts\prepare_release.ps1 -Bump auto
+.\scripts\publish_release.ps1 -Bump auto
+```
+
+Publicatie vereist een schone repository en aangemelde GitHub CLI. Het script
+test, bouwt, tagt en publiceert installer, draagbaar archief, SHA-256-bestanden
+en release-opmerkingen.
+
+## Diagnoseopdrachten
+
+```powershell
+.\NaviXav.bat
+.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+.\scripts\build_windows.ps1
+.\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
+```

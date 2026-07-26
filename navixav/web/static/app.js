@@ -91,6 +91,43 @@ async function loadStatus() {
   return status;
 }
 
+async function checkForUpdates() {
+  const button = $("update-install");
+  try {
+    const response = await fetch("/api/update/check", { cache: "no-store" });
+    const update = await response.json();
+    if (!response.ok || !update.available) return;
+    button.dataset.version = update.latest_version;
+    button.textContent = `${t("update_available")} ${update.latest_version}`;
+    button.title = t("update_title");
+    show(button, true);
+  } catch (_error) {
+    // Une coupure réseau ne doit jamais gêner le démarrage ou le vol.
+  }
+}
+
+async function installAvailableUpdate() {
+  const button = $("update-install");
+  const version = button.dataset.version || "";
+  if (!window.confirm(t("update_confirm").replace("{version}", version))) return;
+  button.disabled = true;
+  button.textContent = t("update_downloading");
+  try {
+    const response = await fetch("/api/update/install", {
+      method: "POST",
+      headers: { "X-NaviXav-Update": "install" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("update_failed"));
+    button.textContent = t("update_restarting");
+    showBanner("info", t("update_ready"), [t("update_restart_body")]);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = `${t("update_available")} ${version}`;
+    showBanner("error", t("update_failed"), [String(error)]);
+  }
+}
+
 async function pollSimulatorStatus() {
   const indicator = $("sim-status");
   try {
@@ -2102,6 +2139,7 @@ $("sia-opacity").addEventListener("input", (event) => {
 });
 $("map-route").addEventListener("click", () => MAP.fitRoute());
 $("settings-open").addEventListener("click", openSettings);
+$("update-install").addEventListener("click", installAvailableUpdate);
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);
@@ -2129,6 +2167,7 @@ async function initialiseApplication() {
   try {
     $("demo-toggle").checked = false;
     const status = await loadStatus();
+    checkForUpdates();
     if (status.simbrief_configured) await buildPlan();
   } catch (error) {
     showBanner("error", "Initialisation impossible", [String(error)]);

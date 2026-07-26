@@ -101,3 +101,75 @@ oficjalnymi źródłami.
 Rotacyjny dziennik diagnostyczny znajduje się w
 `%LOCALAPPDATA%\NaviXav\logs\navixav.log`. Zawiera błędy i czasy operacji, ale
 nie zapisuje identyfikatora SimBrief ani pełnej trasy.
+
+## Szczegółowe działanie
+
+### Plan lotu i procedury
+
+Przy uruchomieniu NaviXav pobiera ostatni wygenerowany OFP SimBrief: odlot,
+cel, lotnisko zapasowe, trasę, poziom przelotowy, samolot, paliwo, masy i
+METAR. Sam plan nadal tworzy się w SimBrief. Dane odczytane bezpośrednio z
+MSFS uzupełniają pas, SID, przejście, STAR i podejście; inną zgodę ATIS lub ATC
+można wymusić w interfejsie. Blok Odlot–Trasa–Przylot można zwinąć, a aktywny
+punkt trasy zmienia kolor.
+
+### Prowadzenie, podejście i MCDU
+
+Prowadzenie pokazuje odległość, namiar, wymaganą wysokość, następne
+ograniczenie, prędkość względem ziemi (GS) i prędkość wskazywaną (IAS). Gdy są
+dostępne, pokazuje częstotliwość i kurs ILS, kąt ścieżki, wysokość przechwycenia,
+wysokość progu, minima i wysokość nieudanego podejścia. Oficjalna karta i ATC
+zawsze mają pierwszeństwo.
+
+Karta MCDU grupuje dane dla INIT, F-PLN, RAD NAV, PERF TAKEOFF i PERF APPR:
+lotniska, numer lotu, cost index, przelot, pasy, procedury, przejścia, ILS, QNH,
+wiatr, temperaturę, minima i znane dane startowe.
+
+### Mapa, zapis i dokumenty oficjalne
+
+Trasa SimBrief jest rysowana na OpenStreetMap, osobno dla SID, trasy, STAR i
+podejścia. Szczegóły naziemne są filtrowane zależnie od powiększenia. Lokalny
+ślad lotu można odtworzyć i nigdy nie jest wysyłany.
+
+Odlot i przylot są domyślnie wybrane dla oficjalnych PDF. Obsługiwane są SIA
+Francja, ENAIRE Hiszpania, LVNL Holandia i FAA d-TPP USA. Przycisk nakładki
+pojawia się tylko po zatwierdzonej georeferencji; zwykły PDF można czytać, ale
+nie jest przybliżenie nakładany na mapę.
+
+### Dane lokalne i pamięć podręczna
+
+Ustawienia są w `%LOCALAPPDATA%\NaviXav\user_settings.json`, dane nawigacyjne w
+`%LOCALAPPDATA%\NaviXav\navixav.sqlite`, a logi pod
+`%LOCALAPPDATA%\NaviXav\logs`. Pierwsze wczytanie lotniska lub procedury może
+trwać kilkadziesiąt sekund podczas zapełniania pamięci podręcznej MSFS.
+
+## Automatyczne aktualizacje i Releases
+
+Przy starcie NaviXav sprawdza najnowszą publiczną Release
+`xalacaga/NaviXav`. Gdy wersja jest nowsza, pojawia się **Aktualizacja**. Po
+potwierdzeniu instalator trafia do `%LOCALAPPDATA%\NaviXav\updates`, jest
+sprawdzany opublikowanym SHA-256 i uruchamiany. Błąd sieci nie blokuje funkcji
+lotu.
+
+Repozytorium jest publiczne do odczytu; zapisywać mogą tylko upoważnieni
+współpracownicy. Wersje mają format `MAJOR.MINOR.PATCH`: `feat:` zwiększa
+minor, `fix:` patch, a `BREAKING CHANGE` lub `!:` major. Notatki są w
+`RELEASE_NOTES.md`, historia w `CHANGELOG.md`.
+
+```powershell
+.\scripts\prepare_release.ps1 -Bump auto
+.\scripts\publish_release.ps1 -Bump auto
+```
+
+Publikowanie wymaga czystego repozytorium i zalogowanego GitHub CLI. Skrypt
+testuje, buduje, taguje i publikuje instalator, archiwum przenośne, pliki
+SHA-256 oraz notatki.
+
+## Polecenia diagnostyczne
+
+```powershell
+.\NaviXav.bat
+.\.venv\Scripts\python.exe -m navixav.desktop --no-open
+.\scripts\build_windows.ps1
+.\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
+```

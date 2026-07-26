@@ -183,7 +183,8 @@ restent volontairement dans leur notation internationale.
 
 ## Installation rapide sous Windows
 
-1. Télécharger `NaviXav-Setup-0.1.0.exe`.
+1. Télécharger le fichier `NaviXav-Setup-<version>.exe` de la dernière
+   [Release GitHub](https://github.com/xalacaga/NaviXav/releases/latest).
 2. Lancer l’installateur.
 3. Vérifier la page de contrôle des prérequis.
 4. Conserver ou modifier le dossier proposé, puis cliquer sur **Installer**.
@@ -194,7 +195,7 @@ manque. L’installation se fait pour l’utilisateur courant et ne demande
 normalement pas de droits administrateur.
 
 Une archive portable est également disponible : extraire
-`NaviXav-0.1.0-windows-x64-portable.zip`, puis lancer `NaviXav.exe`. Sur une
+`NaviXav-<version>-windows-x64-portable.zip`, puis lancer `NaviXav.exe`. Sur une
 machine dépourvue de WebView2, utiliser d’abord l’installateur complet.
 
 ### Depuis les sources
@@ -242,8 +243,8 @@ Après une construction réussie :
 
 | Fichier | Usage |
 |---|---|
-| `release\NaviXav-Setup-0.1.0.exe` | installateur Windows recommandé |
-| `release\NaviXav-0.1.0-windows-x64-portable.zip` | version portable |
+| `release\NaviXav-Setup-<version>.exe` | installateur Windows recommandé |
+| `release\NaviXav-<version>-windows-x64-portable.zip` | version portable |
 | `release\*.sha256` | empreintes de contrôle des fichiers distribués |
 
 Le dossier `release\` est volontairement ignoré par Git. Les exécutables sont
@@ -449,6 +450,51 @@ Le fichier `.gitignore` exclut notamment :
 Les mémoires Claude/Codex peuvent donc être maintenues localement sans être
 publiées dans le dépôt Git.
 
+### Mises à jour automatiques
+
+Au démarrage, NaviXav interroge uniquement la dernière Release publique du
+dépôt `xalacaga/NaviXav`. Si sa version est supérieure à la version installée,
+un bouton **Mise à jour** apparaît dans la barre supérieure. L’installation ne
+commence qu’après confirmation de l’utilisateur.
+
+L’installateur est téléchargé dans
+`%LOCALAPPDATA%\NaviXav\updates\`, puis son empreinte SHA-256 est comparée à
+celle publiée par GitHub. En cas d’empreinte absente ou différente, le fichier
+est supprimé et n’est jamais exécuté. Une panne de GitHub ou d’Internet ne
+bloque ni le démarrage ni les fonctions de vol.
+
+Le dépôt est public en lecture. Un utilisateur peut consulter le code et
+télécharger les Releases sans compte GitHub, mais seuls les collaborateurs
+autorisés peuvent écrire dans le dépôt.
+
+### Version et notes de Release
+
+La version suit le format sémantique `MAJEURE.MINEURE.CORRECTIF`. Les messages
+de commit conventionnels déterminent automatiquement le niveau suivant :
+
+- `feat:` produit normalement une version mineure ;
+- `fix:` produit une version corrective ;
+- `BREAKING CHANGE` ou `!:` produit une version majeure ;
+- les autres changements produisent une version corrective.
+
+Préparer localement la version et ses notes :
+
+```powershell
+.\scripts\prepare_release.ps1 -Bump auto
+```
+
+Publier l’installateur, l’archive portable, leurs empreintes et les notes dans
+une Release GitHub :
+
+```powershell
+.\scripts\publish_release.ps1 -Bump auto
+```
+
+Le second script exige un dépôt propre et GitHub CLI authentifié. Il exécute
+les tests, construit les livrables, crée le commit et le tag de version, pousse
+`main` et le tag, puis crée la Release GitHub. `CHANGELOG.md` conserve
+l’historique et `RELEASE_NOTES.md` contient les notes de la version courante.
+
 ## Dépannage
 
 ### Le port 8765 est déjà utilisé
@@ -479,7 +525,7 @@ Il est aussi possible de démarrer l’application sur un autre port :
   `msedgewebview2.exe`.
 
 L’archive portable ne peut pas installer elle-même WebView2. Sur une machine
-qui ne possède pas ce composant, utiliser `NaviXav-Setup-0.1.0.exe`.
+qui ne possède pas ce composant, utiliser `NaviXav-Setup-<version>.exe`.
 
 ### Le voyant MSFS reste rouge
 

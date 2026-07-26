@@ -6,7 +6,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$Version = "0.1.0"
+$VersionSource = Get-Content -LiteralPath (Join-Path $ProjectRoot "navixav\__init__.py") -Raw
+if ($VersionSource -notmatch '__version__\s*=\s*"(?<version>\d+\.\d+\.\d+)"') {
+    throw "Version NaviXav introuvable dans navixav\__init__.py."
+}
+$Version = $Matches.version
 $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $ReleaseDir = Join-Path $ProjectRoot "release"
 $ModernSimConnect = "C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"
@@ -145,7 +149,7 @@ if (-not $SkipInstaller) {
         throw "Inno Setup 6 est absent. Utilise -SkipInstaller ou autorise son installation."
     }
     Write-Step "Construction de l'installateur Windows"
-    & $Iscc (Join-Path $ProjectRoot "installer\NaviXav.iss")
+    & $Iscc "/DMyAppVersion=$Version" (Join-Path $ProjectRoot "installer\NaviXav.iss")
     if ($LASTEXITCODE -ne 0) { throw "La compilation de l'installateur a échoué." }
 }
 

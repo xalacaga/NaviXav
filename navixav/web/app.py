@@ -43,6 +43,7 @@ from navixav.preferences import AirportPreferences
 from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 from navixav.sia import SiaClient, SiaError
+from navixav.updater import GitHubUpdater, UpdateError
 
 STATIC_DIR = resource_path("navixav", "web", "static")
 DEMO_OFP = resource_path("tests", "data", "ofp_lfst_lfbo.json")
@@ -108,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for source in NATIONAL_AIP_SOURCES
     }
     demo_state: dict[str, Any] = {}
+    updater = GitHubUpdater(__version__)
 
     @app.middleware("http")
     async def log_relevant_requests(request: Request, call_next):
@@ -200,6 +202,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/settings")
     def get_settings() -> dict[str, object]:
         return settings.user_values()
+
+    @app.get("/api/update/check")
+    def check_update() -> dict[str, object]:
+        try:
+            update = updater.check()
+        except UpdateError as exc:
+            LOGGER.warning("Vérification de mise à jour impossible : %s", exc)
+            return {
+                "current_version": __version__,
+                "available": False,
+                "error": str(exc),
+            }
+        if update.available:
+            LOGGER.info("Mise à jour NaviXav %s disponible", update.latest_version)
+        return update.to_dict()
+
+    @app.post("/api/update/install")
+    def install_update(request: Request) -> dict[str, object]:
+        if request.headers.get("X-NaviXav-Update") != "install":
+            raise HTTPException(403, "Confirmation de mise à jour absente.")
+        callback = getattr(app.state, "request_update_install", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "L'installation automatique est disponible dans l'application Windows.",
+            )
+        try:
+            update = updater.check()
+            if not update.available:
+                raise HTTPException(409, "NaviXav est déjà à jour.")
+            installer = updater.download(update)
+        except UpdateError as exc:
+            LOGGER.warning("Mise à jour refusée : %s", exc)
+            raise HTTPException(502, str(exc)) from exc
+        callback(installer)
+        return {
+            "status": "starting",
+            "version": update.latest_version,
+        }
 
     @app.put("/api/settings")
     def update_settings(request: SettingsRequest) -> dict[str, object]:
