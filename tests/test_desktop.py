@@ -141,3 +141,13 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert 'id="update-install"' in html
     assert 'fetch("/api/update/check"' in javascript
     assert '"X-NaviXav-Update": "install"' in javascript
+
+
+def test_vertical_profile_waits_for_descent_before_reporting_too_low():
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    assert 'phase === "Descente"' in javascript
+    assert 'phase === "Approche"' in javascript
+    assert "En attente du TOD" in javascript
+    assert "Math.abs(delta) <= 500" in javascript

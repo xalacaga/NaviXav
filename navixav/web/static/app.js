@@ -811,16 +811,32 @@ function updateFlightPanel(aircraft) {
         : `dépassé de ${Math.abs(descent.todInNm).toFixed(0)} NM`;
     liveValue("flight-tod", todText, descent.todInNm < -2 ? "warning" : "good");
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
-    const delta = descent.profileDeltaFt;
-    liveValue(
-      "flight-vertical-profile",
-      Math.abs(delta) <= 300
-        ? "Profil correct"
-        : delta > 0
-          ? `Trop haut de ${Math.abs(delta)} ft`
-          : `Trop bas de ${Math.abs(delta)} ft`,
-      Math.abs(delta) <= 300 ? "good" : Math.abs(delta) <= 1000 ? "warning" : "danger"
+    const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
+    const profileActive = (
+      phase === "Descente"
+      || phase === "Approche"
+      || verticalSpeed < -300
+      || descent.todInNm <= 2
     );
+    if (!profileActive) {
+      const waiting = descent.todInNm > 2
+        ? `En attente du TOD · ${descent.todInNm.toFixed(0)} NM`
+        : "Profil disponible en descente";
+      liveValue("flight-vertical-profile", waiting);
+    } else {
+      const delta = descent.profileDeltaFt;
+      // Une marge de 500 ft évite une alerte instable due à l'arrondi du
+      // profil 3°, au QNH et aux points de procédure rapprochés.
+      liveValue(
+        "flight-vertical-profile",
+        Math.abs(delta) <= 500
+          ? "Profil correct"
+          : delta > 0
+            ? `Trop haut de ${Math.abs(delta)} ft`
+            : `Trop bas de ${Math.abs(delta)} ft`,
+        Math.abs(delta) <= 500 ? "good" : Math.abs(delta) <= 1200 ? "warning" : "danger"
+      );
+    }
   } else {
     for (const id of ["flight-tod", "flight-descent-vs", "flight-vertical-profile"]) {
       liveValue(id, "—");
@@ -865,8 +881,8 @@ function renderFlightPanel(plan) {
   item("Distance contrainte", "flight-constraint-distance");
   item("Taux requis", "flight-required-vs", "Pour respecter la prochaine altitude");
   item("Top of Descent", "flight-tod");
+  item("Profil vertical", "flight-vertical-profile", "Évalué à partir du TOD");
   item("Descente indicative", "flight-descent-vs", "Base 3° · à confirmer");
-  item("Profil vertical", "flight-vertical-profile");
   panel.append(grid);
 
   const recorder = el("section", "flight-recorder");
