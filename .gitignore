@@ -1,0 +1,43 @@
+# Secrets et configuration locale
+.env
+data/user_settings.json
+data/user_settings.tmp
+
+# Claude
+.claude/
+.claude.json
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+
+# Codex
+.codex/
+AGENTS.md
+CODEX.md
+
+# Graphify
+.graphify/
+.graphify*
+graphify-out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.pytest_tmp/
+
+# Données d'exécution locales
+data/navixav.sqlite
+data/cache/
+out/
+
+# Éditeurs et système
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -323,7 +323,7 @@ navixav/
 │   └── parser.py        normalisation du JSON, dispatch, points de raccord
 ├── weather/metar.py     lecture du vent (METAR = nord vrai)
 ├── msfs/                extraction depuis MSFS
-│   ├── client.py        SimConnect Facilities en ctypes
+│   ├── client.py        client ctypes unique : Facilities + variables de vol
 │   ├── fields.py        champs et types établis par sondage
 │   └── extract.py       aéroport, installations radio, repères, routes
 ├── navdata/

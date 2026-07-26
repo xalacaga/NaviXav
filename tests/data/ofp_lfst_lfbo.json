@@ -1,0 +1,193 @@
+{
+  "fetch": { "status": "Success" },
+  "params": {
+    "time_generated": "1785000000",
+    "airac": "2604",
+    "units": "KGS"
+  },
+  "general": {
+    "icao_airline": "AFR",
+    "flight_number": "1234",
+    "route": "EPIK8M EPIKO DCT LIRKO DCT MOKIP DCT GERVA DCT AFRIC AFRI8N",
+    "initial_altitude": "34000",
+    "costindex": "24",
+    "cruise_profile": "CI",
+    "climb_profile": "250/300/78",
+    "descent_profile": "78/300/250",
+    "avg_wind_comp": "-014",
+    "avg_wind_dir": "268",
+    "avg_wind_spd": "42",
+    "avg_temp_dev": "3",
+    "avg_tropopause": "37000",
+    "route_distance": "311",
+    "air_distance": "325",
+    "gc_distance": "298"
+  },
+  "fuel": {
+    "taxi": "200",
+    "enroute_burn": "3140",
+    "contingency": "157",
+    "alternate_burn": "1090",
+    "reserve": "1150",
+    "extra": "0",
+    "min_takeoff": "5537",
+    "plan_takeoff": "5537",
+    "plan_ramp": "5737",
+    "plan_landing": "2397",
+    "avg_fuel_flow": "2410",
+    "max_tanks": "18730"
+  },
+  "weights": {
+    "oew": "44300",
+    "pax_count": "162",
+    "pax_count_actual": "162",
+    "bag_count": "142",
+    "cargo": "1200",
+    "payload": "16040",
+    "est_zfw": "60340",
+    "max_zfw": "64300",
+    "est_tow": "66077",
+    "max_tow": "79000",
+    "est_ldw": "62937",
+    "max_ldw": "67400"
+  },
+  "times": {
+    "est_out": "1785002400",
+    "est_off": "1785003300",
+    "est_on": "1785008400",
+    "est_in": "1785009000",
+    "est_time_enroute": "5100",
+    "est_block": "6600"
+  },
+  "origin": {
+    "icao_code": "LFST",
+    "iata_code": "SXB",
+    "name": "Strasbourg Entzheim",
+    "plan_rwy": "05",
+    "elevation": "505"
+  },
+  "destination": {
+    "icao_code": "LFBO",
+    "iata_code": "TLS",
+    "name": "Toulouse Blagnac",
+    "plan_rwy": "",
+    "elevation": "499"
+  },
+  "alternate": {
+    "icao_code": "LFBP",
+    "name": "Pau Pyrenees",
+    "route": "DCT AGN DCT",
+    "distance": "94",
+    "ete": "1320",
+    "burn": "1090",
+    "cruise_altitude": "20000"
+  },
+  "aircraft": {
+    "icaocode": "A20N",
+    "name": "Airbus A320neo",
+    "reg": "F-HXAV",
+    "equip": "SDE2E3FGHIRWXYZ/LB1",
+    "selcal": "AB-CD"
+  },
+  "atc": {
+    "callsign": "AFR1234",
+    "flightplan_text": "(FPL-AFR1234-IS -A20N/M-SDE2E3FGHIRWXYZ/LB1 -LFST0730 -N0447F340 EPIK8M EPIKO DCT LIRKO DCT MOKIP DCT GERVA DCT AFRIC AFRI8N -LFBO0125 LFBP -PBN/A1B1C1D1O1S2 DOF/260726 REG/FHXAV)"
+  },
+  "weather": {
+    "orig_metar": "LFST 260730Z 04006KT 9999 FEW035 18/12 Q1019 NOSIG",
+    "dest_metar": "LFBO 260730Z 33008KT 320V350 CAVOK 21/11 Q1018 NOSIG",
+    "altn_metar": "LFBP 260730Z 29004KT CAVOK 19/10 Q1018 NOSIG"
+  },
+  "navlog": {
+    "fix": [
+      {
+        "ident": "D308M",
+        "name": "DEPARTURE FIX",
+        "type": "wpt",
+        "via_airway": "EPIK8M",
+        "is_sid_star": "1",
+        "stage": "CLB"
+      },
+      {
+        "ident": "EPIKO",
+        "name": "EPIKO",
+        "type": "wpt",
+        "via_airway": "EPIK8M",
+        "is_sid_star": "1",
+        "stage": "CLB"
+      },
+      {
+        "ident": "TOC",
+        "name": "TOP OF CLIMB",
+        "type": "wpt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "CLB"
+      },
+      {
+        "ident": "LIRKO",
+        "name": "LIRKO",
+        "type": "wpt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "CRZ"
+      },
+      {
+        "ident": "MOKIP",
+        "name": "MOKIP",
+        "type": "wpt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "CRZ"
+      },
+      {
+        "ident": "GERVA",
+        "name": "GERVA",
+        "type": "wpt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "CRZ"
+      },
+      {
+        "ident": "TOD",
+        "name": "TOP OF DESCENT",
+        "type": "wpt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "CRZ"
+      },
+      {
+        "ident": "AFRIC",
+        "name": "AFRIC",
+        "type": "wpt",
+        "via_airway": "AFRI8N",
+        "is_sid_star": "1",
+        "stage": "DSC"
+      },
+      {
+        "ident": "FARCI",
+        "name": "FARCI",
+        "type": "wpt",
+        "via_airway": "AFRI8N",
+        "is_sid_star": "1",
+        "stage": "DSC"
+      },
+      {
+        "ident": "ADIMO",
+        "name": "ADIMO",
+        "type": "wpt",
+        "via_airway": "AFRI8N",
+        "is_sid_star": "1",
+        "stage": "DSC"
+      },
+      {
+        "ident": "LFBO",
+        "name": "TOULOUSE BLAGNAC",
+        "type": "apt",
+        "via_airway": "DCT",
+        "is_sid_star": "0",
+        "stage": "DSC"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "LFBO": {
+    "arrival": ["32R", "14L"],
+    "departure": ["32L", "14R"],
+    "note": "Blagnac : arrivées sur la piste sud-est, départs sur la piste nord-ouest"
+  },
+  "LFPG": {
+    "arrival": ["26L", "27R", "08R", "09L"],
+    "departure": ["26R", "27L", "08L", "09R"],
+    "note": "Roissy : doublets, pistes extérieures aux arrivées"
+  },
+  "LFPO": {
+    "arrival": ["06", "24"],
+    "departure": ["08", "26"],
+    "note": "Orly : 06/24 aux arrivées, 08/26 aux départs"
+  },
+  "EHAM": {
+    "arrival": ["06", "18R", "27", "36R"],
+    "departure": ["24", "36L", "09", "18L"],
+    "note": "Schiphol : configuration préférentielle antibruit"
+  },
+  "EGLL": {
+    "arrival": ["27L", "09L"],
+    "departure": ["27R", "09R"],
+    "note": "Heathrow : alternance, valeur indicative"
+  }
+}
