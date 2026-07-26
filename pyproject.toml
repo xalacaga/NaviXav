@@ -1,7 +1,7 @@
 [project]
 name = "navixav"
-version = "0.1.0"
-description = "Compléteur de plan de vol IFR : SimBrief + navdata locale -> SID/STAR/approche/transitions"
+version = "0.2.0"
+description = "ComplÃ©teur de plan de vol IFR : SimBrief + navdata locale -> SID/STAR/approche/transitions"
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
@@ -11,10 +11,10 @@ dependencies = [
     "pydantic>=2.0",
     "uvicorn>=0.29",
     "pypdf>=5.0,<7",
-    # Fenêtre Windows native embarquant l'interface dans Edge WebView2.
+    # FenÃªtre Windows native embarquant l'interface dans Edge WebView2.
     "pywebview>=6.0,<7 ; sys_platform == 'win32'",
     # Lecture de la position dans MSFS, et fournisseur de SimConnect.dll pour
-    # les machines dépourvues du SDK Microsoft Flight Simulator.
+    # les machines dÃ©pourvues du SDK Microsoft Flight Simulator.
     "SimConnect>=0.4.26 ; sys_platform == 'win32'",
 ]
 
@@ -36,10 +36,10 @@ include = ["navixav*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Le dossier temporaire par défaut (%LOCALAPPDATA%\Temp\pytest-of-*) est
-# devenu illisible sur cette machine : pytest ne peut plus y créer les
-# répertoires de `tmp_path`. On l'isole donc dans le projet.
+# Le dossier temporaire par dÃ©faut (%LOCALAPPDATA%\Temp\pytest-of-*) est
+# devenu illisible sur cette machine : pytest ne peut plus y crÃ©er les
+# rÃ©pertoires de `tmp_path`. On l'isole donc dans le projet.
 addopts = "--basetemp=.pytest_tmp"
 markers = [
-    "live_msfs: tests d'intégration qui nécessitent MSFS démarré",
+    "live_msfs: tests d'intÃ©gration qui nÃ©cessitent MSFS dÃ©marrÃ©",
 ]

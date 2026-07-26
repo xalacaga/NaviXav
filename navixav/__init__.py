@@ -1,10 +1,10 @@
-"""NaviXav — compléteur de plan de vol IFR.
+"""NaviXav â€” complÃ©teur de plan de vol IFR.
 
-Récupère le dernier OFP SimBrief, puis complète les éléments terminaux
-manquants (piste, SID, STAR, approche et transitions) à partir d'une base
+RÃ©cupÃ¨re le dernier OFP SimBrief, puis complÃ¨te les Ã©lÃ©ments terminaux
+manquants (piste, SID, STAR, approche et transitions) Ã  partir d'une base
 de navigation locale.
 """
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

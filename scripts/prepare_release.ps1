@@ -1,15 +1,17 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto"
 )
 
 $ErrorActionPreference = "Stop"
+$env:LC_ALL = "C.UTF-8"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $ProjectRoot
 
 function Get-CurrentVersion {
-    $Source = Get-Content -LiteralPath "navixav\__init__.py" -Raw
+    $Source = Get-Content -LiteralPath "navixav\__init__.py" -Raw -Encoding UTF8
     if ($Source -notmatch '__version__\s*=\s*"(?<version>\d+\.\d+\.\d+)"') {
         throw "Version NaviXav introuvable."
     }
@@ -46,7 +48,7 @@ function Set-VersionInFile(
     [string]$Pattern,
     [string]$Replacement
 ) {
-    $Content = Get-Content -LiteralPath $Path -Raw
+    $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
     $Updated = [regex]::Replace($Content, $Pattern, $Replacement, 1)
     if ($Updated -eq $Content) {
         throw "Version non modifiée dans $Path."
@@ -115,7 +117,7 @@ $ReleaseText = $Notes -join "`n"
 
 $ChangelogEntry = "## [$Next] - $Date`n`n" + (($Notes | Select-Object -Skip 4) -join "`n")
 if (Test-Path -LiteralPath "CHANGELOG.md") {
-    $Existing = Get-Content -LiteralPath "CHANGELOG.md" -Raw
+    $Existing = Get-Content -LiteralPath "CHANGELOG.md" -Raw -Encoding UTF8
     $Header = "# Journal des modifications`n`n"
     $Body = if ($Existing.StartsWith($Header)) { $Existing.Substring($Header.Length) } else { $Existing }
     [System.IO.File]::WriteAllText(
