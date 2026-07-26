@@ -1,16 +1,19 @@
-# NaviXav 0.2.1
+# NaviXav 0.3.0
 
 Publication du 2026-07-26.
 
-## Corrections de bugs
+## Nouvelles fonctionnalités
 
-- Le profil vertical ne signale plus l’avion « trop bas » pendant la montée ou
-  la croisière avant le Top of Descent.
-- Avant la descente, l’interface indique désormais clairement
-  **En attente du TOD** avec la distance restante.
-- La comparaison verticale devient active pendant la descente et l’approche,
-  avec une tolérance stabilisée à 500 ft.
-- La carte **Profil vertical** est placée directement à côté du Top of Descent
-  dans le bloc de guidage.
+- Le suivi de progression utilise maintenant toute la géométrie du vol :
+  SID, route, STAR et approche.
+- Les fixes des procédures sont affichés dans le bandeau et deviennent actifs
+  successivement au passage de l’avion.
+- La progression est monotone afin d’éviter les sauts vers un segment futur
+  lorsque deux portions de route sont géographiquement proches.
+- Un bouton permanent **Rechercher MAJ** permet de vérifier manuellement les
+  Releases GitHub ; il devient bouton d’installation lorsqu’une version plus
+  récente est disponible.
+- L’icône avion NaviXav est maintenant imposée à la fenêtre WebView et à son
+  identité Windows, en plus de l’exécutable et de l’installateur.
 
 L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.

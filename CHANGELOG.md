@@ -1,5 +1,17 @@
 # Journal des modifications
 
+## [0.3.0] - 2026-07-26
+
+## Nouvelles fonctionnalités
+
+- Progression temps réel sur la géométrie complète SID–route–STAR–approche.
+- Affichage et activation successive des fixes de procédure.
+- Protection monotone contre les sauts de progression aux croisements.
+- Bouton permanent de recherche manuelle des mises à jour.
+- Icône avion appliquée explicitement à la fenêtre et à l’identité Windows.
+
+L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+
 ## [0.2.1] - 2026-07-26
 
 ## Corrections de bugs
