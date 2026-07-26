@@ -1,16 +1,17 @@
-# NaviXav 0.3.2
+# NaviXav 0.4.0
 
 Publication du 2026-07-26.
 
+## Nouvelles fonctionnalités
+
+- personnaliser la carte et fiabiliser la distribution
+
 ## Corrections de bugs
 
-- afficher correctement les accents PowerShell
-- ajouter un lanceur de publication Windows
-- fiabiliser la detection des releases GitHub
+- nettoyer les effets secondaires du build
 
 ## Autres changements
 
-- detailler la documentation neerlandaise
-- detailler les traductions europeennes
+- detailler la documentation polonaise
 
 L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
