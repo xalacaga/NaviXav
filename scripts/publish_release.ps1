@@ -9,22 +9,34 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $ProjectRoot
 
+function Find-GitHubCli {
+    $Command = Get-Command "gh.exe" -ErrorAction SilentlyContinue
+    if ($Command) { return $Command.Source }
+    $Candidates = @(
+        (Join-Path $env:ProgramFiles "GitHub CLI\gh.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\GitHub CLI\gh.exe")
+    )
+    return $Candidates |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_) } |
+        Select-Object -First 1
+}
+
 if (git status --porcelain) {
     throw "Le dépôt doit être propre. Committe d'abord les modifications de l'application."
 }
 
-$Gh = Get-Command "gh.exe" -ErrorAction SilentlyContinue
+$Gh = Find-GitHubCli
 if (-not $Gh -and -not $SkipToolInstall) {
     $Winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
     if ($Winget) {
         & $Winget.Source install --id GitHub.cli --exact --silent --accept-package-agreements --accept-source-agreements
-        $Gh = Get-Command "gh.exe" -ErrorAction SilentlyContinue
+        $Gh = Find-GitHubCli
     }
 }
 if (-not $Gh) {
     throw "GitHub CLI est absent. Installe-le ou relance sans -SkipToolInstall."
 }
-& $Gh.Source auth status
+& $Gh auth status
 if ($LASTEXITCODE -ne 0) {
     throw "Connecte GitHub CLI avec : gh auth login"
 }
@@ -46,7 +58,7 @@ git push origin "v$Version"
 
 $Installer = "release\NaviXav-Setup-$Version.exe"
 $Portable = "release\NaviXav-$Version-windows-x64-portable.zip"
-& $Gh.Source release create "v$Version" `
+& $Gh release create "v$Version" `
     $Installer "$Installer.sha256" $Portable "$Portable.sha256" `
     --repo "xalacaga/NaviXav" `
     --title "NaviXav $Version" `
