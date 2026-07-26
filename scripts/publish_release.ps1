@@ -168,8 +168,17 @@ foreach ($Asset in $Assets) {
 Invoke-Checked "git" @("push", "origin", "main") "L'envoi de la branche main a échoué"
 Invoke-Checked "git" @("push", "origin", $Tag) "L'envoi du tag $Tag a échoué"
 
-& $Gh release view $Tag --repo "xalacaga/NaviXav" *> $null
-$ReleaseExists = $LASTEXITCODE -eq 0
+$ReleaseTags = @(
+    & $Gh release list `
+        --repo "xalacaga/NaviXav" `
+        --limit 100 `
+        --json "tagName" `
+        --jq ".[].tagName"
+)
+if ($LASTEXITCODE -ne 0) {
+    throw "Impossible de consulter les Releases GitHub."
+}
+$ReleaseExists = $ReleaseTags -contains $Tag
 if ($ReleaseExists) {
     Write-Host "La Release $Tag existe : mise à jour de ses fichiers." -ForegroundColor Yellow
     Invoke-Checked $Gh (@("release", "upload", $Tag) + $Assets + @(
