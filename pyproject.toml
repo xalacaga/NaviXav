@@ -1,6 +1,6 @@
 [project]
 name = "navixav"
-version = "0.2.0"
+version = "0.2.1"
 description = "ComplÃ©teur de plan de vol IFR : SimBrief + navdata locale -> SID/STAR/approche/transitions"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,5 +1,16 @@
 # Journal des modifications
 
+## [0.2.1] - 2026-07-26
+
+## Corrections de bugs
+
+- Activation du contrôle du profil vertical uniquement pendant la descente ou
+  l’approche.
+- Affichage « En attente du TOD » avant le début de la descente.
+- Tolérance du profil stabilisée à 500 ft pour éviter les alertes oscillantes.
+
+L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+
 ## [0.2.0] - 2026-07-26
 
 ### Nouvelles fonctionnalités
