@@ -45,7 +45,9 @@ Name: "{group}\Documentation NaviXav"; Filename: "{app}\README.md"
 Name: "{autodesktop}\NaviXav"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Lancer NaviXav"; Flags: nowait postinstall skipifsilent
+; Cette entrée doit aussi s'exécuter pendant une mise à jour /SILENT.
+; runasoriginaluser évite de relancer NaviXav avec les droits de l'installateur.
+Filename: "{app}\{#MyAppExeName}"; Description: "Lancer NaviXav"; Flags: nowait postinstall runasoriginaluser
 
 [Code]
 var

@@ -165,6 +165,20 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert 'class="icon-btn update-btn"' in html
 
 
+def test_silent_update_restarts_navixav():
+    project = Path(desktop.__file__).parent.parent
+    installer = (project / "installer" / "NaviXav.iss").read_text(encoding="utf-8")
+    run_entry = next(
+        line
+        for line in installer.splitlines()
+        if line.startswith('Filename: "{app}\\{#MyAppExeName}"')
+    )
+
+    assert "postinstall" in run_entry
+    assert "runasoriginaluser" in run_entry
+    assert "skipifsilent" not in run_entry
+
+
 def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     javascript = (
         Path(desktop.__file__).parent / "web" / "static" / "app.js"
