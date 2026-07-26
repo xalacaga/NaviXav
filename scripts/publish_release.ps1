@@ -16,6 +16,9 @@ $ReleaseFiles = @(
     "CHANGELOG.md",
     "RELEASE_NOTES.md"
 )
+$BuildSideEffectFiles = @(
+    "tests/data/navdata_test.sqlite"
+)
 Set-Location $ProjectRoot
 
 function Find-GitHubCli {
@@ -58,6 +61,24 @@ function Assert-CleanRepository {
     }
     if ($Status) {
         throw "Le dépôt doit être propre. Committe d'abord les modifications de l'application."
+    }
+}
+
+function Restore-BuildSideEffects {
+    & git restore --worktree -- @BuildSideEffectFiles
+    if ($LASTEXITCODE -ne 0) {
+        throw "Impossible de restaurer les fichiers temporaires modifiés par les tests."
+    }
+}
+
+function Assert-OnlyReleaseChanges {
+    $ChangedFiles = @(& git diff --name-only)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Impossible de contrôler les changements produits par la construction."
+    }
+    $Unexpected = @($ChangedFiles | Where-Object { $_ -notin $ReleaseFiles })
+    if ($Unexpected.Count -gt 0) {
+        throw "Des fichiers inattendus ont changé pendant la construction : $($Unexpected -join ', '). Committe-les séparément puis relance."
     }
 }
 
@@ -124,6 +145,8 @@ if ($Resume) {
         if ($LASTEXITCODE -ne 0) {
             throw "La construction de la Release a échoué."
         }
+        Restore-BuildSideEffects
+        Assert-OnlyReleaseChanges
 
         Invoke-Checked "git" (@("add") + $ReleaseFiles) "Impossible de préparer les fichiers de Release"
         Invoke-Checked "git" @("commit", "-m", "chore(release): v$Version") "Impossible de créer le commit de Release"
@@ -132,6 +155,7 @@ if ($Resume) {
         if (-not $ReleaseCommitted) {
             Write-Host "Restauration des fichiers de version après l'échec." -ForegroundColor Yellow
             & git restore --staged --worktree -- @ReleaseFiles
+            & git restore --worktree -- @BuildSideEffectFiles
         }
         throw
     }
