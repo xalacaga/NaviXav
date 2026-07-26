@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -137,6 +137,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 response.status_code,
                 elapsed,
             )
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
         return response
 
     @app.on_event("shutdown")
@@ -629,8 +632,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         demo_state["key"] = key
 
     @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
+    def index() -> HTMLResponse:
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        return HTMLResponse(
+            html.replace("__NAVIXAV_VERSION__", __version__),
+            headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+        )
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

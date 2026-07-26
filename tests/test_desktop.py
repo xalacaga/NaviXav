@@ -109,7 +109,7 @@ def test_windows_distribution_uses_the_navixav_aircraft_icon():
     assert int.from_bytes(header[4:6], "little") == 7
     assert 'icon=str(project_root / "assets" / "navixav.ico")' in spec
     assert '(str(project_root / "assets" / "navixav.ico"), "assets")' in spec
-    assert 'href="/static/navixav-icon.svg"' in html
+    assert 'href="/static/navixav-icon.svg?v=__NAVIXAV_VERSION__"' in html
 
 
 def test_windows_process_uses_stable_navixav_identity(monkeypatch):
