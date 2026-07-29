@@ -677,6 +677,7 @@
     ".toolbar .switch": "demo_title",
     "#settings-open": "settings_title",
     "#update-install": "check_update_title",
+    "#support-open-toolbar": "support_title",
     "#sim-status": "sim_title",
     "#shutdown": "quit_title",
     "#map-basemap": "basemap_title",
@@ -741,6 +742,8 @@
       const node = document.querySelector(selector);
       if (node) node.title = t(key);
     }
+    const supportToolbar = document.querySelector("#support-open-toolbar");
+    if (supportToolbar) supportToolbar.setAttribute("aria-label", t("support_title"));
     const close = document.querySelector("#settings-close");
     if (close) close.setAttribute("aria-label", t("close"));
     const basemapStyle = document.querySelector("#map-basemap-style");

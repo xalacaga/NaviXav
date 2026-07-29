@@ -625,6 +625,29 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
 .icon-btn.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.toolbar-exit-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.support-toolbar-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 7px;
+  color: #fbbf24;
+}
+.support-toolbar-btn svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+.support-toolbar-btn:hover {
+  color: #f59e0b;
+  border-color: color-mix(in srgb, #fbbf24 65%, var(--border));
+  background: color-mix(in srgb, #fbbf24 10%, var(--surface-raised));
+}
 
 /* Sélecteur de fond de carte, aligné sur la taille des boutons de la barre. */
 .map-basemap-style {
@@ -1346,6 +1369,7 @@ pre {
   .brand h1 { font-size: 1rem; }
   .brand-sub { display: none; }
   .toolbar > * { flex: 1 1 auto; justify-content: center; }
+  .toolbar .toolbar-exit-actions { flex: 0 0 auto; }
   .toolbar .btn-primary { flex-basis: 100%; }
   .nav-source, .sim-status { white-space: nowrap; }
   main { padding: 12px 12px 32px; }
@@ -1456,6 +1480,7 @@ body.remote-client #settings-open,
 body.remote-client #update-install,
 body.remote-client #shutdown,
 body.remote-client #refresh,
+body.remote-client .toolbar-exit-actions,
 body.remote-client .toolbar > .switch {
   display: none;
 }

@@ -140,7 +140,10 @@ def test_support_button_opens_buy_me_a_coffee_only_after_an_explicit_click():
     ).read_text(encoding="utf-8")
 
     assert 'id="support-open"' in html
+    assert 'id="support-open-toolbar"' in html
+    assert 'class="toolbar-exit-actions"' in html
     assert 'fetch("/api/support/open"' in javascript
+    assert '$("support-open-toolbar").addEventListener("click", openSupportPage)' in javascript
     assert '"X-NaviXav-External": "support"' in javascript
     assert "https://buymeacoffee.com/xalacaga" in desktop_source
     assert 'request.headers.get("X-NaviXav-External") != "support"' in server_source

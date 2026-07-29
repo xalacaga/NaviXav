@@ -47,9 +47,17 @@
       <span class="sim-status-dot"></span>
       <span id="sim-status-text">MSFS hors ligne</span>
     </button>
-    <button id="shutdown" class="icon-btn shutdown-btn" title="Arrêter NaviXav et libérer le port">
-      Quitter
-    </button>
+    <div class="toolbar-exit-actions">
+      <button id="support-open-toolbar" class="icon-btn support-toolbar-btn" type="button"
+              title="Soutenir NaviXav" aria-label="Soutenir NaviXav">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 7h12v7a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V7zm12 2h1.5a2.5 2.5 0 0 1 0 5H17v-2h1.5a.5.5 0 0 0 0-1H17V9zM8 3h2v3H8V3zm4 0h2v3h-2V3z"/>
+        </svg>
+      </button>
+      <button id="shutdown" class="icon-btn shutdown-btn" title="Arrêter NaviXav et libérer le port">
+        Quitter
+      </button>
+    </div>
     <button id="refresh" class="btn-primary">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
       <span>Importation du plan</span>

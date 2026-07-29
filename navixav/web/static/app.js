@@ -254,8 +254,8 @@ async function openSimBriefPlanner() {
   }
 }
 
-async function openSupportPage() {
-  const button = $("support-open");
+async function openSupportPage(event) {
+  const button = event?.currentTarget || $("support-open");
   button.disabled = true;
   try {
     const response = await fetch("/api/support/open", {
@@ -4208,6 +4208,7 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
 $("refresh").addEventListener("click", buildPlan);
 $("simbrief-create").addEventListener("click", openSimBriefPlanner);
 $("support-open").addEventListener("click", openSupportPage);
+$("support-open-toolbar").addEventListener("click", openSupportPage);
 $("demo-toggle").addEventListener("change", buildPlan);
 
 $("map-fit").addEventListener("click", () => MAP.fit());
