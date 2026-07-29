@@ -12,7 +12,8 @@ dostosowanym do przygotowania lotu oraz do wprowadzania danych w MCDU.
 
 Aplikacja posiada własne okno systemu Windows. Interfejs jest renderowany przez
 Microsoft WebView2 i komunikuje się wyłącznie z lokalną usługą powiązaną z
-adresem `127.0.0.1`. Żadna zewnętrzna przeglądarka nie jest otwierana.
+adresem `127.0.0.1`. Zewnętrzna przeglądarka otwiera się tylko po kliknięciu
+**Utwórz plan SimBrief**, aby wyświetlić oficjalny edytor.
 Ustawienia, baza nawigacyjna i pamięci podręczne pozostają na komputerze.
 
 Okno można dowolnie skalować. Interfejs zmienia układ paneli, elementów
@@ -70,14 +71,16 @@ wyświetlić:
 - Top of Descent oraz orientacyjną prędkość zniżania na ścieżce 3°;
 - odchylenie od zaplanowanego profilu pionowego.
 
-Ślad lotu jest zapisywany lokalnie co pięć sekund. Można go wstrzymać, usunąć
-lub odtworzyć z poziomu interfejsu. Żadna historia nie jest wysyłana do usług
-zewnętrznych.
+Lokalny dziennik nie przechowuje szczegółowego śladu lotu. Po lądowaniu
+zapisywane jest tylko podsumowanie z czasem trwania, odległością i maksymalną
+wysokością. Wszystkie podsumowania można usunąć z interfejsu, a dane lotu nie
+są wysyłane do usług zewnętrznych.
 
 ### Karta MCDU
 
-Karta **Karta MCDU** zbiera informacje przeznaczone do wprowadzenia w FMS
-Airbusa:
+Karta **Karta MCDU** dostosowuje strony do typu samolotu: MCDU Airbusa, CDU
+Boeinga lub ogólny FMS dla pozostałych maszyn. Nie pokazuje parametrów
+startowych, których nie można zautomatyzować:
 
 - `FROM/TO`, numer lotu i lotnisko zapasowe;
 - Cost Index i poziom przelotowy;

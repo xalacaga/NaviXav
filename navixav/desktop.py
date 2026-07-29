@@ -15,6 +15,7 @@ import threading
 import time
 import traceback
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 from navixav import __version__
@@ -223,6 +224,10 @@ def _run_desktop_window(url: str, server: object) -> None:
             # Laisse le temps à la réponse HTTP d'atteindre l'interface.
             threading.Timer(0.8, launch).start()
 
+        def open_simbrief() -> None:
+            """Ouvre l'éditeur SimBrief uniquement après une action explicite."""
+            webbrowser.open("https://dispatch.simbrief.com/options/new", new=2)
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -233,6 +238,7 @@ def _run_desktop_window(url: str, server: object) -> None:
         window.events.closed += stop_server
         server.config.app.state.request_shutdown = stop_from_interface
         server.config.app.state.request_update_install = install_update
+        server.config.app.state.request_open_simbrief = open_simbrief
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

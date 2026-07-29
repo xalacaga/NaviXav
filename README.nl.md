@@ -12,7 +12,8 @@ interface die is afgestemd op de vluchtvoorbereiding en de MCDU-invoer.
 
 De applicatie heeft een eigen Windows-venster. De interface wordt weergegeven
 door Microsoft WebView2 en communiceert uitsluitend met een lokale dienst
-gebonden aan `127.0.0.1`. Er wordt geen externe browser geopend. Instellingen,
+gebonden aan `127.0.0.1`. Alleen de knop **SimBrief-plan maken** opent op
+verzoek de officiële editor in een externe browser. Instellingen,
 de navigatiedatabase en caches blijven op de computer.
 
 Het venster is volledig schaalbaar. De interface herschikt haar panelen,
@@ -68,14 +69,16 @@ tonen:
 - het Top of Descent en een indicatieve daalsnelheid op een helling van 3°;
 - de afwijking ten opzichte van het geplande verticale profiel.
 
-Het vluchtspoor wordt elke vijf seconden lokaal opgeslagen. Het kan vanuit de
-interface worden gepauzeerd, gewist of afgespeeld. Er wordt geen geschiedenis
-naar een externe dienst verzonden.
+Het lokale journaal bewaart geen gedetailleerd vluchtspoor. Na de landing wordt
+alleen een samenvatting met duur, afstand en maximale hoogte opgeslagen. Alle
+samenvattingen kunnen via de interface worden gewist en er worden geen
+vluchtgegevens naar externe diensten verzonden.
 
 ### MCDU-kaart
 
-Het tabblad **MCDU-kaart** bundelt de gegevens die in een Airbus-FMS moeten
-worden ingevoerd:
+Het tabblad **MCDU-kaart** past de pagina's aan het vliegtuigtype aan: Airbus
+MCDU, Boeing CDU of een algemeen FMS voor andere toestellen. Niet te
+automatiseren startprestaties worden niet aangeboden:
 
 - `FROM/TO`, vluchtnummer en uitwijkhaven;
 - Cost Index en kruisniveau;
@@ -590,7 +593,7 @@ ingevoerd.
   officiële publicaties.
 
 De lokale dienst luistert nooit op het externe netwerk. De SimBrief Pilot ID, de
-voorkeuren, het vluchtspoor en de gecachete PDF's blijven op de machine. Alleen
+voorkeuren, de vluchtsamenvattingen en de gecachete PDF's blijven op de machine. Alleen
 de verzoeken die nodig zijn voor SimBrief, OpenStreetMap, het weer en de
 officiële AIS-publicaties verlaten de computer.
 

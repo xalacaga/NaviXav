@@ -28,6 +28,9 @@ let flightGeometry = [];
 let flightLog = [];
 let flightRecording = true;
 let lastFlightLogAt = 0;
+let activeFlightSummary = null;
+let previousFlightSummarySample = null;
+let lastFlightSummaryAt = 0;
 let replayTimer = null;
 let replayActive = false;
 let replaySpeed = 1;
@@ -44,6 +47,9 @@ const FLIGHT_LOG_INTERVAL_MS = 5000;
 const FLIGHT_LOG_MAX_POINTS = 3600;
 const FLIGHT_LOG_INDEX_KEY = "navixav-flight-log-index";
 const FLIGHT_REPLAY_BASE_MS = 300;
+const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
+const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
+const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
 const APP_SESSION_ID = Date.now().toString(36);
 const TERMINAL_COLLAPSED_KEY = "navixav-terminal-collapsed";
 const ONBOARDING_KEY = "navixav-onboarded";
@@ -219,6 +225,27 @@ async function shutdownApplication() {
     button.disabled = false;
     button.textContent = t("quit");
     showBanner("error", "Impossible d’arrêter NaviXav", [String(error)]);
+  }
+}
+
+async function openSimBriefPlanner() {
+  const button = $("simbrief-create");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/simbrief/new", {
+      method: "POST",
+      headers: { "X-NaviXav-External": "simbrief" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Ouverture impossible");
+    showBanner("info", "SimBrief ouvert", [
+      "Créez puis générez l’OFP dans SimBrief.",
+      "Revenez ensuite dans NaviXav et cliquez sur « Importation du plan ».",
+    ]);
+  } catch (error) {
+    showBanner("error", "Impossible d’ouvrir SimBrief", [String(error)]);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -981,7 +1008,7 @@ function descentGuidance(plan, aircraft, projection) {
 
 const ALERTS_STORAGE_KEY = "navixav-alerts-enabled";
 const ALERT_RAISE_MS = 3000;
-const ALERT_CLEAR_MS = 1500;
+const ALERT_CORRECTION_MS = 750;
 const ALERT_BANNER_MAX = 3;
 const STD_PRESSURE_HPA = 1013.25;
 const LBS_TO_KG = 0.45359237;
@@ -1293,20 +1320,32 @@ function commitAlerts(hits, phase, now) {
   for (const rule of ALERT_RULES) {
     let state = alertStates.get(rule.id);
     if (!state) {
-      state = { firstSeen: 0, lastSeen: 0, active: false, acknowledged: false, detail: "" };
+      state = {
+        firstSeen: 0,
+        correctedAt: 0,
+        active: false,
+        acknowledged: false,
+        detail: "",
+      };
       alertStates.set(rule.id, state);
     }
 
     if (hits.has(rule.id)) {
       state.detail = hits.get(rule.id);
-      state.lastSeen = now;
+      state.correctedAt = 0;
       if (!state.firstSeen) state.firstSeen = now;
       if (!state.active && now - state.firstSeen >= ALERT_RAISE_MS) state.active = true;
-    } else if (state.firstSeen && now - state.lastSeen >= ALERT_CLEAR_MS) {
-      state.firstSeen = 0;
-      state.active = false;
-      state.acknowledged = false;
-      state.detail = "";
+    } else if (state.firstSeen) {
+      if (!state.correctedAt) state.correctedAt = now;
+      if (now - state.correctedAt >= ALERT_CORRECTION_MS) {
+        // Une correction stable acquitte automatiquement l'alarme et la
+        // réarme immédiatement pour une éventuelle nouvelle anomalie.
+        state.firstSeen = 0;
+        state.correctedAt = 0;
+        state.active = false;
+        state.acknowledged = false;
+        state.detail = "";
+      }
     }
 
     if (state.active && !state.acknowledged) {
@@ -1938,6 +1977,235 @@ function renderFlightArchive() {
   }
 }
 
+function flightSummaryPlanKey(plan) {
+  return [
+    plan.departure?.icao || "----",
+    plan.arrival?.icao || "----",
+    plan.callsign || "flight",
+    plan.demo
+      ? `demo-${APP_SESSION_ID}`
+      : plan.source?.simbrief_generated_at || APP_SESSION_ID,
+  ].join(":");
+}
+
+function loadFlightSummaries() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FLIGHT_SUMMARY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function saveFlightSummaries(entries) {
+  try {
+    localStorage.setItem(
+      FLIGHT_SUMMARY_KEY,
+      JSON.stringify(entries.slice(0, FLIGHT_SUMMARY_MAX_ENTRIES))
+    );
+  } catch (_error) {
+    // Le suivi du vol courant reste disponible même si le stockage est plein.
+  }
+}
+
+function summaryDistance(points) {
+  let distanceNm = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const point = points[index];
+    const elapsedHours = (
+      Date.parse(point.recorded_at || "")
+      - Date.parse(previous.recorded_at || "")
+    ) / 3_600_000;
+    const leg = haversineNm(previous, point);
+    const speed = Math.max(
+      50,
+      finiteOr(previous.ground_speed_kt, 0),
+      finiteOr(point.ground_speed_kt, 0)
+    );
+    const plausible = Number.isFinite(elapsedHours) && elapsedHours > 0
+      ? Math.max(0.15, speed * elapsedHours * 4)
+      : 2;
+    if (leg <= plausible) distanceNm += leg;
+  }
+  return distanceNm;
+}
+
+function migrateDetailedFlightLogs() {
+  const summaries = loadFlightSummaries();
+  const existing = new Set(summaries.map((entry) => entry.id));
+  let archive = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FLIGHT_LOG_INDEX_KEY) || "[]");
+    if (Array.isArray(parsed)) archive = parsed;
+  } catch (_error) {
+    archive = [];
+  }
+  const archiveByKey = new Map(archive.map((entry) => [entry?.key, entry]));
+  const legacyKeys = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index) || "";
+    if (key.startsWith("navixav-flight-log:")) legacyKeys.push(key);
+  }
+
+  for (const key of legacyKeys) {
+    const points = loadStoredFlightLog(key);
+    const metadata = archiveByKey.get(key) || {};
+    if (points.length >= 2 && !existing.has(`legacy:${key}`)) {
+      const parts = key.split(":");
+      const startedAt = metadata.started_at || points[0]?.recorded_at || "";
+      const endedAt = metadata.ended_at || points.at(-1)?.recorded_at || "";
+      summaries.push({
+        id: `legacy:${key}`,
+        departure: metadata.departure || parts[1] || "----",
+        arrival: metadata.arrival || parts[2] || "----",
+        callsign: metadata.callsign || parts[3] || "",
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration_seconds: Math.max(
+          0,
+          (Date.parse(endedAt) - Date.parse(startedAt)) / 1000 || 0
+        ),
+        distance_nm: summaryDistance(points),
+        max_altitude_ft: points.reduce(
+          (maximum, point) => Math.max(maximum, finiteOr(point.altitude_ft, 0)),
+          0
+        ),
+      });
+    }
+    localStorage.removeItem(key);
+  }
+  localStorage.removeItem(FLIGHT_LOG_INDEX_KEY);
+  summaries.sort(
+    (first, second) => String(second.ended_at).localeCompare(String(first.ended_at))
+  );
+  saveFlightSummaries(summaries);
+}
+
+function purgeFlightHistory() {
+  const legacyKeys = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index) || "";
+    if (key.startsWith("navixav-flight-log:")) legacyKeys.push(key);
+  }
+  for (const key of legacyKeys) localStorage.removeItem(key);
+  localStorage.removeItem(FLIGHT_LOG_INDEX_KEY);
+  localStorage.removeItem(FLIGHT_SUMMARY_KEY);
+  renderFlightSummaries();
+}
+
+function storeCompletedFlightSummary(summary) {
+  const entries = loadFlightSummaries().filter((entry) => entry.id !== summary.id);
+  entries.unshift(summary);
+  saveFlightSummaries(entries);
+  renderFlightSummaries();
+}
+
+function updateFlightSummary(aircraft) {
+  if (!aircraft || !currentPlan) return;
+  const now = Date.now();
+  const previous = previousFlightSummarySample;
+  const tookOff = previous?.on_ground === true && aircraft.on_ground === false;
+  const landed = previous?.on_ground === false && aircraft.on_ground === true;
+
+  if (!activeFlightSummary && (tookOff || aircraft.on_ground === false)) {
+    const startedAt = new Date(now).toISOString();
+    activeFlightSummary = {
+      id: `${flightSummaryPlanKey(currentPlan)}:${now}`,
+      plan_key: flightSummaryPlanKey(currentPlan),
+      departure: currentPlan.departure?.icao || "----",
+      arrival: currentPlan.arrival?.icao || "----",
+      callsign: currentPlan.callsign || "",
+      started_at: startedAt,
+      ended_at: startedAt,
+      duration_seconds: 0,
+      distance_nm: 0,
+      max_altitude_ft: Math.max(0, finiteOr(aircraft.altitude_ft, 0)),
+      last_position: aircraft,
+      last_sampled_at: startedAt,
+    };
+    lastFlightSummaryAt = 0;
+  }
+
+  const due = now - lastFlightSummaryAt >= FLIGHT_SUMMARY_INTERVAL_MS;
+  if (activeFlightSummary && (due || landed)) {
+    const sampledAt = new Date(now).toISOString();
+    const previousPoint = {
+      ...activeFlightSummary.last_position,
+      recorded_at: activeFlightSummary.last_sampled_at,
+    };
+    const currentPoint = { ...aircraft, recorded_at: sampledAt };
+    activeFlightSummary.distance_nm += summaryDistance([previousPoint, currentPoint]);
+    activeFlightSummary.max_altitude_ft = Math.max(
+      activeFlightSummary.max_altitude_ft,
+      finiteOr(aircraft.altitude_ft, 0)
+    );
+    activeFlightSummary.ended_at = sampledAt;
+    activeFlightSummary.duration_seconds = Math.max(
+      0,
+      (Date.parse(sampledAt) - Date.parse(activeFlightSummary.started_at)) / 1000
+    );
+    activeFlightSummary.last_position = aircraft;
+    activeFlightSummary.last_sampled_at = sampledAt;
+    lastFlightSummaryAt = now;
+  }
+
+  if (activeFlightSummary && landed) {
+    const { plan_key, last_position, last_sampled_at, ...completed } = activeFlightSummary;
+    storeCompletedFlightSummary(completed);
+    activeFlightSummary = null;
+    lastFlightSummaryAt = 0;
+  }
+  previousFlightSummarySample = aircraft;
+}
+
+function formatFlightSummaryDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours ? `${hours} h ${String(minutes).padStart(2, "0")}` : `${minutes} min`;
+}
+
+function renderFlightSummaries() {
+  const container = $("flight-summary-list");
+  if (!container) return;
+  container.innerHTML = "";
+  const entries = loadFlightSummaries();
+  const purge = $("flight-summary-purge");
+  if (purge) purge.disabled = entries.length === 0;
+  if (!entries.length) {
+    container.append(el("p", "flight-summary-empty", "Aucun vol terminé pour le moment."));
+    return;
+  }
+
+  for (const entry of entries) {
+    const row = el("article", "flight-summary-row");
+    const heading = el("div", "flight-summary-heading");
+    heading.append(
+      el("strong", null, `${entry.departure} → ${entry.arrival}`),
+      el(
+        "span",
+        null,
+        [entry.callsign, entry.ended_at ? new Date(entry.ended_at).toLocaleString() : ""]
+          .filter(Boolean)
+          .join(" · ")
+      )
+    );
+    const metrics = el("div", "flight-summary-metrics");
+    for (const [label, value] of [
+      ["Durée", formatFlightSummaryDuration(entry.duration_seconds || 0)],
+      ["Distance", `${finiteOr(entry.distance_nm, 0).toFixed(1)} NM`],
+      ["Altitude max.", `${Math.round(finiteOr(entry.max_altitude_ft, 0))} ft`],
+    ]) {
+      const metric = el("span");
+      metric.append(el("small", null, label), el("b", null, value));
+      metrics.append(metric);
+    }
+    row.append(heading, metrics);
+    container.append(row);
+  }
+}
+
 function liveValue(id, value, status = "") {
   const node = $(id);
   if (!node) return;
@@ -2363,9 +2631,12 @@ function buildConfigurationSection() {
 }
 
 function renderFlightPanel(plan) {
-  flightLog = loadFlightLog(plan);
-  lastFlightLogAt = 0;
-  stopFlightReplay();
+  migrateDetailedFlightLogs();
+  if (activeFlightSummary?.plan_key !== flightSummaryPlanKey(plan)) {
+    activeFlightSummary = null;
+    previousFlightSummarySample = null;
+    lastFlightSummaryAt = 0;
+  }
   resetAlertStates();
   const panel = $("panel-flight");
   panel.innerHTML = "";
@@ -2417,76 +2688,30 @@ function renderFlightPanel(plan) {
 
   panel.append(buildConfigurationSection());
 
-  const recorder = el("section", "flight-recorder");
-  const recorderHead = el("div");
-  recorderHead.append(el("div", "card-kicker", "Journal local"));
-  recorderHead.append(el("h2", null, "Enregistrement et rejeu"));
-  const recorderStatus = el("span", "badge");
-  recorderStatus.id = "flight-recorder-status";
-  const recorderTop = el("div", "flight-recorder-head");
-  recorderTop.append(recorderHead, recorderStatus);
-  recorder.append(recorderTop);
-  const actions = el("div", "flight-recorder-actions");
-  const toggle = el("button", "icon-btn");
-  toggle.id = "flight-record-toggle";
-  toggle.type = "button";
-  toggle.addEventListener("click", () => {
-    flightRecording = !flightRecording;
-    updateRecorderStatus();
+  const journal = el("section", "flight-summary");
+  const journalHead = el("div", "flight-summary-head");
+  const journalTitle = el("div");
+  journalTitle.append(el("div", "card-kicker", "Journal local"));
+  journalTitle.append(el("h2", null, "Résumé des vols effectués"));
+  const purge = el("button", "icon-btn", "Purger l’historique des vols");
+  purge.id = "flight-summary-purge";
+  purge.type = "button";
+  purge.addEventListener("click", () => {
+    if (!window.confirm("Supprimer définitivement tous les résumés de vol locaux ?")) return;
+    purgeFlightHistory();
   });
-  const replay = el("button", "btn-primary", "Rejouer");
-  replay.type = "button";
-  replay.addEventListener("click", () => startFlightReplay());
-  const analyse = el("button", "icon-btn", "Débriefer");
-  analyse.type = "button";
-  analyse.addEventListener("click", () => renderFlightDebrief());
-  const speed = el("label", "flight-replay-speed");
-  speed.append(el("span", null, "Vitesse"));
-  const speedSelect = el("select");
-  speedSelect.id = "flight-replay-speed";
-  speedSelect.setAttribute("aria-label", "Vitesse du rejeu");
-  for (const value of [0.5, 1, 2, 4]) {
-    const option = el("option", null, `×${String(value).replace(".", ",")}`);
-    option.value = String(value);
-    option.selected = value === replaySpeed;
-    speedSelect.append(option);
-  }
-  speedSelect.addEventListener("change", () => {
-    replaySpeed = Number(speedSelect.value) || 1;
-    updateRecorderStatus();
-  });
-  speed.append(speedSelect);
-  const stop = el("button", "icon-btn", "Arrêter le rejeu");
-  stop.type = "button";
-  stop.addEventListener("click", stopFlightReplay);
-  const clear = el("button", "icon-btn", "Effacer le journal");
-  clear.type = "button";
-  clear.addEventListener("click", () => {
-    stopFlightReplay();
-    flightLog = [];
-    saveFlightLog();
-    syncMapTrail();
-    updateRecorderStatus();
-  });
-  actions.append(toggle, replay, analyse, speed, stop, clear);
-  recorder.append(actions);
-  const debrief = el("section", "flight-debrief");
-  debrief.id = "flight-debrief";
-  debrief.append(el("h3", null, "Débrief IFR intelligent"));
-  const debriefContent = el("div", "flight-debrief-content");
-  debriefContent.id = "flight-debrief-content";
-  debrief.append(debriefContent);
-  recorder.append(debrief);
-  const archive = el("section", "flight-archive");
-  archive.append(el("h3", null, "Vols enregistrés"));
-  const archiveList = el("div", "flight-archive-list");
-  archiveList.id = "flight-archive-list";
-  archive.append(archiveList);
-  recorder.append(archive);
-  panel.append(recorder);
-  renderFlightDebrief();
-  renderFlightArchive();
-  updateRecorderStatus();
+  journalHead.append(journalTitle, purge);
+  journal.append(journalHead);
+  journal.append(el(
+    "p",
+    "flight-summary-note",
+    "Seuls la durée, la distance et l’altitude maximale des vols terminés sont conservés."
+  ));
+  const summaryList = el("div", "flight-summary-list");
+  summaryList.id = "flight-summary-list";
+  journal.append(summaryList);
+  panel.append(journal);
+  renderFlightSummaries();
   updateFlightPanel(latestAircraft);
 }
 
@@ -2994,27 +3219,6 @@ function loadMinima(plan) {
   }
 }
 
-function takeoffPerformanceStorageKey(plan) {
-  const departure = plan.departure || {};
-  return [
-    "navixav-takeoff-performance",
-    departure.icao || "",
-    departure.runway?.value || "",
-    plan.aircraft || "",
-    plan.source?.simbrief_generated_at || APP_SESSION_ID,
-  ].join(":");
-}
-
-function loadTakeoffPerformance(plan) {
-  try {
-    return JSON.parse(
-      localStorage.getItem(takeoffPerformanceStorageKey(plan)) || "{}"
-    );
-  } catch (_error) {
-    return {};
-  }
-}
-
 function siaRequestKey(plan) {
   const arrival = plan.arrival || {};
   return [
@@ -3422,95 +3626,77 @@ function minimaEditor(plan, minima) {
   return wrapper;
 }
 
-function takeoffPerformanceEditor(plan, performance) {
-  const wrapper = el("form", "minima-editor takeoff-performance-editor");
-  const header = el("div", "minima-editor-head");
-  const title = el("div");
-  title.append(el("div", "card-kicker", "Décollage"));
-  title.append(el("h2", null, "Performances à saisir dans le MCDU"));
-  header.append(title);
-  wrapper.append(header);
-
-  const fields = el("div", "minima-fields");
-  const inputs = {};
-  const addField = (key, label, placeholder, type = "number") => {
-    const node = el("label", "field");
-    node.append(el("span", null, label));
-    const input = el("input");
-    input.type = type;
-    input.placeholder = placeholder;
-    input.autocomplete = "off";
-    if (type === "number") {
-      input.min = "0";
-      input.step = "1";
-    }
-    input.value = performance[key] ?? "";
-    node.append(input);
-    fields.append(node);
-    inputs[key] = input;
+function aircraftFmsProfile(plan) {
+  const code = String(plan.aircraft || "").trim().toUpperCase();
+  const name = String(plan.aircraft_name || "").trim();
+  if (
+    /^(?:A30[06B]|A31[089]|A32[01]|A20N|A21N|A33[23789]|A34[2356]|A35[9K]|A388|BCS[13])$/.test(code)
+    || /airbus/i.test(name)
+  ) {
+    return {
+      kind: "airbus",
+      label: "MCDU",
+      init: "INIT A",
+      weights: "INIT B",
+      route: "F-PLN › EN ROUTE · VIA / TO",
+      departure: "F-PLN › DEPARTURE",
+      arrival: "F-PLN › ARRIVAL",
+      radio: "RAD NAV",
+      flightNumber: "FLT NBR",
+      approachTransition: "VIA",
+      starTransition: "TRANS",
+    };
+  }
+  if (/^B(?:7[0-9A-Z]{2}|3[7-9X][0-9A-Z])$/.test(code) || /boeing/i.test(name)) {
+    return {
+      kind: "boeing",
+      label: "CDU",
+      init: "RTE 1",
+      weights: "PERF INIT",
+      route: "RTE · VIA / TO",
+      departure: "DEP/ARR › DEPARTURE",
+      arrival: "DEP/ARR › ARRIVAL",
+      radio: "NAV RADIO",
+      flightNumber: "FLT NO",
+      approachTransition: "APPR TRANS",
+      starTransition: "STAR TRANS",
+    };
+  }
+  return {
+    kind: "generic",
+    label: "FMS",
+    init: "FLIGHT PLAN",
+    weights: "FLIGHT DATA",
+    route: "ROUTE · VIA / TO",
+    departure: "PROCEDURES › DEPARTURE",
+    arrival: "PROCEDURES › ARRIVAL",
+    radio: "RADIO NAV",
+    flightNumber: "FLIGHT",
+    approachTransition: "APPR TRANS",
+    starTransition: "STAR TRANS",
   };
-
-  addField("v1_kt", "V1 (kt)", "ex. 145");
-  addField("vr_kt", "VR (kt)", "ex. 149");
-  addField("v2_kt", "V2 (kt)", "ex. 152");
-  addField("flaps", "FLAPS", "ex. 1+F", "text");
-  addField("ths", "THS", "ex. UP0.5", "text");
-  addField("flap_retraction_kt", "F RETR (kt)", "ex. 145");
-  addField("slat_retraction_kt", "S RETR (kt)", "ex. 189");
-  addField("clean_speed_kt", "CLEAN (kt)", "ex. 212");
-  addField("takeoff_shift_m", "TO SHIFT (m)", "ex. 0");
-  addField("flex_temp_c", "FLEX TO TEMP (°C)", "ex. 51");
-  addField("thrust_reduction_altitude_ft", "THR RED ALT (ft)", "ex. 1790");
-  addField("acceleration_altitude_ft", "ACC ALT (ft)", "ex. 1790");
-  addField(
-    "engine_out_acceleration_altitude_ft",
-    "ENG OUT ACC (ft)",
-    "ex. 1790"
-  );
-  wrapper.append(fields);
-
-  const actions = el("div", "minima-actions");
-  actions.append(el(
-    "p",
-    "approach-caution",
-    "Recopiez les valeurs calculées par l’EFB ou l’avion. NaviXav ne calcule pas les vitesses de décollage."
-  ));
-  const save = el("button", "btn-primary", "Mémoriser les performances");
-  save.type = "submit";
-  actions.append(save);
-  wrapper.append(actions);
-
-  wrapper.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const saved = {};
-    for (const [key, input] of Object.entries(inputs)) {
-      const value = input.value.trim();
-      if (!value) continue;
-      saved[key] = input.type === "number" ? Number(value) : value.toUpperCase();
-    }
-    localStorage.setItem(
-      takeoffPerformanceStorageKey(plan),
-      JSON.stringify(saved)
-    );
-    renderMcdu(plan);
-  });
-  return wrapper;
-}
-
-function mcduTakeoffValue(value, suffix = "") {
-  return value !== undefined && value !== null && value !== ""
-    ? `${value}${suffix}`
-    : "□□□";
 }
 
 function renderMcdu(plan) {
   const panel = $("panel-mcdu");
   panel.innerHTML = "";
   const minima = loadMinima(plan);
-  const takeoff = loadTakeoffPerformance(plan);
+  const profile = aircraftFmsProfile(plan);
   panel.append(siaApproachCard(plan));
-  panel.append(takeoffPerformanceEditor(plan, takeoff));
   panel.append(minimaEditor(plan, minima));
+  const profileHeader = el("div", "mcdu-profile");
+  profileHeader.append(
+    el("div", "card-kicker", `Fiche ${profile.label}`),
+    el("h2", null, plan.aircraft_name || plan.aircraft || "Type d’avion inconnu"),
+    el(
+      "p",
+      null,
+      profile.kind === "generic"
+        ? "Présentation FMS générique : vérifiez les libellés propres à l’avion."
+        : `Présentation adaptée au système ${profile.label} de cet avion.`
+    )
+  );
+  panel.append(profileHeader);
   const screen = el("div", "mcdu");
   const d = plan.dispatch || {};
   const unit = { KGS: "kg", LBS: "lb" }[d.units] || d.units || "";
@@ -3518,15 +3704,15 @@ function renderMcdu(plan) {
   const arr = plan.arrival;
 
   const pages = [
-    mcduPage("INIT A", [
+    mcduPage(profile.init, [
       mcduLine("FROM/TO", `${dep?.icao || "----"}/${arr?.icao || "----"}`),
       plan.alternate_icao && mcduLine("ALTN", plan.alternate_icao),
-      plan.callsign && mcduLine("FLT NBR", plan.callsign),
+      plan.callsign && mcduLine(profile.flightNumber, plan.callsign),
       d.cost_index && mcduLine("COST INDEX", d.cost_index),
       plan.enroute.cruise_altitude_ft &&
         mcduLine("CRZ FL", `FL${Math.round(plan.enroute.cruise_altitude_ft / 100)}`),
     ]),
-    mcduPage("INIT B", [
+    mcduPage(profile.weights, [
       d.zfw && mcduLine("ZFW", kg(d.zfw, unit)),
       d.block_fuel && mcduLine("BLOCK", kg(d.block_fuel, unit)),
       d.taxi_fuel && mcduLine("TAXI", kg(d.taxi_fuel, unit)),
@@ -3535,55 +3721,31 @@ function renderMcdu(plan) {
       d.alternate_fuel && mcduLine("ALTN", kg(d.alternate_fuel, unit)),
     ]),
     dep &&
-      mcduPage(`PERF TO · RWY ${dep.runway?.value || "□□"}`, [
-        mcduLine("V1", mcduTakeoffValue(takeoff.v1_kt)),
-        mcduLine("VR", mcduTakeoffValue(takeoff.vr_kt)),
-        mcduLine("V2", mcduTakeoffValue(takeoff.v2_kt)),
-        mcduLine(
-          "FLAPS/THS",
-          `${mcduTakeoffValue(takeoff.flaps)}/${mcduTakeoffValue(takeoff.ths)}`
-        ),
-        mcduLine("F RETR", mcduTakeoffValue(takeoff.flap_retraction_kt, " kt")),
-        mcduLine("S RETR", mcduTakeoffValue(takeoff.slat_retraction_kt, " kt")),
-        mcduLine("CLEAN", mcduTakeoffValue(takeoff.clean_speed_kt, " kt")),
-        mcduLine("TRANS ALT", mcduTakeoffValue(dep.transition_altitude_ft, " ft")),
-        mcduLine("TO SHIFT", mcduTakeoffValue(takeoff.takeoff_shift_m, " m")),
-        mcduLine("FLEX TEMP", mcduTakeoffValue(takeoff.flex_temp_c, "°C")),
-        mcduLine(
-          "THR RED/ACC",
-          `${mcduTakeoffValue(takeoff.thrust_reduction_altitude_ft)}/${mcduTakeoffValue(takeoff.acceleration_altitude_ft)} ft`
-        ),
-        mcduLine(
-          "ENG OUT ACC",
-          mcduTakeoffValue(takeoff.engine_out_acceleration_altitude_ft, " ft")
-        ),
-      ]),
-    dep &&
-      mcduPage("F-PLN › DEPARTURE", [
+      mcduPage(profile.departure, [
         dep.runway && mcduLine("RWY", dep.runway.value || "—", null, needsCheck(dep.runway)),
         mcduLine("SID", dep.sid.value || "—", null, needsCheck(dep.sid)),
         mcduLine("TRANS", dep.sid_transition.value || "—", "sortie de la SID", needsCheck(dep.sid_transition)),
         dep.transition_altitude_ft && mcduLine("TRANS ALT", String(dep.transition_altitude_ft)),
       ]),
     plan.enroute.route_legs?.length &&
-      mcduPage("F-PLN › EN ROUTE · VIA / TO", [
+      mcduPage(profile.route, [
         ...plan.enroute.route_legs.map((leg) =>
           mcduLine(leg.via || "DCT", leg.to, leg.stage || null)
         ),
       ]),
     arr &&
-      mcduPage("F-PLN › ARRIVAL", [
+      mcduPage(profile.arrival, [
         arr.runway && mcduLine("RWY", arr.runway.value || "—", null, needsCheck(arr.runway)),
         mcduLine("APPR", arr.approach.value || "—", null, needsCheck(arr.approach)),
-        mcduLine("VIA", arr.approach_transition.value || "—", "transition d'APPROCHE", needsCheck(arr.approach_transition)),
+        mcduLine(profile.approachTransition, arr.approach_transition.value || "—", "transition d'APPROCHE", needsCheck(arr.approach_transition)),
         mcduLine("STAR", arr.star.value || "—", null, needsCheck(arr.star)),
-        mcduLine("TRANS", arr.star_transition.value || "—", "entrée de STAR", needsCheck(arr.star_transition)),
+        mcduLine(profile.starTransition, arr.star_transition.value || "—", "entrée de STAR", needsCheck(arr.star_transition)),
         arr.transition_level_ft && mcduLine("TRANS LVL", String(arr.transition_level_ft)),
         arr.missed_approach_altitude_ft &&
           mcduLine("GA ALT", `${arr.missed_approach_altitude_ft} ft`, "remise de gaz"),
       ]),
     arr?.ils_frequency_mhz &&
-      mcduPage("RAD NAV", [
+      mcduPage(profile.radio, [
         mcduLine("ILS", `${arr.ils_frequency_mhz.toFixed(2)} / ${arr.ils_ident || ""}`),
         arr.ils_course_deg !== null && arr.ils_course_deg !== undefined &&
           mcduLine("CRS", `${String(Math.round(arr.ils_course_deg)).padStart(3, "0")}°`),
@@ -3802,7 +3964,7 @@ function updateHud(aircraft) {
   }
 }
 
-function applyAircraftState(aircraft, shouldRecord = true) {
+function applyAircraftState(aircraft) {
   latestAircraft = aircraft;
   if (currentChart) {
     const point = projectToChart(aircraft.latitude, aircraft.longitude);
@@ -3815,11 +3977,11 @@ function applyAircraftState(aircraft, shouldRecord = true) {
   updateHud(aircraft);
   updateRouteStripProgress(aircraft);
   updateFlightPanel(aircraft);
-  if (shouldRecord) recordFlightPoint(aircraft);
+  updateFlightSummary(aircraft);
 }
 
 async function pollLive() {
-  if (replayActive || !currentChart) return;
+  if (!currentChart) return;
 
   const params = new URLSearchParams({
     demo: $("demo-toggle").checked ? "1" : "0",
@@ -3840,7 +4002,7 @@ async function pollLive() {
     }
     const aircraft = data.aircraft;
     setLiveState(true, `${aircraft.source} · en direct`);
-    applyAircraftState(aircraft, true);
+    applyAircraftState(aircraft);
   } catch (error) {
     setLiveState(false, "Erreur de liaison");
     updateRouteStripProgress(null);
@@ -3890,6 +4052,7 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
 });
 
 $("refresh").addEventListener("click", buildPlan);
+$("simbrief-create").addEventListener("click", openSimBriefPlanner);
 $("demo-toggle").addEventListener("change", buildPlan);
 
 $("map-fit").addEventListener("click", () => MAP.fit());

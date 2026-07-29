@@ -13,7 +13,8 @@ ist.
 
 Die Anwendung besitzt ein eigenes Windows-Fenster. Ihre Oberfläche wird von
 Microsoft WebView2 dargestellt und kommuniziert ausschließlich mit einem
-lokalen Dienst auf `127.0.0.1`. Es wird kein externer Browser geöffnet.
+lokalen Dienst auf `127.0.0.1`. Ein externer Browser wird nur geöffnet, wenn
+der Benutzer **SimBrief-Plan erstellen** anklickt, um den offiziellen Editor zu öffnen.
 Einstellungen, Navigationsdatenbank und Caches verbleiben auf dem Rechner.
 
 Das Fenster ist vollständig skalierbar. Die Oberfläche ordnet Bereiche,
@@ -95,23 +96,25 @@ Drei Vorkehrungen verhindern Fehlalarme:
   bestätigt;
 - eine Bedingung muss einige Sekunden anliegen, bevor eine Warnung ausgelöst
   wird — das verhindert Flackern beim Überschreiten einer Schwelle;
-- Warnungen sind während einer Wiedergabe und bei beschleunigter
-  Simulationsgeschwindigkeit ausgesetzt.
+- Warnungen sind bei beschleunigter Simulationsgeschwindigkeit ausgesetzt.
 
-Jede Warnung wird mit einem Klick quittiert und bei der nächsten Flugphase
-erneut aktiviert. Eine Plakette `MASTER CAUTION` oder `MASTER WARNING` fasst die
+Jede Warnung wird automatisch gelöscht und erneut aktiviert, sobald die
+Korrektur stabil ist; ein Klick quittiert sie weiterhin sofort. Eine Plakette
+`MASTER CAUTION` oder `MASTER WARNING` fasst die
 Lage zusammen, und das gesamte System lässt sich im Panel abschalten. Das
 Blinken, das kritischen Warnungen vorbehalten ist, entfällt, wenn das System
 reduzierte Bewegung anfordert.
 
-Die Flugspur wird alle fünf Sekunden lokal aufgezeichnet. Sie kann in der
-Oberfläche angehalten, gelöscht oder erneut abgespielt werden. Es wird kein
-Verlauf an einen externen Dienst gesendet.
+Das lokale Journal speichert keine detaillierte Flugspur. Nach der Landung
+bleibt nur eine Zusammenfassung mit Dauer, Entfernung und maximaler Höhe
+erhalten. Alle Zusammenfassungen können in der Oberfläche gelöscht werden;
+Flugdaten werden nicht an externe Dienste gesendet.
 
 ### MCDU-Blatt
 
-Die Registerkarte **MCDU-Blatt** fasst die in ein Airbus-FMS einzugebenden
-Informationen zusammen:
+Die Registerkarte **MCDU-Blatt** passt ihre Seiten an den Flugzeugtyp an:
+Airbus-MCDU, Boeing-CDU oder ein allgemeines FMS für andere Flugzeuge.
+Nicht automatisierbare Startleistungswerte werden nicht angeboten:
 
 - `FROM/TO`, Flugnummer und Ausweichflughafen;
 - Cost Index und Reiseflugfläche;
@@ -638,7 +641,7 @@ werden.
   die amtlichen Veröffentlichungen.
 
 Der lokale Dienst hört niemals auf dem externen Netzwerk. Die
-SimBrief-Pilot-ID, die Einstellungen, die Flugspur und die zwischengespeicherten
+SimBrief-Pilot-ID, die Einstellungen, die Flugzusammenfassungen und die zwischengespeicherten
 PDFs verbleiben auf dem Rechner. Nur die für SimBrief, OpenStreetMap, das
 Wetter und die amtlichen AIS-Veröffentlichungen erforderlichen Anfragen
 verlassen den Computer.

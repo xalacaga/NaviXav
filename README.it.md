@@ -12,7 +12,8 @@ pensata per la preparazione del volo e l'inserimento nell'MCDU.
 
 L'applicazione dispone di una propria finestra Windows. La sua interfaccia è
 resa da Microsoft WebView2 e comunica soltanto con un servizio locale associato
-a `127.0.0.1`. Non viene aperto alcun browser esterno. Le impostazioni, la base
+a `127.0.0.1`. Un browser esterno viene aperto solo quando l'utente seleziona
+**Crea piano SimBrief** per aprire l'editor ufficiale. Le impostazioni, la base
 di navigazione e le cache restano sul computer.
 
 La finestra è completamente ridimensionabile. L'interfaccia riorganizza
@@ -68,14 +69,16 @@ visualizzare:
 - il Top of Descent e un rateo di discesa indicativo su una pendenza di 3°;
 - lo scostamento rispetto al profilo verticale previsto.
 
-La traccia del volo viene registrata localmente ogni cinque secondi. Può essere
-messa in pausa, cancellata o riprodotta dall'interfaccia. Nessuno storico viene
-inviato a servizi esterni.
+Il giornale locale non conserva una traccia dettagliata. Dopo l'atterraggio
+salva soltanto un riepilogo con durata, distanza e altitudine massima. Tutti i
+riepiloghi possono essere eliminati dall'interfaccia e nessun dato di volo
+viene inviato a servizi esterni.
 
 ### Scheda MCDU
 
-La scheda **Scheda MCDU** raccoglie le informazioni da inserire in un FMS
-Airbus:
+La scheda **Scheda MCDU** adatta le pagine al tipo di aeromobile: MCDU Airbus,
+CDU Boeing o FMS generico per gli altri velivoli. Non propone prestazioni di
+decollo che non possono essere automatizzate:
 
 - `FROM/TO`, numero di volo e alternato;
 - Cost Index e livello di crociera;
@@ -581,7 +584,7 @@ Confermare sempre le informazioni importanti prima di inserirle nel simulatore.
   pubblicazioni ufficiali.
 
 Il servizio locale non è mai in ascolto sulla rete esterna. Il Pilot ID
-SimBrief, le preferenze, la traccia del volo e i PDF in cache restano sulla
+SimBrief, le preferenze, i riepiloghi dei voli e i PDF in cache restano sulla
 macchina. Lasciano il computer solo le richieste necessarie a SimBrief,
 OpenStreetMap, la meteorologia e le pubblicazioni AIS ufficiali.
 

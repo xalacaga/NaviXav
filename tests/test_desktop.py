@@ -115,6 +115,18 @@ def test_windows_distribution_uses_the_navixav_aircraft_icon():
     assert 'href="/static/navixav-icon.svg?v=__NAVIXAV_VERSION__"' in html
 
 
+def test_simbrief_creation_button_opens_the_official_new_plan_page():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    desktop_source = Path(desktop.__file__).read_text(encoding="utf-8")
+
+    assert 'id="simbrief-create"' in html
+    assert 'fetch("/api/simbrief/new"' in javascript
+    assert '"X-NaviXav-External": "simbrief"' in javascript
+    assert "https://dispatch.simbrief.com/options/new" in desktop_source
+
+
 def test_windows_process_uses_stable_navixav_identity(monkeypatch):
     captured = []
     shell32 = SimpleNamespace(
@@ -241,64 +253,70 @@ def test_global_alarm_opens_its_details_and_armed_spoilers_take_priority():
     )
 
 
-def test_local_flight_journal_lists_previous_flights_and_replay_speeds():
+def test_corrected_alert_is_acknowledged_and_rearmed_automatically():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "const ALERT_CORRECTION_MS = 750;" in javascript
+    assert "if (!state.correctedAt) state.correctedAt = now;" in javascript
+    assert "now - state.correctedAt >= ALERT_CORRECTION_MS" in javascript
+    assert "state.acknowledged = false;" in javascript
+
+
+def test_local_flight_journal_keeps_only_completed_flight_summaries():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
     css = (static / "app.css").read_text(encoding="utf-8")
 
-    assert 'FLIGHT_LOG_INDEX_KEY = "navixav-flight-log-index"' in javascript
+    assert 'FLIGHT_SUMMARY_KEY = "navixav-flight-summaries"' in javascript
     assert 'key.startsWith("navixav-flight-log:")' in javascript
-    assert "function renderFlightArchive()" in javascript
-    assert 'archiveList.id = "flight-archive-list"' in javascript
-    assert "for (const value of [0.5, 1, 2, 4])" in javascript
-    assert "FLIGHT_REPLAY_BASE_MS / replaySpeed" in javascript
-    assert ".flight-archive-row" in css
+    assert "function updateFlightSummary(aircraft)" in javascript
+    assert 'summaryList.id = "flight-summary-list"' in javascript
+    assert '"Résumé des vols effectués"' in javascript
+    assert '"Purger l’historique des vols"' in javascript
+    assert "localStorage.removeItem(FLIGHT_SUMMARY_KEY)" in javascript
+    assert ".flight-summary-row" in css
 
 
-def test_ifr_debrief_analyses_track_and_replays_each_event():
+def test_flight_summary_stores_no_detailed_track_or_replay_controls():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
-    css = (static / "app.css").read_text(encoding="utf-8")
-
-    assert "function flightDebrief(points, routeSegments" in javascript
-    assert "function projectAircraftOnDebriefPath(aircraft, routeSegments)" in javascript
-    assert "route_segments: flightStagePaths(plan)" in javascript
-    assert "entry.route_segments || (sameRoute" in javascript
-    assert "maxDeviationNm" in javascript
-    assert "offRouteSeconds" in javascript
-    assert '"Train non confirmé sous 1 000 ft"' in javascript
-    assert '"Taux de descente élevé sous 1 000 ft"' in javascript
-    assert '"Survitesse détectée"' in javascript
-    assert "debrief.samples.slice(start, end)" in javascript
-    assert 'debrief.id = "flight-debrief"' in javascript
-    assert '"Débrief IFR intelligent"' in javascript
-    assert ".flight-debrief-event" in css
+    panel = javascript[
+        javascript.index("function renderFlightPanel(plan)"):
+        javascript.index("function choiceRow")
+    ]
+    assert '"Enregistrement et rejeu"' not in panel
+    assert '"Rejouer"' not in panel
+    assert '"Débrief IFR intelligent"' not in panel
+    assert "recordFlightPoint(aircraft)" not in javascript[
+        javascript.index("function applyAircraftState"):
+        javascript.index("async function pollLive")
+    ]
 
 
-def test_mcdu_takeoff_page_keeps_unavailable_performance_values_manual():
+def test_mcdu_omits_non_automatable_takeoff_performance_editor():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
-    assert "function takeoffPerformanceStorageKey(plan)" in javascript
-    assert '"navixav-takeoff-performance"' in javascript
-    assert "function takeoffPerformanceEditor(plan, performance)" in javascript
-    assert "NaviXav ne calcule pas les vitesses de décollage." in javascript
-    assert 'mcduPage(`PERF TO · RWY ${dep.runway?.value || "□□"}`' in javascript
-    for field in (
-        '"V1"',
-        '"VR"',
-        '"V2"',
-        '"FLAPS/THS"',
-        '"F RETR"',
-        '"S RETR"',
-        '"CLEAN"',
-        '"TRANS ALT"',
-        '"TO SHIFT"',
-        '"FLEX TEMP"',
-        '"THR RED/ACC"',
-        '"ENG OUT ACC"',
-    ):
-        assert field in javascript
+    assert "function takeoffPerformanceStorageKey(plan)" not in javascript
+    assert '"navixav-takeoff-performance"' not in javascript
+    assert "function takeoffPerformanceEditor(plan, performance)" not in javascript
+    assert '"Performances à saisir dans le MCDU"' not in javascript
+    assert "mcduPage(`PERF TO · RWY" not in javascript
+
+
+def test_mcdu_card_adapts_terminology_to_aircraft_type():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "function aircraftFmsProfile(plan)" in javascript
+    assert 'label: "MCDU"' in javascript
+    assert 'label: "CDU"' in javascript
+    assert 'label: "FMS"' in javascript
+    assert "mcduPage(profile.init" in javascript
+    assert "mcduPage(profile.departure" in javascript
+    assert "mcduPage(profile.arrival" in javascript
+    assert "mcduLine(profile.approachTransition" in javascript
 
 
 def test_map_breaks_teleports_and_never_invents_a_direct_route():

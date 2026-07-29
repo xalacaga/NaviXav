@@ -12,7 +12,8 @@ concebida para a preparação do voo e a introdução no MCDU.
 
 A aplicação possui a sua própria janela do Windows. A interface é apresentada
 pelo Microsoft WebView2 e comunica apenas com um serviço local associado a
-`127.0.0.1`. Não é aberto nenhum navegador externo. As definições, a base de
+`127.0.0.1`. Um navegador externo só é aberto quando o utilizador seleciona
+**Criar plano SimBrief** para abrir o editor oficial. As definições, a base de
 navegação e as caches permanecem no computador.
 
 A janela é totalmente redimensionável. A interface reorganiza os seus painéis,
@@ -69,13 +70,16 @@ apresentar:
 - o Top of Descent e uma razão de descida indicativa numa rampa de 3°;
 - o desvio em relação ao perfil vertical previsto.
 
-O rasto do voo é registado localmente a cada cinco segundos. Pode ser colocado
-em pausa, apagado ou reproduzido a partir da interface. Nenhum histórico é
-enviado para serviços externos.
+O diário local não conserva um rasto detalhado. Após a aterragem, guarda apenas
+um resumo com a duração, a distância e a altitude máxima. Todos os resumos
+podem ser eliminados na interface e nenhum dado de voo é enviado para serviços
+externos.
 
 ### Ficha MCDU
 
-O separador **Ficha MCDU** reúne as informações a introduzir num FMS Airbus:
+O separador **Ficha MCDU** adapta as páginas ao tipo de aeronave: MCDU Airbus,
+CDU Boeing ou FMS genérico para as restantes aeronaves. Não apresenta
+desempenhos de descolagem que não possam ser automatizados:
 
 - `FROM/TO`, número de voo e alternante;
 - Cost Index e nível de cruzeiro;
@@ -586,7 +590,7 @@ simulador.
   publicações oficiais.
 
 O serviço local nunca escuta na rede exterior. O Pilot ID SimBrief, as
-preferências, o rasto do voo e os PDF em cache permanecem na máquina. Apenas os
+preferências, os resumos de voo e os PDF em cache permanecem na máquina. Apenas os
 pedidos necessários ao SimBrief, ao OpenStreetMap, à meteorologia e às
 publicações AIS oficiais saem do computador.
 

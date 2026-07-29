@@ -166,6 +166,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             if request.url.path in {
                 "/api/settings",
+                "/api/simbrief/new",
                 "/api/update/install",
                 "/api/shutdown",
             }:
@@ -664,6 +665,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         asyncio.create_task(stop_after_response())
         return {"stopping": True}
+
+    @app.post("/api/simbrief/new")
+    def open_simbrief(request: Request) -> dict[str, bool]:
+        if request.headers.get("X-NaviXav-External") != "simbrief":
+            raise HTTPException(403, "Confirmation d’ouverture absente.")
+        callback = getattr(app.state, "request_open_simbrief", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "L’ouverture de SimBrief est disponible dans l’application Windows.",
+            )
+        callback()
+        return {"opened": True}
 
     def _ensure_demo_source(icao: str | None, runway: str | None) -> None:
         """Construit un roulage simulé du premier poste vers le seuil de piste."""

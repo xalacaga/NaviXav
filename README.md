@@ -12,7 +12,8 @@ une interface adaptée à la préparation du vol et à la saisie du MCDU.
 
 L’application possède sa propre fenêtre Windows. Son interface est rendue par
 Microsoft WebView2 et communique uniquement avec un service local lié à
-`127.0.0.1`. Aucun navigateur externe n’est ouvert. Les réglages, la base de
+`127.0.0.1`. Aucun navigateur externe n’est ouvert, sauf lorsque l’utilisateur
+clique sur **Créer un plan SimBrief** pour ouvrir l’éditeur officiel. Les réglages, la base de
 navigation et les caches restent sur l’ordinateur.
 
 La fenêtre est entièrement redimensionnable. L’interface réorganise ses
@@ -90,21 +91,25 @@ Trois précautions évitent les fausses alarmes :
   sont évaluées que si le simulateur confirme que l’avion en possède ;
 - une condition doit tenir quelques secondes avant de lever une alarme, ce qui
   supprime les clignotements au franchissement d’un seuil ;
-- les alarmes sont suspendues pendant un rejeu et lorsque le simulateur tourne
-  en vitesse accélérée.
+- les alarmes sont suspendues lorsque le simulateur tourne en vitesse
+  accélérée.
 
-Chaque alarme s’acquitte d’un clic et se réarme au changement de phase. Une
+Chaque alarme disparaît et se réarme automatiquement dès que la correction est
+stable ; un clic permet toujours de l’acquitter immédiatement. Une
 pastille `MASTER CAUTION` ou `MASTER WARNING` résume la situation, et
 l’ensemble peut être désactivé depuis le panneau. Le clignotement, réservé aux
 alarmes critiques, disparaît si le système demande des animations réduites.
 
-La trace du vol est enregistrée localement toutes les cinq secondes. Elle peut
-être mise en pause, effacée ou rejouée depuis l’interface. Aucun historique
-n’est envoyé vers un service externe.
+Le journal local ne conserve aucune trace détaillée : après l’atterrissage, il
+mémorise seulement un résumé du vol (durée, distance et altitude maximale).
+Tous les résumés peuvent être purgés depuis l’interface et aucune donnée de vol
+n’est envoyée vers un service externe.
 
 ### Fiche MCDU
 
-L’onglet **Fiche MCDU** regroupe les informations à saisir dans un FMS Airbus :
+L’onglet **Fiche MCDU** adapte ses pages au type d’avion : terminologie MCDU
+pour Airbus, CDU pour Boeing et FMS générique pour les autres appareils. Il ne
+propose pas de performances de décollage qui ne peuvent pas être automatisées :
 
 - `FROM/TO`, numéro de vol et dégagement ;
 - Cost Index et niveau de croisière ;
@@ -621,7 +626,7 @@ simulateur.
   publications officielles.
 
 Le service local n’écoute jamais sur le réseau extérieur. Le Pilot ID
-SimBrief, les préférences, la trace du vol et les PDF mis en cache restent sur
+SimBrief, les préférences, les résumés de vol et les PDF mis en cache restent sur
 la machine. Seules les requêtes nécessaires à SimBrief, OpenStreetMap, la
 météo et aux publications AIS officielles quittent l’ordinateur.
 

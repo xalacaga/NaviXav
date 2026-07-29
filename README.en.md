@@ -12,7 +12,8 @@ designed for flight preparation and MCDU entry.
 
 The application has its own Windows window. Its interface is rendered by
 Microsoft WebView2 and communicates only with a local service bound to
-`127.0.0.1`. No external browser is opened. Settings, the navigation database
+`127.0.0.1`. No external browser is opened unless the user clicks **Create a
+SimBrief plan** to open the official editor. Settings, the navigation database
 and caches all stay on the computer.
 
 The window is fully resizable. The interface rearranges its panels, controls,
@@ -90,21 +91,23 @@ Three safeguards keep false alarms away:
   evaluated once the simulator confirms the aircraft has them;
 - a condition must hold for a few seconds before an alert is raised, which
   removes the flicker when a threshold is crossed;
-- alerts are suspended during a replay and whenever the simulator runs at an
-  accelerated rate.
+- alerts are suspended whenever the simulator runs at an accelerated rate.
 
-Each alert is acknowledged with a click and re-arms on the next flight phase. A
+Each alert clears and re-arms automatically once the correction is stable; a
+click can still acknowledge it immediately. A
 `MASTER CAUTION` or `MASTER WARNING` pill summarises the situation, and the
 whole system can be switched off from the panel. Blinking, reserved for
 critical alerts, is dropped when the system asks for reduced motion.
 
-The flight track is recorded locally every five seconds. It can be paused,
-cleared or replayed from the interface. No history is sent to any external
-service.
+The local journal keeps no detailed track: after landing, it stores only a
+flight summary (duration, distance and maximum altitude). All summaries can be
+purged from the interface, and no flight data is sent to any external service.
 
 ### MCDU card
 
-The **MCDU card** tab gathers the information to be entered into an Airbus FMS:
+The **MCDU card** tab adapts its pages to the aircraft type: Airbus MCDU,
+Boeing CDU, or a generic FMS for other aircraft. It does not offer takeoff
+performance values that cannot be automated:
 
 - `FROM/TO`, flight number and alternate;
 - Cost Index and cruise level;
@@ -606,7 +609,7 @@ Always confirm important information before entering it into the simulator.
   official publications.
 
 The local service never listens on the external network. The SimBrief Pilot ID,
-the preferences, the flight track and the cached PDFs stay on the machine. Only
+the preferences, the flight summaries and the cached PDFs stay on the machine. Only
 the requests needed for SimBrief, OpenStreetMap, the weather and the official
 AIS publications leave the computer.
 

@@ -968,11 +968,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .stat-note { margin-top: 3px; font-size: 0.72rem; color: var(--text-faint); }
 
 .flight-panel-head,
-.flight-recorder-head {
+.flight-summary-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
 }
 .flight-panel-head h2,
-.flight-recorder-head h2 { margin: 4px 0 0; }
+.flight-summary-head h2 { margin: 4px 0 0; }
 .flight-phase-pill {
   padding: 7px 12px; border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--high) 55%, var(--border));
@@ -1106,77 +1106,37 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .light-chip[data-state="off"] { opacity: 0.55; }
 .light-chip[data-state="unknown"] { opacity: 0.35; font-style: italic; }
 
-.flight-recorder {
+.flight-summary {
   margin-top: 18px; padding: 18px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
 }
-.flight-recorder-actions {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;
+.flight-summary-note {
+  margin: 10px 0 14px; color: var(--text-muted); font-size: 0.8rem;
 }
-.flight-replay-speed {
-  display: flex; align-items: center; gap: 7px;
-  color: var(--text-muted); font-size: 0.78rem;
-}
-.flight-replay-speed select {
-  min-width: 82px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-.flight-archive {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.flight-archive h3 { margin-bottom: 10px; font-size: 0.9rem; }
-.flight-archive-list { display: grid; gap: 8px; }
-.flight-archive-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 12px;
+.flight-summary-list { display: grid; gap: 8px; }
+.flight-summary-row {
+  display: grid; grid-template-columns: minmax(150px, 1fr) minmax(260px, 1fr);
+  align-items: center; gap: 16px; padding: 12px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
-.flight-archive-description { display: grid; gap: 3px; min-width: 0; }
-.flight-archive-description strong { font-size: 0.86rem; }
-.flight-archive-description span {
+.flight-summary-heading { display: grid; gap: 3px; min-width: 0; }
+.flight-summary-heading strong { font-size: 0.9rem; }
+.flight-summary-heading span {
   color: var(--text-muted); font-size: 0.74rem; overflow-wrap: anywhere;
 }
-.flight-archive-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.flight-archive-empty { color: var(--text-muted); font-size: 0.8rem; }
-.flight-debrief {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+.flight-summary-metrics {
+  display: grid; grid-template-columns: repeat(3, minmax(70px, 1fr)); gap: 8px;
 }
-.flight-debrief h3 { margin-bottom: 10px; font-size: 0.9rem; }
-.flight-debrief-heading {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  margin-bottom: 12px;
-}
-.flight-debrief-heading span { color: var(--text-muted); font-size: 0.72rem; }
-.flight-debrief-stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-  gap: 8px;
-}
-.flight-debrief-timeline { display: grid; gap: 7px; margin-top: 12px; }
-.flight-debrief-event {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 10px 12px;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--surface-raised); color: var(--text); text-align: left;
-  cursor: pointer;
-}
-.flight-debrief-event:hover { border-color: var(--accent); }
-.flight-debrief-event[data-severity="warning"] { border-left: 3px solid var(--medium); }
-.flight-debrief-event[data-severity="danger"] { border-left: 3px solid var(--low); }
-.flight-debrief-event-mark { color: var(--accent); font-size: 0.72rem; }
-.flight-debrief-event-body { display: grid; gap: 2px; }
-.flight-debrief-event-body strong { font-size: 0.8rem; }
-.flight-debrief-event-body span { color: var(--text-muted); font-size: 0.72rem; }
+.flight-summary-metrics span { display: grid; gap: 2px; }
+.flight-summary-metrics small { color: var(--text-faint); font-size: 0.64rem; }
+.flight-summary-metrics b { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.flight-summary-empty { color: var(--text-muted); font-size: 0.8rem; }
 @media (max-width: 620px) {
-  .flight-panel-head, .flight-recorder-head { flex-direction: column; }
-  .flight-archive-row { align-items: stretch; flex-direction: column; }
-  .flight-debrief-heading { align-items: flex-start; flex-direction: column; }
+  .flight-panel-head, .flight-summary-head { flex-direction: column; }
+  .flight-summary-row { grid-template-columns: 1fr; }
+  .flight-summary-metrics { grid-template-columns: repeat(3, 1fr); }
 }
 
 .meter { margin-top: 9px; height: 5px; border-radius: 999px; background: var(--surface-raised); overflow: hidden; }
@@ -1207,6 +1167,13 @@ pre {
   line-height: 1.85;
   overflow-x: auto;
 }
+.mcdu-profile {
+  padding: 14px 16px; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.mcdu-profile h2 { margin: 3px 0 5px; font-size: 1rem; }
+.mcdu-profile p { color: var(--text-muted); font-size: 0.76rem; }
 .mcdu .mcdu-title { color: #4ea8ff; letter-spacing: 0.16em; }
 .mcdu .mcdu-label { color: #9bb4cf; }
 .mcdu .mcdu-value { color: #ffffff; }
@@ -1217,9 +1184,6 @@ pre {
   padding: 18px; margin-bottom: 16px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised);
-}
-.takeoff-performance-editor {
-  border-color: color-mix(in srgb, var(--high) 35%, var(--border));
 }
 .sia-card {
   padding: 18px; margin-bottom: 16px;
