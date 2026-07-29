@@ -44,7 +44,8 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["pytest"],
+    # Outil personnel d'administration : ne jamais l'inclure dans NaviXav.
+    excludes=["pytest", "navixav.release_dashboard"],
     noarchive=False,
     optimize=1,
 )

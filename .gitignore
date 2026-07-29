@@ -38,6 +38,8 @@ installer/assets/MicrosoftEdgeWebView2Setup.exe
 # Données d'exécution locales
 data/navixav.sqlite
 data/cache/
+data/private_admin/
+data/developer/
 out/
 
 # Éditeurs et système

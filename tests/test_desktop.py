@@ -334,6 +334,18 @@ def test_map_breaks_teleports_and_never_invents_a_direct_route():
     assert "...trail.filter(Boolean).map" in map_javascript
 
 
+def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "window.requestAnimationFrame(() => MAP.resize())" in javascript
+    assert "canvas.clientWidth <= 0 || canvas.clientHeight <= 0" in map_javascript
+    assert "fitPending = true;" in map_javascript
+    assert "!Number.isFinite(screenPixelsPerTile)" in map_javascript
+    assert "MAX_TILE_RADIUS" in map_javascript
+
+
 def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
     project = Path(desktop.__file__).parent.parent
     store = tmp_path / "navdata.sqlite"

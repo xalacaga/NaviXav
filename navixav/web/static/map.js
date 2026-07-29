@@ -25,6 +25,8 @@ const MAP = (() => {
   const tileCache = new Map();
   const TILE_SIZE = 256;
   const MAX_TILE_CACHE = 320;
+  const MAX_TILE_RADIUS = 8;
+  let fitPending = false;
   // Les tuiles CARTO sont réparties sur quatre sous-domaines pour paralléliser
   // les téléchargements, comme le recommande leur documentation.
   const cartoSubdomain = (x, y) => "abcd"[(Math.abs(x) + Math.abs(y)) % 4];
@@ -85,6 +87,10 @@ const MAP = (() => {
 
   function fit() {
     if (!chart) return;
+    if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) {
+      fitPending = true;
+      return;
+    }
     const b = chart.bounds;
     const width = Math.max(1, b.max_x - b.min_x);
     const height = Math.max(1, b.max_y - b.min_y);
@@ -94,6 +100,7 @@ const MAP = (() => {
       canvas.clientWidth / width,
       canvas.clientHeight / height
     ) * 0.92;
+    fitPending = false;
     view.follow = false;
     syncFollowButton();
     draw();
@@ -102,10 +109,15 @@ const MAP = (() => {
   /* --------------------------------------------------------------- rendu */
 
   function resize() {
+    if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
     const ratio = window.devicePixelRatio || 1;
     canvas.width = canvas.clientWidth * ratio;
     canvas.height = canvas.clientHeight * ratio;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    if (chart && (fitPending || !Number.isFinite(view.scale) || view.scale <= 0)) {
+      fit();
+      return;
+    }
     draw();
   }
 
@@ -166,6 +178,7 @@ const MAP = (() => {
   }
 
   function drawBasemap() {
+    if (!Number.isFinite(view.scale) || view.scale <= 0) return;
     const zoom = basemapZoom();
     const tileCount = 2 ** zoom;
     const origin = webMercatorPixel(chart.origin.lat, chart.origin.lon, zoom);
@@ -173,12 +186,19 @@ const MAP = (() => {
       (2 * Math.PI * 6371000 * Math.cos(chart.origin.lat * Math.PI / 180)) /
       (TILE_SIZE * tileCount);
     const screenPixelsPerTile = (TILE_SIZE * metresPerPixel) * view.scale;
+    if (!Number.isFinite(screenPixelsPerTile) || screenPixelsPerTile <= 0) return;
     const centreGlobalX = origin.x + view.centerX / metresPerPixel;
     const centreGlobalY = origin.y - view.centerY / metresPerPixel;
     const centreTileX = centreGlobalX / TILE_SIZE;
     const centreTileY = centreGlobalY / TILE_SIZE;
-    const radiusX = Math.ceil(canvas.clientWidth / screenPixelsPerTile / 2) + 1;
-    const radiusY = Math.ceil(canvas.clientHeight / screenPixelsPerTile / 2) + 1;
+    const radiusX = Math.min(
+      MAX_TILE_RADIUS,
+      Math.ceil(canvas.clientWidth / screenPixelsPerTile / 2) + 1
+    );
+    const radiusY = Math.min(
+      MAX_TILE_RADIUS,
+      Math.ceil(canvas.clientHeight / screenPixelsPerTile / 2) + 1
+    );
     const firstX = Math.floor(centreTileX) - radiusX;
     const lastX = Math.floor(centreTileX) + radiusX;
     const firstY = Math.max(0, Math.floor(centreTileY) - radiusY);
@@ -525,6 +545,7 @@ const MAP = (() => {
       chart = data;
       aircraft = null;
       routeSegments = [];
+      fitPending = true;
       fit();
     },
     setAircraft(position) {

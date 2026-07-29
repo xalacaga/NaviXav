@@ -4026,7 +4026,7 @@ function selectTab(name) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
-  if (name === "map") MAP.resize();
+  if (name === "map") window.requestAnimationFrame(() => MAP.resize());
 }
 
 function openActiveAlerts() {
