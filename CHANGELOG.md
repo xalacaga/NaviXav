@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## [1.0.0] - 2026-07-29
+
+## Corrections de bugs
+
+- restaurer la trace en mémoire et les crans Airbus
+
+L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+
 ## [0.13.0] - 2026-07-29
 
 ## Nouvelles fonctionnalités
