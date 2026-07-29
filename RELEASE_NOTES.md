@@ -1,4 +1,4 @@
-# NaviXav 1.1.0
+# NaviXav 1.2.0
 
 Publication du 2026-07-29.
 
