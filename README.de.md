@@ -70,6 +70,40 @@ zeigt:
 - den Top of Descent und eine Richt-Sinkrate auf einem 3°-Profil;
 - die Abweichung vom geplanten Vertikalprofil.
 
+#### Flugzeugkonfiguration
+
+Der Block **Flugzeugkonfiguration** liest Fahrwerk, Klappen, Bremsklappen,
+Parkbremse und die sieben Außenlichter direkt aus MSFS, ebenso die
+Höhenmessereinstellung, die Autopilotmodi, die gewählte Höhe, den Kraftstoff an
+Bord und den tatsächlichen Wind. Die Einheiten werden beim Simulator angefragt
+und nie nachträglich umgerechnet.
+
+#### Visuelle Warnungen
+
+NaviXav überwacht diese Konfiguration und meldet Versäumnisse: Fahrwerk im
+Anflug nicht ausgefahren, Klappen oder Bremsklappen nicht konfiguriert, Strobes
+oder Landescheinwerfer aus, Parkbremse noch gesetzt, QNH oder Standardeinstellung
+beim Überschreiten der Übergangshöhe nicht gesetzt, gewählte Höhe über der
+nächsten Beschränkung, ILS-Frequenz abweichend von der geplanten,
+Enteisung in Vereisungsbedingungen abgeschaltet, Kraftstoff unter der
+Endreserve.
+
+Drei Vorkehrungen verhindern Fehlalarme:
+
+- Regeln, die ein einfahrbares Fahrwerk, Klappen oder Bremsklappen
+  voraussetzen, werden nur bewertet, wenn der Simulator deren Vorhandensein
+  bestätigt;
+- eine Bedingung muss einige Sekunden anliegen, bevor eine Warnung ausgelöst
+  wird — das verhindert Flackern beim Überschreiten einer Schwelle;
+- Warnungen sind während einer Wiedergabe und bei beschleunigter
+  Simulationsgeschwindigkeit ausgesetzt.
+
+Jede Warnung wird mit einem Klick quittiert und bei der nächsten Flugphase
+erneut aktiviert. Eine Plakette `MASTER CAUTION` oder `MASTER WARNING` fasst die
+Lage zusammen, und das gesamte System lässt sich im Panel abschalten. Das
+Blinken, das kritischen Warnungen vorbehalten ist, entfällt, wenn das System
+reduzierte Bewegung anfordert.
+
 Die Flugspur wird alle fünf Sekunden lokal aufgezeichnet. Sie kann in der
 Oberfläche angehalten, gelöscht oder erneut abgespielt werden. Es wird kein
 Verlauf an einen externen Dienst gesendet.
@@ -118,7 +152,9 @@ Die Karte umfasst:
 - Zoom, Verschieben und Einpassen auf Flughafen oder Route;
 - die vollständige tatsächlich geflogene Spur von Abflug bis Ankunft;
 - eine frei wählbare Farbe der Flugspur;
-- die Wahl zwischen OpenStreetMap Standard und OpenTopoMap.
+- die Wahl zwischen OpenStreetMap Standard, OpenTopoMap, CartoDB Positron
+  (hell) und CartoDB Dark Matter (dunkel, Cockpit) – direkt in der Kartenleiste
+  oder in den Einstellungen.
 
 ### Amtliche nationale AIS-Karten
 
@@ -327,10 +363,12 @@ nachdem ein Flug in SimBrief erzeugt oder geändert wurde.
 
 ## Verwendung der Karte
 
-- **Kartenhintergrund**: blendet die in den Einstellungen gewählte freie Karte
-  ein oder aus.
-- **Einstellungen**: wählt OpenStreetMap Standard oder OpenTopoMap sowie die
-  Farbe der vollständigen Flugspur.
+- **Kartenhintergrund**: blendet die gewählte freie Karte ein oder aus.
+- **Hintergrundauswahl**: wechselt direkt auf der Karte zwischen OpenStreetMap
+  Standard, OpenTopoMap, CartoDB Positron (hell) und CartoDB Dark Matter
+  (dunkel, Cockpit). Die Wahl wird in den Einstellungen gespeichert.
+- **Einstellungen**: bietet dieselbe Hintergrundauswahl sowie die Farbe der
+  vollständigen Flugspur.
 - **Amtliche Überlagerung**: erscheint nur für das georeferenzierte Blatt des
   aktuell angezeigten Flugplatzes und regelt dessen Deckkraft.
 - **Gesamte Route**: rahmt die vollständige Flugroute ein.

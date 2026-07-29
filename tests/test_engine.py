@@ -68,6 +68,26 @@ def test_atc_route_is_rebuilt(provider, settings, ofp):
     assert plan.enroute.route_path[-1]["ident"] == "LFBO"
 
 
+def test_route_path_starts_and_ends_on_the_selected_runways(provider, settings, ofp):
+    """Le tracé part du seuil de la 05 à LFST et finit sur celui de la 32R."""
+    plan = _plan(provider, settings, ofp)
+
+    def threshold(icao: str, name: str) -> tuple[float, float]:
+        runway = next(r for r in provider.runways(icao) if r.name == name)
+        return (runway.lat, runway.lon)
+
+    first = plan.enroute.route_path[0]
+    last = plan.enroute.route_path[-1]
+
+    assert (first["lat"], first["lon"]) == threshold("LFST", "05")
+    assert first["runway"] == "05"
+    assert (last["lat"], last["lon"]) == threshold("LFBO", "32R")
+    assert last["runway"] == "32R"
+
+    airport = provider.airport("LFST")
+    assert (first["lat"], first["lon"]) != (airport.lat, airport.lon)
+
+
 def test_aircraft_information_reaches_web_payload(provider, settings, ofp):
     payload = _plan(provider, settings, ofp).to_dict()
 

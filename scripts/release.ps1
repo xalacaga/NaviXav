@@ -2,16 +2,20 @@
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
-    [int]$KeepReleases = 1, # Nombre de releases récents à conserver dans release/
+    [int]$KeepReleases = 0, # Nombre d'anciennes versions à conserver en plus de la nouvelle (0 = conserve uniquement la dernière)
     [switch]$SkipToolInstall,
     [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
-$env:LC_ALL = "C.UTF-8"
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-# 1. Autoriser l'exécution de scripts pour la session en cours
+# Force l'encodage UTF-8 global pour préserver tous les accents français
+$env:LC_ALL = "fr_FR.UTF-8"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+
+# 1. Déblocage de la politique d'exécution pour la session
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -21,45 +25,47 @@ function Write-Step([string]$Message) {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
-function Clear-OldReleases([string]$ReleaseDir, [int]$KeepCount) {
+function Clear-OldReleases([string]$ReleaseDir, [string]$CurrentVersion, [int]$KeepCount) {
     if (-not (Test-Path -LiteralPath $ReleaseDir)) { return }
 
-    Write-Step "Nettoyage du dossier release/..."
+    Write-Step "Nettoyage des anciennes versions (conservation de v$CurrentVersion)..."
 
-    # Récupérer tous les fichiers .exe, .zip et .sha256 triés par date de modification (les plus récents en premier)
+    # Récupération des fichiers de publication
     $AllFiles = Get-ChildItem -LiteralPath $ReleaseDir -File | 
         Where-Object { $_.Extension -in ".exe", ".zip", ".sha256" }
 
-    # Identifier les versions uniques à partir des noms de fichiers (ex: NaviXav-0.6.0-windows-x64-portable.zip)
-    # Extrait la version (ex: 0.6.0)
+    # Extraction des numéros de version
     $Versions = $AllFiles | ForEach-Object {
         if ($_.Name -match '(\d+\.\d+\.\d+)') { $Matches[1] }
     } | Select-Object -Unique
 
-    if ($Versions.Count -le $KeepCount) {
-        Write-Host "Aucune ancienne release à supprimer (total versions : $($Versions.Count), limite : $KeepCount)." -ForegroundColor Gray
+    # Exclusion explicite de la version actuelle qu'on vient de générer
+    $OldVersions = $Versions | Where-Object { $_ -ne $CurrentVersion }
+
+    if (-not $OldVersions -or $OldVersions.Count -eq 0) {
+        Write-Host "Aucune ancienne version à nettoyer." -ForegroundColor Gray
         return
     }
 
-    # Conserver les $KeepCount versions les plus récentes en fonction de la date des fichiers associés
-    $VersionsToKeep = $Versions | Sort-Object {
+    # Sélection des anciennes versions à conserver/supprimer
+    $OldVersionsToKeep = $OldVersions | Sort-Object {
         ($AllFiles | Where-Object { $_.Name -like "*$_*" } | Measure-Object -Property LastWriteTime -Maximum).Maximum
     } -Descending | Select-Object -First $KeepCount
 
-    $VersionsToRemove = $Versions | Where-Object { $_ -notin $VersionsToKeep }
+    $VersionsToRemove = $OldVersions | Where-Object { $_ -notin $OldVersionsToKeep }
 
     foreach ($Ver in $VersionsToRemove) {
         $FilesToDelete = $AllFiles | Where-Object { $_.Name -like "*$Ver*" }
         foreach ($File in $FilesToDelete) {
             Remove-Item -LiteralPath $File.FullName -Force
-            Write-Host "Supprimé : $($File.Name)" -ForegroundColor Yellow
+            Write-Host "Supprimé (ancienne version) : $($File.Name)" -ForegroundColor Yellow
         }
     }
 
-    Write-Host "Nettoyage terminé. Seule(s) la/les $KeepCount dernière(s) version(s) ont été conservée(s)." -ForegroundColor Green
+    Write-Host "Nettoyage terminé. La version v$CurrentVersion est conservée." -ForegroundColor Green
 }
 
-# 2. Vérification de l'état Git
+# 2. Contrôle Git et gestion du français dans le terminal
 Write-Step "Vérification de l'état Git..."
 $Status = & git status --porcelain
 if ($LASTEXITCODE -ne 0) {
@@ -72,29 +78,29 @@ if ($Status) {
         & git add .
         & git commit -m "feat: pré-release (auto-commit)"
     } else {
-        Write-Host "Fichiers non commités détectés :" -ForegroundColor Yellow
+        Write-Host "Fichiers non enregistrés détectés :" -ForegroundColor Yellow
         & git status -s
-        $Choice = Read-Host "`nVoulez-vous commiter automatiquement tous ces changements ? (O/n)"
+        $Choice = Read-Host "`nVoulez-vous enregistrer automatiquement tous ces changements ? (O/n)"
         if ($Choice -eq "" -or $Choice -match "^[OyY]") {
             $Msg = Read-Host "Message de commit [feat: mises à jour de l'application]"
             if (-not $Msg) { $Msg = "feat: mises à jour de l'application" }
             & git add .
             & git commit -m "$Msg"
         } else {
-            throw "Publication annulée. Committez vos modifications avant de relancer."
+            throw "Publication annulée. Enregistrez vos modifications avant de relancer."
         }
     }
 }
 
 # 3. Synchronisation avec le dépôt distant
-Write-Step "Mise à jour avec origin/main..."
+Write-Step "Vérification de la branche principale..."
 & git fetch origin main --quiet 2>$null
 $Behind = & git rev-list --count HEAD..origin/main
 if ($LASTEXITCODE -eq 0 -and [int]$Behind -gt 0) {
-    throw "Votre branche locale a $Behind commit(s) de retard par rapport à origin/main. Faites un 'git pull' d'abord."
+    throw "Votre branche locale a $Behind commit(s) de retard par rapport à origin/main. Exécutez 'git pull' d'abord."
 }
 
-# 4. Lancement du processus de publication
+# 4. Exécution du processus de publication
 Write-Step "Lancement de la publication..."
 $PublishScript = Join-Path $PSScriptRoot "publish_release.ps1"
 if (-not (Test-Path -LiteralPath $PublishScript)) {
@@ -108,8 +114,12 @@ if ($SkipToolInstall) { $PublishParams.Add("SkipToolInstall", $true) }
 
 & $PublishScript @PublishParams
 
-# 5. Nettoyage final des anciens fichiers de release locaux
-$ReleaseDirectory = Join-Path $ProjectRoot "release"
-Clear-OldReleases -ReleaseDir $ReleaseDirectory -KeepCount $KeepKeepReleases
+# 5. Nettoyage sécurisé des anciennes releases
+$InitSource = Get-Content -LiteralPath (Join-Path $ProjectRoot "navixav\__init__.py") -Raw -Encoding UTF8
+if ($InitSource -match '__version__\s*=\s*"(?<version>\d+\.\d+\.\d+)"') {
+    $CurrentVersion = $Matches.version
+    $ReleaseDirectory = Join-Path $ProjectRoot "release"
+    Clear-OldReleases -ReleaseDir $ReleaseDirectory -CurrentVersion $CurrentVersion -KeepCount $KeepReleases
+}
 
-Write-Host "`nProcessus terminé avec succès !" -ForegroundColor Green
+Write-Host "`nPublication terminée avec succès !" -ForegroundColor Green

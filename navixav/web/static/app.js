@@ -41,6 +41,8 @@ const LIVE_INTERVAL_MS = 1000;
 const FLIGHT_LOG_INTERVAL_MS = 5000;
 const FLIGHT_LOG_MAX_POINTS = 3600;
 const TERMINAL_COLLAPSED_KEY = "navixav-terminal-collapsed";
+const ONBOARDING_KEY = "navixav-onboarded";
+const DEFAULT_TRAIL_COLOR = "#22d3ee";
 
 /* ------------------------------------------------------------------ utils */
 
@@ -215,6 +217,24 @@ async function shutdownApplication() {
   }
 }
 
+/**
+ * Aligne le champ couleur et son aperçu sur une teinte valide.
+ *
+ * Le champ natif refuse toute valeur hors « #rrggbb » et retombe alors sur du
+ * noir : la teinte est normalisée avant d'être appliquée, et la ligne d'aperçu
+ * reçoit la couleur exacte utilisée pour la trace sur la carte.
+ */
+function setTrailColorField(value) {
+  const colour = /^#[0-9a-f]{6}$/i.test(String(value || ""))
+    ? String(value)
+    : DEFAULT_TRAIL_COLOR;
+  const input = $("settings-trail-color");
+  input.value = colour;
+  input.closest(".color-field").style.setProperty("--trail-preview", colour);
+  $("settings-trail-value").textContent = colour.toUpperCase();
+  return colour;
+}
+
 async function openSettings() {
   const message = $("settings-message");
   message.textContent = "";
@@ -232,7 +252,7 @@ async function openSettings() {
     $("settings-runway-length").value = values.min_runway_length_ft;
     $("settings-rnp").checked = Boolean(values.aircraft_rnp_capable);
     $("settings-basemap").value = values.map_basemap || "osm";
-    $("settings-trail-color").value = values.map_trail_color || "#22d3ee";
+    setTrailColorField(values.map_trail_color);
     $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
     show($("settings-lan-access"), Boolean(values.lan_enabled));
     $("settings-lan-url").value = latestStatus?.lan_url || "";
@@ -288,6 +308,109 @@ async function saveSettings(event) {
   }
 }
 
+/* ------------------------------------------------- premier lancement */
+
+/**
+ * Le premier lancement impose le choix de la langue et la saisie du compte
+ * SimBrief. Un client distant (téléphone, tablette) parle à un poste déjà
+ * configuré : seule la langue lui est demandée.
+ */
+function needsOnboarding(status) {
+  if (status.remote_client) return !window.I18N.hasLanguage();
+  if (localStorage.getItem(ONBOARDING_KEY)) return false;
+  return !window.I18N.hasLanguage() || !status.simbrief_configured;
+}
+
+function welcomeNeedsSimbrief() {
+  return !$("welcome-simbrief").classList.contains("hidden");
+}
+
+function welcomeIdentifiers() {
+  return {
+    simbrief_pilot_id: $("welcome-pilot-id").value.trim(),
+    simbrief_username: $("welcome-username").value.trim(),
+  };
+}
+
+function refreshWelcomeSubmit() {
+  const { simbrief_pilot_id, simbrief_username } = welcomeIdentifiers();
+  $("welcome-submit").disabled =
+    welcomeNeedsSimbrief() && !simbrief_pilot_id && !simbrief_username;
+}
+
+function openWelcome(status) {
+  show($("welcome-simbrief"), !status.simbrief_configured && !status.remote_client);
+  show(
+    $("welcome-demo"),
+    welcomeNeedsSimbrief() && Boolean(status.demo_available)
+  );
+  if (!window.I18N.hasLanguage()) {
+    $("welcome-language").value = window.I18N.suggestedLanguage();
+  }
+  const message = $("welcome-message");
+  message.textContent = "";
+  message.className = "settings-message";
+  refreshWelcomeSubmit();
+  $("welcome-dialog").showModal();
+  $("welcome-language").focus();
+}
+
+function closeWelcome() {
+  localStorage.setItem(ONBOARDING_KEY, "1");
+  window.I18N.setLanguage($("welcome-language").value);
+  $("welcome-dialog").close();
+}
+
+async function submitWelcome(event) {
+  event.preventDefault();
+  const message = $("welcome-message");
+  const identifiers = welcomeIdentifiers();
+  if (
+    welcomeNeedsSimbrief()
+    && !identifiers.simbrief_pilot_id
+    && !identifiers.simbrief_username
+  ) {
+    message.textContent = t("welcome_need_id");
+    message.className = "settings-message error";
+    return;
+  }
+  if (!welcomeNeedsSimbrief()) {
+    closeWelcome();
+    return;
+  }
+
+  const button = $("welcome-submit");
+  button.disabled = true;
+  message.textContent = t("saving");
+  message.className = "settings-message";
+  try {
+    // L'enregistrement remplace la totalité du fichier utilisateur : les
+    // autres réglages sont relus puis renvoyés inchangés.
+    const current = await fetch("/api/settings").then((r) => r.json());
+    const response = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...current, ...identifiers, navdata_store: "" }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
+    applyMapPreferences(result);
+    closeWelcome();
+    await initialiseApplication();
+  } catch (error) {
+    message.textContent = String(error);
+    message.className = "settings-message error";
+    button.disabled = false;
+  }
+}
+
+async function skipWelcomeWithDemo() {
+  closeWelcome();
+  checkForUpdates();
+  $("demo-toggle").checked = true;
+  await buildPlan();
+}
+
 /* ------------------------------------------------------------------- plan */
 
 async function buildPlan() {
@@ -329,6 +452,12 @@ function showBanner(kind, title, lines) {
   for (const line of lines.filter(Boolean)) list.append(el("li", null, line));
   if (list.childElementCount) body.append(list);
   banner.append(body);
+  const dismiss = el("button", "banner-close", "×");
+  dismiss.type = "button";
+  dismiss.title = t("close");
+  dismiss.setAttribute("aria-label", t("close"));
+  dismiss.addEventListener("click", hideBanner);
+  banner.append(dismiss);
   show(banner, true);
 }
 
@@ -599,7 +728,15 @@ function haversineNm(first, second) {
   return (2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(value)))) / 1852;
 }
 
+function samePosition(first, second) {
+  return Boolean(first) && Boolean(second)
+    && first.lat === second.lat && first.lon === second.lon;
+}
+
 function flightStagePaths(plan) {
+  // Le moteur ancre déjà les deux extrémités de la route sur les seuils des
+  // pistes retenues : le tracé part donc de la piste de départ et s'arrête sur
+  // celle d'arrivée, sans redoubler un point déjà fourni par la procédure.
   const route = plan.enroute?.route_path || [];
   const origin = route[0];
   const destination = route.at(-1);
@@ -607,7 +744,7 @@ function flightStagePaths(plan) {
   const star = [...(plan.arrival?.star_path || [])];
   const approach = [...(plan.arrival?.approach_path || [])];
 
-  if (origin && sid.length) sid.unshift(origin);
+  if (origin && sid.length && !samePosition(origin, sid[0])) sid.unshift(origin);
   const departureEnd = sid.at(-1) || origin;
   const arrivalStart = star[0] || approach[0] || destination;
   const enroute = [
@@ -623,8 +760,11 @@ function flightStagePaths(plan) {
   if (star.length && approach.length) approach.unshift(star.at(-1));
 
   if (destination) {
-    if (approach.length) approach.push(destination);
-    else if (star.length) star.push(destination);
+    if (approach.length) {
+      if (!samePosition(destination, approach.at(-1))) approach.push(destination);
+    } else if (star.length && !samePosition(destination, star.at(-1))) {
+      star.push(destination);
+    }
   }
   return [
     { stage: "sid", points: sid },
@@ -816,6 +956,377 @@ function descentGuidance(plan, aircraft, projection) {
   };
 }
 
+/* --------------------------------------------- configuration avion et alarmes */
+
+/*
+ * Deux garde-fous rendent ces alarmes utilisables en vol.
+ *
+ * Les capacités de la cellule d'abord : une règle qui dépend du train
+ * rentrant, des volets ou des aérofreins n'est évaluée que si le simulateur a
+ * confirmé que l'avion en possède. Sans cette information, la règle se taît
+ * plutôt que de crier sur un train fixe.
+ *
+ * L'anti-rebond ensuite : une condition doit tenir quelques secondes avant de
+ * lever une alarme, et disparaître un moment avant de l'éteindre. Sans cela,
+ * chaque franchissement de seuil — 10 000 ft, 2 000 ft AGL — ferait clignoter
+ * le bandeau.
+ */
+
+const ALERTS_STORAGE_KEY = "navixav-alerts-enabled";
+const ALERT_RAISE_MS = 3000;
+const ALERT_CLEAR_MS = 1500;
+const ALERT_BANNER_MAX = 3;
+const STD_PRESSURE_HPA = 1013.25;
+const LBS_TO_KG = 0.45359237;
+const SEVERITY_RANK = { danger: 0, warning: 1, info: 2 };
+
+const LIGHT_LABELS = [
+  ["landing", "LDG"],
+  ["taxi", "TAXI"],
+  ["strobe", "STRB"],
+  ["nav", "NAV"],
+  ["beacon", "BCN"],
+  ["logo", "LOGO"],
+  ["wing", "WING"],
+];
+
+let alertsEnabled = localStorage.getItem(ALERTS_STORAGE_KEY) !== "0";
+let alertPhaseMemory = null;
+const alertStates = new Map();
+
+function finiteOr(value, fallback = null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/** Réserve finale de l'OFP ramenée en kilogrammes, l'unité de SimConnect. */
+function reserveFuelKg(plan) {
+  const dispatch = plan?.dispatch || {};
+  const reserve = finiteOr(dispatch.reserve_fuel, 0);
+  if (!reserve) return null;
+  return String(dispatch.units || "").toLowerCase().startsWith("lb")
+    ? reserve * LBS_TO_KG
+    : reserve;
+}
+
+function flightContext(aircraft, projection, phase, constraint) {
+  const configuration = aircraft?.configuration || null;
+  return {
+    aircraft,
+    configuration,
+    capabilities: configuration?.capabilities || null,
+    plan: currentPlan,
+    projection,
+    phase,
+    constraint,
+    onGround: Boolean(aircraft?.on_ground),
+    groundSpeed: finiteOr(aircraft?.ground_speed_kt, 0),
+    verticalSpeed: finiteOr(aircraft?.vertical_speed_fpm, 0),
+    airspeed: finiteOr(aircraft?.indicated_airspeed_kt, 0),
+    aglFt: finiteOr(aircraft?.height_above_ground_ft),
+    // L'altitude indiquée est la seule comparable aux contraintes publiées.
+    altitudeFt: finiteOr(
+      configuration?.indicated_altitude_ft,
+      finiteOr(aircraft?.altitude_ft)
+    ),
+  };
+}
+
+const ALERT_RULES = [
+  {
+    id: "parking_brake",
+    severity: "danger",
+    armed: (c) => !c.onGround || c.groundSpeed > 5,
+    when: (c) => c.configuration.parking_brake === true,
+  },
+  {
+    id: "gear_not_down",
+    severity: "danger",
+    needs: "retractable_gear",
+    armed: (c) => (
+      !c.onGround
+      && c.aglFt !== null && c.aglFt < 2000
+      && c.verticalSpeed < -300
+      && (c.phase === "Approche" || c.phase === "Atterrissage")
+    ),
+    when: (c) => finiteOr(c.configuration.gear_extended_pct, 100) < 95,
+  },
+  {
+    id: "gear_not_up",
+    severity: "warning",
+    needs: "retractable_gear",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt > 1000 && c.verticalSpeed > 300,
+    when: (c) => finiteOr(c.configuration.gear_extended_pct, 0) > 5,
+  },
+  {
+    id: "flaps_not_set",
+    severity: "warning",
+    needs: "flaps",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 3000 && c.phase === "Approche",
+    when: (c) => c.configuration.flaps_handle_index === 0,
+  },
+  {
+    id: "flaps_still_out",
+    severity: "warning",
+    needs: "flaps",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt > 3000 && c.phase === "Montée",
+    when: (c) => finiteOr(c.configuration.flaps_handle_index, 0) > 0,
+  },
+  {
+    id: "flaps_takeoff",
+    severity: "warning",
+    needs: "flaps",
+    armed: (c) => c.onGround && c.phase === "Décollage",
+    when: (c) => c.configuration.flaps_handle_index === 0,
+  },
+  {
+    id: "spoilers_not_armed",
+    severity: "warning",
+    needs: "spoilers",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 2000 && c.phase === "Approche",
+    when: (c) => c.configuration.spoilers_armed === false,
+  },
+  {
+    id: "spoilers_out",
+    severity: "warning",
+    needs: "spoilers",
+    armed: (c) => c.phase === "Montée",
+    when: (c) => finiteOr(c.configuration.spoilers_handle_pct, 0) > 5,
+  },
+  {
+    id: "strobe_off",
+    severity: "warning",
+    armed: (c) => !c.onGround || c.phase === "Décollage",
+    when: (c) => c.configuration.lights?.strobe === false,
+  },
+  {
+    id: "beacon_off",
+    severity: "warning",
+    armed: (c) => c.onGround,
+    when: (c) => c.configuration.lights?.beacon === false,
+  },
+  {
+    id: "nav_lights_off",
+    severity: "info",
+    armed: () => true,
+    when: (c) => c.configuration.lights?.nav === false,
+  },
+  {
+    id: "taxi_light_off",
+    severity: "info",
+    armed: (c) => c.onGround && c.groundSpeed > 3,
+    when: (c) => c.configuration.lights?.taxi === false,
+  },
+  {
+    id: "landing_lights_off",
+    severity: "warning",
+    armed: (c) => (
+      !c.onGround
+      && c.altitudeFt !== null && c.altitudeFt < 10000
+      && (c.phase === "Descente" || c.phase === "Approche")
+    ),
+    when: (c) => c.configuration.lights?.landing === false,
+  },
+  {
+    id: "landing_lights_on",
+    severity: "info",
+    armed: (c) => c.phase === "Croisière" && c.altitudeFt !== null && c.altitudeFt > 10000,
+    when: (c) => c.configuration.lights?.landing === true,
+  },
+  {
+    id: "std_not_set",
+    severity: "warning",
+    armed: (c) => {
+      const transition = finiteOr(c.plan?.departure?.transition_altitude_ft);
+      return (
+        !c.onGround && c.phase === "Montée"
+        && transition !== null && c.altitudeFt !== null
+        && c.altitudeFt > transition
+      );
+    },
+    when: (c) => {
+      const setting = finiteOr(c.configuration.altimeter_hpa);
+      return setting !== null && Math.abs(setting - STD_PRESSURE_HPA) > 0.5;
+    },
+  },
+  {
+    id: "qnh_not_set",
+    severity: "warning",
+    armed: (c) => {
+      const level = finiteOr(c.plan?.arrival?.transition_level_ft);
+      return (
+        !c.onGround
+        && (c.phase === "Descente" || c.phase === "Approche")
+        && level !== null && c.altitudeFt !== null
+        && c.altitudeFt < level
+      );
+    },
+    when: (c) => {
+      const setting = finiteOr(c.configuration.altimeter_hpa);
+      return setting !== null && Math.abs(setting - STD_PRESSURE_HPA) <= 0.5;
+    },
+  },
+  {
+    id: "selected_altitude_above",
+    severity: "danger",
+    // Une altitude sélectionnée nulle signifie « non exposée par cet avion » :
+    // c'est elle qui conditionne la règle, pas le maître du pilote automatique.
+    armed: (c) => (
+      Boolean(c.constraint?.altitudeFt)
+      && c.constraint.distanceNm < 15
+      && finiteOr(c.configuration.selected_altitude_ft, 0) > 0
+    ),
+    when: (c) => (
+      finiteOr(c.configuration.selected_altitude_ft, 0) > c.constraint.altitudeFt + 100
+    ),
+    detail: (c) => `${Math.round(c.configuration.selected_altitude_ft)} ft / ${c.constraint.altitudeFt} ft`,
+  },
+  {
+    id: "ils_mismatch",
+    severity: "warning",
+    armed: (c) => (
+      Boolean(finiteOr(c.plan?.arrival?.ils_frequency_mhz))
+      && (c.phase === "Descente" || c.phase === "Approche")
+      && finiteOr(c.projection?.remainingNm, Infinity) < 25
+    ),
+    when: (c) => {
+      const expected = finiteOr(c.plan.arrival.ils_frequency_mhz);
+      const tuned = finiteOr(c.configuration.nav1_frequency_mhz, 0);
+      return Math.abs(tuned - expected) > 0.005;
+    },
+    detail: (c) => (
+      `${finiteOr(c.configuration.nav1_frequency_mhz, 0).toFixed(2)}`
+      + ` / ${finiteOr(c.plan.arrival.ils_frequency_mhz).toFixed(2)}`
+    ),
+  },
+  {
+    id: "flap_overspeed",
+    severity: "danger",
+    armed: () => true,
+    when: (c) => c.configuration.flap_speed_exceeded === true,
+  },
+  {
+    id: "overspeed",
+    severity: "danger",
+    armed: () => true,
+    when: (c) => c.configuration.overspeed_warning === true,
+  },
+  {
+    id: "stall",
+    severity: "danger",
+    armed: (c) => !c.onGround,
+    when: (c) => c.configuration.stall_warning === true,
+  },
+  {
+    id: "anti_ice",
+    severity: "warning",
+    armed: (c) => {
+      const temperature = finiteOr(c.configuration.total_air_temperature_c);
+      return (
+        !c.onGround && temperature !== null && temperature < 10
+        && c.configuration.in_cloud === true
+      );
+    },
+    when: (c) => c.configuration.engine_anti_ice === false,
+  },
+  {
+    id: "fuel_below_reserve",
+    severity: "danger",
+    armed: (c) => !c.onGround && reserveFuelKg(c.plan) !== null,
+    when: (c) => {
+      const onboard = finiteOr(c.configuration.fuel_total_kg);
+      return onboard !== null && onboard < reserveFuelKg(c.plan);
+    },
+    detail: (c) => `${Math.round(c.configuration.fuel_total_kg)} kg`,
+  },
+];
+
+/** Motif d'inhibition globale, ou null si les alarmes doivent être évaluées. */
+function alertsInhibition(context) {
+  if (!alertsEnabled) return { key: "alerts_off" };
+  if (replayActive) return { key: "alerts_replay" };
+  if (!context.aircraft || !context.configuration) return { key: "alerts_no_data" };
+  const rate = finiteOr(context.configuration.simulation_rate);
+  if (rate !== null && Math.abs(rate - 1) > 0.05) {
+    return { key: "alerts_rate", detail: `×${rate}` };
+  }
+  return null;
+}
+
+/** Règles en faute à cet instant, avant anti-rebond. */
+function evaluateAlerts(context) {
+  const hits = new Map();
+  for (const rule of ALERT_RULES) {
+    // Une capacité inconnue vaut absente : mieux vaut se taire que mentir.
+    if (rule.needs && !context.capabilities?.[rule.needs]) continue;
+    if (!rule.armed(context)) continue;
+    if (!rule.when(context)) continue;
+    let detail = "";
+    try {
+      detail = rule.detail ? rule.detail(context) : "";
+    } catch (_error) {
+      detail = "";
+    }
+    hits.set(rule.id, detail);
+  }
+  return hits;
+}
+
+/**
+ * Applique l'anti-rebond et l'acquittement, et renvoie les alarmes à afficher.
+ * Un changement de phase lève les acquittements : la situation a changé.
+ */
+function commitAlerts(hits, phase, now) {
+  if (phase !== alertPhaseMemory) {
+    alertPhaseMemory = phase;
+    for (const state of alertStates.values()) state.acknowledged = false;
+  }
+
+  const active = [];
+  for (const rule of ALERT_RULES) {
+    let state = alertStates.get(rule.id);
+    if (!state) {
+      state = { firstSeen: 0, lastSeen: 0, active: false, acknowledged: false, detail: "" };
+      alertStates.set(rule.id, state);
+    }
+
+    if (hits.has(rule.id)) {
+      state.detail = hits.get(rule.id);
+      state.lastSeen = now;
+      if (!state.firstSeen) state.firstSeen = now;
+      if (!state.active && now - state.firstSeen >= ALERT_RAISE_MS) state.active = true;
+    } else if (state.firstSeen && now - state.lastSeen >= ALERT_CLEAR_MS) {
+      state.firstSeen = 0;
+      state.active = false;
+      state.acknowledged = false;
+      state.detail = "";
+    }
+
+    if (state.active && !state.acknowledged) {
+      active.push({
+        id: rule.id,
+        severity: rule.severity,
+        detail: state.detail,
+        label: t(`alert_${rule.id}`),
+        action: t(`alert_${rule.id}_action`),
+      });
+    }
+  }
+
+  active.sort((first, second) => SEVERITY_RANK[first.severity] - SEVERITY_RANK[second.severity]);
+  return active;
+}
+
+function acknowledgeAlert(id) {
+  const state = alertStates.get(id);
+  if (state) state.acknowledged = true;
+}
+
+function resetAlertStates() {
+  alertStates.clear();
+  alertPhaseMemory = null;
+}
+
 function flightLogStorageKey(plan) {
   return [
     "navixav-flight-log",
@@ -929,11 +1440,226 @@ function liveValue(id, value, status = "") {
   node.closest(".flight-live-stat")?.setAttribute("data-status", status);
 }
 
+/* ------------------------------------------------- rendu de la configuration */
+
+function describeGear(configuration, capabilities) {
+  if (capabilities && !capabilities.retractable_gear) {
+    return { text: t("cfg_gear_fixed"), status: "" };
+  }
+  const extended = finiteOr(configuration.gear_extended_pct);
+  if (extended === null) return { text: "—", status: "" };
+  if (extended >= 99) return { text: t("cfg_gear_down"), status: "good" };
+  if (extended <= 1) return { text: t("cfg_gear_up"), status: "" };
+  return { text: t("cfg_gear_transit"), status: "warning" };
+}
+
+function describeFlaps(configuration, capabilities) {
+  if (capabilities && !capabilities.flaps) {
+    return { text: t("cfg_none"), status: "" };
+  }
+  const index = finiteOr(configuration.flaps_handle_index);
+  if (index === null) return { text: "—", status: "" };
+  const positions = finiteOr(capabilities?.flap_positions, 0);
+  // MSFS compte la position lisse : quatre crans utiles sur cinq positions.
+  const steps = positions > 1 ? positions - 1 : 0;
+  if (index === 0) return { text: t("cfg_flaps_up"), status: "" };
+  return {
+    text: steps ? `${index} / ${steps}` : String(index),
+    status: "good",
+  };
+}
+
+function describeSpoilers(configuration, capabilities) {
+  if (capabilities && !capabilities.spoilers) {
+    return { text: t("cfg_none"), status: "" };
+  }
+  const handle = finiteOr(configuration.spoilers_handle_pct);
+  if (handle === null) return { text: "—", status: "" };
+  if (handle > 5) return { text: `${Math.round(handle)} %`, status: "warning" };
+  if (configuration.spoilers_armed === true) {
+    return { text: t("cfg_spoilers_armed"), status: "good" };
+  }
+  return { text: t("cfg_spoilers_retracted"), status: "" };
+}
+
+function describeParkingBrake(configuration) {
+  if (configuration.parking_brake === null || configuration.parking_brake === undefined) {
+    return { text: "—", status: "" };
+  }
+  return configuration.parking_brake
+    ? { text: t("cfg_brake_set"), status: "warning" }
+    : { text: t("cfg_brake_released"), status: "good" };
+}
+
+function describeAltimeter(configuration) {
+  const setting = finiteOr(configuration.altimeter_hpa);
+  if (setting === null) return { text: "—", status: "" };
+  const standard = Math.abs(setting - STD_PRESSURE_HPA) <= 0.5;
+  return {
+    text: standard ? "STD · 1013 hPa" : `QNH ${Math.round(setting)} hPa`,
+    status: "",
+  };
+}
+
+/*
+ * Tous les avions ne câblent pas « AUTOPILOT MASTER » : un A320 modifié
+ * annonce NAV tenu alors que le maître reste à faux. Les modes sont donc lus
+ * un par un, sans exiger le maître au préalable.
+ */
+function describeAutopilot(configuration) {
+  const modes = [];
+  if (configuration.autopilot_master) modes.push("AP");
+  if (configuration.autothrottle_active) modes.push("A/THR");
+  if (configuration.autopilot_nav_lock) modes.push("NAV");
+  if (configuration.autopilot_approach_hold) modes.push("APPR");
+  if (configuration.autopilot_glideslope_hold) modes.push("G/S");
+  if (!modes.length) return { text: t("cfg_ap_off"), status: "" };
+  return { text: modes.join(" · "), status: "good" };
+}
+
+function describeSelectedAltitude(configuration) {
+  const selected = finiteOr(configuration.selected_altitude_ft);
+  if (selected === null || selected <= 0) return { text: "—", status: "" };
+  return { text: `${Math.round(selected)} ft`, status: "" };
+}
+
+function describeFuel(configuration, plan) {
+  const onboard = finiteOr(configuration.fuel_total_kg);
+  if (onboard === null) return { text: "—", status: "" };
+  const reserve = reserveFuelKg(plan);
+  if (reserve === null) return { text: `${Math.round(onboard)} kg`, status: "" };
+  const margin = onboard - reserve;
+  return {
+    text: `${Math.round(onboard)} kg`,
+    status: margin < 0 ? "danger" : margin < reserve * 0.25 ? "warning" : "good",
+  };
+}
+
+function describeWind(configuration) {
+  const direction = finiteOr(configuration.wind_direction_deg);
+  const speed = finiteOr(configuration.wind_speed_kt);
+  if (direction === null || speed === null) return { text: "—", status: "" };
+  return {
+    text: `${String(Math.round(direction)).padStart(3, "0")}° / ${Math.round(speed)} kt`,
+    status: "",
+  };
+}
+
+function updateLights(configuration) {
+  const container = $("flight-lights");
+  if (!container) return;
+  container.innerHTML = "";
+  const lights = configuration?.lights || {};
+  for (const [key, label] of LIGHT_LABELS) {
+    const state = lights[key];
+    const chip = el("span", "light-chip", label);
+    // L'état ne repose pas sur la seule couleur : le texte reste lisible et
+    // l'attribut est exposé aux lecteurs d'écran.
+    chip.dataset.state = state === true ? "on" : state === false ? "off" : "unknown";
+    chip.setAttribute(
+      "aria-label",
+      `${label} · ${t(state === true ? "cfg_light_on" : state === false ? "cfg_light_off" : "cfg_unknown")}`
+    );
+    container.append(chip);
+  }
+}
+
+function updateConfigurationBlock(aircraft) {
+  const section = $("flight-config");
+  if (!section) return;
+  const configuration = aircraft?.configuration || null;
+  const capabilities = configuration?.capabilities || null;
+
+  const unavailable = $("flight-config-unavailable");
+  show(unavailable, !configuration);
+  show($("flight-config-body"), Boolean(configuration));
+  if (!configuration) return;
+
+  const entries = [
+    ["flight-cfg-gear", describeGear(configuration, capabilities)],
+    ["flight-cfg-flaps", describeFlaps(configuration, capabilities)],
+    ["flight-cfg-spoilers", describeSpoilers(configuration, capabilities)],
+    ["flight-cfg-brake", describeParkingBrake(configuration)],
+    ["flight-cfg-altimeter", describeAltimeter(configuration)],
+    ["flight-cfg-autopilot", describeAutopilot(configuration)],
+    ["flight-cfg-selected", describeSelectedAltitude(configuration)],
+    ["flight-cfg-fuel", describeFuel(configuration, currentPlan)],
+    ["flight-cfg-wind", describeWind(configuration)],
+  ];
+  for (const [id, description] of entries) {
+    liveValue(id, description.text, description.status);
+  }
+  updateLights(configuration);
+}
+
+/* -------------------------------------------------------- rendu des alarmes */
+
+function updateAlertsDisplay(context) {
+  const banner = $("flight-alerts");
+  const master = $("flight-alert-master");
+  if (!banner || !master) return;
+
+  banner.innerHTML = "";
+  const inhibition = alertsInhibition(context);
+  if (inhibition) {
+    resetAlertStates();
+    master.dataset.severity = "none";
+    master.textContent = inhibition.detail
+      ? `${t(inhibition.key)} ${inhibition.detail}`
+      : t(inhibition.key);
+    return;
+  }
+
+  const active = commitAlerts(
+    evaluateAlerts(context),
+    context.phase,
+    performance.now()
+  );
+
+  if (!active.length) {
+    master.dataset.severity = "ok";
+    master.textContent = t("alerts_none");
+    return;
+  }
+
+  master.dataset.severity = active[0].severity;
+  master.textContent = `${t(
+    active[0].severity === "danger" ? "master_warning" : "master_caution"
+  )} · ${active.length}`;
+
+  for (const alert of active.slice(0, ALERT_BANNER_MAX)) {
+    const row = el("button", "flight-alert");
+    row.type = "button";
+    row.dataset.severity = alert.severity;
+    row.title = t("alerts_ack_hint");
+    row.append(el("span", "flight-alert-mark", alert.severity === "info" ? "i" : "!"));
+    const body = el("span", "flight-alert-body");
+    body.append(el("span", "flight-alert-label", alert.label));
+    const action = alert.detail ? `${alert.action} · ${alert.detail}` : alert.action;
+    body.append(el("span", "flight-alert-action", action));
+    row.append(body);
+    row.addEventListener("click", () => {
+      acknowledgeAlert(alert.id);
+      updateAlertsDisplay(context);
+    });
+    banner.append(row);
+  }
+
+  if (active.length > ALERT_BANNER_MAX) {
+    banner.append(
+      el("div", "flight-alert-more", `+${active.length - ALERT_BANNER_MAX}`)
+    );
+  }
+}
+
 function updateFlightPanel(aircraft) {
   const projection = projectAircraftOnFlightPath(aircraft);
   const phase = detectFlightPhase(aircraft, projection);
   const constraint = nextFlightConstraint(currentPlan, projection, aircraft || {});
   const descent = descentGuidance(currentPlan, aircraft, projection);
+
+  updateConfigurationBlock(aircraft);
+  updateAlertsDisplay(flightContext(aircraft, projection, phase, constraint));
 
   liveValue("flight-phase", phase);
   liveValue(
@@ -1032,10 +1758,80 @@ function updateFlightPanel(aircraft) {
   }
 }
 
+function buildConfigurationSection() {
+  const section = el("section", "flight-config");
+  section.id = "flight-config";
+
+  const head = el("div", "flight-config-head");
+  const heading = el("div");
+  heading.append(el("div", "card-kicker", t("cfg_kicker")));
+  heading.append(el("h2", null, t("cfg_title")));
+  head.append(heading);
+
+  const switchLabel = el("label", "switch");
+  const input = el("input");
+  input.type = "checkbox";
+  input.id = "flight-alerts-toggle";
+  input.checked = alertsEnabled;
+  input.addEventListener("change", () => {
+    alertsEnabled = input.checked;
+    localStorage.setItem(ALERTS_STORAGE_KEY, alertsEnabled ? "1" : "0");
+    resetAlertStates();
+    if (latestAircraft) updateFlightPanel(latestAircraft);
+  });
+  switchLabel.append(input);
+  // La case elle-même est masquée : le rail et le curseur portent le rendu.
+  const track = el("span", "switch-track");
+  track.append(el("span", "switch-thumb"));
+  switchLabel.append(track);
+  switchLabel.append(el("span", "switch-label", t("alerts_toggle")));
+  switchLabel.title = t("alerts_toggle_title");
+  head.append(switchLabel);
+  section.append(head);
+
+  const unavailable = el("p", "flight-config-empty", t("alerts_no_data"));
+  unavailable.id = "flight-config-unavailable";
+  section.append(unavailable);
+
+  const body = el("div");
+  body.id = "flight-config-body";
+  const grid = el("div", "flight-live-grid");
+  const item = (label, id, note = "") => {
+    const node = el("article", "flight-live-stat");
+    node.append(el("div", "stat-label", label));
+    const value = el("div", "stat-value", "—");
+    value.id = id;
+    node.append(value);
+    if (note) node.append(el("div", "stat-note", note));
+    grid.append(node);
+  };
+  item(t("cfg_gear"), "flight-cfg-gear");
+  item(t("cfg_flaps"), "flight-cfg-flaps");
+  item(t("cfg_spoilers"), "flight-cfg-spoilers");
+  item(t("cfg_brake"), "flight-cfg-brake");
+  item(t("cfg_altimeter"), "flight-cfg-altimeter");
+  item(t("cfg_autopilot"), "flight-cfg-autopilot");
+  item(t("cfg_selected_altitude"), "flight-cfg-selected", t("cfg_selected_note"));
+  item(t("cfg_fuel"), "flight-cfg-fuel", t("cfg_fuel_note"));
+  item(t("cfg_wind"), "flight-cfg-wind", t("cfg_wind_note"));
+  body.append(grid);
+
+  const lightsBlock = el("div", "flight-lights-block");
+  lightsBlock.append(el("div", "stat-label", t("cfg_lights")));
+  const lights = el("div", "flight-lights");
+  lights.id = "flight-lights";
+  lightsBlock.append(lights);
+  body.append(lightsBlock);
+
+  section.append(body);
+  return section;
+}
+
 function renderFlightPanel(plan) {
   flightLog = loadFlightLog(plan);
   lastFlightLogAt = 0;
   stopFlightReplay();
+  resetAlertStates();
   const panel = $("panel-flight");
   panel.innerHTML = "";
   const header = el("div", "flight-panel-head");
@@ -1043,10 +1839,22 @@ function renderFlightPanel(plan) {
   title.append(el("div", "card-kicker", "Guidage et progression"));
   title.append(el("h2", null, "Suivi du vol en temps réel"));
   header.append(title);
+  const pills = el("div", "flight-panel-pills");
+  const master = el("span", "flight-alert-pill", t("alerts_none"));
+  master.id = "flight-alert-master";
+  master.dataset.severity = "none";
+  pills.append(master);
   const phase = el("span", "flight-phase-pill", "Hors connexion");
   phase.id = "flight-phase";
-  header.append(phase);
+  pills.append(phase);
+  header.append(pills);
   panel.append(header);
+
+  const alerts = el("div", "flight-alerts");
+  alerts.id = "flight-alerts";
+  alerts.setAttribute("role", "status");
+  alerts.setAttribute("aria-live", "polite");
+  panel.append(alerts);
 
   const grid = el("div", "flight-live-grid");
   const item = (label, id, note = "") => {
@@ -1071,6 +1879,8 @@ function renderFlightPanel(plan) {
   item("Profil vertical", "flight-vertical-profile", "Évalué à partir du TOD");
   item("Descente indicative", "flight-descent-vs", "Base 3° · à confirmer");
   panel.append(grid);
+
+  panel.append(buildConfigurationSection());
 
   const recorder = el("section", "flight-recorder");
   const recorderHead = el("div");
@@ -2218,6 +3028,28 @@ function applyMapPreferences(values) {
   });
 }
 
+/**
+ * Mémorise le fond choisi depuis la barre carte.
+ *
+ * Le PUT attend l'ensemble des réglages : on relit donc les valeurs courantes
+ * avant de n'y remplacer que le fond. Un client distant n'écrit rien.
+ */
+async function persistBasemap(key) {
+  if (latestStatus?.remote_client) return;
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) return;
+    const values = await response.json();
+    await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, map_basemap: key }),
+    });
+  } catch (error) {
+    // Le fond reste appliqué à l'écran même si l'enregistrement échoue.
+  }
+}
+
 async function loadMapPreferences(status = latestStatus) {
   if (status?.remote_client) {
     applyMapPreferences(status);
@@ -2353,6 +3185,11 @@ $("map-zoom-in").addEventListener("click", () => MAP.zoomIn());
 $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
+$("map-basemap-style").addEventListener("change", (event) => {
+  const applied = MAP.setBasemap(event.target.value);
+  $("settings-basemap").value = applied;
+  persistBasemap(applied);
+});
 $("map-sia").addEventListener("click", () => toggleSiaMapOverlay());
 $("sia-overlay-close").addEventListener("click", () => toggleSiaMapOverlay(false));
 $("sia-opacity").addEventListener("input", (event) => {
@@ -2367,6 +3204,19 @@ $("settings-form").addEventListener("submit", saveSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
 });
+$("settings-trail-color").addEventListener("input", (event) => {
+  setTrailColorField(event.target.value);
+});
+$("welcome-form").addEventListener("submit", submitWelcome);
+$("welcome-demo").addEventListener("click", skipWelcomeWithDemo);
+// Le premier lancement ne se contourne ni par Échap ni par un clic extérieur.
+$("welcome-dialog").addEventListener("cancel", (event) => event.preventDefault());
+$("welcome-language").addEventListener("change", (event) => {
+  window.I18N.setLanguage(event.target.value);
+});
+for (const id of ["welcome-pilot-id", "welcome-username"]) {
+  $(id).addEventListener("input", refreshWelcomeSubmit);
+}
 $("settings-lan-enabled").addEventListener("change", (event) => {
   show($("settings-lan-access"), event.target.checked);
 });
@@ -2404,6 +3254,10 @@ async function initialiseApplication() {
     $("demo-toggle").checked = false;
     const status = await loadStatus();
     await loadMapPreferences(status);
+    if (needsOnboarding(status)) {
+      openWelcome(status);
+      return;
+    }
     if (!status.remote_client) checkForUpdates();
     if (status.simbrief_configured) await buildPlan();
   } catch (error) {

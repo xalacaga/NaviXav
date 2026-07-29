@@ -67,6 +67,37 @@ L’onglet **Suivi du vol** exploite la position MSFS en temps réel pour affich
 - le Top of Descent et un taux de descente indicatif sur une pente de 3° ;
 - l’écart par rapport au profil vertical prévu.
 
+#### Configuration avion
+
+Le bloc **Configuration avion** lit directement dans MSFS l’état du train, des
+volets, des aérofreins, du frein de parc et des sept feux extérieurs, ainsi que
+le calage altimétrique, les modes du pilote automatique, l’altitude
+sélectionnée, le carburant à bord et le vent réel. Les unités sont demandées au
+simulateur, jamais recalculées.
+
+#### Alarmes visuelles
+
+NaviXav surveille cette configuration et signale les oublis : train non sorti
+en approche, volets ou aérofreins non configurés, strobes ou landing lights
+éteints, frein de parc resté serré, calage QNH ou STD non effectué au
+franchissement de l’altitude de transition, altitude sélectionnée au-delà de la
+prochaine contrainte, fréquence ILS différente de celle prévue, antigivrage
+coupé en conditions givrantes, carburant sous la réserve finale.
+
+Trois précautions évitent les fausses alarmes :
+
+- les règles qui dépendent du train rentrant, des volets ou des aérofreins ne
+  sont évaluées que si le simulateur confirme que l’avion en possède ;
+- une condition doit tenir quelques secondes avant de lever une alarme, ce qui
+  supprime les clignotements au franchissement d’un seuil ;
+- les alarmes sont suspendues pendant un rejeu et lorsque le simulateur tourne
+  en vitesse accélérée.
+
+Chaque alarme s’acquitte d’un clic et se réarme au changement de phase. Une
+pastille `MASTER CAUTION` ou `MASTER WARNING` résume la situation, et
+l’ensemble peut être désactivé depuis le panneau. Le clignotement, réservé aux
+alarmes critiques, disparaît si le système demande des animations réduites.
+
 La trace du vol est enregistrée localement toutes les cinq secondes. Elle peut
 être mise en pause, effacée ou rejouée depuis l’interface. Aucun historique
 n’est envoyé vers un service externe.
@@ -114,7 +145,9 @@ La carte comprend :
 - le zoom, le déplacement et l’ajustement au terrain ou à la route ;
 - la trace complète réellement parcourue, conservée du départ à l’arrivée ;
 - une couleur de trace personnalisable ;
-- le choix entre OpenStreetMap Standard et OpenTopoMap.
+- le choix entre OpenStreetMap Standard, OpenTopoMap, CartoDB Positron (clair)
+  et CartoDB Dark Matter (sombre, cockpit), directement depuis la barre de la
+  carte ou depuis les paramètres.
 
 ### Cartes AIS nationales officielles
 
@@ -314,14 +347,17 @@ Dans la version installée, les valeurs sont conservées dans
 8. Consulter les contraintes et la carte officielle.
 9. Valider les minima avant de les recopier dans le MCDU.
 
-Le bouton **Compléter le plan** permet de récupérer à nouveau le dernier OFP
+Le bouton **Importation du plan** permet de récupérer à nouveau le dernier OFP
 après avoir généré ou modifié un vol dans SimBrief.
 
 ## Utilisation de la carte
 
-- **Fond carte** : affiche ou masque le fond libre choisi dans les paramètres.
-- **Paramètres** : choisit OpenStreetMap Standard ou OpenTopoMap et la couleur
-  de la trace complète du vol.
+- **Fond carte** : affiche ou masque le fond libre sélectionné.
+- **Sélecteur de fond** : bascule directement sur la carte entre OpenStreetMap
+  Standard, OpenTopoMap, CartoDB Positron (clair) et CartoDB Dark Matter
+  (sombre, cockpit). Le choix est enregistré dans les paramètres.
+- **Paramètres** : reprend le même choix de fond et la couleur de la trace
+  complète du vol.
 - **Calque officiel** : apparaît uniquement pour la fiche géoréférencée de
   l’aérodrome actuellement affiché et règle son opacité.
 - **Route complète** : cadre toute la route du vol.

@@ -96,3 +96,52 @@ def test_fix_position(provider):
     latitude, longitude = position
     assert 43 < latitude < 44
     assert 2 < longitude < 4
+
+
+# --------------------------------------------------------------------------- #
+# Repères de seuil de piste
+#
+# « RW18L » n'est pas un point de report mondial : c'est le seuil de la piste
+# 18L du terrain qui publie la procédure. Une recherche de waypoint plaçait la
+# 18L de Madrid à Antalya, et un rattachement approximatif la plaçait à
+# Toulouse dès qu'un autre terrain possédait une piste homonyme.
+# --------------------------------------------------------------------------- #
+
+
+def test_runway_fix_resolves_to_its_own_airport(provider):
+    for icao in ("LFST", "LFBO"):
+        runways = {r.name: (r.lat, r.lon) for r in provider.runways(icao)}
+        for name, expected in runways.items():
+            assert provider.fix_position(f"RW{name}", icao) == expected
+
+
+def test_runway_fix_never_borrows_another_airport(provider):
+    madrid_like = {r.name for r in provider.runways("LFBO")}
+    strasbourg = {r.name for r in provider.runways("LFST")}
+    shared = madrid_like & strasbourg
+    for name in shared:
+        toulouse = provider.fix_position(f"RW{name}", "LFBO")
+        entzheim = provider.fix_position(f"RW{name}", "LFST")
+        assert toulouse != entzheim
+
+
+def test_ambiguous_runway_fix_is_refused_without_an_airport(provider):
+    """Sans terrain fourni, mieux vaut aucune position qu'une position fausse."""
+    counts: dict[str, set[str]] = {}
+    for icao in ("LFST", "LFBO", "LFPO"):
+        for runway in provider.runways(icao):
+            counts.setdefault(runway.name, set()).add(icao)
+    ambiguous = [name for name, airports in counts.items() if len(airports) > 1]
+    for name in ambiguous:
+        assert provider.fix_position(f"RW{name}") is None
+
+
+def test_runway_fix_is_never_looked_up_as_a_waypoint(provider):
+    """Le repère de seuil ne doit jamais atteindre la table des waypoints."""
+    stored = {
+        row[0]
+        for row in provider._conn.execute(  # noqa: SLF001 - vérification du cache
+            "SELECT ident FROM waypoint WHERE ident GLOB 'RW[0-9]*'"
+        )
+    }
+    assert not stored

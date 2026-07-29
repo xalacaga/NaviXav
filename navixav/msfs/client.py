@@ -61,9 +61,28 @@ EXCEPTION_NAMES = {
     19: "INVALID_DATA_SIZE", 20: "DATA_ERROR", 21: "INVALID_ARRAY",
 }
 
+# Un refus du simulateur arrive avant les blocs déjà émis pour la même
+# requête : on laisse ce court sursis pour les récupérer, puis on abandonne.
+# Attendre la fin du délai complet figerait l'application pendant vingt
+# secondes à chaque identifiant inconnu.
+EXCEPTION_GRACE_S = 0.25
+
 
 class SimConnectError(RuntimeError):
     """Le simulateur est absent, ou refuse la définition demandée."""
+
+
+class SimConnectRefused(SimConnectError):
+    """Le simulateur a répondu, en refusant la demande.
+
+    À distinguer d'une absence de réponse : un refus renseigne sur la donnée
+    demandée et arrive immédiatement, alors qu'un silence n'est constaté qu'au
+    bout du délai d'attente.
+    """
+
+    def __init__(self, message: str, codes: Sequence[int] = ()) -> None:
+        super().__init__(message)
+        self.codes = tuple(codes)
 
 
 class _RECV(ct.Structure):
@@ -169,6 +188,9 @@ class SimConnectClient:
         self._dll = self._load(dll_path)
         self._handle = ct.c_void_p()
         self._next_id = 1
+        # Une définition de données est réutilisable : la déclarer à chaque
+        # lecture les accumulerait côté simulateur pour toute la connexion.
+        self._simvar_definitions: dict[tuple[tuple[str, str], ...], int] = {}
         if self._dll.SimConnect_Open(
             ct.byref(self._handle), b"NaviXav", None, 0, None, 0
         ) != 0:
@@ -253,7 +275,9 @@ class SimConnectClient:
                 return blocks
             elif recv.dwID == RECV_ID_EXCEPTION:
                 exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
-                exceptions.append(exception.dwException)
+                if exception.dwException not in exceptions:
+                    exceptions.append(exception.dwException)
+                deadline = min(deadline, time.monotonic() + EXCEPTION_GRACE_S)
             elif recv.dwID == RECV_ID_QUIT:
                 raise SimConnectError("Le simulateur s'est fermé.")
 
@@ -261,7 +285,9 @@ class SimConnectClient:
             names = ", ".join(
                 EXCEPTION_NAMES.get(code, str(code)) for code in exceptions
             )
-            raise SimConnectError(f"SimConnect a refusé la définition ({names}).")
+            raise SimConnectRefused(
+                f"SimConnect a refusé la définition ({names}).", exceptions
+            )
         raise SimConnectError(
             f"Aucune réponse pour {icao.upper()} après {timeout_s:.0f} s. "
             "L'aéroport est peut-être hors de la zone chargée par le simulateur."
@@ -278,27 +304,23 @@ class SimConnectClient:
 
         Toutes les valeurs sont demandées en FLOAT64 ; un booléen revient donc
         en 0.0 ou 1.0.
+
+        La définition est mise en cache et réutilisée : le suivi temps réel
+        appelle cette méthode plusieurs fois par seconde pendant des heures.
         """
         if not variables:
             return {}
 
+        definition_id = self._definition_for(variables)
         self._next_id += 1
         request_id = self._next_id
 
-        for name, unit in variables:
-            result = self._dll.SimConnect_AddToDataDefinition(
-                self._handle, request_id, name.encode(), unit.encode(),
-                DATATYPE_FLOAT64, 0.0, SIMCONNECT_UNUSED,
-            )
-            if result != 0:
-                raise SimConnectError(
-                    f"Impossible de déclarer la variable {name} ({unit})."
-                )
         result = self._dll.SimConnect_RequestDataOnSimObject(
-            self._handle, request_id, request_id, OBJECT_ID_USER,
+            self._handle, request_id, definition_id, OBJECT_ID_USER,
             PERIOD_ONCE, 0, 0, 0, 0,
         )
         if result != 0:
+            self._forget_definition(variables)
             raise SimConnectError("Impossible de demander les données de vol.")
 
         expected = len(variables) * 8
@@ -328,21 +350,56 @@ class SimConnectClient:
                 return {name: value for (name, _unit), value in zip(variables, values)}
             if recv.dwID == RECV_ID_EXCEPTION:
                 exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
-                exceptions.append(exception.dwException)
+                if exception.dwException not in exceptions:
+                    exceptions.append(exception.dwException)
+                deadline = min(deadline, time.monotonic() + EXCEPTION_GRACE_S)
             elif recv.dwID == RECV_ID_QUIT:
                 raise SimConnectError("Le simulateur s'est fermé.")
 
         if exceptions:
+            # Une variable refusée rend la définition inutilisable : l'oublier
+            # permet à l'appelant de retenter avec un jeu réduit.
+            self._forget_definition(variables)
             names = ", ".join(
                 EXCEPTION_NAMES.get(code, str(code)) for code in exceptions
             )
-            raise SimConnectError(f"SimConnect a refusé la demande ({names}).")
+            raise SimConnectRefused(
+                f"SimConnect a refusé la demande ({names}).", exceptions
+            )
         raise SimConnectError("Aucune donnée de vol reçue du simulateur.")
+
+    def _definition_for(self, variables: Sequence[tuple[str, str]]) -> int:
+        """Renvoie l'identifiant de définition de ce jeu de variables."""
+        key = tuple(variables)
+        existing = self._simvar_definitions.get(key)
+        if existing is not None:
+            return existing
+
+        self._next_id += 1
+        definition_id = self._next_id
+        for name, unit in variables:
+            result = self._dll.SimConnect_AddToDataDefinition(
+                self._handle, definition_id, name.encode(), unit.encode(),
+                DATATYPE_FLOAT64, 0.0, SIMCONNECT_UNUSED,
+            )
+            if result != 0:
+                self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+                raise SimConnectError(
+                    f"Impossible de déclarer la variable {name} ({unit})."
+                )
+        self._simvar_definitions[key] = definition_id
+        return definition_id
+
+    def _forget_definition(self, variables: Sequence[tuple[str, str]]) -> None:
+        definition_id = self._simvar_definitions.pop(tuple(variables), None)
+        if definition_id is not None:
+            self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
 
     def close(self) -> None:
         if self._handle:
             self._dll.SimConnect_Close(self._handle)
             self._handle = ct.c_void_p()
+        self._simvar_definitions.clear()
 
     def __enter__(self) -> "SimConnectClient":
         return self
@@ -386,6 +443,7 @@ def _declare(dll) -> None:
         ("SimConnect_RequestDataOnSimObject",
          [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
           ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_ClearDataDefinition", [ct.c_void_p, ct.c_ulong]),
         ("SimConnect_Close", [ct.c_void_p]),
     ]
     for name, argtypes in signatures:

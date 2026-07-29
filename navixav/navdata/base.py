@@ -205,7 +205,15 @@ class NavdataProvider(Protocol):
 
     def is_airway(self, name: str) -> bool: ...
 
-    def fix_position(self, ident: str) -> tuple[float, float] | None: ...
+    def fix_position(
+        self, ident: str, icao: str | None = None
+    ) -> tuple[float, float] | None:
+        """Position d'un repère.
+
+        `icao` rattache la recherche à un aérodrome ; il est indispensable pour
+        les repères de seuil de piste, homonymes d'un terrain à l'autre.
+        """
+        ...
 
     def close(self) -> None: ...
 

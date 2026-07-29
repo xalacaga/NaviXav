@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -27,6 +28,9 @@ from navixav.navdata.base import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+# Repère synthétique désignant un seuil de piste : « RW18L », « RW05 ».
+_RUNWAY_FIX_RE = re.compile(r"^RW(\d{1,2}[LRC]?)$")
 
 
 class MsfsProvider:
@@ -374,9 +378,25 @@ class MsfsProvider:
         ).fetchone()
         return row is not None
 
-    def fix_position(self, ident: str) -> tuple[float, float] | None:
-        """Position d'un repère, récupérée au simulateur si nécessaire."""
+    def fix_position(
+        self, ident: str, icao: str | None = None
+    ) -> tuple[float, float] | None:
+        """Position d'un repère, récupérée au simulateur si nécessaire.
+
+        `icao` désigne l'aérodrome dont on lit une procédure. Il lève
+        l'ambiguïté des repères de seuil, qui portent le même nom sur des
+        terrains différents.
+        """
         key = ident.strip().upper()
+
+        # « RW18L » désigne le seuil de piste de la procédure qui le cite, pas
+        # un point de report. Le chercher comme un waypoint mondial ramène la
+        # première piste homonyme trouvée ailleurs sur la planète : la 18L de
+        # Madrid se retrouvait positionnée à Antalya.
+        threshold = _RUNWAY_FIX_RE.match(key)
+        if threshold:
+            return self._runway_threshold(key, threshold.group(1), icao)
+
         row = self._conn.execute(
             "SELECT lat, lon FROM waypoint WHERE ident = ? LIMIT 1", (key,)
         ).fetchone()
@@ -388,18 +408,54 @@ class MsfsProvider:
                 try:
                     found = extract_waypoint(self._client_or_open(), key, region)
                 except (NavdataError, SimConnectError):
-                    found = None
-                    break
+                    # Simulateur absent ou muet : rien n'est prouvé sur ce
+                    # repère. Le marquer introuvable le condamnerait dans la
+                    # base, même une fois MSFS relancé.
+                    return None
                 if found is not None:
                     msfs_store.store_waypoint(self._conn, found)
                     return (found["lat"], found["lon"])
             msfs_store.store_miss(self._conn, key, "waypoint")
+        return None
 
-        # Repli : un seuil de piste peut porter cet identifiant.
-        row = self._conn.execute(
-            "SELECT lat, lon FROM runway WHERE name = ? LIMIT 1", (key,)
-        ).fetchone()
-        return (row["lat"], row["lon"]) if row else None
+    def _runway_threshold(
+        self, fix_ident: str, runway_name: str, icao: str | None
+    ) -> tuple[float, float] | None:
+        """Seuil de la piste désignée, sur le terrain qui publie ce repère.
+
+        Sans aérodrome fourni, on ne retient une position que si un seul
+        terrain de la base cite ce repère. Deux aérodromes possédant une piste
+        du même nom rendraient le choix arbitraire : mieux vaut ne rien
+        afficher qu'un seuil situé à l'autre bout de l'Europe.
+        """
+        runway = normalise_runway(runway_name)
+
+        if icao:
+            row = self._conn.execute(
+                "SELECT lat, lon FROM runway WHERE icao = ? AND name = ?",
+                (icao.strip().upper(), runway),
+            ).fetchone()
+            return (row["lat"], row["lon"]) if row else None
+
+        candidates = self._conn.execute(
+            """
+            SELECT DISTINCT r.icao, r.lat, r.lon
+            FROM leg l
+            JOIN procedure p ON p.id = l.procedure_id
+            JOIN runway r ON r.icao = p.icao AND r.name = ?
+            WHERE l.fix_ident = ?
+            LIMIT 2
+            """,
+            (runway, fix_ident),
+        ).fetchall()
+        if len(candidates) == 1:
+            return (candidates[0]["lat"], candidates[0]["lon"])
+        if len(candidates) > 1:
+            LOGGER.debug(
+                "Repère de seuil %s ambigu entre plusieurs terrains : ignoré",
+                fix_ident,
+            )
+        return None
 
     def _missed(self, ident: str, kind: str) -> bool:
         row = self._conn.execute(

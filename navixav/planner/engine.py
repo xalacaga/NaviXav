@@ -154,8 +154,47 @@ class CompletionEngine:
 
         plan.departure = self._build_departure(ofp, overrides)
         plan.arrival = self._build_arrival(ofp, overrides)
+        self._anchor_route_on_runways(plan)
         plan.warnings = self._warnings
         return plan
+
+    def _anchor_route_on_runways(self, plan: FlightPlan) -> None:
+        """Ancre les extrémités du tracé sur les seuils de piste retenus.
+
+        Le tracé part du point de référence de l'aérodrome tant que la piste
+        n'est pas choisie ; une fois départ et arrivée résolus, le premier et
+        le dernier point sont ramenés sur le seuil réellement utilisé.
+        """
+        path = plan.enroute.route_path if plan.enroute else []
+        if not path:
+            return
+
+        departure = plan.departure
+        if departure is not None and path[0].get("ident") == departure.icao:
+            threshold = self._runway_threshold(departure.icao, departure.runway)
+            if threshold is not None:
+                path[0]["lat"], path[0]["lon"] = threshold
+                path[0]["runway"] = departure.runway.choice.value
+
+        arrival = plan.arrival
+        if arrival is not None and path[-1].get("ident") == arrival.icao:
+            threshold = self._runway_threshold(arrival.icao, arrival.runway)
+            if threshold is not None:
+                path[-1]["lat"], path[-1]["lon"] = threshold
+                path[-1]["runway"] = arrival.runway.choice.value
+
+    def _runway_threshold(
+        self, icao: str, choice: RunwayChoice | None
+    ) -> tuple[float, float] | None:
+        """Position du seuil de la piste retenue, ou None si indéterminable."""
+        name = choice.choice.value if choice is not None else None
+        if not name:
+            return None
+        wanted = normalise_runway(name)
+        for runway in self.provider.runways(icao):
+            if normalise_runway(runway.name) == wanted:
+                return (runway.lat, runway.lon)
+        return None
 
     # ------------------------------------------------------------------ #
     # Départ
@@ -216,7 +255,7 @@ class CompletionEngine:
                 selected,
                 block.sid_transition.value,
                 transition_first=False,
-                position_lookup=self.provider.fix_position,
+                position_lookup=self._airport_lookup(icao),
             )
         return block
 
@@ -257,7 +296,7 @@ class CompletionEngine:
             if picked is not None:
                 return self._departure_choice_from(
                     picked, target_fix, forced_transition, "simbrief",
-                    Confidence.HIGH, "SID filée par SimBrief et validée en base",
+                    Confidence.HIGH, "SID donnée par SimBrief et validée en base",
                 )
             if _find_by_ident(sids, simbrief_name) is not None:
                 self._warn(
@@ -397,7 +436,7 @@ class CompletionEngine:
                     selected_star,
                     block.star_transition.value,
                     transition_first=True,
-                    position_lookup=self.provider.fix_position,
+                    position_lookup=self._airport_lookup(icao),
                 )
         else:
             self._warn(f"Aucune STAR publiée pour {icao} dans la base.")
@@ -433,7 +472,7 @@ class CompletionEngine:
                     selected_approach,
                     block.approach_transition.value,
                     transition_first=True,
-                    position_lookup=self.provider.fix_position,
+                    position_lookup=self._airport_lookup(icao),
                 )
                 block.missed_approach_altitude_ft = (
                     selected_approach.missed_approach_altitude_ft
@@ -542,7 +581,7 @@ class CompletionEngine:
                 picked = match
                 confidence = Confidence.HIGH
                 source = "simbrief"
-                reason = "STAR filée par SimBrief et validée en base"
+                reason = "STAR donnée par SimBrief et validée en base"
             elif _find_by_ident(stars, simbrief_name) is not None:
                 self._warn(
                     f"La STAR SimBrief « {simbrief_name} » n'est pas publiée "
@@ -975,6 +1014,22 @@ class CompletionEngine:
                     f"navdata locale {db_cycle}. Une procédure peut avoir changé "
                     "de nom ou disparu."
                 )
+
+    def _airport_lookup(self, icao: str):
+        """Recherche de position rattachée à un aérodrome.
+
+        Les repères de seuil de piste (« RW18L ») portent le même nom sur des
+        terrains différents : sans ce rattachement, le tracé d'une procédure de
+        Madrid pourrait emprunter le seuil homonyme de Toulouse.
+        """
+        def lookup(ident: str) -> tuple[float, float] | None:
+            try:
+                return self.provider.fix_position(ident, icao)
+            except TypeError:
+                # Fournisseur ne connaissant pas le rattachement par aérodrome.
+                return self.provider.fix_position(ident)
+
+        return lookup
 
     def _warn(self, message: str) -> None:
         if message not in self._warnings:

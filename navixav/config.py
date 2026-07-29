@@ -25,7 +25,7 @@ DEFAULT_APPROACH_PREFERENCE = (
 )
 DEFAULT_MAP_BASEMAP = "osm"
 DEFAULT_MAP_TRAIL_COLOR = "#22d3ee"
-MAP_BASEMAPS = {"osm", "opentopo"}
+MAP_BASEMAPS = {"osm", "opentopo", "carto_light", "carto_dark"}
 
 USER_SETTINGS_FILE = user_data_path("user_settings.json")
 

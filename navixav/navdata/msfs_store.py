@@ -10,6 +10,7 @@ base reste ensuite consultable simulateur fermé.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import sqlite3
 from datetime import datetime, timezone
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from navixav.paths import user_data_path
+
+LOGGER = logging.getLogger(__name__)
 
 DEFAULT_STORE = user_data_path("navixav.sqlite")
 SCHEMA_VERSION = 1
@@ -193,12 +196,34 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(SCHEMA)
+    _purge_runway_pseudo_fixes(connection)
     connection.execute(
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
         (str(SCHEMA_VERSION),),
     )
     connection.commit()
     return connection
+
+
+def _purge_runway_pseudo_fixes(connection: sqlite3.Connection) -> None:
+    """Supprime les seuils de piste enregistrés comme points de report.
+
+    Une version antérieure résolvait « RW18L » par une recherche mondiale de
+    waypoint : la 18L de Madrid pouvait ainsi hériter des coordonnées d'une
+    piste homonyme à l'autre bout du monde. Ces positions sont désormais
+    calculées depuis la table des pistes ; les entrées polluées doivent
+    disparaître des bases déjà constituées.
+    """
+    removed = connection.execute(
+        "DELETE FROM waypoint WHERE ident GLOB 'RW[0-9]*'"
+    ).rowcount
+    connection.execute("DELETE FROM lookup_miss WHERE ident GLOB 'RW[0-9]*'")
+    connection.execute("DELETE FROM airway_segment WHERE from_ident GLOB 'RW[0-9]*'")
+    if removed:
+        LOGGER.info(
+            "Base NaviXav : %d seuil(s) de piste mal positionné(s) supprimé(s)",
+            removed,
+        )
 
 
 def store_airport(connection: sqlite3.Connection, extracted: dict[str, Any]) -> None:

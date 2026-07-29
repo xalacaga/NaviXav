@@ -7,7 +7,13 @@ import pytest
 from navixav.live.base import AircraftState, PositionUnavailable
 from navixav.live.demo import DemoSource, _bearing
 from navixav.live.registry import LiveTracker
-from navixav.live.simconnect import SimConnectSource, _VARIABLES
+from navixav.live.simconnect import (
+    _CAPABILITY_VARIABLES,
+    _CONFIGURATION_VARIABLES,
+    _VARIABLES,
+    SimConnectSource,
+)
+from navixav.msfs.client import SimConnectClient, SimConnectError
 
 
 # --------------------------------------------------------------------------- #
@@ -42,33 +48,105 @@ def test_position_and_speed_units():
     assert units["VERTICAL SPEED"] == "Feet per minute"
 
 
+def test_configuration_variables_declare_their_units():
+    for name, unit in _CONFIGURATION_VARIABLES + _CAPABILITY_VARIABLES:
+        assert name and unit, f"unité manquante pour {name}"
+
+
+def test_configuration_units_avoid_local_conversions():
+    """Les unités affichées sont demandées au simulateur, jamais recalculées."""
+    units = dict(_CONFIGURATION_VARIABLES)
+    assert units["KOHLSMAN SETTING MB"] == "Millibars"
+    assert units["FUEL TOTAL QUANTITY WEIGHT"] == "Kilograms"
+    assert units["TOTAL WEIGHT"] == "Kilograms"
+    assert units["NAV ACTIVE FREQUENCY:1"] == "MHz"
+    assert units["TOTAL AIR TEMPERATURE"] == "Celsius"
+    assert units["AMBIENT WIND VELOCITY"] == "Knots"
+
+
+def test_position_block_stays_independent_of_configuration():
+    """La position ne doit pas dépendre de variables qu'un avion peut ignorer."""
+    position = {name for name, _unit in _VARIABLES}
+    optional = {name for name, _unit in _CONFIGURATION_VARIABLES}
+    assert not position & optional
+
+
 # --------------------------------------------------------------------------- #
 # Client SimConnect unique
 # --------------------------------------------------------------------------- #
 
 
+_POSITION_VALUES = {
+    "PLANE LATITUDE": 48.723,
+    "PLANE LONGITUDE": 2.379,
+    "PLANE ALTITUDE": 5100.0,
+    "PLANE ALT ABOVE GROUND": 4300.0,
+    "PLANE HEADING DEGREES TRUE": 371.5,
+    "PLANE HEADING DEGREES MAGNETIC": -2.0,
+    "GROUND VELOCITY": 185.0,
+    "AIRSPEED INDICATED": 172.0,
+    "VERTICAL SPEED": -700.0,
+    "SIM ON GROUND": 0.0,
+}
+
+
+class FakeClient:
+    """Client SimConnect factice, un bloc de variables à la fois.
+
+    `failing` liste les blocs qui doivent lever, pour vérifier que l'échec d'un
+    bloc secondaire ne fait pas tomber la position.
+    """
+
+    def __init__(self, failing: tuple[str, ...] = ()) -> None:
+        self.failing = failing
+        self.calls: list[int] = []
+
+    def read_simvars(self, variables, timeout_s: float = 3.0):
+        self.calls.append(len(variables))
+        if variables == _VARIABLES:
+            if "position" in self.failing:
+                raise SimConnectError("bloc position refusé")
+            return dict(_POSITION_VALUES)
+        if variables == _CONFIGURATION_VARIABLES:
+            if "configuration" in self.failing:
+                raise SimConnectError("variable inconnue de cet avion")
+            values = {name: 0.0 for name, _unit in _CONFIGURATION_VARIABLES}
+            values.update({
+                "GEAR HANDLE POSITION": 1.0,
+                "GEAR TOTAL PCT EXTENDED": 100.0,
+                "FLAPS HANDLE INDEX": 2.0,
+                "SPOILERS ARMED": 1.0,
+                "LIGHT LANDING": 1.0,
+                "LIGHT STROBE": 1.0,
+                "KOHLSMAN SETTING MB": 1013.25,
+                "INDICATED ALTITUDE": 5000.0,
+                "AUTOPILOT MASTER": 1.0,
+                "AUTOPILOT ALTITUDE LOCK VAR": 6000.0,
+                "AUTOPILOT HEADING LOCK DIR": 361.0,
+                "NAV ACTIVE FREQUENCY:1": 110.30,
+                "NAV LOCALIZER:1": -107.0,
+                "FUEL TOTAL QUANTITY WEIGHT": 4200.0,
+                "AMBIENT WIND DIRECTION": 400.0,
+                "SIMULATION RATE": 1.0,
+            })
+            return values
+        if variables == _CAPABILITY_VARIABLES:
+            if "capabilities" in self.failing:
+                raise SimConnectError("capacités indisponibles")
+            return {
+                "IS GEAR RETRACTABLE": 1.0,
+                "FLAPS AVAILABLE": 1.0,
+                "SPOILER AVAILABLE": 0.0,
+                "FLAPS NUM HANDLE POSITIONS": 5.0,
+            }
+        raise AssertionError(f"bloc de variables inattendu : {variables}")
+
+    def close(self):
+        pass
+
+
 def test_simconnect_source_maps_direct_values(monkeypatch):
     """La source temps réel passe par le client ctypes commun, sans conversion."""
-
-    class FakeClient:
-        def read_simvars(self, variables):
-            assert variables == _VARIABLES
-            return {
-                "PLANE LATITUDE": 48.723,
-                "PLANE LONGITUDE": 2.379,
-                "PLANE ALTITUDE": 5100.0,
-                "PLANE ALT ABOVE GROUND": 4300.0,
-                "PLANE HEADING DEGREES TRUE": 371.5,
-                "PLANE HEADING DEGREES MAGNETIC": -2.0,
-                "GROUND VELOCITY": 185.0,
-                "AIRSPEED INDICATED": 172.0,
-                "VERTICAL SPEED": -700.0,
-                "SIM ON GROUND": 0.0,
-            }
-
-        def close(self):
-            pass
-
     source = SimConnectSource()
     fake = FakeClient()
     monkeypatch.setattr(source, "_connect", lambda: fake)
@@ -86,6 +164,171 @@ def test_simconnect_source_maps_direct_values(monkeypatch):
     assert state.vertical_speed_fpm == -700.0
     assert not state.on_ground
     assert state.source == "SimConnect"
+
+
+# --------------------------------------------------------------------------- #
+# Configuration avion
+# --------------------------------------------------------------------------- #
+
+
+def test_configuration_is_read_and_normalised(monkeypatch):
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient())
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.gear_handle_down is True
+    assert configuration.gear_extended_pct == 100.0
+    assert configuration.flaps_handle_index == 2
+    assert configuration.spoilers_armed is True
+    assert configuration.lights["landing"] is True
+    assert configuration.lights["taxi"] is False
+    assert configuration.altimeter_hpa == 1013.25
+    assert configuration.selected_altitude_ft == 6000.0
+    assert configuration.nav1_frequency_mhz == pytest.approx(110.30)
+    assert configuration.fuel_total_kg == 4200.0
+    # Les caps sont ramenés dans [0, 360[ comme ceux de la position.
+    assert configuration.selected_heading_deg == 1.0
+    assert configuration.nav1_course_deg == 253.0
+    assert configuration.wind_direction_deg == 40.0
+
+
+def test_capabilities_describe_the_airframe(monkeypatch):
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient())
+
+    capabilities = source.read().configuration.capabilities
+
+    assert capabilities is not None
+    assert capabilities.retractable_gear is True
+    assert capabilities.flaps is True
+    assert capabilities.spoilers is False
+    assert capabilities.flap_positions == 5
+
+
+def test_capabilities_are_read_once_per_connection(monkeypatch):
+    """Inutile de redemander à chaque sondage ce qui ne change pas en vol."""
+    source = SimConnectSource()
+    fake = FakeClient()
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    source.read()
+    first = list(fake.calls)
+    source.read()
+
+    capability_calls = fake.calls.count(len(_CAPABILITY_VARIABLES))
+    assert capability_calls == 1
+    assert len(fake.calls) > len(first)
+
+
+def test_position_survives_a_refused_configuration_block(monkeypatch):
+    """Un avion qui n'expose pas tout ne doit pas couper le suivi de position."""
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient(failing=("configuration",)))
+
+    state = source.read()
+
+    assert state.latitude == 48.723
+    assert state.configuration is None
+
+
+def test_refused_configuration_block_is_put_to_sleep(monkeypatch):
+    """Le retenter à chaque sondage coûterait un délai d'attente complet."""
+    source = SimConnectSource()
+    fake = FakeClient(failing=("configuration",))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    source.read()
+    attempts_after_first = fake.calls.count(len(_CONFIGURATION_VARIABLES))
+    source.read()
+
+    assert fake.calls.count(len(_CONFIGURATION_VARIABLES)) == attempts_after_first == 1
+
+
+def test_configuration_survives_missing_capabilities(monkeypatch):
+    """Sans capacités, la configuration reste lisible : l'interface se taira."""
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient(failing=("capabilities",)))
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.capabilities is None
+
+
+def test_demo_reports_a_configuration():
+    """Le mode démo doit alimenter le panneau, sans déclencher d'alarme."""
+    source = DemoSource(start=(48.545, 7.632), end=(48.535, 7.615))
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.parking_brake is False
+    assert configuration.lights["beacon"] is True
+    assert configuration.simulation_rate == 1.0
+
+
+# --------------------------------------------------------------------------- #
+# Définitions SimConnect
+#
+# Le suivi appelle read_simvars plusieurs fois par seconde pendant des heures :
+# déclarer une définition à chaque lecture les accumulerait côté simulateur.
+# --------------------------------------------------------------------------- #
+
+
+class FakeDll:
+    def __init__(self) -> None:
+        self.added: list[tuple[int, bytes]] = []
+        self.cleared: list[int] = []
+
+    def SimConnect_AddToDataDefinition(self, _handle, definition_id, name, *_rest):
+        self.added.append((definition_id, name))
+        return 0
+
+    def SimConnect_ClearDataDefinition(self, _handle, definition_id):
+        self.cleared.append(definition_id)
+        return 0
+
+
+def _client_with_fake_dll() -> tuple[SimConnectClient, FakeDll]:
+    """Un client sans simulateur : seule la gestion des définitions est testée."""
+    client = object.__new__(SimConnectClient)
+    dll = FakeDll()
+    client._dll = dll
+    client._handle = None
+    client._next_id = 1
+    client._simvar_definitions = {}
+    return client, dll
+
+
+def test_definition_is_declared_once_and_reused():
+    client, dll = _client_with_fake_dll()
+
+    first = client._definition_for(_VARIABLES)
+    second = client._definition_for(_VARIABLES)
+
+    assert first == second
+    assert len(dll.added) == len(_VARIABLES)
+
+
+def test_distinct_blocks_get_distinct_definitions():
+    client, _dll = _client_with_fake_dll()
+
+    position = client._definition_for(_VARIABLES)
+    configuration = client._definition_for(_CONFIGURATION_VARIABLES)
+
+    assert position != configuration
+
+
+def test_forgetting_a_definition_releases_it():
+    """Une variable refusée rend la définition inutilisable : il faut la rendre."""
+    client, dll = _client_with_fake_dll()
+    definition = client._definition_for(_VARIABLES)
+
+    client._forget_definition(_VARIABLES)
+
+    assert dll.cleared == [definition]
+    assert client._definition_for(_VARIABLES) != definition
 
 
 # --------------------------------------------------------------------------- #

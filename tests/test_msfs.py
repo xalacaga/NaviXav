@@ -6,12 +6,21 @@ portent sur le décodage et la reconstruction s'exécutent toujours.
 
 from __future__ import annotations
 
+import ctypes as ct
 import struct
+import time
 
 import pytest
 
+from navixav.msfs import client as client_module
 from navixav.msfs import fields as F
-from navixav.msfs.client import FacilityDefinition, SimConnectError, decode
+from navixav.msfs.client import (
+    FacilityDefinition,
+    SimConnectClient,
+    SimConnectError,
+    SimConnectRefused,
+    decode,
+)
 from navixav.navdata import msfs_store
 from navixav.navdata.base import ProcedureKind
 
@@ -66,6 +75,69 @@ def test_facility_types_cover_navaids():
     """Les blocs hors aéroport doivent être nommés, sinon ils sont ignorés."""
     for code in (F.TYPE_VOR, F.TYPE_WAYPOINT, F.TYPE_ROUTE):
         assert code in F.TYPE_NAMES
+
+
+# --------------------------------------------------------------------------- #
+# Refus du simulateur
+#
+# Un identifiant inconnu est refusé immédiatement : attendre la fin du délai
+# figeait la complétion d'un plan plusieurs dizaines de secondes.
+# --------------------------------------------------------------------------- #
+
+
+class _RefusingDll:
+    """Simulateur qui refuse toute demande, sans jamais rien envoyer d'autre."""
+
+    def __init__(self, code: int = 7) -> None:
+        self.record = client_module._RECV_EXCEPTION()
+        self.record.dwSize = ct.sizeof(self.record)
+        self.record.dwID = client_module.RECV_ID_EXCEPTION
+        self.record.dwException = code
+        self._view = ct.cast(ct.byref(self.record), ct.POINTER(client_module._RECV))
+
+    def __getattr__(self, _name):  # AddToFacilityDefinition, RequestFacilityData…
+        return lambda *_args: 0
+
+    def SimConnect_GetNextDispatch(self, _handle, pointer_ref, size_ref):
+        pointer_ref._obj.contents = self._view.contents
+        size_ref._obj.value = self.record.dwSize
+        return 0
+
+
+def _refused_client(code: int = 7) -> SimConnectClient:
+    client = object.__new__(SimConnectClient)
+    client._dll = _RefusingDll(code)
+    client._handle = None
+    client._next_id = 1
+    client._simvar_definitions = {}
+    return client
+
+
+def test_a_refused_facility_gives_up_without_waiting():
+    client = _refused_client()
+    definition = FacilityDefinition()
+    definition.open("WAYPOINT", F.TYPE_WAYPOINT, (F.f64("LATITUDE"),)).close_all()
+
+    started = time.monotonic()
+    with pytest.raises(SimConnectRefused, match="NAME_UNRECOGNIZED"):
+        client.request_raw(definition, "INCONNU", timeout_s=20.0)
+
+    assert time.monotonic() - started < 5.0
+
+
+def test_refused_simvars_give_up_without_waiting():
+    client = _refused_client(code=3)
+
+    started = time.monotonic()
+    with pytest.raises(SimConnectRefused):
+        client.read_simvars((("PLANE LATITUDE", "Degrees"),), timeout_s=20.0)
+
+    assert time.monotonic() - started < 5.0
+
+
+def test_a_refusal_is_distinguishable_from_a_silence():
+    """Un refus renseigne sur la donnée ; un silence ne prouve rien."""
+    assert issubclass(SimConnectRefused, SimConnectError)
 
 
 # --------------------------------------------------------------------------- #

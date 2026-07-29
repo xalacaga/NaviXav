@@ -98,7 +98,9 @@ class SettingsRequest(BaseModel):
     max_crosswind_kt: int = Field(default=35, ge=0, le=100)
     min_runway_length_ft: int = Field(default=0, ge=0, le=30000)
     aircraft_rnp_capable: bool = True
-    map_basemap: str = Field(default="osm", pattern="^(osm|opentopo)$")
+    map_basemap: str = Field(
+        default="osm", pattern="^(osm|opentopo|carto_light|carto_dark)$"
+    )
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
     lan_enabled: bool = False
 

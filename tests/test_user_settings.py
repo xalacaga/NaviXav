@@ -1,7 +1,12 @@
 import pytest
 from pydantic import ValidationError
 
-from navixav.config import Settings, load_user_settings, save_user_settings
+from navixav.config import (
+    MAP_BASEMAPS,
+    Settings,
+    load_user_settings,
+    save_user_settings,
+)
 from navixav.web.app import SettingsRequest
 
 
@@ -51,6 +56,17 @@ def test_settings_request_accepts_interface_values():
     assert request.min_runway_length_ft == 4500
     assert request.map_basemap == "opentopo"
     assert request.lan_enabled is True
+
+
+@pytest.mark.parametrize("basemap", sorted(MAP_BASEMAPS))
+def test_every_basemap_survives_both_validation_paths(basemap, tmp_path):
+    """Les fonds proposés dans l'interface doivent passer l'API et le disque."""
+    assert SettingsRequest(map_basemap=basemap).map_basemap == basemap
+
+    path = tmp_path / "settings.json"
+    save_user_settings(Settings().with_user_values({"map_basemap": basemap}), path)
+
+    assert load_user_settings(Settings(), path).map_basemap == basemap
 
 
 def test_settings_request_rejects_invalid_limits():

@@ -25,18 +25,41 @@ const MAP = (() => {
   const tileCache = new Map();
   const TILE_SIZE = 256;
   const MAX_TILE_CACHE = 320;
+  // Les tuiles CARTO sont réparties sur quatre sous-domaines pour paralléliser
+  // les téléchargements, comme le recommande leur documentation.
+  const cartoSubdomain = (x, y) => "abcd"[(Math.abs(x) + Math.abs(y)) % 4];
   const BASEMAPS = {
     osm: {
       url: (zoom, x, y) => `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`,
       maxZoom: 19,
+      alpha: 0.78,
       attribution: "© OpenStreetMap contributors",
       attributionUrl: "https://www.openstreetmap.org/copyright",
     },
     opentopo: {
       url: (zoom, x, y) => `https://a.tile.opentopomap.org/${zoom}/${x}/${y}.png`,
       maxZoom: 17,
+      alpha: 0.78,
       attribution: "© OpenStreetMap contributors · SRTM · OpenTopoMap",
       attributionUrl: "https://opentopomap.org/about",
+    },
+    carto_light: {
+      url: (zoom, x, y) =>
+        `https://${cartoSubdomain(x, y)}.basemaps.cartocdn.com/light_all/${zoom}/${x}/${y}.png`,
+      maxZoom: 19,
+      // Fond très clair et peu contrasté : il supporte une opacité plus forte
+      // sans masquer les pistes ni la route.
+      alpha: 0.9,
+      attribution: "© OpenStreetMap contributors © CARTO",
+      attributionUrl: "https://carto.com/attributions",
+    },
+    carto_dark: {
+      url: (zoom, x, y) =>
+        `https://${cartoSubdomain(x, y)}.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}.png`,
+      maxZoom: 19,
+      alpha: 0.92,
+      attribution: "© OpenStreetMap contributors © CARTO",
+      attributionUrl: "https://carto.com/attributions",
     },
   };
 
@@ -162,7 +185,7 @@ const MAP = (() => {
     const lastY = Math.min(tileCount - 1, Math.floor(centreTileY) + radiusY);
 
     context.save();
-    context.globalAlpha = 0.78;
+    context.globalAlpha = BASEMAPS[basemapKey].alpha ?? 0.78;
     for (let tileY = firstY; tileY <= lastY; tileY += 1) {
       for (let tileX = firstX; tileX <= lastX; tileX += 1) {
         const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
@@ -468,6 +491,26 @@ const MAP = (() => {
     attribution.href = source.attributionUrl;
   }
 
+  /** Aligne le sélecteur de la barre carte sur le fond réellement affiché. */
+  function syncBasemapSelect() {
+    const select = document.getElementById("map-basemap-style");
+    if (!select) return;
+    if (select.value !== basemapKey) select.value = basemapKey;
+    select.disabled = !basemapVisible;
+  }
+
+  /** Applique un fond connu ; renvoie la clé retenue (repli sur OSM). */
+  function applyBasemap(key) {
+    const nextBasemap = BASEMAPS[key] ? key : "osm";
+    if (nextBasemap !== basemapKey) {
+      basemapKey = nextBasemap;
+      tileCache.clear();
+    }
+    syncBasemapAttribution();
+    syncBasemapSelect();
+    return basemapKey;
+  }
+
   /* --------------------------------------------------------------- public */
 
   return {
@@ -495,16 +538,11 @@ const MAP = (() => {
       draw();
     },
     configure(options = {}) {
-      const nextBasemap = BASEMAPS[options.basemap] ? options.basemap : "osm";
       const nextColor = /^#[0-9a-f]{6}$/i.test(options.trailColor || "")
         ? options.trailColor
         : "#22d3ee";
-      if (nextBasemap !== basemapKey) {
-        basemapKey = nextBasemap;
-        tileCache.clear();
-      }
+      applyBasemap(options.basemap);
       trailColor = nextColor;
-      syncBasemapAttribution();
       draw();
     },
     setRoute(points) {
@@ -560,8 +598,16 @@ const MAP = (() => {
         button.classList.toggle("active", basemapVisible);
         button.setAttribute("aria-pressed", String(basemapVisible));
       }
+      syncBasemapSelect();
       draw();
     },
+    /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
+    setBasemap(key) {
+      const applied = applyBasemap(key);
+      draw();
+      return applied;
+    },
+    get basemap() { return basemapKey; },
     get following() { return view.follow; },
     resize,
     hasChart: () => chart !== null,

@@ -224,6 +224,24 @@ main {
 .banner ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-dim); }
 .banner li { margin-bottom: 3px; }
 .banner strong { display: block; margin-bottom: 2px; }
+.banner-close {
+  flex: 0 0 auto;
+  margin: -4px -6px 0 auto;
+  padding: 0;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.banner-close:hover { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); }
+.banner-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ------------------------------------------------------------ route strip */
 
@@ -552,6 +570,21 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
 .icon-btn.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+
+/* Sélecteur de fond de carte, aligné sur la taille des boutons de la barre. */
+.map-basemap-style {
+  min-width: 0;
+  max-width: 220px;
+  padding: 8px 30px 8px 11px;
+  background-position: right 10px center;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+.map-basemap-style:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.map-basemap-style:disabled { opacity: 0.45; cursor: not-allowed; }
 .sim-status {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 12px; border-radius: 999px;
@@ -644,6 +677,70 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .settings-message.error { color: var(--low); }
 .settings-actions { justify-content: flex-end; margin-top: 10px; }
 @media (max-width: 620px) { .settings-grid { grid-template-columns: 1fr; } }
+
+/* Champ couleur : le pastille et la ligne d'aperçu portent la teinte réelle
+   de la trace. Sans règles dédiées, le remplissage du champ texte écrase
+   l'échantillon natif et l'aperçu reste gris. */
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.settings-grid .color-field input[type="color"] {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+.color-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+.color-field input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.color-field input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.trail-preview {
+  flex: 1 1 auto;
+  min-width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--trail-preview, #22d3ee);
+  box-shadow: 0 0 10px var(--trail-preview, #22d3ee);
+}
+.color-value {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+/* Premier lancement : langue et compte SimBrief sont demandés avant tout. */
+.welcome-dialog { max-width: 520px; }
+.welcome-dialog::backdrop { background: #020617e6; backdrop-filter: blur(4px); }
+.welcome-grid { display: grid; gap: 16px; margin: 22px 0 10px; }
+.welcome-grid select { width: 100%; box-sizing: border-box; }
+.welcome-grid input {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-raised); color: var(--text); font: inherit;
+}
+.welcome-simbrief {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.welcome-simbrief small { color: var(--text-dim); line-height: 1.45; font-size: 0.76rem; }
+.welcome-dialog .settings-actions { justify-content: space-between; }
+.welcome-dialog .btn-primary[disabled] { cursor: not-allowed; }
 
 .airport-btn {
   padding: 8px 15px;
@@ -853,6 +950,107 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   background: color-mix(in srgb, var(--low) 9%, var(--surface-raised));
 }
 .flight-live-stat[data-status="danger"] .stat-value { color: var(--low); }
+
+/* ------------------------------------------- configuration avion et alarmes */
+
+.flight-panel-pills {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.flight-alert-pill {
+  padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-raised);
+  color: var(--text-muted); font-weight: 700; font-size: 0.78rem;
+  white-space: nowrap;
+}
+.flight-alert-pill[data-severity="ok"] {
+  border-color: color-mix(in srgb, var(--high) 45%, var(--border));
+  color: var(--high);
+}
+.flight-alert-pill[data-severity="info"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.flight-alert-pill[data-severity="warning"] {
+  border-color: color-mix(in srgb, var(--medium) 60%, var(--border));
+  background: color-mix(in srgb, var(--medium) 12%, var(--surface-raised));
+  color: var(--medium);
+}
+.flight-alert-pill[data-severity="danger"] {
+  border-color: color-mix(in srgb, var(--low) 65%, var(--border));
+  background: color-mix(in srgb, var(--low) 14%, var(--surface-raised));
+  color: var(--low);
+  animation: alert-blink 1.4s ease-in-out infinite;
+}
+
+.flight-alerts { display: grid; gap: 8px; margin-top: 14px; }
+.flight-alerts:empty { display: none; }
+.flight-alert {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 14px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-raised); color: var(--text);
+  font: inherit;
+}
+.flight-alert-mark {
+  flex: none; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 0.8rem; font-weight: 800;
+  border: 1px solid currentColor;
+}
+.flight-alert-body { display: grid; gap: 2px; min-width: 0; }
+.flight-alert-label { font-weight: 700; font-size: 0.9rem; }
+.flight-alert-action { font-size: 0.78rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.flight-alert[data-severity="info"] { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.flight-alert[data-severity="info"] .flight-alert-mark { color: var(--accent); }
+.flight-alert[data-severity="warning"] {
+  border-color: color-mix(in srgb, var(--medium) 55%, var(--border));
+  background: color-mix(in srgb, var(--medium) 8%, var(--surface-raised));
+}
+.flight-alert[data-severity="warning"] .flight-alert-mark { color: var(--medium); }
+.flight-alert[data-severity="danger"] {
+  border-color: color-mix(in srgb, var(--low) 62%, var(--border));
+  background: color-mix(in srgb, var(--low) 11%, var(--surface-raised));
+}
+.flight-alert[data-severity="danger"] .flight-alert-mark {
+  color: var(--low);
+  animation: alert-blink 1.4s ease-in-out infinite;
+}
+.flight-alert-more { font-size: 0.78rem; color: var(--text-muted); padding-left: 4px; }
+
+@keyframes alert-blink {
+  50% { opacity: 0.35; }
+}
+
+.flight-config {
+  margin-top: 18px; padding: 18px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+}
+.flight-config-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+}
+.flight-config-head h2 { margin: 4px 0 0; }
+.flight-config-empty { margin: 14px 0 0; font-size: 0.84rem; color: var(--text-muted); }
+.flight-lights-block { margin-top: 14px; }
+.flight-lights { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.light-chip {
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-raised);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+/* La couleur ne porte jamais seule l'information : le fond, la bordure et
+   l'opacité distinguent aussi un feu allumé d'un feu éteint. */
+.light-chip[data-state="on"] {
+  border-color: color-mix(in srgb, var(--high) 55%, var(--border));
+  background: color-mix(in srgb, var(--high) 16%, var(--surface-raised));
+  color: var(--high);
+}
+.light-chip[data-state="off"] { opacity: 0.55; }
+.light-chip[data-state="unknown"] { opacity: 0.35; font-style: italic; }
+
 .flight-recorder {
   margin-top: 18px; padding: 18px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -1073,6 +1271,7 @@ pre {
   .row-value { overflow-wrap: anywhere; }
   .map-stage { height: clamp(320px, calc(100dvh - 260px), 580px); }
   .map-actions .icon-btn { flex: 1 1 auto; }
+  .map-basemap-style { flex: 1 1 100%; max-width: none; }
   .map-hud {
     top: 8px;
     left: 8px;
@@ -1169,4 +1368,7 @@ body.remote-client .toolbar {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+  /* Le clignotement des alarmes doit disparaître : la couleur, l'icône et le
+     texte suffisent à les distinguer. */
+  * { animation: none !important; }
 }

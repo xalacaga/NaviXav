@@ -48,7 +48,7 @@
     </button>
     <button id="refresh" class="btn-primary">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
-      <span>Compléter le plan</span>
+      <span>Importation du plan</span>
     </button>
   </div>
 </header>
@@ -94,6 +94,14 @@
         </span>
         <button id="map-basemap" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer le fond OpenStreetMap">Fond carte</button>
+        <select id="map-basemap-style" class="map-basemap-style"
+                aria-label="Fond de carte"
+                title="Choisir le fond de carte affiché">
+          <option value="osm">OpenStreetMap Standard</option>
+          <option value="opentopo">OpenTopoMap</option>
+          <option value="carto_light">CartoDB Positron · clair</option>
+          <option value="carto_dark">CartoDB Dark Matter · cockpit</option>
+        </select>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
@@ -172,7 +180,7 @@
           <option value="pl">Polski</option>
         </select>
       </label>
-      <label class="field">
+      <label class="field" for="settings-pilot-id">
         <span>SimBrief Pilot ID</span>
         <input id="settings-pilot-id" autocomplete="off" placeholder="ex. 123456" />
       </label>
@@ -208,11 +216,17 @@
         <select id="settings-basemap">
           <option value="osm">OpenStreetMap Standard</option>
           <option value="opentopo">OpenTopoMap</option>
+          <option value="carto_light">CartoDB Positron · clair</option>
+          <option value="carto_dark">CartoDB Dark Matter · cockpit</option>
         </select>
       </label>
       <label class="field" for="settings-trail-color">
         <span>Couleur de la trace du vol</span>
-        <input id="settings-trail-color" type="color" value="#22d3ee" />
+        <span class="color-field">
+          <input id="settings-trail-color" type="color" value="#22d3ee" />
+          <i class="trail-preview" aria-hidden="true"></i>
+          <output id="settings-trail-value" class="color-value" for="settings-trail-color">#22D3EE</output>
+        </span>
       </label>
       <label class="switch settings-switch">
         <input type="checkbox" id="settings-rnp" />
@@ -237,6 +251,48 @@
     <div class="settings-actions">
       <button type="button" id="settings-cancel" class="icon-btn">Annuler</button>
       <button type="submit" class="btn-primary">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="welcome-dialog" class="settings-dialog welcome-dialog">
+  <form id="welcome-form">
+    <div class="settings-head">
+      <div>
+        <h2 id="welcome-title">Bienvenue dans NaviXav</h2>
+        <p id="welcome-intro">Choisis la langue de l’interface puis renseigne ton compte SimBrief.</p>
+      </div>
+    </div>
+    <div class="welcome-grid">
+      <label class="field" for="welcome-language">
+        <span id="welcome-language-label">Langue de l’interface</span>
+        <select id="welcome-language">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+        </select>
+      </label>
+      <div id="welcome-simbrief" class="welcome-simbrief">
+        <label class="field" for="welcome-pilot-id">
+          <span id="welcome-pilot-label">SimBrief Pilot ID</span>
+          <input id="welcome-pilot-id" autocomplete="off" placeholder="ex. 123456" />
+        </label>
+        <label class="field" for="welcome-username">
+          <span id="welcome-username-label">SimBrief username</span>
+          <input id="welcome-username" autocomplete="off" placeholder="alternative au Pilot ID" />
+        </label>
+        <small id="welcome-simbrief-help">Renseigne au moins l’un des deux identifiants : NaviXav s’en sert pour récupérer ton dernier OFP.</small>
+      </div>
+    </div>
+    <p id="welcome-message" class="settings-message"></p>
+    <div class="settings-actions">
+      <button type="button" id="welcome-demo" class="icon-btn hidden">Continuer en mode démo</button>
+      <button type="submit" id="welcome-submit" class="btn-primary" disabled>Commencer</button>
     </div>
   </form>
 </dialog>

@@ -67,6 +67,37 @@ The **Flight tracking** tab uses the real-time MSFS position to display:
 - the Top of Descent and an indicative descent rate on a 3° path;
 - the deviation from the planned vertical profile.
 
+#### Aircraft configuration
+
+The **Aircraft configuration** block reads the landing gear, flaps,
+speedbrakes, parking brake and the seven exterior lights straight from MSFS,
+together with the altimeter setting, the autopilot modes, the selected
+altitude, the fuel on board and the actual wind. Units are requested from the
+simulator and never recomputed locally.
+
+#### Visual alerts
+
+NaviXav monitors that configuration and flags anything left out: gear not down
+on approach, flaps or speedbrakes not configured, strobes or landing lights
+off, parking brake still set, QNH or standard setting not selected when
+crossing the transition altitude, selected altitude above the next constraint,
+ILS frequency different from the planned one, anti-ice off in icing conditions,
+fuel below the final reserve.
+
+Three safeguards keep false alarms away:
+
+- rules that depend on retractable gear, flaps or speedbrakes are only
+  evaluated once the simulator confirms the aircraft has them;
+- a condition must hold for a few seconds before an alert is raised, which
+  removes the flicker when a threshold is crossed;
+- alerts are suspended during a replay and whenever the simulator runs at an
+  accelerated rate.
+
+Each alert is acknowledged with a click and re-arms on the next flight phase. A
+`MASTER CAUTION` or `MASTER WARNING` pill summarises the situation, and the
+whole system can be switched off from the panel. Blinking, reserved for
+critical alerts, is dropped when the system asks for reduced motion.
+
 The flight track is recorded locally every five seconds. It can be paused,
 cleared or replayed from the interface. No history is sent to any external
 service.
@@ -112,7 +143,9 @@ The map includes:
 - zoom, panning and fitting to the airport or the route;
 - the complete track actually flown from departure to arrival;
 - a customisable flight-track colour;
-- a choice between OpenStreetMap Standard and OpenTopoMap.
+- a choice between OpenStreetMap Standard, OpenTopoMap, CartoDB Positron
+  (light) and CartoDB Dark Matter (dark, cockpit), straight from the map bar or
+  from Settings.
 
 ### Official national AIS charts
 
@@ -314,9 +347,12 @@ generating or modifying a flight in SimBrief.
 
 ## Using the map
 
-- **Map background**: shows or hides the open-source map selected in Settings.
-- **Settings**: selects OpenStreetMap Standard or OpenTopoMap and the colour of
-  the complete flight track.
+- **Map background**: shows or hides the selected open-source map.
+- **Base-map picker**: switches straight from the map between OpenStreetMap
+  Standard, OpenTopoMap, CartoDB Positron (light) and CartoDB Dark Matter
+  (dark, cockpit). The choice is saved into the settings.
+- **Settings**: offers the same base-map choice and the colour of the complete
+  flight track.
 - **Official overlay**: appears only for the georeferenced chart of the
   aerodrome currently displayed, and adjusts its opacity.
 - **Full route**: frames the entire flight route.
