@@ -25,6 +25,9 @@ let simulatorTimer = null;
 let activeRoutePointIndex = null;
 let latestAircraft = null;
 let flightGeometry = [];
+let currentFlightTrail = [];
+let currentFlightTrailPlanKey = "";
+let lastCurrentFlightTrailAt = 0;
 let flightLog = [];
 let flightRecording = true;
 let lastFlightLogAt = 0;
@@ -43,6 +46,8 @@ let siaOverlayKey = null;
 
 const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
+const CURRENT_FLIGHT_TRAIL_INTERVAL_MS = 5000;
+const CURRENT_FLIGHT_TRAIL_MAX_POINTS = 3600;
 const FLIGHT_LOG_INTERVAL_MS = 5000;
 const FLIGHT_LOG_MAX_POINTS = 3600;
 const FLIGHT_LOG_INDEX_KEY = "navixav-flight-log-index";
@@ -1549,7 +1554,40 @@ function flightTrailPoints(points) {
 
 function syncMapTrail() {
   if (!currentChart) return;
-  MAP.setTrail(flightTrailPoints(flightLog));
+  MAP.setTrail(flightTrailPoints(currentFlightTrail));
+}
+
+/**
+ * Conserve uniquement en mémoire la trace du vol affiché.
+ *
+ * Cette liste n'est jamais écrite dans localStorage : elle disparaît à la
+ * fermeture de NaviXav et ne constitue ni un historique ni un rejeu.
+ */
+function recordCurrentFlightTrail(aircraft) {
+  if (!aircraft || !currentPlan) return;
+  const planKey = flightSummaryPlanKey(currentPlan);
+  if (planKey !== currentFlightTrailPlanKey) {
+    currentFlightTrail = [];
+    currentFlightTrailPlanKey = planKey;
+    lastCurrentFlightTrailAt = 0;
+  }
+
+  const now = Date.now();
+  if (now - lastCurrentFlightTrailAt < CURRENT_FLIGHT_TRAIL_INTERVAL_MS) return;
+  lastCurrentFlightTrailAt = now;
+  currentFlightTrail.push({
+    latitude: aircraft.latitude,
+    longitude: aircraft.longitude,
+    ground_speed_kt: aircraft.ground_speed_kt,
+    source: aircraft.source,
+    recorded_at: new Date(now).toISOString(),
+  });
+  if (currentFlightTrail.length > CURRENT_FLIGHT_TRAIL_MAX_POINTS) {
+    currentFlightTrail = currentFlightTrail.filter(
+      (_point, index) => index % 2 === 0 || index === currentFlightTrail.length - 1
+    );
+  }
+  syncMapTrail();
 }
 
 function recordFlightPoint(aircraft) {
@@ -2240,7 +2278,12 @@ function flapDetentLabels(aircraft, plan, positions) {
     identity.includes("AIRBUS")
     || /\bA(?:19|20|21|30|31|32|33|34|35|38)[A-Z0-9]*\b/.test(identity)
   );
-  if (isAirbus && positions === 5) return ["UP", "1", "2", "3", "FULL"];
+  // Les avions Airbus exposent souvent deux états SimConnect pour le même
+  // cran physique 1 : configuration 1 en vol et 1+F au sol. L'interface doit
+  // afficher la position de la manette, pas le sous-état aérodynamique.
+  if (isAirbus && positions >= 5) {
+    return ["UP", "1", "1", "2", "3", "FULL"];
+  }
 
   const isBoeing737 = (
     identity.includes("BOEING 737")
@@ -2283,8 +2326,14 @@ function describeFlaps(configuration, capabilities, aircraft, plan) {
   const steps = positions > 1 ? positions - 1 : 0;
   if (index === 0) return { text: t("cfg_flaps_up"), status: "" };
   const detents = flapDetentLabels(aircraft, plan, positions);
-  const detent = detents?.[Math.round(index)];
   const extended = finiteOr(configuration.flaps_extended_pct);
+  // Certains Airbus annoncent FULL sur le dernier index déclaré (4), d'autres
+  // sur un index supplémentaire (5). L'extension réelle lève l'ambiguïté.
+  const detent = (
+    detents && extended !== null && extended >= 98
+      ? "FULL"
+      : detents?.[Math.round(index)]
+  );
   return {
     text: detent || (
       extended !== null
@@ -4033,6 +4082,7 @@ function applyAircraftState(aircraft) {
   updateHud(aircraft);
   updateRouteStripProgress(aircraft);
   updateFlightPanel(aircraft);
+  recordCurrentFlightTrail(aircraft);
   updateFlightSummary(aircraft);
 }
 

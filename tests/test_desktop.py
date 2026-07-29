@@ -268,7 +268,8 @@ def test_flap_detents_adapt_to_known_aircraft_families():
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
     assert "function flapDetentLabels(aircraft, plan, positions)" in javascript
-    assert 'return ["UP", "1", "2", "3", "FULL"]' in javascript
+    assert 'return ["UP", "1", "1", "2", "3", "FULL"]' in javascript
+    assert 'extended >= 98' in javascript
     assert 'return ["UP", "1", "2", "5", "10", "15", "25", "30", "40"]' in javascript
     assert 'return ["UP", "1", "5", "10", "20", "25", "30"]' in javascript
     assert 'return ["UP", "1", "5", "15", "20", "25", "30"]' in javascript
@@ -305,6 +306,25 @@ def test_flight_summary_stores_no_detailed_track_or_replay_controls():
         javascript.index("function applyAircraftState"):
         javascript.index("async function pollLive")
     ]
+
+
+def test_current_flight_trace_is_memory_only_and_still_drawn_on_the_map():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    recorder = javascript[
+        javascript.index("function recordCurrentFlightTrail"):
+        javascript.index("function recordFlightPoint")
+    ]
+    aircraft_update = javascript[
+        javascript.index("function applyAircraftState"):
+        javascript.index("async function pollLive")
+    ]
+
+    assert "currentFlightTrail.push" in recorder
+    assert "localStorage" not in recorder
+    assert "MAP.setTrail(flightTrailPoints(currentFlightTrail))" in javascript
+    assert "recordCurrentFlightTrail(aircraft)" in aircraft_update
 
 
 def test_mcdu_omits_non_automatable_takeoff_performance_editor():
