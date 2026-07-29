@@ -2226,7 +2226,53 @@ function describeGear(configuration, capabilities) {
   return { text: t("cfg_gear_transit"), status: "warning" };
 }
 
-function describeFlaps(configuration, capabilities) {
+function flapDetentLabels(aircraft, plan, positions) {
+  const identity = [
+    aircraft?.title,
+    plan?.aircraft,
+    plan?.aircraft_name,
+  ].filter(Boolean).join(" ").toUpperCase();
+
+  // SimConnect expose un index et un nombre de positions, mais pas le nom
+  // inscrit à côté de chaque cran. Les profils connus ne sont appliqués que
+  // lorsque le nombre de positions déclaré par l'avion correspond.
+  const isAirbus = (
+    identity.includes("AIRBUS")
+    || /\bA(?:19|20|21|30|31|32|33|34|35|38)[A-Z0-9]*\b/.test(identity)
+  );
+  if (isAirbus && positions === 5) return ["UP", "1", "2", "3", "FULL"];
+
+  const isBoeing737 = (
+    identity.includes("BOEING 737")
+    || /\b(?:B73[3-9]|B3[789]M)\b/.test(identity)
+  );
+  if (isBoeing737 && positions === 9) {
+    return ["UP", "1", "2", "5", "10", "15", "25", "30", "40"];
+  }
+
+  const isBoeing747 = (
+    identity.includes("BOEING 747")
+    || /\bB74[1-8]\b/.test(identity)
+  );
+  if (isBoeing747 && positions === 7) {
+    return ["UP", "1", "5", "10", "20", "25", "30"];
+  }
+
+  const isOtherBoeingWidebody = (
+    identity.includes("BOEING 757")
+    || identity.includes("BOEING 767")
+    || identity.includes("BOEING 777")
+    || identity.includes("BOEING 787")
+    || /\bB(?:75[2-3]|76[2-4]|77[A-Z0-9]|78[A-Z0-9])\b/.test(identity)
+  );
+  if (isOtherBoeingWidebody && positions === 7) {
+    return ["UP", "1", "5", "15", "20", "25", "30"];
+  }
+
+  return null;
+}
+
+function describeFlaps(configuration, capabilities, aircraft, plan) {
   if (capabilities && !capabilities.flaps) {
     return { text: t("cfg_none"), status: "" };
   }
@@ -2236,8 +2282,15 @@ function describeFlaps(configuration, capabilities) {
   // MSFS compte la position lisse : quatre crans utiles sur cinq positions.
   const steps = positions > 1 ? positions - 1 : 0;
   if (index === 0) return { text: t("cfg_flaps_up"), status: "" };
+  const detents = flapDetentLabels(aircraft, plan, positions);
+  const detent = detents?.[Math.round(index)];
+  const extended = finiteOr(configuration.flaps_extended_pct);
   return {
-    text: steps ? `${index} / ${steps}` : String(index),
+    text: detent || (
+      extended !== null
+        ? `${Math.round(extended)} %`
+        : (steps ? `${index} / ${steps}` : String(index))
+    ),
     status: "good",
   };
 }
@@ -2352,7 +2405,10 @@ function updateConfigurationBlock(aircraft) {
 
   const entries = [
     ["flight-cfg-gear", describeGear(configuration, capabilities)],
-    ["flight-cfg-flaps", describeFlaps(configuration, capabilities)],
+    [
+      "flight-cfg-flaps",
+      describeFlaps(configuration, capabilities, aircraft, currentPlan),
+    ],
     ["flight-cfg-spoilers", describeSpoilers(configuration, capabilities)],
     ["flight-cfg-brake", describeParkingBrake(configuration)],
     ["flight-cfg-altimeter", describeAltimeter(configuration)],

@@ -263,6 +263,19 @@ def test_corrected_alert_is_acknowledged_and_rearmed_automatically():
     assert "state.acknowledged = false;" in javascript
 
 
+def test_flap_detents_adapt_to_known_aircraft_families():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "function flapDetentLabels(aircraft, plan, positions)" in javascript
+    assert 'return ["UP", "1", "2", "3", "FULL"]' in javascript
+    assert 'return ["UP", "1", "2", "5", "10", "15", "25", "30", "40"]' in javascript
+    assert 'return ["UP", "1", "5", "10", "20", "25", "30"]' in javascript
+    assert 'return ["UP", "1", "5", "15", "20", "25", "30"]' in javascript
+    assert "`${Math.round(extended)} %`" in javascript
+    assert "describeFlaps(configuration, capabilities, aircraft, currentPlan)" in javascript
+
+
 def test_local_flight_journal_keeps_only_completed_flight_summaries():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
