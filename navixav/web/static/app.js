@@ -254,6 +254,23 @@ async function openSimBriefPlanner() {
   }
 }
 
+async function openSupportPage() {
+  const button = $("support-open");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/support/open", {
+      method: "POST",
+      headers: { "X-NaviXav-External": "support" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("support_open_failed"));
+  } catch (error) {
+    showBanner("error", t("support_open_failed"), [String(error)]);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 /**
  * Aligne le champ couleur et son aperçu sur une teinte valide.
  *
@@ -451,6 +468,11 @@ async function skipWelcomeWithDemo() {
 /* ------------------------------------------------------------------- plan */
 
 async function buildPlan() {
+  if (latestStatus?.remote_client) {
+    await loadCurrentPlan();
+    return;
+  }
+
   const button = $("refresh");
   button.disabled = true;
   button.querySelector("span").textContent = t("loading_plan");
@@ -476,6 +498,32 @@ async function buildPlan() {
   } finally {
     button.disabled = false;
     button.querySelector("span").textContent = t("complete");
+  }
+}
+
+async function loadCurrentPlan() {
+  const button = $("refresh");
+  button.disabled = true;
+  button.querySelector("span").textContent = t("loading_current_flight");
+
+  try {
+    const response = await fetch("/api/plan/current");
+    const payload = await response.json();
+    if (!response.ok) {
+      if (response.status === 404) {
+        showBanner("info", t("mobile_wait_title"), [t("mobile_wait_body")]);
+      } else {
+        showBanner("error", t("mobile_load_failed"), [payload.detail]);
+      }
+      return;
+    }
+    currentPlan = payload;
+    renderPlan(payload);
+  } catch (error) {
+    showBanner("error", "Erreur réseau", [String(error)]);
+  } finally {
+    button.disabled = false;
+    button.querySelector("span").textContent = t("refresh_current_flight");
   }
 }
 
@@ -4159,6 +4207,7 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
 
 $("refresh").addEventListener("click", buildPlan);
 $("simbrief-create").addEventListener("click", openSimBriefPlanner);
+$("support-open").addEventListener("click", openSupportPage);
 $("demo-toggle").addEventListener("change", buildPlan);
 
 $("map-fit").addEventListener("click", () => MAP.fit());
@@ -4240,8 +4289,12 @@ async function initialiseApplication() {
       openWelcome(status);
       return;
     }
-    if (!status.remote_client) checkForUpdates();
-    if (status.simbrief_configured) await buildPlan();
+    if (status.remote_client) {
+      await loadCurrentPlan();
+    } else {
+      checkForUpdates();
+      if (status.simbrief_configured) await buildPlan();
+    }
   } catch (error) {
     showBanner("error", "Initialisation impossible", [String(error)]);
   }

@@ -29,6 +29,7 @@ DEFAULT_PORT = 8765
 LAST_PORT = 8775
 WEBVIEW2_CLIENT_ID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 APP_USER_MODEL_ID = "Galvo.NaviXav"
+SUPPORT_URL = "https://buymeacoffee.com/xalacaga"
 
 
 def _show_error(message: str) -> None:
@@ -228,6 +229,10 @@ def _run_desktop_window(url: str, server: object) -> None:
             """Ouvre l'éditeur SimBrief uniquement après une action explicite."""
             webbrowser.open("https://dispatch.simbrief.com/options/new", new=2)
 
+        def open_support() -> None:
+            """Ouvre la page de soutien uniquement après une action explicite."""
+            webbrowser.open(SUPPORT_URL, new=2)
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -239,6 +244,7 @@ def _run_desktop_window(url: str, server: object) -> None:
         server.config.app.state.request_shutdown = stop_from_interface
         server.config.app.state.request_update_install = install_update
         server.config.app.state.request_open_simbrief = open_simbrief
+        server.config.app.state.request_open_support = open_support
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

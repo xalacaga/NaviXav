@@ -7,6 +7,7 @@ contenu du dispatch, qui n'ont pas à sortir de la machine.
 from __future__ import annotations
 
 import asyncio
+import copy
 import ipaddress
 import logging
 import math
@@ -147,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for source in NATIONAL_AIP_SOURCES
     }
     demo_state: dict[str, Any] = {}
+    current_plan_state: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
 
     @app.middleware("http")
@@ -167,9 +169,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if request.url.path in {
                 "/api/settings",
                 "/api/simbrief/new",
+                "/api/support/open",
                 "/api/update/install",
                 "/api/shutdown",
-            }:
+            } or (
+                request.url.path == "/api/plan" and request.method == "POST"
+            ):
                 return PlainTextResponse(
                     "Cette commande est réservée à l’application sur le PC.",
                     status_code=403,
@@ -380,6 +385,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload = plan.to_dict()
             payload["atc_route"] = plan.atc_route()
             payload["demo"] = request.demo
+            current_plan_state["payload"] = copy.deepcopy(payload)
             LOGGER.info(
                 "Complétion MSFS terminée en %.2f s "
                 "(cache avant: %s terrain(s), %s procédure(s); total %.2f s)",
@@ -399,6 +405,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise
         finally:
             provider.close()
+
+    @app.get("/api/plan/current")
+    def current_plan() -> dict[str, Any]:
+        payload = current_plan_state.get("payload")
+        if payload is None:
+            raise HTTPException(
+                404,
+                "Aucun vol n’est actuellement chargé dans NaviXav sur le PC.",
+            )
+        return copy.deepcopy(payload)
 
     @app.get("/api/airport/{icao}")
     def airport(icao: str) -> dict[str, Any]:
@@ -675,6 +691,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(
                 409,
                 "L’ouverture de SimBrief est disponible dans l’application Windows.",
+            )
+        callback()
+        return {"opened": True}
+
+    @app.post("/api/support/open")
+    def open_support(request: Request) -> dict[str, bool]:
+        if request.headers.get("X-NaviXav-External") != "support":
+            raise HTTPException(403, "Confirmation d’ouverture absente.")
+        callback = getattr(app.state, "request_open_support", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "La page de soutien est disponible dans l’application Windows.",
             )
         callback()
         return {"opened": True}

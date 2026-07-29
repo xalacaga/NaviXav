@@ -728,10 +728,42 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .lan-url-row { display: flex; gap: 8px; }
 .lan-url-row input { min-width: 0; font-family: var(--mono); }
 .lan-access small { color: var(--text-dim); line-height: 1.45; }
+.support-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0 4px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-raised));
+}
+.support-card h3 {
+  margin: 0 0 5px;
+  font-size: 0.88rem;
+}
+.support-card p {
+  max-width: 48rem;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.support-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
 .settings-message { min-height: 20px; color: var(--high); font-size: 0.8rem; }
 .settings-message.error { color: var(--low); }
 .settings-actions { justify-content: flex-end; margin-top: 10px; }
-@media (max-width: 620px) { .settings-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .settings-grid { grid-template-columns: 1fr; }
+  .support-card { align-items: stretch; flex-direction: column; }
+  .support-btn { width: 100%; white-space: normal; }
+}
 
 /* Champ couleur : le pastille et la ligne d'aperçu portent la teinte réelle
    de la trace. Sans règles dédiées, le remplissage du champ texte écrase

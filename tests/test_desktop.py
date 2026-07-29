@@ -7,6 +7,9 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from navixav import desktop
 from navixav.config import Settings
 from navixav.logging_setup import (
@@ -125,6 +128,23 @@ def test_simbrief_creation_button_opens_the_official_new_plan_page():
     assert 'fetch("/api/simbrief/new"' in javascript
     assert '"X-NaviXav-External": "simbrief"' in javascript
     assert "https://dispatch.simbrief.com/options/new" in desktop_source
+
+
+def test_support_button_opens_buy_me_a_coffee_only_after_an_explicit_click():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    desktop_source = Path(desktop.__file__).read_text(encoding="utf-8")
+    server_source = (
+        Path(desktop.__file__).parent / "web" / "app.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'id="support-open"' in html
+    assert 'fetch("/api/support/open"' in javascript
+    assert '"X-NaviXav-External": "support"' in javascript
+    assert "https://buymeacoffee.com/xalacaga" in desktop_source
+    assert 'request.headers.get("X-NaviXav-External") != "support"' in server_source
+    assert '"/api/support/open",' in server_source
 
 
 def test_windows_process_uses_stable_navixav_identity(monkeypatch):
@@ -389,7 +409,13 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
         return next(route.endpoint for route in app.routes if route.path == path)
 
     try:
+        current_plan = endpoint("/api/plan/current")
+        with pytest.raises(HTTPException) as missing:
+            current_plan()
+        assert missing.value.status_code == 404
+
         plan = endpoint("/api/plan")(PlanRequest(demo=True))
+        assert current_plan() == plan
         departure = plan["departure"]
         runway = departure["runway"]["value"]
         chart = endpoint("/api/chart/{icao}")(departure["icao"], runway)
@@ -401,6 +427,24 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
     finally:
         for close in app.router.on_shutdown:
             close()
+
+
+def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
+    app_source = (
+        Path(desktop.__file__).parent / "web" / "app.py"
+    ).read_text(encoding="utf-8")
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert '@app.get("/api/plan/current")' in app_source
+    assert (
+        'request.url.path == "/api/plan" and request.method == "POST"'
+        in app_source
+    )
+    assert 'fetch("/api/plan/current")' in javascript
+    assert "if (status.remote_client)" in javascript
+    assert "await loadCurrentPlan();" in javascript
 
 
 def test_route_progress_uses_sid_star_and_approach_geometry():
