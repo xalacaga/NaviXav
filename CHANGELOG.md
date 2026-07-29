@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## [0.8.0] - 2026-07-29
+
+## Nouvelles fonctionnalités
+
+- mises Ã  jour de l'application
+
+L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+
 ## [0.7.0] - 2026-07-29
 
 ## Nouvelles fonctionnalités
