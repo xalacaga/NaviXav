@@ -9,7 +9,7 @@
   const STORAGE_KEY = "navixav-language";
   const TRANSLATIONS = {
     fr: {
-      subtitle: "Compléteur de plan de vol IFR",
+      subtitle: "Votre copilote IFR",
       source_title: "Navigation et procédures récupérées directement par SimConnect",
       source: "Source · MSFS",
       demo_title: "Utiliser le vol de démonstration LFST → LFBO",
@@ -209,7 +209,7 @@
       alert_fuel_below_reserve_action: "Envisager un déroutement",
     },
     en: {
-      subtitle: "IFR flight plan assistant",
+      subtitle: "Your IFR copilot",
       source_title: "Navigation and procedures retrieved directly through SimConnect",
       source: "Source · MSFS",
       demo_title: "Use the LFST → LFBO demonstration flight",
@@ -412,7 +412,7 @@
 
   Object.assign(TRANSLATIONS, {
     de: {
-      subtitle: "IFR-Flugplanassistent", source_title: "Navigation und Verfahren direkt über SimConnect",
+      subtitle: "Ihr IFR-Copilot", source_title: "Navigation und Verfahren direkt über SimConnect",
       source: "Quelle · MSFS", demo_title: "Demoflug LFST → LFBO verwenden", demo: "Demo",
       settings: "Einstellungen", settings_title: "NaviXav konfigurieren", sim_title: "Verbindungsstatus zu Microsoft Flight Simulator",
       sim_offline: "MSFS offline", quit: "Beenden", quit_title: "NaviXav beenden und Port freigeben",
@@ -440,7 +440,7 @@
       update_available: "Update", update_downloading: "Download…", update_restarting: "Neustart…", check_update: "Nach Updates suchen",
     },
     es: {
-      subtitle: "Asistente de plan de vuelo IFR", source_title: "Navegación y procedimientos obtenidos directamente mediante SimConnect",
+      subtitle: "Tu copiloto IFR", source_title: "Navegación y procedimientos obtenidos directamente mediante SimConnect",
       source: "Fuente · MSFS", demo_title: "Usar el vuelo de demostración LFST → LFBO", demo: "Demo",
       settings: "Ajustes", settings_title: "Configurar NaviXav", sim_title: "Estado de conexión con Microsoft Flight Simulator",
       sim_offline: "MSFS desconectado", quit: "Salir", quit_title: "Detener NaviXav y liberar el puerto",
@@ -468,7 +468,7 @@
       update_available: "Actualizar", update_downloading: "Descargando…", update_restarting: "Reiniciando…", check_update: "Buscar actualizaciones",
     },
     it: {
-      subtitle: "Assistente al piano di volo IFR", source_title: "Navigazione e procedure recuperate direttamente tramite SimConnect",
+      subtitle: "Il tuo copilota IFR", source_title: "Navigazione e procedure recuperate direttamente tramite SimConnect",
       source: "Fonte · MSFS", demo_title: "Usa il volo dimostrativo LFST → LFBO", demo: "Demo",
       settings: "Impostazioni", settings_title: "Configura NaviXav", sim_title: "Stato connessione a Microsoft Flight Simulator",
       sim_offline: "MSFS non connesso", quit: "Esci", quit_title: "Arresta NaviXav e libera la porta",
@@ -496,7 +496,7 @@
       update_available: "Aggiorna", update_downloading: "Download…", update_restarting: "Riavvio…", check_update: "Cerca aggiornamenti",
     },
     pt: {
-      subtitle: "Assistente de plano de voo IFR", source_title: "Navegação e procedimentos obtidos diretamente pelo SimConnect",
+      subtitle: "O teu copiloto IFR", source_title: "Navegação e procedimentos obtidos diretamente pelo SimConnect",
       source: "Fonte · MSFS", demo_title: "Usar o voo de demonstração LFST → LFBO", demo: "Demo",
       settings: "Definições", settings_title: "Configurar NaviXav", sim_title: "Estado da ligação ao Microsoft Flight Simulator",
       sim_offline: "MSFS offline", quit: "Sair", quit_title: "Parar NaviXav e libertar a porta",
@@ -524,7 +524,7 @@
       update_available: "Atualizar", update_downloading: "A transferir…", update_restarting: "A reiniciar…", check_update: "Procurar atualizações",
     },
     nl: {
-      subtitle: "IFR-vluchtplanassistent", source_title: "Navigatie en procedures rechtstreeks opgehaald via SimConnect",
+      subtitle: "Jouw IFR-copiloot", source_title: "Navigatie en procedures rechtstreeks opgehaald via SimConnect",
       source: "Bron · MSFS", demo_title: "Demovlucht LFST → LFBO gebruiken", demo: "Demo",
       settings: "Instellingen", settings_title: "NaviXav instellen", sim_title: "Verbindingsstatus met Microsoft Flight Simulator",
       sim_offline: "MSFS offline", quit: "Afsluiten", quit_title: "NaviXav stoppen en poort vrijgeven",
@@ -552,7 +552,7 @@
       update_available: "Bijwerken", update_downloading: "Downloaden…", update_restarting: "Herstarten…", check_update: "Controleren op updates",
     },
     pl: {
-      subtitle: "Asystent planu lotu IFR", source_title: "Nawigacja i procedury pobierane bezpośrednio przez SimConnect",
+      subtitle: "Twój drugi pilot IFR", source_title: "Nawigacja i procedury pobierane bezpośrednio przez SimConnect",
       source: "Źródło · MSFS", demo_title: "Użyj lotu demonstracyjnego LFST → LFBO", demo: "Demo",
       settings: "Ustawienia", settings_title: "Skonfiguruj NaviXav", sim_title: "Stan połączenia z Microsoft Flight Simulator",
       sim_offline: "MSFS offline", quit: "Zakończ", quit_title: "Zatrzymaj NaviXav i zwolnij port",

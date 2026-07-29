@@ -3,15 +3,18 @@
 import sys
 import time
 import logging
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
 from navixav import desktop
+from navixav.config import Settings
 from navixav.logging_setup import (
     LOG_BACKUP_COUNT,
     LOG_MAX_BYTES,
     configure_logging,
 )
+from navixav.web.app import PlanRequest, create_app
 
 
 class _Event:
@@ -214,6 +217,127 @@ def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     assert 'phase === "Approche"' in javascript
     assert "En attente du TOD" in javascript
     assert "Math.abs(delta) <= 500" in javascript
+
+
+def test_global_alarm_opens_its_details_and_armed_spoilers_take_priority():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="global-flight-alert"' in html
+    assert 'aria-controls="panel-flight"' in html
+    assert ".global-flight-alert" in css
+    assert "updateGlobalFlightAlert(active);" in javascript
+    assert 'selectTab("flight");' in javascript
+    assert '#flight-alerts .flight-alert' in javascript
+
+    spoilers = javascript[
+        javascript.index("function describeSpoilers"):
+        javascript.index("function describeParkingBrake")
+    ]
+    assert spoilers.index("configuration.spoilers_armed === true") < spoilers.index(
+        "capabilities && !capabilities.spoilers"
+    )
+
+
+def test_local_flight_journal_lists_previous_flights_and_replay_speeds():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    assert 'FLIGHT_LOG_INDEX_KEY = "navixav-flight-log-index"' in javascript
+    assert 'key.startsWith("navixav-flight-log:")' in javascript
+    assert "function renderFlightArchive()" in javascript
+    assert 'archiveList.id = "flight-archive-list"' in javascript
+    assert "for (const value of [0.5, 1, 2, 4])" in javascript
+    assert "FLIGHT_REPLAY_BASE_MS / replaySpeed" in javascript
+    assert ".flight-archive-row" in css
+
+
+def test_ifr_debrief_analyses_track_and_replays_each_event():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    assert "function flightDebrief(points, routeSegments" in javascript
+    assert "function projectAircraftOnDebriefPath(aircraft, routeSegments)" in javascript
+    assert "route_segments: flightStagePaths(plan)" in javascript
+    assert "entry.route_segments || (sameRoute" in javascript
+    assert "maxDeviationNm" in javascript
+    assert "offRouteSeconds" in javascript
+    assert '"Train non confirmé sous 1 000 ft"' in javascript
+    assert '"Taux de descente élevé sous 1 000 ft"' in javascript
+    assert '"Survitesse détectée"' in javascript
+    assert "debrief.samples.slice(start, end)" in javascript
+    assert 'debrief.id = "flight-debrief"' in javascript
+    assert '"Débrief IFR intelligent"' in javascript
+    assert ".flight-debrief-event" in css
+
+
+def test_mcdu_takeoff_page_keeps_unavailable_performance_values_manual():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "function takeoffPerformanceStorageKey(plan)" in javascript
+    assert '"navixav-takeoff-performance"' in javascript
+    assert "function takeoffPerformanceEditor(plan, performance)" in javascript
+    assert "NaviXav ne calcule pas les vitesses de décollage." in javascript
+    assert 'mcduPage(`PERF TO · RWY ${dep.runway?.value || "□□"}`' in javascript
+    for field in (
+        '"V1"',
+        '"VR"',
+        '"V2"',
+        '"FLAPS/THS"',
+        '"F RETR"',
+        '"S RETR"',
+        '"CLEAN"',
+        '"TRANS ALT"',
+        '"TO SHIFT"',
+        '"FLEX TEMP"',
+        '"THR RED/ACC"',
+        '"ENG OUT ACC"',
+    ):
+        assert field in javascript
+
+
+def test_map_breaks_teleports_and_never_invents_a_direct_route():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "const cruise = route.slice(1, -1);" in javascript
+    assert "const enroute = cruise.length" in javascript
+    assert "function flightTrailPoints(points)" in javascript
+    assert "trail.push(null);" in javascript
+    assert 'previous.source === "Démonstration"' in javascript
+    assert "haversineNm(previous, point) > plausibleDistanceNm" in javascript
+    assert "if (!point)" in map_javascript
+    assert "...trail.filter(Boolean).map" in map_javascript
+
+
+def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
+    project = Path(desktop.__file__).parent.parent
+    store = tmp_path / "navdata.sqlite"
+    shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
+    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
+
+    def endpoint(path):
+        return next(route.endpoint for route in app.routes if route.path == path)
+
+    try:
+        plan = endpoint("/api/plan")(PlanRequest(demo=True))
+        departure = plan["departure"]
+        runway = departure["runway"]["value"]
+        chart = endpoint("/api/chart/{icao}")(departure["icao"], runway)
+        live = endpoint("/api/live")(True, departure["icao"], runway)
+
+        assert chart["parkings"]
+        assert live["connected"] is True
+        assert live["aircraft"]["source"] == "Démonstration"
+    finally:
+        for close in app.router.on_shutdown:
+            close()
 
 
 def test_route_progress_uses_sid_star_and_approach_geometry():

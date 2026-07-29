@@ -282,7 +282,7 @@ const MAP = (() => {
   }
 
   function drawTrail() {
-    if (trail.length < 2) return;
+    if (trail.filter(Boolean).length < 2) return;
     context.save();
     context.strokeStyle = trailColor;
     context.globalAlpha = 0.9;
@@ -290,10 +290,17 @@ const MAP = (() => {
     context.lineCap = "round";
     context.lineJoin = "round";
     context.beginPath();
-    trail.forEach(([wx, wy], index) => {
+    let drawing = false;
+    trail.forEach((point) => {
+      if (!point) {
+        drawing = false;
+        return;
+      }
+      const [wx, wy] = point;
       const [x, y] = toScreen(wx, wy);
-      if (index === 0) context.moveTo(x, y);
+      if (!drawing) context.moveTo(x, y);
       else context.lineTo(x, y);
+      drawing = true;
     });
     context.stroke();
     context.restore();
@@ -532,8 +539,11 @@ const MAP = (() => {
     },
     setTrail(points) {
       trail = Array.isArray(points)
-        ? points.filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
-          .map((point) => [point.x, point.y])
+        ? points.map((point) => (
+          Number.isFinite(point?.x) && Number.isFinite(point?.y)
+            ? [point.x, point.y]
+            : null
+        ))
         : [];
       draw();
     },
@@ -558,7 +568,7 @@ const MAP = (() => {
     fitRoute() {
       const visiblePoints = [
         ...route,
-        ...trail.map(([x, y]) => ({ x, y })),
+        ...trail.filter(Boolean).map(([x, y]) => ({ x, y })),
       ];
       if (visiblePoints.length < 2) return;
       const xs = visiblePoints.map((point) => point.x);

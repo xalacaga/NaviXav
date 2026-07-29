@@ -114,6 +114,9 @@ class FakeClient:
             values.update({
                 "GEAR HANDLE POSITION": 1.0,
                 "GEAR TOTAL PCT EXTENDED": 100.0,
+                "GEAR CENTER POSITION": 100.0,
+                "GEAR LEFT POSITION": 100.0,
+                "GEAR RIGHT POSITION": 100.0,
                 "FLAPS HANDLE INDEX": 2.0,
                 "SPOILERS ARMED": 1.0,
                 "LIGHT LANDING": 1.0,
@@ -192,6 +195,30 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.selected_heading_deg == 1.0
     assert configuration.nav1_course_deg == 253.0
     assert configuration.wind_direction_deg == 40.0
+
+
+def test_configuration_uses_individual_gear_positions_when_total_is_stale(monkeypatch):
+    """Les positions des jambes restent fiables si l'agrégat ne bouge plus."""
+
+    class GearInTransitClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            values = super().read_simvars(variables, timeout_s)
+            if variables == _CONFIGURATION_VARIABLES:
+                values.update({
+                    "GEAR TOTAL PCT EXTENDED": 100.0,
+                    "GEAR CENTER POSITION": 62.0,
+                    "GEAR LEFT POSITION": 58.0,
+                    "GEAR RIGHT POSITION": 60.0,
+                })
+            return values
+
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: GearInTransitClient())
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.gear_extended_pct == 58.0
 
 
 def test_capabilities_describe_the_airframe(monkeypatch):

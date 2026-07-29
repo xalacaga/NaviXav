@@ -45,6 +45,9 @@ _VARIABLES = (
 _CONFIGURATION_VARIABLES = (
     ("GEAR HANDLE POSITION", "Bool"),
     ("GEAR TOTAL PCT EXTENDED", "Percent"),
+    ("GEAR CENTER POSITION", "Percent"),
+    ("GEAR LEFT POSITION", "Percent"),
+    ("GEAR RIGHT POSITION", "Percent"),
     ("FLAPS HANDLE INDEX", "Number"),
     ("TRAILING EDGE FLAPS LEFT PERCENT", "Percent"),
     ("SPOILERS HANDLE POSITION", "Percent"),
@@ -194,9 +197,19 @@ class SimConnectSource:
             )
             return None
 
+        # Certains appareils laissent la SimVar agrégée figée alors que les
+        # positions de chaque jambe continuent d'être publiées. La plus petite
+        # des trois est volontairement retenue : le train n'est « sorti » que
+        # lorsque toutes les jambes le sont.
+        gear_positions = (
+            values["GEAR CENTER POSITION"],
+            values["GEAR LEFT POSITION"],
+            values["GEAR RIGHT POSITION"],
+        )
+
         return AircraftConfiguration(
             gear_handle_down=bool(values["GEAR HANDLE POSITION"]),
-            gear_extended_pct=values["GEAR TOTAL PCT EXTENDED"],
+            gear_extended_pct=min(gear_positions),
             flaps_handle_index=int(round(values["FLAPS HANDLE INDEX"])),
             flaps_extended_pct=values["TRAILING EDGE FLAPS LEFT PERCENT"],
             spoilers_handle_pct=values["SPOILERS HANDLE POSITION"],
