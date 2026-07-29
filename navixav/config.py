@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -76,8 +75,10 @@ class Settings:
     aircraft_rnp_capable: bool = True
     map_basemap: str = DEFAULT_MAP_BASEMAP
     map_trail_color: str = DEFAULT_MAP_TRAIL_COLOR
+    # Accès depuis un téléphone ou une tablette du même réseau local. Sans
+    # jeton : le lien affiché sur le PC suffit. Les commandes sensibles
+    # (paramètres, mise à jour, arrêt) restent réservées à la machine hôte.
     lan_enabled: bool = False
-    lan_access_token: str = ""
 
     @classmethod
     def load(cls, env_file: Path | str | None = None) -> "Settings":
@@ -110,7 +111,6 @@ class Settings:
             map_basemap=DEFAULT_MAP_BASEMAP,
             map_trail_color=DEFAULT_MAP_TRAIL_COLOR,
             lan_enabled=False,
-            lan_access_token="",
         )
 
     def describe_simbrief_target(self) -> str:
@@ -155,11 +155,6 @@ class Settings:
         ):
             raw_trail_color = DEFAULT_MAP_TRAIL_COLOR
         lan_enabled = bool(values.get("lan_enabled", self.lan_enabled))
-        lan_access_token = str(
-            values.get("lan_access_token", self.lan_access_token) or ""
-        ).strip()
-        if lan_enabled and len(lan_access_token) < 24:
-            lan_access_token = secrets.token_urlsafe(24)
         return Settings(
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
             simbrief_username=str(values.get("simbrief_username", "") or "").strip(),
@@ -180,7 +175,6 @@ class Settings:
             map_basemap=raw_basemap,
             map_trail_color=raw_trail_color,
             lan_enabled=lan_enabled,
-            lan_access_token=lan_access_token,
         )
 
     def user_values(self) -> dict[str, object]:
@@ -197,7 +191,6 @@ class Settings:
             "map_basemap": self.map_basemap,
             "map_trail_color": self.map_trail_color,
             "lan_enabled": self.lan_enabled,
-            "lan_access_token": self.lan_access_token,
         }
 
 

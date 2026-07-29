@@ -10,7 +10,6 @@ import asyncio
 import ipaddress
 import logging
 import math
-import secrets
 import socket
 import time
 from pathlib import Path
@@ -137,7 +136,6 @@ def _local_ipv4() -> str | None:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
-    lan_token = settings.lan_access_token
     app = FastAPI(title="NaviXav", version=__version__, docs_url="/api/docs")
     tracker = LiveTracker()
     sia = SiaClient()
@@ -153,18 +151,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def log_relevant_requests(request: Request, call_next):
         """Journalise les lenteurs et erreurs sans saturer le fichier."""
         remote_client = not _is_loopback(request.client.host if request.client else None)
-        grant_cookie = False
-        if lan_active and remote_client:
-            supplied = request.query_params.get("access", "")
-            cookie = request.cookies.get("navixav_lan", "")
-            valid_query = bool(lan_token) and secrets.compare_digest(supplied, lan_token)
-            valid_cookie = bool(lan_token) and secrets.compare_digest(cookie, lan_token)
-            if not valid_query and not valid_cookie:
+        if remote_client:
+            # Aucun jeton n'est demandé : le service n'est joignable que si
+            # l'accès réseau local a été activé, et seulement depuis le réseau
+            # de la machine. En revanche, les commandes qui modifient ou
+            # arrêtent l'application restent réservées au PC hôte.
+            if not lan_active:
                 return PlainTextResponse(
-                    "Accès NaviXav refusé. Utilise le lien affiché sur le PC.",
+                    "Accès réseau désactivé. Active-le dans les paramètres, "
+                    "sur le PC.",
                     status_code=403,
                 )
-            grant_cookie = valid_query
             if request.url.path in {
                 "/api/settings",
                 "/api/update/install",
@@ -198,14 +195,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.url.path == "/" or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-store, max-age=0"
             response.headers["Pragma"] = "no-cache"
-        if grant_cookie:
-            response.set_cookie(
-                "navixav_lan",
-                lan_token,
-                httponly=True,
-                samesite="strict",
-                max_age=60 * 60 * 24 * 30,
-            )
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
@@ -274,11 +263,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "demo_available": DEMO_OFP.is_file(),
             "remote_client": remote_client,
             "lan_active": lan_active,
-            "lan_url": (
-                f"http://{address}:{port}/?access={lan_token}"
-                if address and lan_token
-                else ""
-            ),
+            "lan_url": f"http://{address}:{port}/" if address else "",
             "map_basemap": settings.map_basemap,
             "map_trail_color": settings.map_trail_color,
             "navdata": navdata,
@@ -287,7 +272,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/settings")
     def get_settings() -> dict[str, object]:
         values = settings.user_values()
-        values.pop("lan_access_token", None)
         return values
 
     @app.get("/api/update/check")
@@ -346,7 +330,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.metar_source,
         )
         values = settings.user_values()
-        values.pop("lan_access_token", None)
         values["lan_restart_required"] = settings.lan_enabled != lan_active
         return values
 

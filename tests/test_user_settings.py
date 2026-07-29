@@ -33,7 +33,8 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.map_basemap == "opentopo"
     assert restored.map_trail_color == "#ff5500"
     assert restored.lan_enabled is True
-    assert len(restored.lan_access_token) >= 24
+    # Aucun jeton n'est généré : l'accès mobile repose sur le seul lien local.
+    assert not hasattr(restored, "lan_access_token")
 
 
 def test_settings_request_accepts_interface_values():

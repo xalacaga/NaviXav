@@ -195,8 +195,12 @@ def test_mobile_lan_interface_is_protected_and_responsive():
     assert "env(safe-area-inset-bottom)" in css
     assert "body.remote-client" in css
     assert 'document.body.classList.toggle("remote-client"' in javascript
-    assert '"navixav_lan"' in server
-    assert "secrets.compare_digest" in server
+    # L'accès depuis un téléphone ne demande aucun jeton : seules les commandes
+    # qui modifient ou arrêtent l'application restent réservées au PC hôte.
+    assert "navixav_lan" not in server
+    assert "compare_digest" not in server
+    assert '"/api/settings",' in server
+    assert '"/api/shutdown",' in server
     assert '"0.0.0.0" if settings.lan_enabled' in (
         project / "navixav" / "desktop.py"
     ).read_text(encoding="utf-8")
