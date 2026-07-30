@@ -1034,6 +1034,97 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   background: color-mix(in srgb, var(--high) 12%, var(--surface-raised));
   color: var(--high); font-weight: 700; font-size: 0.78rem;
 }
+/* ------------------------------------------ progression départ → arrivée */
+
+.flight-progress {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 18px;
+  margin-top: 18px; padding: 16px 20px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.flight-progress-role {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.flight-progress-icao {
+  margin-top: 2px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.flight-progress-name {
+  max-width: 150px; margin-top: 2px;
+  font-size: 0.74rem; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.flight-progress-airport.is-right { text-align: right; }
+.flight-progress-airport.is-right .flight-progress-name { margin-left: auto; }
+
+.flight-progress-middle { min-width: 0; }
+.flight-progress-track {
+  --flight-progress: 0%;
+  position: relative; height: 3px; margin: 26px 12px 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-faint) 35%, transparent);
+}
+.flight-progress-done {
+  position: absolute; inset: 0 auto 0 0; width: var(--flight-progress);
+  border-radius: 999px; background: var(--accent);
+  transition: width 0.6s linear;
+}
+.flight-progress-dot {
+  position: absolute; top: 50%; left: 0;
+  width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%; background: var(--accent);
+}
+.flight-progress-dot.is-end {
+  left: 100%;
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--text-faint) 60%, transparent);
+}
+.flight-progress-plane {
+  position: absolute; top: 50%; left: var(--flight-progress);
+  transform: translate(-50%, -50%);
+  color: var(--accent);
+  transition: left 0.6s linear;
+}
+.flight-progress-plane svg {
+  display: block; width: 20px; height: 20px;
+  transform: rotate(90deg);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%));
+}
+.flight-progress-percent {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text-muted); white-space: nowrap;
+}
+.flight-progress-track[data-state="offline"] .flight-progress-done,
+.flight-progress-track[data-state="offline"] .flight-progress-dot,
+.flight-progress-track[data-state="offline"] .flight-progress-plane {
+  color: var(--text-faint); background-color: var(--text-faint);
+}
+.flight-progress-track[data-state="offline"] .flight-progress-dot.is-end {
+  background-color: transparent;
+}
+
+.flight-progress-caption {
+  margin-top: 10px; text-align: center;
+  font-size: 0.82rem; font-weight: 650; font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.flight-progress-times {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px; margin-top: 8px;
+}
+.flight-progress-time { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.flight-progress-time.is-center { text-align: center; }
+.flight-progress-time.is-right { text-align: right; }
+.flight-progress-time-label {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+.flight-progress-time-value {
+  font-size: 0.92rem; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+
 .flight-live-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px; margin-top: 18px;
@@ -1465,6 +1556,16 @@ pre {
   .flight-live-grid, .stat-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* La ligne départ → arrivée reste lisible en passant les aéroports au-dessus
+     et en dessous de la trajectoire. */
+  .flight-progress {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 12px; padding: 14px 16px;
+  }
+  .flight-progress-airport { grid-row: 1; grid-column: 1; }
+  .flight-progress-airport.is-right { grid-column: 2; }
+  .flight-progress-middle { grid-row: 2; grid-column: 1 / -1; }
+  .flight-progress-name { display: none; }
   .approach-profile-head, .missed-altitude, .aircraft-identity {
     align-items: flex-start;
     flex-direction: column;

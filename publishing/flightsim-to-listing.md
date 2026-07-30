@@ -1,4 +1,4 @@
-# Flightsim.to Publication Pack — NaviXav 0.12.0
+# Flightsim.to Publication Pack — NaviXav 1.2.0
 
 This document contains the English copy and checklist for publishing NaviXav
 on Flightsim.to. It is not intended to be included in the application.
@@ -21,7 +21,7 @@ MSFS 2020 should not be selected until it has been tested and validated.
 
 **Version**
 
-0.12.0
+1.2.0
 
 **Release status**
 
@@ -120,7 +120,7 @@ required.
 #### Recommended Installer
 
 1. Extract the downloaded Flightsim.to ZIP archive.
-2. Run `NaviXav-Setup-0.12.0.exe`.
+2. Run `NaviXav-Setup-1.2.0.exe`.
 3. Follow the installation wizard.
 4. Start NaviXav from the Windows Start menu or the optional desktop shortcut.
 5. Open **Settings** and enter your SimBrief Pilot ID or username.
@@ -178,7 +178,7 @@ route.
 
 ### Support and Source Code
 
-NaviXav is developed by Xavier BEGUE (`xalacaga`).
+NaviXav is developed by Xalacaga.
 
 Project and issue tracker:
 `https://github.com/xalacaga/NaviXav`
@@ -191,7 +191,7 @@ or other personal information.
 
 NaviXav is distributed under the Apache License 2.0.
 
-Copyright 2026 Xavier BEGUE (xalacaga).
+Copyright 2026 Xalacaga.
 
 Microsoft Flight Simulator, MSFS, SimConnect, Microsoft Edge and WebView2 are
 trademarks of the Microsoft group of companies. Map data and tiles are
@@ -201,7 +201,7 @@ charts remain subject to the terms of their respective providers.
 NaviXav is an independent project and is not affiliated with or endorsed by
 Microsoft, Navigraph/SimBrief, national AIS authorities or the FAA.
 
-## Version 0.12.0 Changelog
+## Version 1.2.0 Changelog
 
 - Simplified the local journal to completed-flight summaries only.
 - Added the ability to purge all locally stored flight summaries.
@@ -210,6 +210,8 @@ Microsoft, Navigraph/SimBrief, national AIS authorities or the FAA.
   FMS layouts according to aircraft type.
 - Alerts now clear and re-arm automatically after a stable correction.
 - Added direct access to the official SimBrief flight-plan creation page.
+- Added a read-only mobile view of the flight currently loaded on the PC.
+- Added an optional, non-intrusive Buy Me a Coffee support link.
 - Improved flight tracking, navigation presentation and application
   reliability.
 - Automatic application updates remain protected by SHA-256 verification and
@@ -251,7 +253,7 @@ Use only images and logos for which you hold the necessary rights.
 
 ### Primary File
 
-`NaviXav-0.12.0-FlightsimTo-Installer.zip`
+`NaviXav-1.2.0-FlightsimTo-Installer.zip`
 
 Label:
 
@@ -263,7 +265,7 @@ Description:
 
 ### Optional Secondary File
 
-`NaviXav-0.12.0-windows-x64-portable.zip`
+`NaviXav-1.2.0-windows-x64-portable.zip`
 
 Label:
 
@@ -281,11 +283,11 @@ files as separate download options.
 - [ ] Use the title exactly as written above and preserve title case.
 - [ ] Select **Utilities / Miscellaneous**.
 - [ ] Select **Microsoft Flight Simulator 2024** only.
-- [ ] Set version to **0.12.0**.
+- [ ] Set version to **1.2.0**.
 - [ ] Upload the installer ZIP as the primary file.
 - [ ] Optionally upload the portable ZIP as a secondary independent file.
 - [ ] Paste the full English description.
-- [ ] Paste the version 0.12.0 changelog.
+- [ ] Paste the version 1.2.0 changelog.
 - [ ] Add at least two original, relevant screenshots of 512 × 512 px or
       larger.
 - [ ] Add a clear thumbnail without clickbait wording.
@@ -305,4 +307,3 @@ files as separate download options.
 Thank you for trying NaviXav. Please report issues with the application
 version, your Windows version and your MSFS version. For privacy, never post
 your SimBrief Pilot ID or username in a public comment.
-

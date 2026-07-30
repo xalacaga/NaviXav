@@ -32,6 +32,7 @@ from navixav.config import (
 from navixav.faa import FaaClient, FaaError
 from navixav.live import LiveTracker, PositionUnavailable
 from navixav.live.demo import DemoSource
+from navixav.live.demo_flight import DemoFlightSource
 from navixav.national_aip import (
     NATIONAL_AIP_SOURCES,
     NationalAipClient,
@@ -386,6 +387,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload["atc_route"] = plan.atc_route()
             payload["demo"] = request.demo
             current_plan_state["payload"] = copy.deepcopy(payload)
+            # Chaque import relance la démonstration au parking de départ,
+            # même si la route calculée est identique à la précédente.
+            demo_state.pop("key", None)
             LOGGER.info(
                 "Complétion MSFS terminée en %.2f s "
                 "(cache avant: %s terrain(s), %s procédure(s); total %.2f s)",
@@ -708,9 +712,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         callback()
         return {"opened": True}
 
+    def _airport_elevation_ft(icao: str | None) -> float:
+        """Altitude du terrain, ou 0 ft si la base ne la fournit pas."""
+        if not icao:
+            return 0.0
+        try:
+            provider = open_provider()
+        except HTTPException:
+            # Sans base de navigation la démonstration reste possible : le
+            # terrain est alors supposé au niveau de la mer.
+            return 0.0
+        try:
+            airport = provider.airport(icao)
+        except (NavdataError, LookupError):
+            return 0.0
+        finally:
+            provider.close()
+        return float(getattr(airport, "altitude_ft", None) or 0.0)
+
     def _ensure_demo_source(icao: str | None, runway: str | None) -> None:
-        """Construit un roulage simulé du premier poste vers le seuil de piste."""
-        key = (icao or "", runway or "")
+        """Prépare la démonstration : vol complet du plan, sinon simple roulage.
+
+        La clé du vol complet ne dépend que du plan : changer d'aéroport sur la
+        carte ne doit pas relancer la démonstration au parking de départ.
+        """
+        payload = current_plan_state.get("payload") or {}
+        path = _demo_flight_path(payload)
+        if len(path) >= 2:
+            key = ("flight", _demo_plan_key(payload), len(path))
+            if demo_state.get("key") == key:
+                return
+            departure = payload.get("departure") or {}
+            arrival = payload.get("arrival") or {}
+            try:
+                tracker.set_demo(
+                    DemoFlightSource(
+                        path=path,
+                        cruise_altitude_ft=(payload.get("enroute") or {}).get(
+                            "cruise_altitude_ft"
+                        ),
+                        departure_elevation_ft=_airport_elevation_ft(
+                            departure.get("icao")
+                        ),
+                        arrival_elevation_ft=_airport_elevation_ft(arrival.get("icao")),
+                        ils_frequency_mhz=arrival.get("ils_frequency_mhz"),
+                    )
+                )
+            except ValueError:
+                LOGGER.info("Route de démonstration inexploitable, roulage simulé.")
+                tracker.set_demo(None)
+            demo_state["key"] = key
+            return
+
+        key = ("taxi", icao or "", runway or "")
         if demo_state.get("key") == key:
             return
 
@@ -754,6 +808,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
+
+
+def _demo_flight_path(payload: dict[str, Any]) -> list[tuple[float, float]]:
+    """Route opérationnelle complète du plan, prête pour la démonstration.
+
+    Même assemblage que le tracé de la carte : départ, SID, route, STAR,
+    approche puis arrivée, sans les extrémités déjà fournies par les
+    procédures.
+    """
+    departure = payload.get("departure") or {}
+    arrival = payload.get("arrival") or {}
+    route = (payload.get("enroute") or {}).get("route_path") or []
+
+    segments: list[dict[str, Any]] = []
+    if route:
+        segments.append(route[0])
+    segments.extend(departure.get("sid_path") or [])
+    segments.extend(route[1:-1] if len(route) > 2 else [])
+    segments.extend(arrival.get("star_path") or [])
+    segments.extend(arrival.get("approach_path") or [])
+    if len(route) > 1:
+        segments.append(route[-1])
+
+    points: list[tuple[float, float]] = []
+    for entry in segments:
+        if not isinstance(entry, dict):
+            continue
+        latitude = entry.get("lat")
+        longitude = entry.get("lon")
+        if latitude is None or longitude is None:
+            continue
+        points.append((float(latitude), float(longitude)))
+    return points
+
+
+def _demo_plan_key(payload: dict[str, Any]) -> str:
+    departure = (payload.get("departure") or {}).get("icao") or "----"
+    arrival = (payload.get("arrival") or {}).get("icao") or "----"
+    route = (payload.get("enroute") or {}).get("raw_simbrief_route") or ""
+    return f"{departure}-{arrival}-{hash(route)}"
 
 
 def _threshold_for(chart: dict[str, Any], runway: str | None) -> dict[str, Any] | None:

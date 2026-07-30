@@ -6,7 +6,6 @@ import threading
 import time
 
 from navixav.live.base import AircraftState, PositionSource, PositionUnavailable
-from navixav.live.demo import DemoSource
 from navixav.live.simconnect import SimConnectSource
 
 # Intervalle minimal entre deux redécouvertes complètes.
@@ -20,13 +19,13 @@ class LiveTracker:
         self._lock = threading.Lock()
         self._sources: list[PositionSource] = [SimConnectSource()]
         self._active: PositionSource | None = None
-        self._demo: DemoSource | None = None
+        self._demo: PositionSource | None = None
         self._last_attempt = 0.0
         self._last_reason = "Recherche du simulateur…"
 
     # ------------------------------------------------------------------ #
 
-    def set_demo(self, source: DemoSource | None) -> None:
+    def set_demo(self, source: PositionSource | None) -> None:
         with self._lock:
             self._demo = source
 

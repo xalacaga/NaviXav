@@ -25,6 +25,7 @@ let simulatorTimer = null;
 let activeRoutePointIndex = null;
 let latestAircraft = null;
 let flightGeometry = [];
+let flightRouteTotalNm = 0;
 let currentFlightTrail = [];
 let currentFlightTrailPlanKey = "";
 let lastCurrentFlightTrailAt = 0;
@@ -562,6 +563,7 @@ function renderPlan(plan) {
   // La progression du bandeau doit utiliser la route opérationnelle complète,
   // y compris les points de SID, STAR et d'approche.
   flightGeometry = buildFlightGeometry(plan);
+  flightRouteTotalNm = routeLengthNm(flightGeometry);
   renderStrip(plan);
   renderTerminal(plan);
   renderConstraints(plan);
@@ -936,6 +938,15 @@ function projectAircraftOnFlightPath(aircraft) {
     distanceToActiveNm: segmentLength * (1 - best.progress),
     remainingNm,
   };
+}
+
+/** Longueur totale de la route opérationnelle, calculée une fois par plan. */
+function routeLengthNm(geometry) {
+  let total = 0;
+  for (let index = 0; index < geometry.length - 1; index += 1) {
+    total += haversineNm(geometry[index], geometry[index + 1]);
+  }
+  return total;
 }
 
 function distanceFromProjectionToIndex(projection, targetIndex) {
@@ -1569,21 +1580,7 @@ function flightTrailPoints(points) {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
 
     if (previous) {
-      const elapsedMs = (
-        Date.parse(point.recorded_at || "")
-        - Date.parse(previous.recorded_at || "")
-      );
-      const elapsedHours = Number.isFinite(elapsedMs) && elapsedMs > 0
-        ? elapsedMs / 3_600_000
-        : 0;
-      const speed = Math.max(
-        50,
-        finiteOr(previous.ground_speed_kt, 0),
-        finiteOr(point.ground_speed_kt, 0)
-      );
-      const plausibleDistanceNm = elapsedHours
-        ? Math.max(0.15, speed * elapsedHours * 4)
-        : 2;
+      const plausibleDistanceNm = plausibleLegNm(previous, point);
       const loopRestart = (
         previous.source === "Démonstration"
         && finiteOr(previous.ground_speed_kt, 0) < 1
@@ -1598,6 +1595,29 @@ function flightTrailPoints(points) {
     previous = point;
   }
   return trail;
+}
+
+/**
+ * Distance maximale crédible entre deux relevés, au-delà de laquelle le
+ * segment vient d'une téléportation (rechargement, slew) et non d'un vol.
+ *
+ * Le vol de démonstration est exempté : il comprime le temps, sa position
+ * avance donc plus vite que la vitesse sol annoncée sans jamais sauter.
+ */
+function plausibleLegNm(previous, point) {
+  if (previous?.source === "Démonstration") return Infinity;
+  const elapsedMs = (
+    Date.parse(point.recorded_at || "") - Date.parse(previous.recorded_at || "")
+  );
+  const elapsedHours = Number.isFinite(elapsedMs) && elapsedMs > 0
+    ? elapsedMs / 3_600_000
+    : 0;
+  const speed = Math.max(
+    50,
+    finiteOr(previous.ground_speed_kt, 0),
+    finiteOr(point.ground_speed_kt, 0)
+  );
+  return elapsedHours ? Math.max(0.15, speed * elapsedHours * 4) : 2;
 }
 
 function syncMapTrail() {
@@ -1785,20 +1805,8 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
     }
     if (!index) continue;
     const previous = samples[index - 1];
-    const elapsedHours = (
-      Date.parse(point.recorded_at || "")
-      - Date.parse(previous.recorded_at || "")
-    ) / 3_600_000;
     const leg = haversineNm(previous, point);
-    const speed = Math.max(
-      50,
-      finiteOr(previous.ground_speed_kt, 0),
-      finiteOr(point.ground_speed_kt, 0)
-    );
-    const plausible = Number.isFinite(elapsedHours) && elapsedHours > 0
-      ? Math.max(0.15, speed * elapsedHours * 4)
-      : 2;
-    if (leg <= plausible) distanceNm += leg;
+    if (leg <= plausibleLegNm(previous, point)) distanceNm += leg;
   }
 
   const events = [];
@@ -2099,20 +2107,9 @@ function summaryDistance(points) {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const point = points[index];
-    const elapsedHours = (
-      Date.parse(point.recorded_at || "")
-      - Date.parse(previous.recorded_at || "")
-    ) / 3_600_000;
-    const leg = haversineNm(previous, point);
-    const speed = Math.max(
-      50,
-      finiteOr(previous.ground_speed_kt, 0),
-      finiteOr(point.ground_speed_kt, 0)
-    );
-    const plausible = Number.isFinite(elapsedHours) && elapsedHours > 0
-      ? Math.max(0.15, speed * elapsedHours * 4)
-      : 2;
-    if (leg <= plausible) distanceNm += leg;
+    if (haversineNm(previous, point) <= plausibleLegNm(previous, point)) {
+      distanceNm += haversineNm(previous, point);
+    }
   }
   return distanceNm;
 }
@@ -2608,6 +2605,123 @@ function updateAlertsDisplay(context) {
   }
 }
 
+/* ------------------------------------------- progression graphique du vol */
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Silhouette d'avion vue de dessus, nez vers le haut puis pivotée en CSS. */
+function planeMark() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute(
+    "d",
+    "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"
+  );
+  path.setAttribute("fill", "currentColor");
+  svg.append(path);
+  return svg;
+}
+
+function progressTime(id, label, extraClass = "") {
+  const node = el("div", `flight-progress-time${extraClass ? ` ${extraClass}` : ""}`);
+  node.append(el("span", "flight-progress-time-label", label));
+  const value = el("span", "flight-progress-time-value", "—");
+  value.id = id;
+  node.append(value);
+  return node;
+}
+
+function progressAirport(block, role, extraClass) {
+  const airport = el("div", `flight-progress-airport${extraClass ? ` ${extraClass}` : ""}`);
+  airport.append(el("div", "flight-progress-role", role));
+  airport.append(el("div", "flight-progress-icao", block?.icao || "----"));
+  if (block?.name) airport.append(el("div", "flight-progress-name", block.name));
+  return airport;
+}
+
+/**
+ * Bandeau « départ → arrivée » : l'avion avance sur la ligne au rythme de la
+ * distance parcourue, avec le temps écoulé, prévu et restant sous la ligne.
+ */
+function buildFlightProgressSection(plan) {
+  const section = el("section", "flight-progress");
+  section.append(progressAirport(plan.departure, t("progress_departure"), ""));
+
+  const middle = el("div", "flight-progress-middle");
+
+  const track = el("div", "flight-progress-track");
+  track.id = "flight-progress-track";
+  track.setAttribute("role", "img");
+  track.append(el("span", "flight-progress-dot"));
+  const done = el("span", "flight-progress-done");
+  track.append(done);
+  const plane = el("span", "flight-progress-plane");
+  const percent = el("span", "flight-progress-percent", "—");
+  percent.id = "flight-progress-percent";
+  plane.append(percent);
+  plane.append(planeMark());
+  track.append(plane);
+  track.append(el("span", "flight-progress-dot is-end"));
+  middle.append(track);
+
+  const caption = el("div", "flight-progress-caption", "—");
+  caption.id = "flight-progress-caption";
+  middle.append(caption);
+
+  const times = el("div", "flight-progress-times");
+  times.append(progressTime("flight-progress-elapsed", t("time_elapsed")));
+  times.append(progressTime("flight-progress-total", t("total_ete"), "is-center"));
+  times.append(progressTime("flight-progress-remaining", t("time_remaining"), "is-right"));
+  middle.append(times);
+
+  section.append(middle);
+  section.append(progressAirport(plan.arrival, t("progress_arrival"), "is-right"));
+  return section;
+}
+
+function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEteSeconds) {
+  const track = $("flight-progress-track");
+  if (!track) return;
+
+  const elapsedSeconds = activeFlightSummary
+    ? Math.max(0, (Date.now() - Date.parse(activeFlightSummary.started_at)) / 1000)
+    : 0;
+
+  // La distance parcourue reste la référence ; sans projection utilisable on
+  // retombe sur le rapport entre le temps écoulé et la prévision SimBrief.
+  let ratio = null;
+  if (projection && flightRouteTotalNm > 0) {
+    ratio = (flightRouteTotalNm - projection.remainingNm) / flightRouteTotalNm;
+  } else if (elapsedSeconds && plannedEteSeconds) {
+    ratio = elapsedSeconds / plannedEteSeconds;
+  }
+
+  const percent = ratio === null ? 0 : Math.min(100, Math.max(0, ratio * 100));
+  track.style.setProperty("--flight-progress", `${percent.toFixed(2)}%`);
+  track.dataset.state = !aircraft ? "offline" : ratio === null ? "unknown" : "live";
+  track.setAttribute(
+    "aria-label",
+    `${t("progress_departure")} ${currentPlan?.departure?.icao || "----"} → `
+      + `${t("progress_arrival")} ${currentPlan?.arrival?.icao || "----"} · `
+      + `${Math.round(percent)} %`
+  );
+
+  liveValue("flight-progress-percent", ratio === null ? "—" : `${Math.round(percent)} %`);
+  liveValue(
+    "flight-progress-caption",
+    projection
+      ? `${projection.remainingNm.toFixed(0)} NM ${t("progress_before_arrival")}`
+      : plannedEteSeconds
+        ? `${hhmm(plannedEteSeconds)} ${t("progress_planned_suffix")}`
+        : "—"
+  );
+  liveValue("flight-progress-elapsed", hhmm(elapsedSeconds) || "—");
+  liveValue("flight-progress-total", hhmm(plannedEteSeconds) || "—");
+  liveValue("flight-progress-remaining", hhmm(remainingSeconds) || "—");
+}
+
 function updateFlightPanel(aircraft) {
   const projection = projectAircraftOnFlightPath(aircraft);
   const phase = detectFlightPhase(aircraft, projection);
@@ -2637,6 +2751,21 @@ function updateFlightPanel(aircraft) {
     "flight-remaining",
     projection ? `${projection.remainingNm.toFixed(0)} NM` : "—"
   );
+
+  // Temps de vol prévu par SimBrief, puis temps restant estimé sur la vitesse
+  // sol réelle. Sous 40 kt la division devient instable : avant le décollage on
+  // retombe sur la prévision SimBrief, et après l'arrivée on n'affiche plus rien.
+  const plannedEteSeconds = Number(currentPlan?.dispatch?.time_enroute_s || 0);
+  const groundSpeedKt = Number(aircraft?.ground_speed_kt || 0);
+  const arrived = projection ? projection.remainingNm <= 5 : false;
+  let remainingSeconds = null;
+  if (projection && groundSpeedKt >= 40) {
+    remainingSeconds = (projection.remainingNm / groundSpeedKt) * 3600;
+  } else if (plannedEteSeconds && !arrived && (!aircraft || aircraft.on_ground)) {
+    remainingSeconds = plannedEteSeconds;
+  }
+  updateFlightProgress(aircraft, projection, remainingSeconds, plannedEteSeconds);
+
   liveValue(
     "flight-ground-speed",
     aircraft?.ground_speed_kt !== null && aircraft?.ground_speed_kt !== undefined
@@ -2814,6 +2943,8 @@ function renderFlightPanel(plan) {
   alerts.setAttribute("role", "status");
   alerts.setAttribute("aria-live", "polite");
   panel.append(alerts);
+
+  panel.append(buildFlightProgressSection(plan));
 
   const grid = el("div", "flight-live-grid");
   const item = (label, id, note = "") => {

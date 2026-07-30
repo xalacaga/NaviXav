@@ -427,6 +427,13 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
         assert chart["parkings"]
         assert live["connected"] is True
         assert live["aircraft"]["source"] == "Démonstration"
+        # La démonstration doit rejouer le vol complet du plan, pas un roulage.
+        assert live["aircraft"]["title"] == "Démonstration NaviXav"
+
+        # Changer d'aéroport sur la carte ne doit pas relancer le vol au départ.
+        arrival = plan["arrival"]["icao"]
+        again = endpoint("/api/live")(True, arrival, None)
+        assert again["aircraft"]["title"] == "Démonstration NaviXav"
     finally:
         for close in app.router.on_shutdown:
             close()
