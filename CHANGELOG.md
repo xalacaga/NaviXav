@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## [1.4.1] - 2026-07-30
+
+## Autres changements
+
+- Optimisation carte.
+
+L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+
 ## [1.4.0] - 2026-07-30
 
 ## Nouvelles fonctionnalités
