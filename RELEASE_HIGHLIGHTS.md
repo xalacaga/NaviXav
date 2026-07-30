@@ -11,6 +11,6 @@ réinitialisé par `scripts\prepare_release.ps1`.
 
 ## Corrections
 
-- Le fond de carte ne laisse plus apparaître la grille des tuiles : sa
-  transparence s'applique désormais à l'ensemble du calque et les tuiles ne se
-  chevauchent plus.
+<!-- Exemple, à supprimer :
+- Le fond de carte ne laisse plus apparaître la grille des tuiles.
+-->
