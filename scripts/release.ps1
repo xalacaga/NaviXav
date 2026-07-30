@@ -4,7 +4,10 @@ param(
     [string]$Bump = "auto",
     [int]$KeepReleases = 0, # Nombre d'anciennes versions à conserver en plus de la nouvelle (0 = conserve uniquement la dernière)
     [switch]$SkipToolInstall,
-    [switch]$Force
+    [switch]$Force,
+    # Publier une version sans changement visible par l'utilisateur, quand
+    # RELEASE_HIGHLIGHTS.md n'a rien à annoncer.
+    [switch]$AllowGenericNotes
 )
 
 $ErrorActionPreference = "Stop"
@@ -118,6 +121,7 @@ $PublishParams = @{
     Bump = $Bump
 }
 if ($SkipToolInstall) { $PublishParams.Add("SkipToolInstall", $true) }
+if ($AllowGenericNotes) { $PublishParams.Add("AllowGenericNotes", $true) }
 
 & $PublishScript @PublishParams
 

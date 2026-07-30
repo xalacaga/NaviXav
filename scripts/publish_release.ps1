@@ -2,7 +2,9 @@
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
-    [switch]$SkipToolInstall
+    [switch]$SkipToolInstall,
+    # Publication sans changement visible : voir prepare_release.ps1.
+    [switch]$AllowGenericNotes
 )
 
 $ErrorActionPreference = "Stop"
@@ -135,7 +137,9 @@ if ($Resume) {
     Write-Host "Reprise de la publication v$Version." -ForegroundColor Yellow
 } else {
     try {
-        $VersionOutput = & (Join-Path $PSScriptRoot "prepare_release.ps1") -Bump $Bump
+        $PrepareParams = @{ Bump = $Bump }
+        if ($AllowGenericNotes) { $PrepareParams.Add("AllowGenericNotes", $true) }
+        $VersionOutput = & (Join-Path $PSScriptRoot "prepare_release.ps1") @PrepareParams
         if ($LASTEXITCODE -ne 0) {
             throw "La préparation de la Release a échoué."
         }

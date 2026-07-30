@@ -1,10 +1,16 @@
 # Nouveautés de la prochaine version
 
-Décrivez ici, en français et du point de vue de l'utilisateur, ce que la
-prochaine version apporte. Une puce par nouveauté. Ce fichier remplace les
-sujets de commit dans la section « Nouvelles fonctionnalités » des notes de
-version, puis il est réinitialisé par `scripts\prepare_release.ps1`.
+À compléter à **chaque modification du code**, pas seulement avant de publier :
+une puce par changement, en français et du point de vue de l'utilisateur. Ce
+fichier remplace les sujets de commit dans les notes de version, puis il est
+réinitialisé par `scripts\prepare_release.ps1`.
 
 <!-- Exemple, à supprimer :
 - Le suivi du vol affiche le temps restant avant l'arrivée.
 -->
+
+## Corrections
+
+- Le fond de carte ne laisse plus apparaître la grille des tuiles : sa
+  transparence s'applique désormais à l'ensemble du calque et les tuiles ne se
+  chevauchent plus.

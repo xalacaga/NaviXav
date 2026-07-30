@@ -1,7 +1,10 @@
 ﻿[CmdletBinding()]
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
-    [string]$Bump = "auto"
+    [string]$Bump = "auto",
+    # Publication d'une version sans changement visible par l'utilisateur : les
+    # notes reprennent alors les sujets de commit, faute de mieux.
+    [switch]$AllowGenericNotes
 )
 
 $ErrorActionPreference = "Stop"
@@ -135,6 +138,14 @@ function Get-Highlights([string]$Path) {
             if ($Line -notmatch '-->') { $InComment = $true }
             continue
         }
+        if ($Line -match '^\s*#{1,6}\s*(?<title>.+?)\s*$') {
+            if ($Current) { $Items.Add($Current) }
+            $Current = ""
+            $Title = $Matches.title
+            if ($Title -match '^(Corrections?|Correctifs?)') { $Items = $Fixes }
+            elseif ($Title -match '^(Nouveaut|Nouvelles)') { $Items = $Features }
+            continue
+        }
         if ($Line -match '^\s*[-*]\s+(?<text>.+?)\s*$') {
             if ($Current) { $Items.Add($Current) }
             $Current = $Matches.text
@@ -147,19 +158,28 @@ function Get-Highlights([string]$Path) {
         }
     }
     if ($Current) { $Items.Add($Current) }
-    return $Items.ToArray()
+    return [pscustomobject]@{
+        Features = $Features.ToArray()
+        Fixes = $Fixes.ToArray()
+    }
 }
 
 $HighlightsTemplate = @"
 # Nouveautés de la prochaine version
 
-Décrivez ici, en français et du point de vue de l'utilisateur, ce que la
-prochaine version apporte. Une puce par nouveauté. Ce fichier remplace les
-sujets de commit dans la section « Nouvelles fonctionnalités » des notes de
-version, puis il est réinitialisé par ``scripts\prepare_release.ps1``.
+À compléter à **chaque modification du code**, pas seulement avant de publier :
+une puce par changement, en français et du point de vue de l'utilisateur. Ce
+fichier remplace les sujets de commit dans les notes de version, puis il est
+réinitialisé par ``scripts\prepare_release.ps1``.
 
 <!-- Exemple, à supprimer :
 - Le suivi du vol affiche le temps restant avant l'arrivée.
+-->
+
+## Corrections
+
+<!-- Exemple, à supprimer :
+- Le fond de carte ne laisse plus apparaître la grille des tuiles.
 -->
 "@
 
@@ -179,6 +199,24 @@ $FrenchDate = (Get-Date).ToString(
 $HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.md"
 $Highlights = Get-Highlights $HighlightsPath
 
+# Contrôle avant toute modification : rien n'est publié avec des notes qui ne
+# décrivent pas la version. Échouer ici coûte deux secondes, pas une
+# construction complète.
+if (
+    $Highlights.Features.Count -eq 0 -and
+    $Highlights.Fixes.Count -eq 0 -and
+    -not $AllowGenericNotes
+) {
+    throw @"
+RELEASE_HIGHLIGHTS.md ne décrit pas cette version.
+
+Ajoutez-y une puce par changement, en français et du point de vue de
+l'utilisateur, sous « # Nouveautés » ou sous « ## Corrections », puis relancez.
+
+Publication sans changement visible : relancez avec -AllowGenericNotes.
+"@
+}
+
 Set-VersionInFile "navixav\__init__.py" '__version__\s*=\s*"\d+\.\d+\.\d+"' "__version__ = `"$Next`""
 Set-VersionInFile "pyproject.toml" '(?m)^version\s*=\s*"\d+\.\d+\.\d+"' "version = `"$Next`""
 
@@ -196,15 +234,12 @@ $Notes.Add("# NaviXav $Next")
 $Notes.Add("")
 $Notes.Add("Publication du $FrenchDate.")
 $Notes.Add("")
-# Les nouveautés rédigées à la main l'emportent : elles parlent du produit,
-# là où le sujet de commit ne décrit que le dépôt.
-if ($Highlights.Count -gt 0) {
-    Add-Category $Notes "Nouvelles fonctionnalités" $Highlights
-} else {
-    Write-Warning "RELEASE_HIGHLIGHTS.md est vide : les notes reprennent les sujets de commit."
-    Add-Category $Notes "Nouvelles fonctionnalités" $Features
-}
-Add-Category $Notes "Corrections de bugs" $Fixes
+# Les textes rédigés à la main l'emportent, section par section : ils parlent
+# du produit, là où le sujet de commit ne décrit que le dépôt.
+$FeatureItems = if ($Highlights.Features.Count -gt 0) { $Highlights.Features } else { $Features }
+$FixItems = if ($Highlights.Fixes.Count -gt 0) { $Highlights.Fixes } else { $Fixes }
+Add-Category $Notes "Nouvelles fonctionnalités" $FeatureItems
+Add-Category $Notes "Corrections de bugs" $FixItems
 Add-Category $Notes "Autres changements" $Other
 if ($Notes[$Notes.Count - 1] -ne "") { $Notes.Add("") }
 $Notes.Add("L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.")
