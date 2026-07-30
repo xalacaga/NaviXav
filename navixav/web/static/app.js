@@ -2658,9 +2658,9 @@ function buildFlightProgressSection(plan) {
   const done = el("span", "flight-progress-done");
   track.append(done);
   const plane = el("span", "flight-progress-plane");
-  const percent = el("span", "flight-progress-percent", "—");
-  percent.id = "flight-progress-percent";
-  plane.append(percent);
+  const altitude = el("span", "flight-progress-altitude", "—");
+  altitude.id = "flight-progress-altitude";
+  plane.append(altitude);
   plane.append(planeMark());
   track.append(plane);
   track.append(el("span", "flight-progress-dot is-end"));
@@ -2679,6 +2679,29 @@ function buildFlightProgressSection(plan) {
   section.append(middle);
   section.append(progressAirport(plan.arrival, t("progress_arrival"), "is-right"));
   return section;
+}
+
+/**
+ * Altitude courante affichée au-dessus de l'avion, en niveau de vol au-dessus
+ * de l'altitude de transition et en pieds en dessous, avec la tendance
+ * verticale. La transition retenue suit la phase : celle du départ tant que
+ * l'avion n'a pas dépassé la mi-route, celle de l'arrivée ensuite.
+ */
+function progressAltitudeLabel(aircraft, ratio) {
+  const altitude = finiteOr(aircraft?.altitude_ft);
+  if (altitude === null) return "—";
+  const transition = finiteOr(
+    ratio !== null && ratio >= 0.5
+      ? currentPlan?.arrival?.transition_level_ft
+      : currentPlan?.departure?.transition_altitude_ft,
+    5000
+  );
+  const text = altitude >= transition
+    ? `FL${String(Math.round(altitude / 100)).padStart(3, "0")}`
+    : `${Math.round(altitude).toLocaleString("fr-FR")} ft`;
+  const verticalSpeed = finiteOr(aircraft?.vertical_speed_fpm, 0);
+  const trend = verticalSpeed > 300 ? " ↑" : verticalSpeed < -300 ? " ↓" : "";
+  return `${text}${trend}`;
 }
 
 function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEteSeconds) {
@@ -2708,14 +2731,15 @@ function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEte
       + `${Math.round(percent)} %`
   );
 
-  liveValue("flight-progress-percent", ratio === null ? "—" : `${Math.round(percent)} %`);
+  liveValue("flight-progress-altitude", progressAltitudeLabel(aircraft, ratio));
+  const caption = projection
+    ? `${projection.remainingNm.toFixed(0)} NM ${t("progress_before_arrival")}`
+    : plannedEteSeconds
+      ? `${hhmm(plannedEteSeconds)} ${t("progress_planned_suffix")}`
+      : "—";
   liveValue(
     "flight-progress-caption",
-    projection
-      ? `${projection.remainingNm.toFixed(0)} NM ${t("progress_before_arrival")}`
-      : plannedEteSeconds
-        ? `${hhmm(plannedEteSeconds)} ${t("progress_planned_suffix")}`
-        : "—"
+    ratio === null ? caption : `${caption} · ${Math.round(percent)} %`
   );
   liveValue("flight-progress-elapsed", hhmm(elapsedSeconds) || "—");
   liveValue("flight-progress-total", hhmm(plannedEteSeconds) || "—");
@@ -4225,15 +4249,26 @@ function updateHud(aircraft) {
     return;
   }
 
+  const heading = finiteOr(aircraft.heading_true_deg);
+  const groundSpeed = finiteOr(aircraft.ground_speed_kt);
+  const verticalSpeed = finiteOr(aircraft.vertical_speed_fpm);
+  const airspeed = finiteOr(aircraft.indicated_airspeed_kt);
+  const temperature = finiteOr(aircraft.configuration?.total_air_temperature_c);
   const rows = [
-    ["cap", aircraft.heading_true_deg !== null && aircraft.heading_true_deg !== undefined
-      ? `${String(Math.round(aircraft.heading_true_deg)).padStart(3, "0")}°` : "—"],
-    ["sol", aircraft.ground_speed_kt !== null && aircraft.ground_speed_kt !== undefined
-      ? `${Math.round(aircraft.ground_speed_kt)} kt` : "—"],
-    ["alt", aircraft.altitude_ft !== null && aircraft.altitude_ft !== undefined
-      ? `${Math.round(aircraft.altitude_ft)} ft` : "—"],
-    ["état", aircraft.on_ground ? "au sol" : "en vol"],
+    ["cap", heading !== null ? `${String(Math.round(heading)).padStart(3, "0")}°` : "—"],
+    ["sol", groundSpeed !== null ? `${Math.round(groundSpeed)} kt` : "—"],
+    ["IAS", airspeed !== null ? `${Math.round(airspeed)} kt` : "—"],
+    ["alt", progressAltitudeLabel(aircraft, null)],
   ];
+  // Le variomètre n'a de sens qu'en vol, et le bruit au sol le rendrait
+  // illisible : il n'apparaît que si la trajectoire monte ou descend.
+  if (!aircraft.on_ground && verticalSpeed !== null && Math.abs(verticalSpeed) >= 50) {
+    const rounded = Math.round(verticalSpeed / 50) * 50;
+    rows.push(["Vz", `${rounded > 0 ? "+" : ""}${rounded} ft/min`]);
+  }
+  if (temperature !== null) rows.push(["temp", `${Math.round(temperature)} °C`]);
+  rows.push(["phase", detectFlightPhase(aircraft, projectAircraftOnFlightPath(aircraft))]);
+
   for (const [label, value] of rows) {
     const line = el("div");
     line.append(document.createTextNode(`${label} `));

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
@@ -82,8 +82,15 @@ if ($Status) {
         & git status -s
         $Choice = Read-Host "`nVoulez-vous enregistrer automatiquement tous ces changements ? (O/n)"
         if ($Choice -eq "" -or $Choice -match "^[OyY]") {
-            $Msg = Read-Host "Message de commit [feat: mises à jour de l'application]"
-            if (-not $Msg) { $Msg = "feat: mises à jour de l'application" }
+            # Un message générique se retrouverait tel quel dans les notes de
+            # version : la description des nouveautés est donc obligatoire.
+            $Msg = ""
+            while (-not $Msg) {
+                $Msg = (Read-Host "Message de commit (ex. « feat: suivi du temps restant en vol »)").Trim()
+                if (-not $Msg) {
+                    Write-Host "Décrivez la nouveauté : ce texte alimente les notes de version." -ForegroundColor Yellow
+                }
+            }
             & git add .
             & git commit -m "$Msg"
         } else {

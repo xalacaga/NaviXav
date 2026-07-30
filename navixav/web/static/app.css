@@ -1061,7 +1061,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .flight-progress-middle { min-width: 0; }
 .flight-progress-track {
   --flight-progress: 0%;
-  position: relative; height: 3px; margin: 26px 12px 0;
+  position: relative; height: 3px; margin: 34px 12px 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-faint) 35%, transparent);
 }
@@ -1091,15 +1091,24 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   transform: rotate(90deg);
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%));
 }
-.flight-progress-percent {
-  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-  font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: var(--text-muted); white-space: nowrap;
+.flight-progress-altitude {
+  position: absolute; bottom: 19px; left: 50%; transform: translateX(-50%);
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+  font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--accent); white-space: nowrap;
+}
+.flight-progress-track[data-state="offline"] .flight-progress-altitude {
+  border-color: var(--border); background: var(--surface-raised);
+  color: var(--text-faint);
 }
 .flight-progress-track[data-state="offline"] .flight-progress-done,
-.flight-progress-track[data-state="offline"] .flight-progress-dot,
+.flight-progress-track[data-state="offline"] .flight-progress-dot {
+  background-color: var(--text-faint);
+}
 .flight-progress-track[data-state="offline"] .flight-progress-plane {
-  color: var(--text-faint); background-color: var(--text-faint);
+  color: var(--text-faint);
 }
 .flight-progress-track[data-state="offline"] .flight-progress-dot.is-end {
   background-color: transparent;

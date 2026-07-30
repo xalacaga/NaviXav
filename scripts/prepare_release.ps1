@@ -60,20 +60,102 @@ function Set-VersionInFile(
     )
 }
 
+# Espace insécable exigée par la typographie française devant les ponctuations
+# doubles et à l'intérieur des guillemets.
+$NoBreakSpace = [char]0x00A0
+
+# Phrase de note de version : majuscule initiale, point final et espaces
+# insécables. L'espace n'est ajoutée devant « : » que si l'auteur en a déjà
+# mis une, sinon les URL et les heures seraient déformées.
+function Format-FrenchSentence([string]$Text) {
+    $Value = ([string]$Text).Trim()
+    if (-not $Value) { return "" }
+    # Le préfixe « feat(scope): » du commit ne concerne que le dépôt. La liste
+    # des types est explicite : « Attention : » ne doit pas être amputé.
+    $Value = [regex]::Replace(
+        $Value,
+        '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([^)]+\))?!?:\s*',
+        ''
+    )
+    if (-not $Value) { return "" }
+    $Value = $Value.Substring(0, 1).ToUpperInvariant() + $Value.Substring(1)
+    $Value = [regex]::Replace($Value, '(?<=\S)[ \t]+([:;!?])', "$NoBreakSpace`$1")
+    $Value = [regex]::Replace($Value, '(?<=\p{L})([;!?])', "$NoBreakSpace`$1")
+    # « : » collé à un mot et suivi d'une espace. Les URL (« https:// ») et les
+    # heures (« 12:05 ») restent intactes : elles ne remplissent pas ces deux
+    # conditions à la fois.
+    $Value = [regex]::Replace($Value, '(?<=\p{L}):(?=\s|$)', "$NoBreakSpace" + ":")
+    $Value = [regex]::Replace($Value, '«[ \t]*', "«$NoBreakSpace")
+    $Value = [regex]::Replace($Value, '[ \t]*»', "$NoBreakSpace»")
+    if ($Value -notmatch '[.!?»]$') { $Value += "." }
+    return $Value
+}
+
 function Add-Category(
     [System.Collections.Generic.List[string]]$Lines,
     [string]$Title,
     [object[]]$Items
 ) {
-    if ($Items.Count -eq 0) { return }
+    $Sentences = @($Items | ForEach-Object { Format-FrenchSentence $_ } | Where-Object { $_ })
+    if ($Sentences.Count -eq 0) { return }
     $Lines.Add("## $Title")
     $Lines.Add("")
-    foreach ($Item in $Items) {
-        $Text = [regex]::Replace([string]$Item, '^[a-z]+(\([^)]+\))?!?:\s*', '')
-        $Lines.Add("- $Text")
+    foreach ($Sentence in $Sentences) {
+        $Lines.Add("- $Sentence")
     }
     $Lines.Add("")
 }
+
+# Nouveautés rédigées à la main pour cette version.
+#
+# Les sujets de commit décrivent le dépôt, pas le produit : ils donnent des
+# notes de version illisibles pour l'utilisateur. RELEASE_HIGHLIGHTS.md prend
+# donc le pas sur eux dès qu'il contient au moins une puce. Le fichier est
+# réinitialisé après la publication, prêt pour la version suivante.
+function Get-Highlights([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return @() }
+    $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    $Items = [System.Collections.Generic.List[string]]::new()
+    $Current = ""
+    $InComment = $false
+    foreach ($Line in ($Content -split "`r?`n")) {
+        # Les exemples du gabarit vivent dans un commentaire HTML : ils ne
+        # doivent jamais se retrouver dans les notes de version.
+        if ($InComment) {
+            if ($Line -match '-->') { $InComment = $false }
+            continue
+        }
+        if ($Line -match '<!--') {
+            if ($Line -notmatch '-->') { $InComment = $true }
+            continue
+        }
+        if ($Line -match '^\s*[-*]\s+(?<text>.+?)\s*$') {
+            if ($Current) { $Items.Add($Current) }
+            $Current = $Matches.text
+        } elseif ($Current -and $Line -match '^\s+\S') {
+            # Puce sur plusieurs lignes : la continuation est indentée.
+            $Current = "$Current " + $Line.Trim()
+        } elseif (-not $Line.Trim()) {
+            if ($Current) { $Items.Add($Current) }
+            $Current = ""
+        }
+    }
+    if ($Current) { $Items.Add($Current) }
+    return $Items.ToArray()
+}
+
+$HighlightsTemplate = @"
+# Nouveautés de la prochaine version
+
+Décrivez ici, en français et du point de vue de l'utilisateur, ce que la
+prochaine version apporte. Une puce par nouveauté. Ce fichier remplace les
+sujets de commit dans la section « Nouvelles fonctionnalités » des notes de
+version, puis il est réinitialisé par ``scripts\prepare_release.ps1``.
+
+<!-- Exemple, à supprimer :
+- Le suivi du vol affiche le temps restant avant l'arrivée.
+-->
+"@
 
 $Current = Get-CurrentVersion
 $LastTag = git tag --list "v*" --sort=-version:refname | Select-Object -First 1
@@ -84,6 +166,12 @@ if ($Commits.Count -eq 0) {
 $EffectiveBump = if ($Bump -eq "auto") { Get-AutomaticBump $Commits } else { $Bump }
 $Next = Get-NextVersion $Current $EffectiveBump
 $Date = Get-Date -Format "yyyy-MM-dd"
+$FrenchDate = (Get-Date).ToString(
+    "d MMMM yyyy",
+    [System.Globalization.CultureInfo]::GetCultureInfo("fr-FR")
+)
+$HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.md"
+$Highlights = Get-Highlights $HighlightsPath
 
 Set-VersionInFile "navixav\__init__.py" '__version__\s*=\s*"\d+\.\d+\.\d+"' "__version__ = `"$Next`""
 Set-VersionInFile "pyproject.toml" '(?m)^version\s*=\s*"\d+\.\d+\.\d+"' "version = `"$Next`""
@@ -100,9 +188,16 @@ $Other = @(
 $Notes = [System.Collections.Generic.List[string]]::new()
 $Notes.Add("# NaviXav $Next")
 $Notes.Add("")
-$Notes.Add("Publication du $Date.")
+$Notes.Add("Publication du $FrenchDate.")
 $Notes.Add("")
-Add-Category $Notes "Nouvelles fonctionnalités" $Features
+# Les nouveautés rédigées à la main l'emportent : elles parlent du produit,
+# là où le sujet de commit ne décrit que le dépôt.
+if ($Highlights.Count -gt 0) {
+    Add-Category $Notes "Nouvelles fonctionnalités" $Highlights
+} else {
+    Write-Warning "RELEASE_HIGHLIGHTS.md est vide : les notes reprennent les sujets de commit."
+    Add-Category $Notes "Nouvelles fonctionnalités" $Features
+}
 Add-Category $Notes "Corrections de bugs" $Fixes
 Add-Category $Notes "Autres changements" $Other
 if ($Notes[$Notes.Count - 1] -ne "") { $Notes.Add("") }
@@ -132,6 +227,14 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
         [System.Text.UTF8Encoding]::new($false)
     )
 }
+
+# Le fichier repart vide : les nouveautés d'une version ne doivent jamais
+# réapparaître dans la suivante.
+[System.IO.File]::WriteAllText(
+    $HighlightsPath,
+    ($HighlightsTemplate + "`n"),
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 Write-Host "Version préparée : $Current -> $Next ($EffectiveBump)" -ForegroundColor Green
 Write-Host "Notes : $ProjectRoot\RELEASE_NOTES.md"
