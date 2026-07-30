@@ -14,7 +14,10 @@ $ReleaseFiles = @(
     "navixav/__init__.py",
     "pyproject.toml",
     "CHANGELOG.md",
-    "RELEASE_NOTES.md"
+    "RELEASE_NOTES.md",
+    # Vidé par prepare_release.ps1 une fois les nouveautés reprises dans les
+    # notes : la remise à zéro appartient donc au commit de Release.
+    "RELEASE_HIGHLIGHTS.md"
 )
 $BuildSideEffectFiles = @(
     "tests/data/navdata_test.sqlite"
