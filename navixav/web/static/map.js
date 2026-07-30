@@ -29,6 +29,10 @@ const MAP = (() => {
   let basemapKey = "osm";
   let trailColor = "#22d3ee";
   const tileCache = new Map();
+  // Le fond est assemblé opaque à part, puis déposé en une seule fois. Appliquer
+  // sa transparence tuile par tuile ferait ressortir chaque raccord.
+  const basemapLayer = document.createElement("canvas");
+  const basemapContext = basemapLayer.getContext("2d");
   const TILE_SIZE = 256;
   // Rayon des tuiles Web Mercator, identique à celui de la projection locale
   // du serveur : les deux repères se recouvrent donc exactement.
@@ -263,6 +267,8 @@ const MAP = (() => {
 
   function drawBasemap() {
     if (!Number.isFinite(view.scale) || view.scale <= 0) return;
+    // Onglet masqué : un calque de taille nulle ferait échouer la composition.
+    if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
     const zoom = basemapZoom();
     const tileCount = 2 ** zoom;
     // Le repère monde étant celui des tuiles, l'indice se lit directement.
@@ -285,8 +291,17 @@ const MAP = (() => {
     const firstY = Math.max(0, Math.floor(centreTileY) - radiusY);
     const lastY = Math.min(tileCount - 1, Math.floor(centreTileY) + radiusY);
 
-    context.save();
-    context.globalAlpha = BASEMAPS[basemapKey].alpha ?? 0.78;
+    const ratio = window.devicePixelRatio || 1;
+    const layerWidth = Math.round(canvas.clientWidth * ratio);
+    const layerHeight = Math.round(canvas.clientHeight * ratio);
+    if (basemapLayer.width !== layerWidth || basemapLayer.height !== layerHeight) {
+      basemapLayer.width = layerWidth;
+      basemapLayer.height = layerHeight;
+    }
+    // Redimensionner un canvas réinitialise sa transformation : on la repose.
+    basemapContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+    basemapContext.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
     for (let tileY = firstY; tileY <= lastY; tileY += 1) {
       for (let tileX = firstX; tileX <= lastX; tileX += 1) {
         const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
@@ -296,16 +311,23 @@ const MAP = (() => {
           canvas.clientWidth / 2 + (tileX - centreTileX) * screenPixelsPerTile;
         const screenY =
           canvas.clientHeight / 2 + (tileY - centreTileY) * screenPixelsPerTile;
-        // Le léger chevauchement évite les coutures dues aux pixels fractionnaires.
-        context.drawImage(
+        // Chaque tuile s'arrête exactement là où commence la suivante : ni
+        // chevauchement, ni couture due aux pixels fractionnaires.
+        const left = Math.floor(screenX);
+        const top = Math.floor(screenY);
+        basemapContext.drawImage(
           tile.image,
-          Math.floor(screenX),
-          Math.floor(screenY),
-          Math.ceil(screenPixelsPerTile) + 1,
-          Math.ceil(screenPixelsPerTile) + 1
+          left,
+          top,
+          Math.max(1, Math.floor(screenX + screenPixelsPerTile) - left),
+          Math.max(1, Math.floor(screenY + screenPixelsPerTile) - top)
         );
       }
     }
+
+    context.save();
+    context.globalAlpha = BASEMAPS[basemapKey].alpha ?? 0.78;
+    context.drawImage(basemapLayer, 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.restore();
   }
 

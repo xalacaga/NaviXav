@@ -106,16 +106,22 @@ function Add-Category(
     $Lines.Add("")
 }
 
-# Nouveautés rédigées à la main pour cette version.
+# Nouveautés et corrections rédigées à la main pour cette version.
 #
 # Les sujets de commit décrivent le dépôt, pas le produit : ils donnent des
 # notes de version illisibles pour l'utilisateur. RELEASE_HIGHLIGHTS.md prend
-# donc le pas sur eux dès qu'il contient au moins une puce. Le fichier est
-# réinitialisé après la publication, prêt pour la version suivante.
+# donc le pas sur eux, section par section, dès qu'il contient au moins une
+# puce. Le fichier est réinitialisé après la publication.
+#
+# Les puces vont aux nouveautés jusqu'au titre « ## Corrections », qui bascule
+# les suivantes vers la section des correctifs.
 function Get-Highlights([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return @() }
+    $Empty = [pscustomobject]@{ Features = @(); Fixes = @() }
+    if (-not (Test-Path -LiteralPath $Path)) { return $Empty }
     $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-    $Items = [System.Collections.Generic.List[string]]::new()
+    $Features = [System.Collections.Generic.List[string]]::new()
+    $Fixes = [System.Collections.Generic.List[string]]::new()
+    $Items = $Features
     $Current = ""
     $InComment = $false
     foreach ($Line in ($Content -split "`r?`n")) {

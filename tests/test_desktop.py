@@ -440,6 +440,23 @@ def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
     assert "MAX_TILE_RADIUS" in map_javascript
 
 
+def test_basemap_is_composited_once_so_tiles_show_no_seams():
+    """La transparence du fond s'applique au calque, pas à chaque tuile.
+
+    Appliquée tuile par tuile avec un débord d'un pixel, elle se cumulait dans
+    le recouvrement — 0,95 au lieu de 0,78 — et dessinait la grille des tuiles.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "const basemapLayer = document.createElement(\"canvas\");" in map_javascript
+    assert "basemapContext.drawImage(" in map_javascript
+    assert "context.drawImage(basemapLayer, 0, 0" in map_javascript
+    # Les tuiles se touchent sans se chevaucher.
+    assert "Math.floor(screenX + screenPixelsPerTile) - left" in map_javascript
+    assert "Math.ceil(screenPixelsPerTile) + 1" not in map_javascript
+
+
 def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
     project = Path(desktop.__file__).parent.parent
     store = tmp_path / "navdata.sqlite"
