@@ -390,6 +390,44 @@ def test_map_breaks_teleports_and_never_invents_a_direct_route():
     assert "...trail.filter(Boolean).map" in map_javascript
 
 
+def test_map_shares_one_web_mercator_frame_with_its_tiles():
+    """Une seule projection, sinon le fond de carte dérive de la route.
+
+    Le plan de terrain arrive en mètres locaux tangents à l'aérodrome. Tant
+    qu'il était dessiné tel quel sous des tuiles Web Mercator, l'écart
+    atteignait 14 NM au bout d'une route de 385 NM.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    # Le repère monde est celui des tuiles, au rayon des tuiles.
+    assert "const EARTH_RADIUS_M = 6378137;" in map_javascript
+    assert "const MERCATOR_WORLD_M = 2 * Math.PI * EARTH_RADIUS_M;" in map_javascript
+    assert "function project(latitude, longitude)" in map_javascript
+    assert "Math.log(Math.tan(Math.PI / 4 + phi / 2))" in map_javascript
+
+    # Le plan de terrain est reconverti à la réception, pas dessiné en local.
+    assert "function localToLatLon(origin, point)" in map_javascript
+    assert "chart = prepareChart(data);" in map_javascript
+
+    # L'indice de tuile se lit dans le repère monde, sans facteur d'échelle
+    # figé à la latitude de l'aérodrome.
+    assert "const tileWorldM = MERCATOR_WORLD_M / tileCount;" in map_javascript
+    assert "(view.centerX + halfWorld) / tileWorldM" in map_javascript
+
+    # Les longueurs au sol tiennent compte de la dilatation de Mercator.
+    assert "function groundRatio(worldY)" in map_javascript
+    assert "1 / Math.cosh(worldY / EARTH_RADIUS_M)" in map_javascript
+    assert "m * pixelsPerMetre >= target" in map_javascript
+    assert "runway.width_m * pixelsPerMetre" in map_javascript
+
+    # Une seule définition : l'interface délègue à la carte.
+    assert "return MAP.project(latitude, longitude);" in javascript
+    assert "webMercatorPixel" not in map_javascript
+    assert "6371000" not in map_javascript
+
+
 def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")

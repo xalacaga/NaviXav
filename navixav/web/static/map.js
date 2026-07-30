@@ -1,11 +1,17 @@
 "use strict";
 
 /**
- * Plan de terrain sur canvas.
+ * Plan de terrain et route sur canvas.
  *
- * Le plan arrive déjà projeté en mètres locaux (x est, y nord). Le rendu ne
- * fait donc qu'appliquer une échelle et un centrage, avec l'axe y inversé pour
- * garder le nord en haut.
+ * Le repère monde est celui des tuiles : Web Mercator, en mètres (EPSG:3857),
+ * x vers l'est et y vers le nord. Le rendu n'applique donc qu'une échelle et un
+ * centrage, avec l'axe y inversé à l'écran pour garder le nord en haut.
+ *
+ * Le plan de terrain, lui, arrive projeté en mètres locaux tangents à
+ * l'aérodrome : il est reconverti une fois à la réception. Sans cela, l'échelle
+ * de Mercator variant en 1/cos(latitude), le fond de carte et la route
+ * dériveraient l'un par rapport à l'autre dès qu'on s'éloigne du terrain — près
+ * de 14 NM au bout d'une route de 385 NM.
  */
 
 const MAP = (() => {
@@ -24,6 +30,11 @@ const MAP = (() => {
   let trailColor = "#22d3ee";
   const tileCache = new Map();
   const TILE_SIZE = 256;
+  // Rayon des tuiles Web Mercator, identique à celui de la projection locale
+  // du serveur : les deux repères se recouvrent donc exactement.
+  const EARTH_RADIUS_M = 6378137;
+  const MERCATOR_WORLD_M = 2 * Math.PI * EARTH_RADIUS_M;
+  const MERCATOR_LIMIT_DEG = 85.051129;
   const MAX_TILE_CACHE = 320;
   const MAX_TILE_RADIUS = 8;
   let fitPending = false;
@@ -69,6 +80,90 @@ const MAP = (() => {
 
   function css(name) {
     return getComputedStyle(document.body).getPropertyValue(name).trim();
+  }
+
+  /** Latitude/longitude vers le repère monde, en mètres Web Mercator. */
+  function project(latitude, longitude) {
+    const clamped = Math.max(
+      -MERCATOR_LIMIT_DEG,
+      Math.min(MERCATOR_LIMIT_DEG, Number(latitude))
+    );
+    const phi = (clamped * Math.PI) / 180;
+    return {
+      x: (EARTH_RADIUS_M * Number(longitude) * Math.PI) / 180,
+      y: EARTH_RADIUS_M * Math.log(Math.tan(Math.PI / 4 + phi / 2)),
+    };
+  }
+
+  /**
+   * Mètres au sol représentés par un mètre Mercator à cette ordonnée, soit
+   * cos(latitude). L'identité cos φ = sech(y / R) évite la trigonométrie
+   * inverse.
+   */
+  function groundRatio(worldY) {
+    return 1 / Math.cosh(worldY / EARTH_RADIUS_M);
+  }
+
+  /** Pixels écran par mètre au sol, au centre de la vue. */
+  function pixelsPerGroundMetre() {
+    return view.scale / groundRatio(view.centerY);
+  }
+
+  /** Inverse de la projection locale du plan de terrain. */
+  function localToLatLon(origin, point) {
+    return [
+      origin.lat + ((point.y / EARTH_RADIUS_M) * 180) / Math.PI,
+      origin.lon
+        + ((point.x / (EARTH_RADIUS_M * Math.cos((origin.lat * Math.PI) / 180))) * 180)
+          / Math.PI,
+    ];
+  }
+
+  /**
+   * Repasse le plan de terrain dans le repère monde. Seules les géométries
+   * réellement dessinées et l'emprise sont converties ; le reste du plan est
+   * transmis tel quel.
+   */
+  function prepareChart(data) {
+    if (!data?.origin) return data;
+    const toWorld = (point) => {
+      const [latitude, longitude] = localToLatLon(data.origin, point);
+      return { ...point, ...project(latitude, longitude) };
+    };
+    const runways = (data.runways || []).map((runway) => ({
+      ...runway,
+      start: toWorld(runway.start),
+      end: toWorld(runway.end),
+      ends: (runway.ends || []).map((end) => ({
+        ...end,
+        threshold: toWorld(end.threshold),
+      })),
+    }));
+
+    // L'emprise du serveur couvre aussi les taxiways et les postes : on
+    // convertit ses quatre coins plutôt que de la recalculer sur les pistes.
+    const source = data.bounds;
+    const corners = source
+      ? [
+        { x: source.min_x, y: source.min_y },
+        { x: source.max_x, y: source.min_y },
+        { x: source.min_x, y: source.max_y },
+        { x: source.max_x, y: source.max_y },
+      ].map(toWorld)
+      : runways.flatMap((runway) => [runway.start, runway.end]);
+    if (!corners.length) return { ...data, runways };
+    const xs = corners.map((point) => point.x);
+    const ys = corners.map((point) => point.y);
+    return {
+      ...data,
+      runways,
+      bounds: {
+        min_x: Math.min(...xs),
+        max_x: Math.max(...xs),
+        min_y: Math.min(...ys),
+        max_y: Math.max(...ys),
+      },
+    };
   }
 
   function toScreen(x, y) {
@@ -134,21 +229,10 @@ const MAP = (() => {
     drawNorth();
   }
 
-  function webMercatorPixel(latitude, longitude, zoom) {
-    const size = TILE_SIZE * (2 ** zoom);
-    const lat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
-    const sin = Math.sin((lat * Math.PI) / 180);
-    return {
-      x: ((longitude + 180) / 360) * size,
-      y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size,
-    };
-  }
-
+  /** Niveau de tuiles dont un pixel vaut à peu près un pixel écran. */
   function basemapZoom() {
-    const latitude = chart.origin.lat * Math.PI / 180;
-    const circumference = 2 * Math.PI * 6371000 * Math.cos(latitude);
     return Math.max(3, Math.min(BASEMAPS[basemapKey].maxZoom,
-      Math.round(Math.log2((view.scale * circumference) / TILE_SIZE))
+      Math.round(Math.log2((MERCATOR_WORLD_M * view.scale) / TILE_SIZE))
     ));
   }
 
@@ -181,16 +265,13 @@ const MAP = (() => {
     if (!Number.isFinite(view.scale) || view.scale <= 0) return;
     const zoom = basemapZoom();
     const tileCount = 2 ** zoom;
-    const origin = webMercatorPixel(chart.origin.lat, chart.origin.lon, zoom);
-    const metresPerPixel =
-      (2 * Math.PI * 6371000 * Math.cos(chart.origin.lat * Math.PI / 180)) /
-      (TILE_SIZE * tileCount);
-    const screenPixelsPerTile = (TILE_SIZE * metresPerPixel) * view.scale;
+    // Le repère monde étant celui des tuiles, l'indice se lit directement.
+    const tileWorldM = MERCATOR_WORLD_M / tileCount;
+    const screenPixelsPerTile = tileWorldM * view.scale;
     if (!Number.isFinite(screenPixelsPerTile) || screenPixelsPerTile <= 0) return;
-    const centreGlobalX = origin.x + view.centerX / metresPerPixel;
-    const centreGlobalY = origin.y - view.centerY / metresPerPixel;
-    const centreTileX = centreGlobalX / TILE_SIZE;
-    const centreTileY = centreGlobalY / TILE_SIZE;
+    const halfWorld = MERCATOR_WORLD_M / 2;
+    const centreTileX = (view.centerX + halfWorld) / tileWorldM;
+    const centreTileY = (halfWorld - view.centerY) / tileWorldM;
     const radiusX = Math.min(
       MAX_TILE_RADIUS,
       Math.ceil(canvas.clientWidth / screenPixelsPerTile / 2) + 1
@@ -230,6 +311,7 @@ const MAP = (() => {
 
   function drawRunways() {
     const highlight = (chart.highlight_runway || "").toUpperCase();
+    const pixelsPerMetre = pixelsPerGroundMetre();
 
     for (const runway of chart.runways) {
       const isHighlighted = runway.ends.some(
@@ -237,7 +319,7 @@ const MAP = (() => {
       );
       const [x1, y1] = toScreen(runway.start.x, runway.start.y);
       const [x2, y2] = toScreen(runway.end.x, runway.end.y);
-      const width = Math.max(2.5, runway.width_m * view.scale);
+      const width = Math.max(2.5, runway.width_m * pixelsPerMetre);
 
       context.strokeStyle = isHighlighted ? css("--rwy-active") : css("--rwy");
       context.lineWidth = width;
@@ -403,12 +485,17 @@ const MAP = (() => {
   }
 
   function drawScaleBar() {
-    const candidates = [10, 25, 50, 100, 250, 500, 1000, 2000, 5000];
+    // L'échelle annonce des mètres au sol : Mercator les dilate en 1/cos(φ).
+    const pixelsPerMetre = pixelsPerGroundMetre();
+    const candidates = [
+      10, 25, 50, 100, 250, 500, 1000, 2000, 5000,
+      10000, 25000, 50000, 100000, 250000, 500000,
+    ];
     const target = 120;
     const metres =
-      candidates.find((m) => m * view.scale >= target) ||
+      candidates.find((m) => m * pixelsPerMetre >= target) ||
       candidates[candidates.length - 1];
-    const pixels = metres * view.scale;
+    const pixels = metres * pixelsPerMetre;
     const x = 18;
     const y = canvas.clientHeight - 22;
 
@@ -541,8 +628,9 @@ const MAP = (() => {
   /* --------------------------------------------------------------- public */
 
   return {
+    project,
     setChart(data) {
-      chart = data;
+      chart = prepareChart(data);
       aircraft = null;
       routeSegments = [];
       fitPending = true;

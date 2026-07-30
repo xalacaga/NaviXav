@@ -4177,15 +4177,14 @@ async function loadChart(icao, runway, mapRole) {
   }
 }
 
-/** Projette une position géographique dans le repère local du plan. */
+/**
+ * Projette une position géographique dans le repère monde de la carte.
+ *
+ * La conversion appartient à `map.js` : route, trace, avion et fond de carte
+ * doivent partager exactement la même, sous peine de dériver entre eux.
+ */
 function projectToChart(latitude, longitude) {
-  const origin = currentChart.origin;
-  const x =
-    ((longitude - origin.lon) * Math.PI / 180) *
-    EARTH_RADIUS_M *
-    Math.cos((origin.lat * Math.PI) / 180);
-  const y = ((latitude - origin.lat) * Math.PI / 180) * EARTH_RADIUS_M;
-  return { x, y };
+  return MAP.project(latitude, longitude);
 }
 
 function applyMapPreferences(values) {

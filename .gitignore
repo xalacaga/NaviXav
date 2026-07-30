@@ -38,6 +38,7 @@ installer/assets/MicrosoftEdgeWebView2Setup.exe
 # Données d'exécution locales
 data/navixav.sqlite
 data/cache/
+data/logs/
 data/private_admin/
 data/developer/
 out/
@@ -50,3 +51,5 @@ Thumbs.db
 
 #Site WEB
 marketing-site/
+navixav-marketing-site.zip
+Voir-site-local.bat
