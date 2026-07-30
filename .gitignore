@@ -47,3 +47,6 @@ out/
 .vscode/
 .DS_Store
 Thumbs.db
+
+#Site WEB
+marketing-site/
