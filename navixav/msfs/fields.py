@@ -102,6 +102,10 @@ def s8(name: str) -> Field:
     return Field(name, "str8")
 
 
+def s32(name: str) -> Field:
+    return Field(name, "str32")
+
+
 def s64(name: str) -> Field:
     return Field(name, "str64")
 
@@ -186,6 +190,24 @@ TAXI_PARKING_FIELDS = (
 TAXI_PATH_FIELDS = (
     i32("TYPE"), f32("WIDTH"), i32("START"), i32("END"),
     i32("NAME_INDEX"), i32("RUNWAY_NUMBER"), i32("RUNWAY_DESIGNATOR"),
+)
+
+# Nature d'un segment : SIMCONNECT_AIRPORT_TAXI_PATH_TYPE.
+#
+# Seuls les segments de piste renseignent RUNWAY_NUMBER et RUNWAY_DESIGNATOR.
+# Sur les autres, le simulateur laisse ces deux champs tels quels : sondés à
+# LFST, LFBO et LFPO, ils y contiennent de la mémoire non réinitialisée
+# (0 valeur exploitable sur 2 114 segments de circulation à Toulouse), dont
+# certaines tombent par hasard entre 1 et 36 et passeraient pour une piste.
+TAXI_PATH_TYPE_RUNWAY = 2
+
+# Table des noms de voies (« A », « B3 »), indexée par le NAME_INDEX des
+# segments. Le bloc ne porte que cette chaîne, mais sa longueur n'est pas la
+# même d'une version du simulateur à l'autre. La taille déclarée ici ne sert
+# donc qu'à annoncer le champ : le décodage lit la charge entière
+# (`extract._taxi_names`) et reste juste quelle que soit cette longueur.
+TAXI_NAME_FIELDS = (
+    s32("NAME"),
 )
 
 # --------------------------------------------------------------------------- #

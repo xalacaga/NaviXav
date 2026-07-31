@@ -22,7 +22,13 @@ from navixav.paths import user_data_path
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_STORE = user_data_path("navixav.sqlite")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Version de la géométrie du sol enregistrée pour un terrain. Elle est portée
+# par l'aéroport lui-même plutôt que par la base : un terrain importé avant
+# l'arrivée des noms de voies doit être repris au simulateur, sans pour autant
+# invalider les autres.
+GROUND_VERSION = 1
 
 EARTH_RADIUS_M = 6378137.0
 METRES_TO_FEET = 3.280839895
@@ -42,7 +48,8 @@ CREATE TABLE IF NOT EXISTS airport (
     transition_altitude_ft INTEGER,
     transition_level_ft INTEGER,
     source TEXT NOT NULL DEFAULT 'MSFS',
-    fetched_at TEXT NOT NULL
+    fetched_at TEXT NOT NULL,
+    ground_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS runway (
@@ -107,6 +114,7 @@ CREATE TABLE IF NOT EXISTS taxi_point (
     idx INTEGER NOT NULL,
     x REAL NOT NULL,
     y REAL NOT NULL,
+    kind TEXT,
     PRIMARY KEY (icao, idx)
 );
 
@@ -114,7 +122,10 @@ CREATE TABLE IF NOT EXISTS taxi_path (
     icao TEXT NOT NULL REFERENCES airport(icao) ON DELETE CASCADE,
     start_idx INTEGER NOT NULL,
     end_idx INTEGER NOT NULL,
-    width_m REAL NOT NULL
+    width_m REAL NOT NULL,
+    kind TEXT,
+    name TEXT,
+    runway_name TEXT
 );
 CREATE INDEX IF NOT EXISTS taxi_path_by_airport ON taxi_path(icao);
 
@@ -187,6 +198,32 @@ PARKING_TYPES = {
     8: "porte grande", 9: "dock", 10: "carburant", 11: "dégivrage",
 }
 
+# Natures de segment : SIMCONNECT_AIRPORT_TAXI_PATH_TYPE.
+#
+# Ces valeurs commandent le calcul d'itinéraire autant que l'affichage : elles
+# restent en clés ASCII stables, que l'interface traduit, plutôt qu'en libellés
+# français dont la moindre variation d'accent fausserait le guidage.
+TAXI_PATH_KINDS = {
+    0: None,
+    1: "taxi",       # voie de circulation nommée
+    2: "runway",     # portion de piste utilisée au roulage
+    3: "parking",    # desserte d'un poste de stationnement
+    4: "path",       # liaison sans nom entre deux voies
+    5: "closed",     # segment fermé : à ne jamais emprunter
+    6: "vehicle",    # route de service, interdite aux aéronefs
+}
+
+# Natures de point : SIMCONNECT_AIRPORT_TAXI_POINT_TYPE. Les points d'attente
+# portent la limite à ne pas franchir sans autorisation.
+TAXI_POINT_KINDS = {
+    0: None,
+    1: "normal",
+    2: "hold_short",
+    3: "ils_hold_short",
+    4: "hold_short_no_draw",
+    5: "ils_hold_short_no_draw",
+}
+
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     """Ouvre la base NaviXav, en la créant au besoin."""
@@ -195,6 +232,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
     connection = sqlite3.connect(target, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    _migrate(connection)
     connection.executescript(SCHEMA)
     _purge_runway_pseudo_fixes(connection)
     connection.execute(
@@ -203,6 +241,78 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
     )
     connection.commit()
     return connection
+
+
+# Colonnes ajoutées après coup, avec la version de schéma qui les introduit.
+# `CREATE TABLE IF NOT EXISTS` laisse intactes les tables déjà présentes : sans
+# ces ajouts explicites, une base constituée par une version antérieure garderait
+# son ancienne forme.
+_ADDED_COLUMNS = (
+    (2, "airport", "ground_version", "INTEGER NOT NULL DEFAULT 0"),
+    (2, "taxi_point", "kind", "TEXT"),
+    (2, "taxi_path", "kind", "TEXT"),
+    (2, "taxi_path", "name", "TEXT"),
+    (2, "taxi_path", "runway_name", "TEXT"),
+)
+
+
+def _migrate(connection: sqlite3.Connection) -> None:
+    """Met à niveau une base antérieure, avant que le schéma ne soit appliqué.
+
+    Aucune donnée n'est effacée : les terrains déjà connus restent consultables
+    simulateur fermé, avec leurs procédures et leur tracé au sol. Ce sont leurs
+    seuls compléments — noms et natures de voies — qui manquent, et
+    `ground_version` provoquera leur reprise à la prochaine ouverture du
+    simulateur.
+    """
+    version = _schema_version(connection)
+    if version >= SCHEMA_VERSION:
+        return
+
+    existing = _table_names(connection)
+    for introduced_in, table, column, declaration in _ADDED_COLUMNS:
+        if version >= introduced_in or table not in existing:
+            continue
+        try:
+            connection.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
+            )
+        except sqlite3.OperationalError:
+            # Colonne déjà présente : la base a été touchée par une version
+            # intermédiaire, il n'y a rien à reprendre.
+            continue
+    connection.commit()
+    if version:
+        LOGGER.info(
+            "Base NaviXav migrée du schéma %d vers %d ; la géométrie du sol "
+            "des terrains déjà connus sera reprise au simulateur",
+            version,
+            SCHEMA_VERSION,
+        )
+
+
+def _schema_version(connection: sqlite3.Connection) -> int:
+    """Version enregistrée, ou 0 pour une base neuve ou antérieure au champ."""
+    if "meta" not in _table_names(connection):
+        return 0
+    row = connection.execute(
+        "SELECT value FROM meta WHERE key = 'schema_version'"
+    ).fetchone()
+    if row is None:
+        return 0
+    try:
+        return int(row["value"])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _table_names(connection: sqlite3.Connection) -> set[str]:
+    return {
+        row["name"]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
 
 
 def _purge_runway_pseudo_fixes(connection: sqlite3.Connection) -> None:
@@ -235,8 +345,8 @@ def store_airport(connection: sqlite3.Connection, extracted: dict[str, Any]) -> 
             """
             INSERT INTO airport (icao, name, lat, lon, altitude_ft,
                                  transition_altitude_ft, transition_level_ft,
-                                 source, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'MSFS', ?)
+                                 source, fetched_at, ground_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'MSFS', ?, ?)
             """,
             (
                 icao,
@@ -247,6 +357,7 @@ def store_airport(connection: sqlite3.Connection, extracted: dict[str, Any]) -> 
                 extracted.get("transition_altitude_ft"),
                 extracted.get("transition_level_ft"),
                 datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                GROUND_VERSION,
             ),
         )
         _store_runways(connection, extracted)
@@ -337,15 +448,32 @@ def _store_procedures(connection: sqlite3.Connection, extracted: dict[str, Any])
 
 def _store_ground(connection: sqlite3.Connection, extracted: dict[str, Any]) -> None:
     icao = extracted["icao"]
+    names: list[str] = extracted.get("taxi_names") or []
+
     connection.executemany(
-        "INSERT OR REPLACE INTO taxi_point (icao, idx, x, y) VALUES (?, ?, ?, ?)",
-        [(icao, index, point["x"], point["y"])
-         for index, point in enumerate(extracted["taxi_points"])],
+        """INSERT OR REPLACE INTO taxi_point (icao, idx, x, y, kind)
+           VALUES (?, ?, ?, ?, ?)""",
+        [
+            (
+                icao, index, point["x"], point["y"],
+                TAXI_POINT_KINDS.get(point.get("type")),
+            )
+            for index, point in enumerate(extracted["taxi_points"])
+        ],
     )
     connection.executemany(
-        "INSERT INTO taxi_path (icao, start_idx, end_idx, width_m) VALUES (?, ?, ?, ?)",
-        [(icao, path["start"], path["end"], path["width_m"])
-         for path in extracted["taxi_paths"]],
+        """INSERT INTO taxi_path (icao, start_idx, end_idx, width_m,
+                                  kind, name, runway_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                icao, path["start"], path["end"], path["width_m"],
+                TAXI_PATH_KINDS.get(path.get("type")),
+                _taxi_path_name(names, path.get("name_index")),
+                path.get("runway"),
+            )
+            for path in extracted["taxi_paths"]
+        ],
     )
     connection.executemany(
         """INSERT INTO parking (icao, label, kind, x, y, radius_m, heading)
@@ -522,6 +650,17 @@ def _common_prefix(
 
 def _needs_rnp(legs: Iterable[dict[str, Any]]) -> bool:
     return any((leg.get("rnp") or 0) > 0 for leg in legs)
+
+
+def _taxi_path_name(names: list[str], index: Any) -> str | None:
+    """Nom du segment, ou None s'il n'en porte pas.
+
+    L'indice 0 est l'entrée vide de la table : une liaison anonyme entre deux
+    voies le porte, et lui inventer un nom tromperait le guidage.
+    """
+    if not isinstance(index, int) or not 0 <= index < len(names):
+        return None
+    return names[index] or None
 
 
 def _parking_label(parking: dict[str, Any]) -> str:

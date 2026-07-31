@@ -48,6 +48,9 @@ class MsfsProvider:
         self._client = client
         self._owns_client = client is None
         self._fetched: set[str] = set()
+        # Terrains dont la reprise du tracé au sol a déjà échoué : inutile de
+        # rouvrir le simulateur pour eux jusqu'à la prochaine session.
+        self._stale_ground: set[str] = set()
 
     # ------------------------------------------------------------------ #
     # Métadonnées
@@ -79,6 +82,19 @@ class MsfsProvider:
     @property
     def has_ground_geometry(self) -> bool:
         row = self._conn.execute("SELECT COUNT(*) AS n FROM taxi_path").fetchone()
+        return bool(row and row["n"])
+
+    @property
+    def has_taxi_names(self) -> bool:
+        """Les voies de circulation sont-elles nommées ?
+
+        Faux sur une base constituée avant que NaviXav ne demande les noms, ou
+        sur un terrain que le simulateur ne renseigne pas. Le guidage au sol
+        s'annonce alors sans « tournez sur Bravo ».
+        """
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM taxi_path WHERE name IS NOT NULL"
+        ).fetchone()
         return bool(row and row["n"])
 
     def stats(self) -> dict[str, int]:
@@ -115,16 +131,35 @@ class MsfsProvider:
     def ensure(self, icao: str, refresh: bool = False) -> bool:
         """Garantit la présence d'un terrain. Retourne True s'il a été récupéré."""
         key = icao.strip().upper()
-        if not refresh and self._has(key):
+        known = self._has(key)
+        # Reprise opportuniste : le terrain est exploitable, seul son tracé au
+        # sol date d'une version antérieure. Son échec ne doit jamais priver
+        # l'utilisateur de ce qui est déjà en base.
+        opportunistic = known and not refresh and self._ground_is_stale(key)
+        if known and not refresh and not opportunistic:
             return False
-        if not self._allow_fetch:
+        if not self._allow_fetch or (opportunistic and key in self._stale_ground):
+            if known:
+                return False
             raise NavdataError(
                 f"{key} absent de la base NaviXav",
                 "lance « navixav import » avec le simulateur ouvert",
             )
         started = time.monotonic()
         LOGGER.info("Mise en cache MSFS d'un aérodrome démarrée")
-        extracted = extract_airport(self._client_or_open(), key)
+        try:
+            extracted = extract_airport(self._client_or_open(), key)
+        except (NavdataError, SimConnectError):
+            if not opportunistic:
+                raise
+            # Une seule tentative par session : rouvrir SimConnect à chaque
+            # consultation coûterait plus cher que les noms de voies manquants.
+            self._stale_ground.add(key)
+            LOGGER.info(
+                "Simulateur injoignable : le tracé au sol d'un aérodrome reste "
+                "celui d'une version antérieure"
+            )
+            return False
         msfs_store.store_airport(self._conn, extracted)
         self._fetched.add(key)
         LOGGER.info(
@@ -144,6 +179,20 @@ class MsfsProvider:
             "SELECT 1 FROM airport WHERE icao = ?", (icao,)
         ).fetchone()
         return row is not None
+
+    def _ground_is_stale(self, icao: str) -> bool:
+        """Le terrain a-t-il été importé avant la géométrie du sol actuelle ?
+
+        Un terrain périmé est repris dès que le simulateur est joignable ; sans
+        lui, il resterait dépourvu des noms de voies jusqu'à un import manuel.
+        Une seule reprise suffit : elle inscrit la version courante.
+        """
+        row = self._conn.execute(
+            "SELECT ground_version FROM airport WHERE icao = ?", (icao,)
+        ).fetchone()
+        if row is None:
+            return False
+        return (row["ground_version"] or 0) < msfs_store.GROUND_VERSION
 
     def _client_or_open(self) -> SimConnectClient:
         if self._client is None:

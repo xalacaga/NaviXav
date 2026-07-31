@@ -77,8 +77,9 @@ def build_chart(
     taxiways = []
     for row in connection.execute(
         """
-        SELECT p.start_idx, p.end_idx, p.width_m,
-               a.x AS start_x, a.y AS start_y, b.x AS end_x, b.y AS end_y
+        SELECT p.start_idx, p.end_idx, p.width_m, p.kind, p.name, p.runway_name,
+               a.x AS start_x, a.y AS start_y, a.kind AS start_kind,
+               b.x AS end_x, b.y AS end_y, b.kind AS end_kind
         FROM taxi_path p
         JOIN taxi_point a ON a.icao = ? AND a.idx = p.start_idx
         JOIN taxi_point b ON b.icao = ? AND b.idx = p.end_idx
@@ -87,10 +88,15 @@ def build_chart(
         (airport.ident, airport.ident, airport.ident),
     ).fetchall():
         taxiways.append({
-            "name": None,
+            "name": row["name"],
+            "kind": row["kind"],
+            "runway": row["runway_name"],
             "width_m": row["width_m"],
             "start": _point((row["start_x"], row["start_y"])),
             "end": _point((row["end_x"], row["end_y"])),
+            # Un point d'attente borne le segment : c'est là que s'arrête un
+            # roulage sans autorisation de traverser ou de s'aligner.
+            "hold_short": _hold_short(row["start_kind"], row["end_kind"]),
         })
 
     parkings = [{
@@ -124,6 +130,15 @@ def build_chart(
 
 def _point(xy: tuple[float, float]) -> dict[str, float]:
     return {"x": round(xy[0], 1), "y": round(xy[1], 1)}
+
+
+def _hold_short(*kinds: str | None) -> bool:
+    """Une des extrémités du segment est-elle un point d'attente ?
+
+    Les variantes « no draw » comptent autant que les autres : elles ne sont pas
+    peintes au sol, mais elles arrêtent le roulage de la même façon.
+    """
+    return any(kind and "hold_short" in kind for kind in kinds)
 
 
 def _bounds(chart: dict[str, Any]) -> dict[str, float]:

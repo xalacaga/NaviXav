@@ -428,6 +428,88 @@ def test_map_shares_one_web_mercator_frame_with_its_tiles():
     assert "6371000" not in map_javascript
 
 
+def test_the_map_draws_the_ground_it_already_receives():
+    """Le plan portait déjà voies et postes ; seules les pistes étaient tracées."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "function drawTaxiways()" in map_javascript
+    assert "function drawParkings()" in map_javascript
+    assert "function drawTaxiwayLabels()" in map_javascript
+    # Voies et postes passent par la même reprojection que les pistes.
+    assert "start: toWorld(taxiway.start)" in map_javascript
+    assert "position: toWorld(parking.position)" in map_javascript
+    # Les voies passent sous les pistes.
+    assert map_javascript.index("drawTaxiways();") < map_javascript.index("drawRunways();")
+
+
+def test_the_taxi_route_is_split_at_the_aircraft():
+    """Vert derrière, bleu devant : la bascule suit l'avion, pas le nœud suivant."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "function taxiProgress(points)" in map_javascript
+    assert "const ratio = (done - travelled) / length;" in map_javascript
+    assert 'css(walked ? "--taxi-done" : "--taxi-ahead")' in map_javascript
+    assert "function drawHoldShortMarks()" in map_javascript
+    # L'itinéraire arrive en mètres locaux : il est reconverti comme le plan.
+    assert "localToLatLon(chart.origin, point)" in map_javascript
+
+
+def test_a_taxi_plan_never_survives_a_change_of_airport():
+    """Sinon l'itinéraire d'un terrain se dessinerait sur le sol d'un autre."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    setter = map_javascript[map_javascript.index("setChart(data) {"):]
+    setter = setter[: setter.index("},")]
+    assert "taxiPlan = null;" in setter
+    assert "currentTaxiPlan = null;" in javascript
+
+
+def test_the_taxi_guidance_follows_the_live_positions():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "async function pollTaxiGuidance(aircraft)" in javascript
+    assert "pollTaxiGuidance(aircraft);" in javascript
+    assert "/api/ground/${currentIcao}/guidance?" in javascript
+    # En vol, il n'y a plus rien à guider au sol.
+    assert "if (!aircraft?.on_ground)" in javascript
+
+
+def test_the_taxi_route_is_only_redrawn_when_it_changed():
+    """Le redéposer chaque seconde effacerait la portion déjà parcourue."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    guard = javascript[javascript.index("async function pollTaxiGuidance"):]
+    guard = guard[: guard.index("\n}\n")]
+    assert "if (data.recomputed) {" in guard
+    assert guard.count("MAP.setTaxiPlan(") == 1
+
+
+def test_a_guidance_failure_stays_silent():
+    """Le signaler chaque seconde couvrirait la carte de bandeaux."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    guard = javascript[javascript.index("async function pollTaxiGuidance"):]
+    guard = guard[: guard.index("\n}\n")]
+    assert "showBanner" not in guard
+
+
+def test_dragging_the_map_does_not_select_a_parking():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+
+    assert "function parkingAt(px, py)" in map_javascript
+    assert "moved <= 4 && parkingListener" in map_javascript
+    # Dézoomé, un poste ne fait que quelques pixels.
+    assert "Math.max(10, (parking.radius_m || 15) * pixelsPerMetre)" in map_javascript
+
+
 def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
@@ -489,6 +571,20 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
         arrival = plan["arrival"]["icao"]
         again = endpoint("/api/live")(True, arrival, None)
         assert again["aircraft"]["title"] == "Démonstration NaviXav"
+
+        # Les postes servent à demander un itinéraire de roulage.
+        parkings = endpoint("/api/ground/{icao}/parkings")(departure["icao"])
+        assert parkings["parkings"]
+        assert parkings["icao"] == departure["icao"]
+
+        # La base de référence est antérieure aux natures de segment : le
+        # roulage doit le dire plutôt que de tracer une route fausse.
+        if not parkings["routable"]:
+            with pytest.raises(HTTPException) as refused:
+                endpoint("/api/ground/{icao}/route")(
+                    departure["icao"], parkings["parkings"][0]["label"], runway,
+                )
+            assert refused.value.status_code == 404
     finally:
         for close in app.router.on_shutdown:
             close()

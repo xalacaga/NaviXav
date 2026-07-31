@@ -6,20 +6,28 @@ en s'appuyant sur cet ordre : un bloc enfant appartient au dernier parent vu.
 
 from __future__ import annotations
 
-from typing import Any
+import logging
+from typing import Any, Sequence
 
 from navixav.msfs import fields as F
 from navixav.msfs.client import (
     SimConnectClient,
+    SimConnectRefused,
     FacilityDefinition,
     group_blocks,
 )
 
+LOGGER = logging.getLogger(__name__)
+
 METRES_TO_FEET = 3.280839895
 
 
-def airport_definition() -> FacilityDefinition:
-    """Définition couvrant tout ce dont NaviXav a besoin d'un aéroport."""
+def airport_definition(with_taxi_names: bool = True) -> FacilityDefinition:
+    """Définition couvrant tout ce dont NaviXav a besoin d'un aéroport.
+
+    `with_taxi_names` permet de retirer le seul bloc que les versions plus
+    anciennes du simulateur peuvent refuser ; voir `extract_airport`.
+    """
     definition = FacilityDefinition()
     definition.open("AIRPORT", F.TYPE_AIRPORT, F.AIRPORT_FIELDS)
 
@@ -64,13 +72,34 @@ def airport_definition() -> FacilityDefinition:
     definition.open("TAXI_POINT", F.TYPE_TAXI_POINT, F.TAXI_POINT_FIELDS).close()
     definition.open("TAXI_PARKING", F.TYPE_TAXI_PARKING, F.TAXI_PARKING_FIELDS).close()
     definition.open("TAXI_PATH", F.TYPE_TAXI_PATH, F.TAXI_PATH_FIELDS).close()
+    if with_taxi_names:
+        definition.open("TAXI_NAME", F.TYPE_TAXI_NAME, F.TAXI_NAME_FIELDS).close()
 
     return definition.close_all()
 
 
 def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
-    """Récupère et recompose un aéroport."""
-    definition = airport_definition()
+    """Récupère et recompose un aéroport.
+
+    Un refus du simulateur invalide toute la définition, donc tout l'aéroport.
+    Le bloc des noms de voies étant le seul dont la présence n'est pas acquise
+    sur les versions antérieures, on réessaie une fois sans lui : mieux vaut un
+    plan de terrain sans noms qu'aucune donnée du tout.
+    """
+    try:
+        return _extract_airport(client, icao, with_taxi_names=True)
+    except SimConnectRefused:
+        LOGGER.warning(
+            "Noms de voies de circulation refusés par le simulateur : "
+            "nouvel essai sans eux"
+        )
+        return _extract_airport(client, icao, with_taxi_names=False)
+
+
+def _extract_airport(
+    client: SimConnectClient, icao: str, with_taxi_names: bool
+) -> dict[str, Any]:
+    definition = airport_definition(with_taxi_names)
     blocks = client.request(definition, icao)
 
     airport: dict[str, Any] = {
@@ -83,6 +112,7 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
         "taxi_points": [],
         "taxi_parkings": [],
         "taxi_paths": [],
+        "taxi_names": _taxi_names(blocks),
     }
 
     # Contexte courant : le dernier parent rencontré de chaque niveau.
@@ -90,7 +120,15 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
     procedure: dict[str, Any] | None = None
     transition: dict[str, Any] | None = None
 
-    for name, values in group_blocks(blocks, definition.layouts):
+    # Les noms sont déjà lus ci-dessus, sur la charge entière : les retirer des
+    # dispositions évite que le découpage générique ne les redécoupe à tort.
+    layouts = {
+        block_type: fields
+        for block_type, fields in definition.layouts.items()
+        if block_type != F.TYPE_TAXI_NAME
+    }
+
+    for name, values in group_blocks(blocks, layouts):
         if name == "AIRPORT":
             airport.update(_airport(values))
 
@@ -175,10 +213,44 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
                     "start": values["START"],
                     "end": values["END"],
                     "name_index": values["NAME_INDEX"],
+                    # Renseignée sur les segments de piste et de sortie : c'est
+                    # elle qui rattache un point d'attente à la piste qu'il
+                    # protège.
+                    "runway": _path_runway(values),
                 }
             )
 
     return airport
+
+
+def _path_runway(values: dict[str, Any]) -> str | None:
+    """Piste dont un segment fait partie, ou None s'il n'en fait pas partie.
+
+    Seuls les segments de piste renseignent ces champs. Ailleurs ils ne sont
+    pas remis à zéro, et le contrôle de plage ne suffit pas à s'en protéger :
+    un reste de mémoire tombe parfois entre 1 et 36 et désignerait une piste
+    inexistante au beau milieu d'une voie de circulation.
+    """
+    if values.get("TYPE") != F.TAXI_PATH_TYPE_RUNWAY:
+        return None
+    number = values.get("RUNWAY_NUMBER") or 0
+    if not 1 <= number <= 36:
+        return None
+    return F.runway_name(number, values.get("RUNWAY_DESIGNATOR", 0))
+
+
+def _taxi_names(blocks: Sequence[tuple[int, int, bytes]]) -> list[str]:
+    """Noms de voies, dans l'ordre où les segments les indexent.
+
+    Le bloc ne portant qu'une chaîne, elle est lue sur toute la charge plutôt
+    que sur une taille supposée : l'extraction reste juste même si le
+    simulateur change la longueur du champ.
+    """
+    return [
+        payload.split(b"\x00")[0].decode("utf-8", "replace").strip()
+        for block_type, _index, payload in blocks
+        if block_type == F.TYPE_TAXI_NAME
+    ]
 
 
 # --------------------------------------------------------------------------- #

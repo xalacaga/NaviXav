@@ -297,6 +297,27 @@ def normalise_runway(name: str) -> str:
     return _normalise_runway(name)
 
 
+# Une piste et son opposée ne diffèrent que par un demi-tour : « 05 » et « 23 »
+# sont les deux seuils d'une même bande de béton.
+_OPPOSITE_DESIGNATOR = {"L": "R", "R": "L", "C": "C", "B": "B", "": ""}
+
+
+def reciprocal_runway(name: str) -> str:
+    """Autre extrémité de la même piste : « 05 » -> « 23 », « 14L » -> « 32R ».
+
+    Le simulateur ne désigne une bande que par un seul de ses deux seuils. Sans
+    cette équivalence, un décollage en 05 à Strasbourg ne trouverait aucune
+    entrée en piste, la géométrie du sol n'y parlant que de la 23.
+    """
+    normalised = _normalise_runway(name)
+    match = _RUNWAY_RE.match(normalised)
+    if not match:
+        return normalised
+    number, designator = match.groups()
+    opposite = (int(number) + 17) % 36 + 1
+    return f"{opposite:02d}{_OPPOSITE_DESIGNATOR.get(designator, designator)}"
+
+
 @dataclass
 class NavdataError(Exception):
     message: str

@@ -57,6 +57,23 @@ def ground_provider(provider):
 
 
 @pytest.fixture(scope="session")
+def named_ground_provider(ground_provider):
+    """Base dont les voies de circulation portent leur nom.
+
+    La base de référence a été constituée avant que NaviXav ne demande le bloc
+    des noms au simulateur ; tant qu'elle n'a pas été refaite, les tests qui en
+    dépendent s'ignorent plutôt que d'échouer sur une donnée absente.
+    """
+    if not ground_provider.has_taxi_names:
+        pytest.skip(
+            "base de test sans nom de voie : refaire « navixav import LFST "
+            "LFBO LFPO --store tests/data/navdata_test.sqlite » avec le "
+            "simulateur ouvert"
+        )
+    return ground_provider
+
+
+@pytest.fixture(scope="session")
 def rnp_provider(provider):
     if not provider.supports_rnp_flag:
         pytest.skip("la base de test ne renseigne pas l'exigence RNP")

@@ -24,6 +24,15 @@ from pydantic import BaseModel, Field
 
 from navixav import __version__
 from navixav.chart import EARTH_RADIUS_M, build_chart
+from navixav.ground import (
+    DEPARTURE,
+    GroundError,
+    build_graph,
+    guide,
+    plan_taxi,
+    replan,
+    replan_needed,
+)
 from navixav.config import (
     Settings,
     load_user_settings,
@@ -466,6 +475,88 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return build_chart(provider, icao, runway)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
+        finally:
+            provider.close()
+
+    @app.get("/api/ground/{icao}/route")
+    def ground_route(
+        icao: str,
+        parking: str,
+        runway: str,
+        direction: str = DEPARTURE,
+    ) -> dict[str, Any]:
+        """Itinéraire de roulage entre un poste de stationnement et une piste."""
+        provider = open_provider()
+        try:
+            graph = build_graph(provider, icao)
+            return plan_taxi(
+                graph, parking=parking, runway=runway, direction=direction
+            ).to_dict()
+        except GroundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        finally:
+            provider.close()
+
+    @app.get("/api/ground/{icao}/guidance")
+    def ground_guidance(
+        icao: str,
+        parking: str,
+        runway: str,
+        latitude: float,
+        longitude: float,
+        direction: str = DEPARTURE,
+    ) -> dict[str, Any]:
+        """Situation de l'avion sur son roulage, et consigne du moment.
+
+        L'itinéraire est recalculé à chaque interrogation plutôt que conservé
+        d'un appel à l'autre : le service ne garde aucun état de session, et le
+        réseau étant en cache, le calcul complet tient en quelques
+        millisecondes.
+        """
+        provider = open_provider()
+        try:
+            graph = build_graph(provider, icao)
+            position = graph.to_local(latitude, longitude)
+            plan = plan_taxi(
+                graph, parking=parking, runway=runway, direction=direction
+            )
+            guidance = guide(plan, *position)
+            if replan_needed(guidance):
+                plan = replan(plan, *position)
+                guidance = guide(plan, *position)
+            return {
+                "plan": plan.to_dict(),
+                "guidance": guidance.to_dict(),
+                "recomputed": plan.from_position,
+            }
+        except GroundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        finally:
+            provider.close()
+
+    @app.get("/api/ground/{icao}/parkings")
+    def ground_parkings(icao: str) -> dict[str, Any]:
+        """Postes de stationnement et pistes que le réseau au sol dessert."""
+        provider = open_provider()
+        try:
+            graph = build_graph(provider, icao)
+        except GroundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        else:
+            return {
+                "icao": graph.icao,
+                "routable": graph.has_kinds,
+                "named": graph.has_names,
+                "runways": list(graph.runway_names()) if graph.has_kinds else [],
+                "parkings": [
+                    {
+                        "label": parking.label,
+                        "kind": parking.kind,
+                        "position": {"x": parking.x, "y": parking.y},
+                    }
+                    for parking in graph.parkings
+                ],
+            }
         finally:
             provider.close()
 

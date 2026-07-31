@@ -7,6 +7,7 @@ import math
 import pytest
 
 from navixav.chart import EARTH_RADIUS_M, Projection, build_chart
+from navixav.navdata import msfs_store
 
 FEET_PER_METRE = 3.280839895
 
@@ -14,6 +15,11 @@ FEET_PER_METRE = 3.280839895
 @pytest.fixture(scope="module")
 def lfst(ground_provider):
     return build_chart(ground_provider, "LFST", "05")
+
+
+@pytest.fixture(scope="module")
+def named_taxiways(named_ground_provider):
+    return build_chart(named_ground_provider, "LFST", "05")
 
 
 # --------------------------------------------------------------------------- #
@@ -94,6 +100,49 @@ def test_bounds_contain_every_element(lfst):
         for point in (taxiway["start"], taxiway["end"]):
             assert bounds["min_x"] <= point["x"] <= bounds["max_x"]
             assert bounds["min_y"] <= point["y"] <= bounds["max_y"]
+
+
+def test_taxiways_carry_what_the_ground_guidance_needs(lfst):
+    """Nom, nature et point d'attente : sans eux, pas de guidage au sol."""
+    for taxiway in lfst["taxiways"]:
+        assert set(taxiway) >= {"name", "kind", "runway", "hold_short"}
+        assert isinstance(taxiway["hold_short"], bool)
+
+
+def test_taxiway_kinds_stay_within_the_known_set(lfst):
+    """Une nature inconnue enverrait l'avion sur une route de service."""
+    known = set(msfs_store.TAXI_PATH_KINDS.values())
+    assert {taxiway["kind"] for taxiway in lfst["taxiways"]} <= known
+
+
+def test_taxiways_are_named(named_taxiways):
+    """« Tournez à droite sur Bravo » suppose que la voie porte un nom."""
+    named = [t for t in named_taxiways["taxiways"] if t["name"]]
+    assert len(named) > 50
+
+
+@pytest.mark.parametrize("icao", ["LFST", "LFBO", "LFPO"])
+def test_only_what_an_aircraft_follows_carries_a_name(named_ground_provider, icao):
+    """Routes de service et dessertes de poste n'ont pas de nom de voie.
+
+    C'est le seul rapport constant entre nature et nom : « taxi » et « path »
+    s'échangent d'un terrain à l'autre selon la main qui a dessiné la scène —
+    à Strasbourg les voies nommées sont des « path », à Toulouse et Orly des
+    « taxi ». S'y fier trierait mal les segments.
+    """
+    chart = build_chart(named_ground_provider, icao)
+    for taxiway in chart["taxiways"]:
+        if taxiway["kind"] in ("vehicle", "parking"):
+            assert taxiway["name"] is None
+
+
+def test_a_runway_segment_names_the_runway_it_serves(named_taxiways):
+    served = {
+        taxiway["runway"]
+        for taxiway in named_taxiways["taxiways"]
+        if taxiway["kind"] == "runway" and taxiway["runway"]
+    }
+    assert served <= {"05", "23"}
 
 
 def test_parkings_are_labelled(lfst):

@@ -25,6 +25,9 @@ const MAP = (() => {
   let route = [];
   let routeSegments = [];
   let dragging = null;
+  let taxiPlan = null;
+  let selectedParking = null;
+  let parkingListener = null;
   let basemapVisible = true;
   let basemapKey = "osm";
   let trailColor = "#22d3ee";
@@ -143,6 +146,15 @@ const MAP = (() => {
         threshold: toWorld(end.threshold),
       })),
     }));
+    const taxiways = (data.taxiways || []).map((taxiway) => ({
+      ...taxiway,
+      start: toWorld(taxiway.start),
+      end: toWorld(taxiway.end),
+    }));
+    const parkings = (data.parkings || []).map((parking) => ({
+      ...parking,
+      position: toWorld(parking.position),
+    }));
 
     // L'emprise du serveur couvre aussi les taxiways et les postes : on
     // convertit ses quatre coins plutôt que de la recalculer sur les pistes.
@@ -155,12 +167,14 @@ const MAP = (() => {
         { x: source.max_x, y: source.max_y },
       ].map(toWorld)
       : runways.flatMap((runway) => [runway.start, runway.end]);
-    if (!corners.length) return { ...data, runways };
+    if (!corners.length) return { ...data, runways, taxiways, parkings };
     const xs = corners.map((point) => point.x);
     const ys = corners.map((point) => point.y);
     return {
       ...data,
       runways,
+      taxiways,
+      parkings,
       bounds: {
         min_x: Math.min(...xs),
         max_x: Math.max(...xs),
@@ -225,7 +239,13 @@ const MAP = (() => {
     if (!chart) return;
 
     if (basemapVisible) drawBasemap();
+    // Les voies passent sous les pistes : à leur croisement, c'est la piste
+    // qui est continue au sol.
+    drawTaxiways();
     drawRunways();
+    drawParkings();
+    drawTaxiRoute();
+    drawTaxiwayLabels();
     drawRoute();
     drawTrail();
     drawAircraft();
@@ -328,6 +348,271 @@ const MAP = (() => {
     context.save();
     context.globalAlpha = BASEMAPS[basemapKey].alpha ?? 0.78;
     context.drawImage(basemapLayer, 0, 0, canvas.clientWidth, canvas.clientHeight);
+    context.restore();
+  }
+
+  /* ------------------------------------------------------------- le sol */
+
+  /** Couleur d'un segment selon ce qu'il est, pas selon son apparence. */
+  function taxiwayColour(kind) {
+    if (kind === "vehicle") return css("--taxiway-service");
+    if (kind === "closed") return css("--taxiway-closed");
+    return css("--taxiway");
+  }
+
+  /** Le segment est-il au moins partiellement à l'écran ? */
+  function onScreen(x1, y1, x2, y2, margin = 40) {
+    return !(
+      (x1 < -margin && x2 < -margin)
+      || (y1 < -margin && y2 < -margin)
+      || (x1 > canvas.clientWidth + margin && x2 > canvas.clientWidth + margin)
+      || (y1 > canvas.clientHeight + margin && y2 > canvas.clientHeight + margin)
+    );
+  }
+
+  function drawTaxiways() {
+    const taxiways = chart.taxiways || [];
+    if (!taxiways.length) return;
+    const pixelsPerMetre = pixelsPerGroundMetre();
+
+    context.save();
+    context.lineCap = "round";
+    for (const taxiway of taxiways) {
+      // Une portion de piste est déjà dessinée par la piste elle-même : la
+      // repasser en voie de circulation la ferait paraître plus étroite.
+      if (taxiway.kind === "runway") continue;
+      const [x1, y1] = toScreen(taxiway.start.x, taxiway.start.y);
+      const [x2, y2] = toScreen(taxiway.end.x, taxiway.end.y);
+      if (!onScreen(x1, y1, x2, y2)) continue;
+
+      context.strokeStyle = taxiwayColour(taxiway.kind);
+      context.lineWidth = Math.max(1, (taxiway.width_m || 15) * pixelsPerMetre);
+      context.setLineDash(taxiway.kind === "closed" ? [6, 5] : []);
+      context.beginPath();
+      context.moveTo(x1, y1);
+      context.lineTo(x2, y2);
+      context.stroke();
+    }
+    context.setLineDash([]);
+    context.restore();
+  }
+
+  /**
+   * Nom des voies, une seule fois par case d'écran.
+   *
+   * Une étiquette par segment en produirait des milliers sur un grand terrain,
+   * toutes superposées. Le regroupement par case garde le nom là où l'œil le
+   * cherche — le long de la voie — sans le répéter.
+   */
+  function drawTaxiwayLabels() {
+    const pixelsPerMetre = pixelsPerGroundMetre();
+    if (pixelsPerMetre < 0.12) return;
+    const taxiways = chart.taxiways || [];
+    if (!taxiways.length) return;
+
+    const CELL = 130;
+    const placed = new Set();
+    context.save();
+    context.font = "700 11px 'Inter', system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    for (const taxiway of taxiways) {
+      if (!taxiway.name || taxiway.kind === "runway") continue;
+      const [x1, y1] = toScreen(taxiway.start.x, taxiway.start.y);
+      const [x2, y2] = toScreen(taxiway.end.x, taxiway.end.y);
+      if (!onScreen(x1, y1, x2, y2, 0)) continue;
+      const x = (x1 + x2) / 2;
+      const y = (y1 + y2) / 2;
+      if (x < 0 || y < 0 || x > canvas.clientWidth || y > canvas.clientHeight) {
+        continue;
+      }
+      const cell = `${taxiway.name}/${Math.round(x / CELL)}/${Math.round(y / CELL)}`;
+      if (placed.has(cell)) continue;
+      placed.add(cell);
+
+      const width = context.measureText(taxiway.name).width + 8;
+      context.fillStyle = css("--label-bg");
+      context.globalAlpha = 0.85;
+      roundRect(x - width / 2, y - 8, width, 16, 4);
+      context.fill();
+      context.globalAlpha = 1;
+      context.fillStyle = css("--label-text");
+      context.fillText(taxiway.name, x, y + 1);
+    }
+    context.restore();
+  }
+
+  function drawParkings() {
+    const parkings = chart.parkings || [];
+    if (!parkings.length) return;
+    const pixelsPerMetre = pixelsPerGroundMetre();
+    if (pixelsPerMetre < 0.05) return;
+    const showLabels = pixelsPerMetre > 0.35;
+
+    context.save();
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = "600 10px 'Inter', system-ui, sans-serif";
+
+    for (const parking of parkings) {
+      const [x, y] = toScreen(parking.position.x, parking.position.y);
+      if (x < -30 || y < -30 || x > canvas.clientWidth + 30 || y > canvas.clientHeight + 30) {
+        continue;
+      }
+      const active = parking.label === selectedParking;
+      const radius = Math.max(3, (parking.radius_m || 15) * pixelsPerMetre);
+
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fillStyle = active ? css("--parking-active") : css("--parking");
+      context.globalAlpha = active ? 0.55 : 0.32;
+      context.fill();
+      context.globalAlpha = 1;
+      context.strokeStyle = active ? css("--parking-active") : css("--parking");
+      context.lineWidth = active ? 2 : 1;
+      context.stroke();
+
+      if (showLabels || active) {
+        context.fillStyle = css("--label-text");
+        context.fillText(parking.label, x, y + radius + 8);
+      }
+    }
+    context.restore();
+  }
+
+  /* --------------------------------------------------------- roulage */
+
+  /** Tracé du roulage en une seule ligne, avec ses distances cumulées. */
+  function taxiPolyline() {
+    if (!taxiPlan?.legs?.length) return { points: [], total: 0 };
+    const points = [];
+    for (const leg of taxiPlan.legs) {
+      for (const point of leg.points || []) {
+        const last = points[points.length - 1];
+        if (last && last.x === point.x && last.y === point.y) continue;
+        points.push(point);
+      }
+    }
+    let total = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      total += Math.hypot(
+        points[index].x - points[index - 1].x,
+        points[index].y - points[index - 1].y
+      );
+    }
+    return { points, total };
+  }
+
+  /**
+   * Distance déjà parcourue, par projection de l'avion sur le tracé.
+   *
+   * La projection se fait sur le segment le plus proche et non sur le point le
+   * plus proche : sur un aller-retour, deux portions du tracé se frôlent, et un
+   * simple plus-proche-point ferait sauter la progression de l'une à l'autre.
+   */
+  function taxiProgress(points) {
+    if (!aircraft || points.length < 2) return 0;
+    let travelled = 0;
+    let best = { distance: Infinity, along: 0 };
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.hypot(dx, dy);
+      if (length > 0) {
+        const ratio = Math.max(0, Math.min(1,
+          ((aircraft.x - from.x) * dx + (aircraft.y - from.y) * dy) / (length * length)
+        ));
+        const closestX = from.x + dx * ratio;
+        const closestY = from.y + dy * ratio;
+        const distance = Math.hypot(aircraft.x - closestX, aircraft.y - closestY);
+        if (distance < best.distance) {
+          best = { distance, along: travelled + length * ratio };
+        }
+      }
+      travelled += length;
+    }
+    return best.along;
+  }
+
+  /** Dessine le tracé, vert derrière l'avion et bleu devant. */
+  function drawTaxiRoute() {
+    const { points } = taxiPolyline();
+    if (points.length < 2) return;
+    const done = taxiProgress(points);
+
+    context.save();
+    context.lineWidth = 5;
+    context.lineJoin = "round";
+    context.lineCap = "round";
+
+    let travelled = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      const segments = [];
+      if (travelled + length <= done) {
+        segments.push([from, to, true]);
+      } else if (travelled >= done) {
+        segments.push([from, to, false]);
+      } else {
+        // L'avion est au milieu de ce segment : on le coupe à sa hauteur pour
+        // que la bascule de couleur suive l'appareil et non le nœud suivant.
+        const ratio = (done - travelled) / length;
+        const split = {
+          x: from.x + (to.x - from.x) * ratio,
+          y: from.y + (to.y - from.y) * ratio,
+        };
+        segments.push([from, split, true], [split, to, false]);
+      }
+      for (const [a, b, walked] of segments) {
+        const [x1, y1] = toScreen(a.x, a.y);
+        const [x2, y2] = toScreen(b.x, b.y);
+        if (!onScreen(x1, y1, x2, y2)) continue;
+        context.strokeStyle = css(walked ? "--taxi-done" : "--taxi-ahead");
+        context.globalAlpha = walked ? 0.7 : 0.95;
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+      }
+      travelled += length;
+    }
+    context.restore();
+    drawHoldShortMarks();
+  }
+
+  /** Barre d'arrêt en travers du tracé, là où il faut attendre. */
+  function drawHoldShortMarks() {
+    if (!taxiPlan?.legs?.length) return;
+    context.save();
+    context.strokeStyle = css("--hold-short");
+    context.lineWidth = 3;
+    context.lineCap = "butt";
+
+    for (const leg of taxiPlan.legs) {
+      if (!leg.hold_short) continue;
+      const points = leg.points || [];
+      if (points.length < 2) continue;
+      const last = points[points.length - 1];
+      const previous = points[points.length - 2];
+      const [x, y] = toScreen(last.x, last.y);
+      if (x < 0 || y < 0 || x > canvas.clientWidth || y > canvas.clientHeight) {
+        continue;
+      }
+      const [px, py] = toScreen(previous.x, previous.y);
+      const length = Math.hypot(x - px, y - py) || 1;
+      // Perpendiculaire au tracé, longueur fixe pour rester lisible dézoomé.
+      const nx = (-(y - py) / length) * 11;
+      const ny = ((x - px) / length) * 11;
+      context.beginPath();
+      context.moveTo(x - nx, y - ny);
+      context.lineTo(x + nx, y + ny);
+      context.stroke();
+    }
     context.restore();
   }
 
@@ -590,7 +875,7 @@ const MAP = (() => {
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (event) => {
-    dragging = { x: event.clientX, y: event.clientY };
+    dragging = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY };
     canvas.setPointerCapture(event.pointerId);
     canvas.style.cursor = "grabbing";
   });
@@ -607,7 +892,43 @@ const MAP = (() => {
     draw();
   });
 
-  const endDrag = () => {
+  /**
+   * Poste sous le pointeur, ou null.
+   *
+   * La tolérance ne descend jamais sous 10 px : dézoomé, un poste ne fait que
+   * quelques pixels et deviendrait impossible à viser.
+   */
+  function parkingAt(px, py) {
+    if (!chart?.parkings?.length) return null;
+    const pixelsPerMetre = pixelsPerGroundMetre();
+    let closest = null;
+    let closestDistance = Infinity;
+    for (const parking of chart.parkings) {
+      const [x, y] = toScreen(parking.position.x, parking.position.y);
+      const distance = Math.hypot(px - x, py - y);
+      const reach = Math.max(10, (parking.radius_m || 15) * pixelsPerMetre);
+      if (distance <= reach && distance < closestDistance) {
+        closest = parking;
+        closestDistance = distance;
+      }
+    }
+    return closest;
+  }
+
+  const endDrag = (event) => {
+    // Un clic est un appui qui n'a pas bougé : au-delà, c'était un glissement
+    // de la carte, et sélectionner un poste au relâchement surprendrait.
+    if (dragging && event) {
+      const moved = Math.hypot(
+        event.clientX - dragging.startX,
+        event.clientY - dragging.startY
+      );
+      if (moved <= 4 && parkingListener) {
+        const rect = canvas.getBoundingClientRect();
+        const parking = parkingAt(event.clientX - rect.left, event.clientY - rect.top);
+        if (parking) parkingListener(parking.label, parking);
+      }
+    }
     dragging = null;
     canvas.style.cursor = "grab";
   };
@@ -655,6 +976,10 @@ const MAP = (() => {
       chart = prepareChart(data);
       aircraft = null;
       routeSegments = [];
+      // Le plan de roulage appartient au terrain affiché : le garder d'un
+      // aérodrome à l'autre tracerait une route sur le mauvais sol.
+      taxiPlan = null;
+      selectedParking = null;
       fitPending = true;
       fit();
     },
@@ -720,6 +1045,44 @@ const MAP = (() => {
       aircraft = null;
       draw();
     },
+    /**
+     * Itinéraire de roulage à afficher.
+     *
+     * Il arrive en mètres locaux, comme le plan de terrain : il est reconverti
+     * ici dans le repère monde, avec la même projection, faute de quoi il
+     * dériverait du sol qu'il est censé suivre.
+     */
+    setTaxiPlan(plan) {
+      if (!plan?.legs?.length || !chart?.origin) {
+        taxiPlan = null;
+        selectedParking = null;
+        draw();
+        return;
+      }
+      const toWorld = (point) => {
+        const [latitude, longitude] = localToLatLon(chart.origin, point);
+        return project(latitude, longitude);
+      };
+      taxiPlan = {
+        ...plan,
+        legs: plan.legs.map((leg) => ({
+          ...leg,
+          points: (leg.points || []).map(toWorld),
+        })),
+      };
+      selectedParking = plan.parking?.label ?? null;
+      draw();
+    },
+    clearTaxiPlan() {
+      taxiPlan = null;
+      selectedParking = null;
+      draw();
+    },
+    /** Appelé avec le libellé du poste cliqué sur la carte. */
+    onParkingSelect(callback) {
+      parkingListener = typeof callback === "function" ? callback : null;
+    },
+    get taxiPlan() { return taxiPlan; },
     fit,
     zoomIn: () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.35),
     zoomOut: () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.35),

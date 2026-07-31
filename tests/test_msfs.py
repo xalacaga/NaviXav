@@ -7,12 +7,14 @@ portent sur le décodage et la reconstruction s'exécutent toujours.
 from __future__ import annotations
 
 import ctypes as ct
+import sqlite3
 import struct
 import time
 
 import pytest
 
 from navixav.msfs import client as client_module
+from navixav.msfs import extract
 from navixav.msfs import fields as F
 from navixav.msfs.client import (
     FacilityDefinition,
@@ -21,7 +23,7 @@ from navixav.msfs.client import (
     SimConnectRefused,
     decode,
 )
-from navixav.navdata import msfs_store
+from navixav.navdata import base, msfs_store
 from navixav.navdata.base import ProcedureKind
 
 
@@ -275,6 +277,260 @@ def _minimal_airport() -> dict:
         "frequencies": [], "approaches": [], "departures": [], "arrivals": [],
         "taxi_points": [], "taxi_parkings": [], "taxi_paths": [],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Réseau de roulage
+#
+# Les noms de voies, la nature des segments et les points d'attente sont ce qui
+# distingue un tracé décoratif d'un réseau sur lequel on peut guider un avion.
+# --------------------------------------------------------------------------- #
+
+
+def _taxi_block(name: str, size: int) -> tuple[int, int, bytes]:
+    """Bloc TAXI_NAME tel que le simulateur l'enverrait sur `size` octets."""
+    payload = name.encode().ljust(size, b"\x00")
+    return (F.TYPE_TAXI_NAME, 0, payload)
+
+
+@pytest.mark.parametrize("size", [8, 32, 64])
+def test_taxi_names_are_read_whatever_their_declared_length(size):
+    """La longueur du champ varie d'une version à l'autre du simulateur.
+
+    Le bloc ne portant qu'une chaîne, elle est lue sur toute la charge : aucune
+    longueur ne peut désaligner le décodage.
+    """
+    blocks = [_taxi_block("A", size), _taxi_block("B3", size)]
+    assert extract._taxi_names(blocks) == ["A", "B3"]
+
+
+def test_taxi_names_ignore_the_other_blocks():
+    blocks = [(F.TYPE_RUNWAY, 0, b"\x00" * 8), _taxi_block("C", 32)]
+    assert extract._taxi_names(blocks) == ["C"]
+
+
+def test_the_names_block_can_be_left_out_of_the_definition():
+    """Repli lorsqu'une version du simulateur refuse ce bloc."""
+    assert "OPEN TAXI_NAME" in extract.airport_definition().tokens
+    assert "OPEN TAXI_NAME" not in extract.airport_definition(False).tokens
+
+
+class _NameRefusingClient:
+    """Simulateur qui refuse la définition dès qu'elle demande les noms.
+
+    Un refus porte sur la définition entière : sans repli, c'est tout
+    l'aéroport qui serait perdu, procédures comprises.
+    """
+
+    def __init__(self) -> None:
+        self.attempts: list[bool] = []
+
+    def request(self, definition, _icao):
+        asked_names = "OPEN TAXI_NAME" in definition.tokens
+        self.attempts.append(asked_names)
+        if asked_names:
+            raise SimConnectRefused("refus", [1])
+        return []
+
+
+def test_a_refused_names_block_does_not_cost_the_whole_airport():
+    client = _NameRefusingClient()
+    airport = extract.extract_airport(client, "lfst")
+    assert client.attempts == [True, False]
+    assert airport["icao"] == "LFST"
+    assert airport["taxi_names"] == []
+
+
+RUNWAY_PATH = F.TAXI_PATH_TYPE_RUNWAY
+
+
+def test_a_runway_segment_names_its_runway():
+    values = {"TYPE": RUNWAY_PATH, "RUNWAY_NUMBER": 32, "RUNWAY_DESIGNATOR": 2}
+    assert extract._path_runway(values) == "32R"
+
+
+def test_a_segment_serving_no_runway_has_none():
+    """Les pistes vont de 1 à 36 : un numéro nul n'est pas la piste « 00 »."""
+    values = {"TYPE": RUNWAY_PATH, "RUNWAY_NUMBER": 0, "RUNWAY_DESIGNATOR": 0}
+    assert extract._path_runway(values) is None
+
+
+@pytest.mark.parametrize("path_type", [1, 3, 4, 5, 6])
+def test_only_a_runway_segment_is_believed_about_its_runway(path_type):
+    """Ailleurs, ces deux champs ne sont pas remis à zéro par le simulateur.
+
+    Sondés à LFST, LFBO et LFPO, ils y contiennent de la mémoire résiduelle :
+    2 114 segments de circulation à Toulouse, aucune valeur exploitable. Le
+    seul contrôle de plage ne protège pas, un reste tombant parfois entre 1 et
+    36 — c'est ainsi qu'une piste « 01 » apparaissait à Strasbourg, qui n'a
+    que la 05/23.
+    """
+    values = {"TYPE": path_type, "RUNWAY_NUMBER": 1, "RUNWAY_DESIGNATOR": 0}
+    assert extract._path_runway(values) is None
+
+
+def test_the_two_thresholds_of_a_runway_are_the_same_strip():
+    assert base.reciprocal_runway("05") == "23"
+    assert base.reciprocal_runway("23") == "05"
+    assert base.reciprocal_runway("14L") == "32R"
+    assert base.reciprocal_runway("32R") == "14L"
+    assert base.reciprocal_runway("18C") == "36C"
+    assert base.reciprocal_runway("36") == "18"
+
+
+def test_a_reciprocal_is_always_reversible():
+    for number in range(1, 37):
+        for designator in ("", "L", "R", "C"):
+            name = f"{number:02d}{designator}"
+            assert base.reciprocal_runway(base.reciprocal_runway(name)) == name
+
+
+def test_an_anonymous_segment_keeps_no_name():
+    """L'indice 0 est l'entrée vide : lui inventer un nom tromperait le guidage."""
+    names = ["", "A", "B3"]
+    assert msfs_store._taxi_path_name(names, 0) is None
+    assert msfs_store._taxi_path_name(names, 2) == "B3"
+    assert msfs_store._taxi_path_name(names, 9) is None
+    assert msfs_store._taxi_path_name(names, None) is None
+
+
+def test_ground_round_trip_keeps_names_kinds_and_hold_points(tmp_path):
+    connection = msfs_store.connect(tmp_path / "navixav.sqlite")
+    airport = _minimal_airport()
+    airport["taxi_names"] = ["", "A", "B3"]
+    airport["taxi_points"] = [
+        {"x": 0.0, "y": 0.0, "type": 1},
+        {"x": 100.0, "y": 0.0, "type": 2},
+        {"x": 100.0, "y": 200.0, "type": 1},
+    ]
+    airport["taxi_paths"] = [
+        {"type": 1, "width_m": 23.0, "start": 0, "end": 1,
+         "name_index": 1, "runway": None},
+        {"type": 2, "width_m": 45.0, "start": 1, "end": 2,
+         "name_index": 0, "runway": "05"},
+    ]
+    msfs_store.store_airport(connection, airport)
+
+    rows = connection.execute(
+        "SELECT * FROM taxi_path WHERE icao = 'TEST' ORDER BY start_idx"
+    ).fetchall()
+    assert [(row["kind"], row["name"], row["runway_name"]) for row in rows] == [
+        ("taxi", "A", None),
+        ("runway", None, "05"),
+    ]
+    kinds = [
+        row["kind"] for row in connection.execute(
+            "SELECT kind FROM taxi_point WHERE icao = 'TEST' ORDER BY idx"
+        )
+    ]
+    assert kinds == ["normal", "hold_short", "normal"]
+    connection.close()
+
+
+def test_a_stored_airport_records_its_ground_version(tmp_path):
+    connection = msfs_store.connect(tmp_path / "navixav.sqlite")
+    msfs_store.store_airport(connection, _minimal_airport())
+    version = connection.execute(
+        "SELECT ground_version FROM airport WHERE icao = 'TEST'"
+    ).fetchone()[0]
+    assert version == msfs_store.GROUND_VERSION
+    connection.close()
+
+
+# --------------------------------------------------------------------------- #
+# Migration
+# --------------------------------------------------------------------------- #
+
+
+_SCHEMA_V1 = """
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE airport (
+    icao TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+    lat REAL NOT NULL, lon REAL NOT NULL, altitude_ft REAL,
+    transition_altitude_ft INTEGER, transition_level_ft INTEGER,
+    source TEXT NOT NULL DEFAULT 'MSFS', fetched_at TEXT NOT NULL
+);
+CREATE TABLE taxi_point (
+    icao TEXT NOT NULL, idx INTEGER NOT NULL,
+    x REAL NOT NULL, y REAL NOT NULL, PRIMARY KEY (icao, idx)
+);
+CREATE TABLE taxi_path (
+    icao TEXT NOT NULL, start_idx INTEGER NOT NULL,
+    end_idx INTEGER NOT NULL, width_m REAL NOT NULL
+);
+INSERT INTO meta VALUES ('schema_version', '1');
+INSERT INTO airport (icao, lat, lon, fetched_at)
+    VALUES ('LFST', 48.5, 7.6, '2026-01-01T00:00:00+00:00');
+INSERT INTO taxi_point VALUES ('LFST', 0, 12.0, 34.0);
+INSERT INTO taxi_path VALUES ('LFST', 0, 1, 23.0);
+"""
+
+
+def _store_at_v1(path):
+    connection = sqlite3.connect(path)
+    connection.executescript(_SCHEMA_V1)
+    connection.commit()
+    connection.close()
+    return path
+
+
+def test_migration_keeps_what_the_previous_version_had_cached(tmp_path):
+    """Rien n'est effacé : une base ancienne reste lisible simulateur fermé."""
+    path = _store_at_v1(tmp_path / "navixav.sqlite")
+    connection = msfs_store.connect(path)
+
+    assert connection.execute(
+        "SELECT COUNT(*) FROM airport WHERE icao = 'LFST'"
+    ).fetchone()[0] == 1
+    point = connection.execute("SELECT * FROM taxi_point").fetchone()
+    assert (point["x"], point["y"]) == (12.0, 34.0)
+    assert point["kind"] is None
+    path_row = connection.execute("SELECT * FROM taxi_path").fetchone()
+    assert path_row["width_m"] == 23.0
+    assert (path_row["kind"], path_row["name"], path_row["runway_name"]) == (
+        None, None, None,
+    )
+    connection.close()
+
+
+def test_migration_marks_the_ground_geometry_as_outdated(tmp_path):
+    """C'est ce marqueur qui déclenchera la reprise au simulateur."""
+    connection = msfs_store.connect(_store_at_v1(tmp_path / "navixav.sqlite"))
+    assert connection.execute(
+        "SELECT ground_version FROM airport WHERE icao = 'LFST'"
+    ).fetchone()[0] == 0
+    assert msfs_store.GROUND_VERSION > 0
+    connection.close()
+
+
+def test_migration_records_the_new_schema_version(tmp_path):
+    connection = msfs_store.connect(_store_at_v1(tmp_path / "navixav.sqlite"))
+    assert connection.execute(
+        "SELECT value FROM meta WHERE key = 'schema_version'"
+    ).fetchone()[0] == str(msfs_store.SCHEMA_VERSION)
+    connection.close()
+
+
+def test_migration_is_idempotent(tmp_path):
+    path = _store_at_v1(tmp_path / "navixav.sqlite")
+    msfs_store.connect(path).close()
+    connection = msfs_store.connect(path)
+    assert connection.execute("SELECT COUNT(*) FROM taxi_point").fetchone()[0] == 1
+    connection.close()
+
+
+def test_an_outdated_airport_is_not_lost_when_the_simulator_is_absent(tmp_path):
+    """Sans simulateur, un terrain d'une version antérieure reste consultable."""
+    from navixav.navdata.msfs import MsfsProvider
+
+    provider = MsfsProvider(
+        _store_at_v1(tmp_path / "navixav.sqlite"), allow_fetch=False
+    )
+    try:
+        assert provider.ensure("LFST") is False
+        assert provider.airport("LFST") is not None
+    finally:
+        provider.close()
 
 
 # --------------------------------------------------------------------------- #

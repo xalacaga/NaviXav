@@ -20,6 +20,8 @@ let currentPlan = null;
 let currentChart = null;
 let currentIcao = null;
 let currentMapRole = null;
+let currentTaxiPlan = null;
+let currentTaxiGuidance = null;
 let liveTimer = null;
 let simulatorTimer = null;
 let activeRoutePointIndex = null;
@@ -4153,8 +4155,10 @@ async function loadChart(icao, runway, mapRole) {
     currentChart = await response.json();
     currentIcao = icao;
     currentMapRole = mapRole;
+    currentTaxiPlan = null;
     syncSiaMapOverlay();
     MAP.setChart(currentChart);
+    MAP.onParkingSelect(requestTaxiRoute);
     const routeSegments = flightStagePaths(currentPlan).map((segment) => ({
       stage: segment.stage,
       points: segment.points.map((point) => {
@@ -4185,6 +4189,89 @@ async function loadChart(icao, runway, mapRole) {
  */
 function projectToChart(latitude, longitude) {
   return MAP.project(latitude, longitude);
+}
+
+/**
+ * Itinéraire de roulage vers le poste cliqué sur la carte.
+ *
+ * Le sens découle du rôle du terrain affiché : au départ on va du poste à la
+ * piste, à l'arrivée on en revient. La piste est celle que le plan a retenue,
+ * déjà mise en évidence — l'utilisateur n'a donc rien à saisir.
+ */
+async function requestTaxiRoute(parking) {
+  const runway = currentChart?.highlight_runway;
+  if (!currentIcao || !runway) {
+    showBanner("warn", t("taxi_no_runway"), [t("taxi_no_runway_body")]);
+    return;
+  }
+
+  const params = new URLSearchParams({
+    parking,
+    runway,
+    direction: currentMapRole === "arrival" ? "arrival" : "departure",
+  });
+  try {
+    const response = await fetch(`/api/ground/${currentIcao}/route?${params}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      currentTaxiPlan = null;
+      MAP.clearTaxiPlan();
+      showBanner("warn", t("taxi_unavailable"), [payload.detail]);
+      return;
+    }
+    currentTaxiPlan = payload;
+    currentTaxiGuidance = null;
+    MAP.setTaxiPlan(payload);
+    updateHud(latestAircraft);
+  } catch (error) {
+    showBanner("error", "Erreur réseau", [String(error)]);
+  }
+}
+
+/**
+ * Suit le roulage au fil des positions et reprend l'itinéraire si besoin.
+ *
+ * L'itinéraire est recalculé côté service à chaque interrogation, sans état de
+ * session : le réseau y étant en cache, le calcul complet coûte quelques
+ * millisecondes, bien moins que la seconde qui sépare deux positions.
+ *
+ * Une erreur reste muette. Le guidage au sol est un confort : le signaler
+ * chaque seconde couvrirait la carte de bandeaux pour une information que le
+ * pilote lit déjà sur le tracé.
+ */
+async function pollTaxiGuidance(aircraft) {
+  if (!currentTaxiPlan || !currentIcao) return;
+  // En vol, il n'y a plus rien à guider au sol.
+  if (!aircraft?.on_ground) {
+    if (currentTaxiGuidance) {
+      currentTaxiGuidance = null;
+      updateHud(aircraft);
+    }
+    return;
+  }
+
+  const params = new URLSearchParams({
+    parking: currentTaxiPlan.parking.label,
+    runway: currentTaxiPlan.runway,
+    direction: currentTaxiPlan.direction,
+    latitude: aircraft.latitude,
+    longitude: aircraft.longitude,
+  });
+  try {
+    const response = await fetch(`/api/ground/${currentIcao}/guidance?${params}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    currentTaxiGuidance = data.guidance;
+    // Le tracé n'est remplacé que s'il a changé : le redéposer à chaque
+    // seconde effacerait la portion déjà parcourue.
+    if (data.recomputed) {
+      currentTaxiPlan = data.plan;
+      MAP.setTaxiPlan(data.plan);
+    }
+    updateHud(aircraft);
+  } catch (error) {
+    currentTaxiGuidance = null;
+  }
 }
 
 function applyMapPreferences(values) {
@@ -4245,6 +4332,7 @@ function updateHud(aircraft) {
       line.append(el("b", null, currentChart.highlight_runway));
       hud.append(line);
     }
+    appendTaxiSummary(hud);
     return;
   }
 
@@ -4280,6 +4368,41 @@ function updateHud(aircraft) {
     line.append(el("b", null, currentChart.highlight_runway));
     hud.append(line);
   }
+  appendTaxiSummary(hud);
+}
+
+/**
+ * Itinéraire de roulage en cours, sous les informations de vol.
+ *
+ * L'enchaînement des voies est repris tel quel : ce sont les identifiants que
+ * le contrôle emploie, et les traduire les rendrait méconnaissables.
+ */
+function appendTaxiSummary(hud) {
+  if (!currentTaxiPlan?.summary?.length) return;
+  const block = el("div", "hud-taxi");
+  const heading = el("div");
+  heading.append(document.createTextNode(
+    currentTaxiPlan.direction === "arrival" ? "roulage vers " : "roulage depuis "
+  ));
+  heading.append(el("b", null, currentTaxiPlan.parking?.label || "—"));
+  block.append(heading);
+
+  const guidance = currentTaxiGuidance;
+  if (guidance?.announce) {
+    const kind = guidance.arrived
+      ? "done"
+      : (!guidance.on_route && "lost") || (guidance.hold_short && "hold") || "go";
+    block.append(el("div", `hud-taxi-call is-${kind}`, guidance.announce));
+  }
+
+  block.append(el("div", "hud-taxi-steps", currentTaxiPlan.summary.join(" › ")));
+  // Une fois le roulage commencé, c'est la distance qui reste qui compte, pas
+  // celle du trajet entier.
+  const distance = guidance
+    ? `${Math.round(guidance.remaining_m)} m restants`
+    : `${Math.round(currentTaxiPlan.distance_m)} m`;
+  block.append(el("div", null, distance));
+  hud.append(block);
 }
 
 function applyAircraftState(aircraft) {
@@ -4322,6 +4445,7 @@ async function pollLive() {
     const aircraft = data.aircraft;
     setLiveState(true, `${aircraft.source} · en direct`);
     applyAircraftState(aircraft);
+    pollTaxiGuidance(aircraft);
   } catch (error) {
     setLiveState(false, "Erreur de liaison");
     updateRouteStripProgress(null);

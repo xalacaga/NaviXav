@@ -53,3 +53,17 @@ Thumbs.db
 marketing-site/
 navixav-marketing-site.zip
 Voir-site-local.bat
+
+# Docker et déploiement conteneurisé
+# Hors du périmètre publié : NaviXav se distribue en installeur Windows.
+Dockerfile
+Dockerfile.*
+.dockerignore
+compose*.yaml
+compose*.yml
+docker-compose*.yaml
+docker-compose*.yml
+.env.docker*
+DOCKER_*.md
+docker/
+navixav/web/container.py
