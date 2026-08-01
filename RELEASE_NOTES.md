@@ -1,20 +1,26 @@
-# NaviXav 1.4.3
+# NaviXav 1.4.4
 
-Publication du 31 juillet 2026.
+Publication du 1 août 2026.
 
 ## Nouvelles fonctionnalités
 
-- Le plan de terrain retient désormais le nom des voies de circulation, la nature de chaque segment et les points d'attente avant piste : c'est la base du guidage du parking à la piste.
-- Les terrains déjà enregistrés sont repris automatiquement à la prochaine ouverture du simulateur, et restent consultables entre-temps.
-- NaviXav calcule l'itinéraire de roulage entre un poste de stationnement et la piste : il suit les voies de circulation, contourne les segments fermés et les routes de service, n'emprunte une piste qu'en dernier recours et signale devant quelle piste s'arrêter.
-- La carte dessine enfin les voies de circulation et les postes de stationnement, avec le nom des voies.
-- Cliquer un poste sur la carte trace l'itinéraire de roulage vers la piste retenue par le plan : vert derrière l'avion, bleu devant, avec les barres d'arrêt et la distance restante. Rien à saisir.
-- Au départ, le point d'attente est celui du seuil réellement utilisé ; à l'arrivée, la sortie de piste la plus proche du poste est choisie automatiquement.
-- Pendant le roulage, NaviXav annonce la manœuvre suivante — « Tournez à gauche sur Q », « Arrêt avant la piste 05 » — et affiche la distance restante.
-- S'écarter de l'itinéraire ne bloque plus rien : un nouveau tracé est calculé depuis la position de l'avion, sans le renvoyer à son point de départ.
+- Nouvel onglet « Roulage » : un plan d'aérodrome dédié sur fond aéronautique sombre, avec quadrillage métrique et indication du nord, sans fond routier ni route de vol.
+- Le plan de roulage occupe toute la zone disponible et reste lisible dans les fenêtres compactes. Les voies secondaires sont masquées par défaut et le bouton « Secondaires » les affiche à la demande.
+- Au départ, NaviXav reconnaît automatiquement le poste proche de l'avion et propose son itinéraire vers la piste retenue. Cliquer un autre poste remplace immédiatement cette proposition.
+- Seules les voies de l'itinéraire portent leur nom : le chemin se lit d'un coup d'œil.
+- La consigne du moment s'affiche en grand sur le plan de roulage, avec le chemin restant et la distance jusqu'au bout.
+- L’onglet Roulage, le suivi du vol, le journal local, les phases de vol, les états de la carte et la commande de création SimBrief suivent désormais immédiatement la langue choisie. Les identifiants et la phraséologie aéronautiques normalisés restent inchangés.
+- Les fiches Départ, Route et Arrivée traduisent aussi leurs libellés, les composantes de vent, les justifications du moteur et les avertissements, sans modifier les procédures, repères ni valeurs issus de SimBrief.
+
+## Corrections de bugs
+
+- La carte redevient lisible : les voies de circulation, les postes et leurs étiquettes ne s'affichent plus par-dessus les tuiles, la route et l'avion. Le détail du sol est passé dans le nouvel onglet « Roulage ».
+- Changer de poste de stationnement annule désormais les anciennes demandes : une réponse réseau ou de guidage retardée ne peut plus restaurer le premier itinéraire.
+- Les chemins de parking SimConnect ne sont plus confondus avec des segments de taxiway. Ils ne peuvent donc plus créer de longues diagonales artificielles à travers le terrain, comme entre T41 et N1 à LFBO.
+- Le recalcul après un écart reste sur le réseau principal praticable et ne sélectionne plus un point isolé ou une route de service.
 
 ## Autres changements
 
-- Ajout taxiway et suivi roulage.
+- Ajout roulage et amélioration traductions.
 
 L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
