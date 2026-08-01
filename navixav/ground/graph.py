@@ -99,6 +99,9 @@ class TaxiGraph:
     adjacency: dict[int, tuple[TaxiEdge, ...]] = field(default_factory=dict)
     # Seuil de chaque piste, en mètres locaux comme le reste du réseau.
     thresholds: dict[str, tuple[float, float]] = field(default_factory=dict)
+    # Plus grand composant praticable, sans routes fermées ni voies véhicules.
+    # Il évite qu'une reprise hors route choisisse un point isolé du terrain.
+    routable_nodes: frozenset[int] = field(default_factory=frozenset)
 
     @property
     def has_kinds(self) -> bool:
@@ -125,7 +128,11 @@ class TaxiGraph:
         self, x: float, y: float, *, among: Iterable[int] | None = None
     ) -> int:
         """Nœud le plus proche d'une position, en mètres locaux."""
-        candidates = list(among) if among is not None else list(self.nodes)
+        candidates = (
+            list(among)
+            if among is not None
+            else list(self.routable_nodes or self.nodes)
+        )
         if not candidates:
             raise GroundError(f"{self.icao} n'a aucun point de circulation.")
         return min(
@@ -269,12 +276,22 @@ def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
         raise GroundError(f"{key} n'a pas de tracé au sol dans la base.")
 
     edges = []
+    # Pour un TAXI_PATH de type PARKING, SimConnect encode START comme un
+    # indice de point de circulation mais END comme un indice de parking. END
+    # n'appartient donc pas au même tableau que les autres chemins. Le traiter
+    # comme un taxi_point crée, lorsque les deux indices coïncident par hasard,
+    # une diagonale de plusieurs kilomètres à travers le terrain.
+    parking_nodes: dict[int, list[int]] = {}
     for row in connection.execute(
         """SELECT start_idx, end_idx, width_m, kind, name, runway_name
            FROM taxi_path WHERE icao = ?""",
         (key,),
     ):
         start, end = row["start_idx"], row["end_idx"]
+        if row["kind"] == PARKING_KIND:
+            if start in nodes:
+                parking_nodes.setdefault(end, []).append(start)
+            continue
         # Un segment dont un bout manque ne relie rien : le garder ferait
         # échouer la recherche sur une arête sans géométrie.
         if start not in nodes or end not in nodes or start == end:
@@ -315,12 +332,15 @@ def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
         adjacency={index: tuple(items) for index, items in adjacency.items()},
         thresholds=thresholds,
     )
-    graph.parkings = _attach_parkings(graph, connection, key)
+    graph.parkings = _attach_parkings(graph, connection, key, parking_nodes)
     return graph
 
 
 def _attach_parkings(
-    graph: TaxiGraph, connection: Any, icao: str
+    graph: TaxiGraph,
+    connection: Any,
+    icao: str,
+    parking_nodes: dict[int, list[int]],
 ) -> tuple[Parking, ...]:
     """Raccroche chaque poste au nœud qui le dessert.
 
@@ -329,20 +349,22 @@ def _attach_parkings(
     nœud le plus proche tous segments confondus pourrait viser une voie de
     circulation qui passe devant le poste sans y mener.
     """
-    served = {
-        node
-        for edge in graph.edges
-        if edge.kind == PARKING_KIND
-        for node in (edge.start, edge.end)
-    }
-    candidates = served or None
-
     parkings = []
-    for row in connection.execute(
-        "SELECT label, kind, x, y, radius_m, heading FROM parking WHERE icao = ?",
+    main_network = _main_component(graph)
+    graph.routable_nodes = frozenset(main_network)
+    for index, row in enumerate(connection.execute(
+        """SELECT label, kind, x, y, radius_m, heading
+           FROM parking WHERE icao = ? ORDER BY rowid""",
         (icao,),
-    ):
-        node = graph.nearest_node(row["x"], row["y"], among=candidates)
+    )):
+        # Plusieurs chemins identiques peuvent désigner le même poste. On
+        # retient alors leur départ le plus proche de sa position publiée.
+        candidates = [
+            node for node in parking_nodes.get(index, ()) if node in main_network
+        ]
+        node = graph.nearest_node(
+            row["x"], row["y"], among=candidates or main_network
+        )
         parkings.append(Parking(
             label=row["label"],
             kind=row["kind"],
@@ -356,3 +378,30 @@ def _attach_parkings(
             ),
         ))
     return tuple(parkings)
+
+
+def _main_component(graph: TaxiGraph) -> set[int]:
+    """Plus grand réseau réellement praticable du terrain.
+
+    Certains chemins de parking désignent un point isolé ou uniquement relié
+    à une route de service. Le poste est alors raccroché au point praticable le
+    plus proche plutôt que laissé dans un îlot sans route vers les pistes.
+    """
+    remaining = set(graph.nodes)
+    components: list[set[int]] = []
+    while remaining:
+        component: set[int] = set()
+        stack = [next(iter(remaining))]
+        while stack:
+            node = stack.pop()
+            if node in component:
+                continue
+            component.add(node)
+            remaining.discard(node)
+            stack.extend(
+                edge.other(node)
+                for edge in graph.neighbours(node)
+                if edge.kind not in FORBIDDEN_KINDS
+            )
+        components.append(component)
+    return max(components, key=len, default=set())

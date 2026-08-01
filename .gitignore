@@ -41,6 +41,7 @@ data/cache/
 data/logs/
 data/private_admin/
 data/developer/
+data/webview/
 out/
 
 # Éditeurs et système

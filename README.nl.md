@@ -116,11 +116,29 @@ De kaart omvat:
 - de positie en de koers van het vliegtuig;
 - een spoor van de verplaatsing;
 - een automatische volgmodus;
-- zoomen, verschuiven en aanpassen aan de luchthaven of de route;
-- optionele gronddetails voor taxibanen en opstelplaatsen.
+- zoomen, verschuiven en aanpassen aan de luchthaven of de route.
 
-De gronddetails zijn standaard verborgen om de kaart leesbaar te houden. De knop
-**Gronddetails** toont ze wanneer dat nodig is.
+### Taxiën op de grond
+
+Het tabblad **Taxiën** toont een afzonderlijk luchthavenplan, los van de
+vluchtkaart en uitsluitend opgebouwd uit native MSFS-faciliteiten:
+
+- het canvas vult alle beschikbare ruimte, ook in compacte vensters;
+- een donkere luchtvaartachtergrond met metrisch raster en noordpijl geeft
+  schaal en oriëntatie zonder de drukte van een wegenkaart;
+- banen, primaire taxibanen, opstelplaatsen en het vliegtuig krijgen visuele prioriteit;
+- secundaire taxibanen en toegangen tot opstelplaatsen zijn standaard verborgen
+  en worden met **Secundair** op verzoek getoond;
+- bij vertrek stelt NaviXav, wanneer het vliegtuig binnen 180 m van een stand
+  aan de grond staat, automatisch een route naar de gekozen baan voor;
+- een klik op een andere stand vervangt het voorstel onmiddellijk; bij aankomst
+  blijft de bestemmingsstand een handmatige keuze;
+- afgelegd en resterend traject, nuttige namen, wachtpunten, volgende manoeuvre
+  en resterende afstand worden duidelijk weergegeven;
+- na een afwijking wordt de route vanaf de werkelijke vliegtuigpositie herberekend.
+
+SimConnect-parkeerpaden koppelen alleen opstelplaatsen aan het taxinetwerk en
+kunnen nooit kunstmatige snelkoppelingen dwars over banen vormen.
 
 ### Officiële nationale AIS-kaarten
 
@@ -327,7 +345,8 @@ nadat in SimBrief een vlucht is aangemaakt of gewijzigd.
 ## Gebruik van de kaart
 
 - **Kaartachtergrond**: toont of verbergt OpenStreetMap.
-- **Gronddetails**: toont de taxibanen en de opstelplaatsen.
+- **Taxiën**: opent het afzonderlijke grondplan; **Secundair** toont of verbergt
+  toegangen en minder belangrijke taxibanen.
 - **Officiële laag**: verschijnt alleen voor de gegeorefereerde kaart van de
   momenteel getoonde luchthaven en regelt de dekking ervan.
 - **Volledige route**: kadert de volledige vluchtroute in.

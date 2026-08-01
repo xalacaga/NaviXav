@@ -150,6 +150,29 @@ The map includes:
   (light) and CartoDB Dark Matter (dark, cockpit), straight from the map bar or
   from Settings.
 
+### Ground taxiing
+
+The **Taxiing** tab provides a dedicated airport diagram, separate from the
+flight map and built only from native MSFS facilities:
+
+- the canvas fills the available area and remains usable in compact windows;
+- a dark aviation background with a metric grid and north arrow provides scale
+  and orientation without the noise of a road map;
+- runways, primary taxiways, stands and the aircraft are visually prioritised;
+- secondary taxiways and stand access paths are hidden by default; the
+  **Secondary** button reveals them on demand;
+- on departure, when the aircraft is on the ground within 180 m of a stand,
+  NaviXav automatically proposes a route from that stand to the selected runway;
+- clicking another stand immediately replaces the proposal; on arrival, the
+  destination stand remains a manual choice;
+- the route separates travelled and remaining portions and shows only useful
+  names, hold-short points, the next manoeuvre and remaining distance;
+- after a deviation, the route is recalculated from the aircraft’s real position.
+
+SimConnect parking paths are used only to attach stands to the taxi network.
+They can never become shortcuts between taxiways, preventing artificial lines
+across runways.
+
 ### Official national AIS charts
 
 NaviXav queries national authority publications directly, without going through

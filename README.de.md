@@ -159,6 +159,27 @@ Die Karte umfasst:
   (hell) und CartoDB Dark Matter (dunkel, Cockpit) – direkt in der Kartenleiste
   oder in den Einstellungen.
 
+### Rollen am Boden
+
+Die Registerkarte **Rollen** zeigt einen eigenen Flugplatzplan, getrennt von
+der Flugkarte und ausschließlich aus nativen MSFS-Einrichtungen aufgebaut:
+
+- die Zeichenfläche nutzt den gesamten verfügbaren Platz, auch in kompakten Fenstern;
+- ein dunkler Luftfahrthintergrund mit metrischem Raster und Nordpfeil liefert
+  Maßstab und Orientierung ohne den Ballast einer Straßenkarte;
+- Bahnen, Hauptrollwege, Standplätze und Flugzeug werden visuell priorisiert;
+- Nebenrollwege und Standplatzzufahrten sind standardmäßig verborgen und
+  werden mit **Nebenwege** bei Bedarf eingeblendet;
+- beim Abflug schlägt NaviXav innerhalb von 180 m um einen Standplatz automatisch
+  eine Route von dort zur gewählten Bahn vor;
+- ein Klick auf einen anderen Standplatz ersetzt den Vorschlag sofort; bei der
+  Ankunft bleibt der Zielstandplatz eine manuelle Auswahl;
+- Route, Haltepunkte, nächste Anweisung und Reststrecke werden klar dargestellt;
+- nach einer Abweichung wird ab der tatsächlichen Flugzeugposition neu geplant.
+
+SimConnect-Parkwege dienen nur zur Zuordnung eines Standplatzes zum Rollnetz.
+Sie können nicht als künstliche Abkürzung quer über Bahnen verwendet werden.
+
 ### Amtliche nationale AIS-Karten
 
 NaviXav fragt die Veröffentlichungen der nationalen Behörden direkt ab, ohne

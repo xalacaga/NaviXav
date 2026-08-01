@@ -117,12 +117,29 @@ O mapa inclui:
 - a posição e o rumo da aeronave;
 - um rasto do deslocamento;
 - um modo de seguimento automático;
-- o zoom, o deslocamento e o ajuste ao aeroporto ou à rota;
-- detalhes do solo opcionais para os caminhos de circulação e os
-  estacionamentos.
+- o zoom, o deslocamento e o ajuste ao aeroporto ou à rota.
 
-Os detalhes do solo estão ocultos por predefinição para manter o mapa legível.
-O botão **Detalhes do solo** apresenta-os quando necessário.
+### Rolagem no solo
+
+O separador **Rolagem** apresenta um plano de aeródromo dedicado, separado do
+mapa de voo e construído apenas com as instalações nativas do MSFS:
+
+- o canvas ocupa todo o espaço disponível, mesmo em janelas compactas;
+- um fundo aeronáutico escuro com grelha métrica e seta do norte fornece escala
+  e orientação sem o ruído de um mapa rodoviário;
+- pistas, caminhos principais, estacionamentos e aeronave têm prioridade visual;
+- caminhos secundários e acessos aos estacionamentos ficam ocultos por
+  predefinição e o botão **Secundários** mostra-os a pedido;
+- à partida, se a aeronave estiver no solo a menos de 180 m de um estacionamento,
+  o NaviXav propõe automaticamente a rota até à pista selecionada;
+- clicar noutro estacionamento substitui imediatamente a proposta; à chegada,
+  o estacionamento de destino continua a ser uma escolha manual;
+- são mostrados o trajeto percorrido e restante, nomes úteis, pontos de espera,
+  próxima manobra e distância restante;
+- após um desvio, a rota é recalculada a partir da posição real da aeronave.
+
+Os caminhos de estacionamento SimConnect servem apenas para ligar os postos à
+rede e nunca podem criar atalhos artificiais através das pistas.
 
 ### Cartas AIS nacionais oficiais
 
@@ -328,8 +345,8 @@ ou modificar um voo no SimBrief.
 ## Utilização do mapa
 
 - **Fundo do mapa**: apresenta ou oculta o OpenStreetMap.
-- **Detalhes do solo**: apresenta os caminhos de circulação e os
-  estacionamentos.
+- **Rolagem**: abre o plano de solo dedicado; **Secundários** mostra ou oculta
+  os acessos e caminhos de menor prioridade.
 - **Camada oficial**: aparece apenas para a carta georreferenciada do aeródromo
   atualmente apresentado e regula a sua opacidade.
 - **Rota completa**: enquadra toda a rota do voo.

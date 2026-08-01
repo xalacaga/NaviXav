@@ -154,6 +154,31 @@ La carte comprend :
   et CartoDB Dark Matter (sombre, cockpit), directement depuis la barre de la
   carte ou depuis les paramètres.
 
+### Roulage au sol
+
+L’onglet **Roulage** affiche un plan d’aérodrome dédié, indépendant de la carte
+de vol et construit uniquement avec les installations natives de MSFS :
+
+- le canvas occupe toute la zone disponible et reste adapté aux petites fenêtres ;
+- un fond aéronautique sombre avec quadrillage métrique et flèche du nord donne
+  l’échelle et l’orientation sans ajouter les rues d’un fond routier ;
+- les pistes, les voies principales, les postes et l’avion sont hiérarchisés
+  pour conserver un tracé lisible ;
+- les voies secondaires et les accès aux postes sont masqués par défaut ; le
+  bouton **Secondaires** les affiche à la demande ;
+- au départ, si l’avion est au sol à moins de 180 m d’un poste, NaviXav propose
+  automatiquement le roulage de ce poste vers la piste retenue ;
+- un clic sur un autre poste remplace immédiatement cette proposition ; à
+  l’arrivée, le poste reste un choix manuel ;
+- l’itinéraire distingue la partie parcourue de la partie restante, affiche
+  uniquement les noms utiles, les points d’attente, la prochaine manœuvre et
+  la distance restante ;
+- en cas d’écart, le trajet est recalculé depuis la position réelle de l’avion.
+
+Les chemins SimConnect de type parking servent uniquement à rattacher un poste
+au réseau. Ils ne sont jamais utilisés comme raccourcis entre deux taxiways, ce
+qui évite les diagonales artificielles à travers les pistes.
+
 ### Cartes AIS nationales officielles
 
 NaviXav interroge directement les publications des autorités nationales, sans

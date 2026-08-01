@@ -69,6 +69,7 @@ _PATHS = [
     (RUNWAY, 45.0, 5, 4, ANONYMOUS, "09"),
     (RUNWAY, 45.0, 4, 6, ANONYMOUS, "09"),
     (CLOSED, 23.0, 0, 3, ANONYMOUS, None),
+    (PATH, 20.0, 7, 0, ANONYMOUS, None),
     (PARKING, 20.0, 7, 0, ANONYMOUS, None),
     (PATH, 23.0, 8, 0, ANONYMOUS, None),
 ]
@@ -121,7 +122,10 @@ def graph(tmp_path_factory):
 
 def test_the_graph_carries_every_point_and_segment(graph):
     assert len(graph.nodes) == len(_POINTS)
-    assert len(graph.edges) == len(_PATHS)
+    # Un chemin de parking relie un taxi_point à un index de parking : ce
+    # n'est pas une arête du réseau de roulage.
+    assert len(graph.edges) == len(_PATHS) - 1
+    assert all(edge.kind != "parking" for edge in graph.edges)
     assert graph.has_kinds
     assert graph.has_names
 
@@ -155,6 +159,13 @@ def test_a_parking_is_attached_to_the_stand_that_serves_it(graph):
     assert parking is not None
     assert parking.node == 7
     assert parking.lead_in_m == pytest.approx(math.hypot(50.0, 5.0), abs=0.1)
+
+
+def test_a_parking_index_is_never_mistaken_for_a_taxi_point(graph):
+    """END vaut ici 0, mais ne désigne surtout pas le taxi_point 0."""
+    links = [edge for edge in graph.edges if {edge.start, edge.end} == {7, 0}]
+    assert len(links) == 1
+    assert links[0].kind == "path"
 
 
 def test_a_parking_is_found_whatever_the_case(graph):
@@ -441,6 +452,21 @@ def test_a_real_route_never_uses_a_service_road(ground_provider, icao):
     stand = network.parkings[0]
     plan = plan_taxi(network, parking=stand.label, runway=network.runway_names()[0])
     assert all(leg["kind"] != "vehicle" for leg in plan.legs())
+
+
+def test_lfbo_e42_does_not_cut_across_the_airport(ground_provider):
+    """Le END du chemin de parking E42 est l'index 3 du parking, pas le point 3."""
+    network = _routable(ground_provider, "LFBO")
+    plan = plan_taxi(network, parking="porte E 42", runway="32R")
+
+    assert plan.summary()[:3] == ("porte E 42", "T41", "T40")
+    assert plan.summary()[-2:] == ("N1", "attente 32R")
+    assert all(edge.kind != "parking" for edge in network.edges)
+    # Aucun segment individuel de cet itinéraire local ne doit traverser tout
+    # le terrain. La fausse liaison 927 -> 19 mesurait 1 215 m.
+    t40 = next(leg for leg in plan.legs() if leg["name"] == "T40")
+    assert t40["distance_m"] < 300
+    assert len(t40["points"]) > 5
 
 
 @pytest.mark.parametrize("icao", ["LFST", "LFBO", "LFPO"])

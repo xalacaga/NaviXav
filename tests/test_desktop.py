@@ -102,6 +102,39 @@ def test_interface_offers_persistent_european_languages():
     assert "navixav:languagechange" in translations
 
 
+def test_flight_tracking_and_local_logbook_follow_the_selected_language():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    panel = javascript[javascript.index("function renderFlightPanel(plan)"):]
+    panel = panel[: panel.index("\n}\n")]
+    summaries = javascript[javascript.index("function renderFlightSummaries()") :]
+    summaries = summaries[: summaries.index("\n}\n")]
+    for french in (
+        "Suivi du vol en temps réel", "Journal local", "Résumé des vols effectués",
+        "Purger l’historique des vols", "Prochain point", "Écart latéral",
+    ):
+        assert french not in panel
+    assert "Aucun vol terminé pour le moment" not in summaries
+    for key in (
+        "flight_tracking_title", "local_journal", "flight_summaries",
+        "purge_history", "flight_next_fix", "flight_lateral_deviation",
+        "simbrief_create", "simbrief_create_title",
+    ):
+        assert f'{key}:' in translations
+
+
+def test_flight_rules_do_not_depend_on_french_phase_names():
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    rules = javascript[javascript.index("const ALERT_RULES ="):]
+    rules = rules[: rules.index("function resetAlertStates")]
+    for phase in ("Approche", "Atterrissage", "Montée", "Décollage", "Descente", "Croisière"):
+        assert f'c.phase === "{phase}"' not in rules
+
+
 def test_windows_distribution_uses_the_navixav_aircraft_icon():
     project = Path(desktop.__file__).parent.parent
     icon = project / "assets" / "navixav.ico"
@@ -248,9 +281,9 @@ def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     javascript = (
         Path(desktop.__file__).parent / "web" / "static" / "app.js"
     ).read_text(encoding="utf-8")
-    assert 'phase === "Descente"' in javascript
-    assert 'phase === "Approche"' in javascript
-    assert "En attente du TOD" in javascript
+    assert 'phase === t("phase_descent")' in javascript
+    assert 'phase === t("phase_approach")' in javascript
+    assert 'tf("profile_waiting"' in javascript
     assert "Math.abs(delta) <= 500" in javascript
 
 
@@ -309,8 +342,8 @@ def test_local_flight_journal_keeps_only_completed_flight_summaries():
     assert 'key.startsWith("navixav-flight-log:")' in javascript
     assert "function updateFlightSummary(aircraft)" in javascript
     assert 'summaryList.id = "flight-summary-list"' in javascript
-    assert '"Résumé des vols effectués"' in javascript
-    assert '"Purger l’historique des vols"' in javascript
+    assert 't("flight_summaries")' in javascript
+    assert 't("purge_history")' in javascript
     assert "localStorage.removeItem(FLIGHT_SUMMARY_KEY)" in javascript
     assert ".flight-summary-row" in css
 
@@ -329,6 +362,27 @@ def test_flight_summary_stores_no_detailed_track_or_replay_controls():
         javascript.index("function applyAircraftState"):
         javascript.index("async function pollLive")
     ]
+
+
+def test_terminal_choices_and_planner_warnings_are_localized():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    terminal = javascript[javascript.index("function terminalCard"):]
+    terminal = terminal[: terminal.index("/* ----------------------------------------------------------- constraints */")]
+    assert 'choiceRow(t("runway")' in terminal
+    assert 'terminalCard(plan.departure, t("departure_title")' in terminal
+    assert 'terminalCard(plan.arrival, t("arrival_title")' in terminal
+    assert '[t("approach"), plan.arrival.approach' in terminal
+    assert 'plannerText(choice.reason)' in javascript
+    assert 'plan.warnings.map(warningText)' in javascript
+    for key in (
+        "warnings", "source_computed", "departure_title", "route_title",
+        "arrival_title", "approach", "reason_runway_simbrief",
+        "reason_transition_nearest_star", "reason_fix_distance",
+    ):
+        assert f"{key}:" in translations
 
 
 def test_current_flight_trace_is_memory_only_and_still_drawn_on_the_map():
@@ -428,44 +482,169 @@ def test_map_shares_one_web_mercator_frame_with_its_tiles():
     assert "6371000" not in map_javascript
 
 
-def test_the_map_draws_the_ground_it_already_receives():
-    """Le plan portait déjà voies et postes ; seules les pistes étaient tracées."""
+def test_the_map_stays_free_of_the_ground_layout():
+    """La carte sert à suivre un vol, pas à rouler.
+
+    Voies, postes et itinéraire de roulage y avaient été ajoutés : sur un grand
+    terrain, les milliers de segments et leurs étiquettes couvraient les
+    tuiles, la route SID/STAR et l'avion. Tout cela vit désormais dans le plan
+    de roulage, qui n'affiche que l'aérodrome.
+    """
     static = Path(desktop.__file__).parent / "web" / "static"
     map_javascript = (static / "map.js").read_text(encoding="utf-8")
 
-    assert "function drawTaxiways()" in map_javascript
-    assert "function drawParkings()" in map_javascript
-    assert "function drawTaxiwayLabels()" in map_javascript
-    # Voies et postes passent par la même reprojection que les pistes.
-    assert "start: toWorld(taxiway.start)" in map_javascript
-    assert "position: toWorld(parking.position)" in map_javascript
-    # Les voies passent sous les pistes.
-    assert map_javascript.index("drawTaxiways();") < map_javascript.index("drawRunways();")
+    for absent in (
+        "drawTaxiways", "drawParkings", "drawTaxiwayLabels",
+        "drawTaxiRoute", "drawHoldShortMarks", "setTaxiPlan", "parkingAt",
+    ):
+        assert absent not in map_javascript, f"{absent} n'a rien à faire sur la carte"
+
+
+def test_the_ground_view_owns_the_airport_layout():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    assert "function drawTaxiways()" in ground
+    assert "function drawParkings()" in ground
+    assert "function drawRunways()" in ground
+    # Les voies passent sous les pistes : à leur croisement, c'est la piste qui
+    # est continue au sol.
+    assert ground.index("drawTaxiways();") < ground.index("drawRunways();")
+
+
+def test_the_ground_view_carries_no_basemap_and_no_flight_route():
+    """C'est tout l'objet du module : le fond de carte noyait les voies sous
+    les rues de la ville, et la route de vol traversait le terrain sans rien
+    apprendre au pilote qui cherche sa piste."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    for absent in ("tile.openstreetmap.org", "basemap", "MERCATOR", "routeSegments"):
+        assert absent not in ground
+
+
+def test_only_the_taxiways_of_the_route_are_named():
+    """Toutes les nommer couvrait le terrain de pastilles — plus de mille à
+    Toulouse — et masquait ce qu'on venait y chercher."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    labels = ground[ground.index("function drawRouteLabels()"):]
+    labels = labels[: labels.index("\n  }\n")]
+    # Les noms sont pris sur les tronçons de l'itinéraire, jamais sur le plan.
+    assert "for (const leg of plan.legs)" in labels
+    assert "chart.taxiways" not in labels
+    assert "placed.has(leg.name)" in labels
 
 
 def test_the_taxi_route_is_split_at_the_aircraft():
     """Vert derrière, bleu devant : la bascule suit l'avion, pas le nœud suivant."""
     static = Path(desktop.__file__).parent / "web" / "static"
-    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
 
-    assert "function taxiProgress(points)" in map_javascript
-    assert "const ratio = (done - travelled) / length;" in map_javascript
-    assert 'css(walked ? "--taxi-done" : "--taxi-ahead")' in map_javascript
-    assert "function drawHoldShortMarks()" in map_javascript
-    # L'itinéraire arrive en mètres locaux : il est reconverti comme le plan.
-    assert "localToLatLon(chart.origin, point)" in map_javascript
+    assert "const ratio = (travelled - walked) / length;" in ground
+    assert 'css(done ? "--taxi-done" : "--taxi-ahead")' in ground
+    assert "function drawHoldBars()" in ground
+
+
+def test_the_ground_progress_comes_from_the_service():
+    """Un calcul local en doublon situerait la manœuvre ailleurs que le tracé."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "setProgress(metres)" in ground
+    assert "GROUND.setProgress(data.guidance?.fix?.travelled_m ?? 0)" in javascript
+
+
+def test_the_ground_view_reads_the_local_metres_the_service_sends():
+    """Pas de tuiles avec lesquelles s'aligner : aucune reprojection n'est due."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "function toLocal(latitude, longitude)" in ground
+    assert "GROUND.setChart(currentChart);" in javascript
 
 
 def test_a_taxi_plan_never_survives_a_change_of_airport():
     """Sinon l'itinéraire d'un terrain se dessinerait sur le sol d'un autre."""
     static = Path(desktop.__file__).parent / "web" / "static"
-    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
-    setter = map_javascript[map_javascript.index("setChart(data) {"):]
+    setter = ground[ground.index("setChart(data) {"):]
     setter = setter[: setter.index("},")]
-    assert "taxiPlan = null;" in setter
+    assert "plan = null;" in setter
+    assert "travelled = 0;" in setter
     assert "currentTaxiPlan = null;" in javascript
+
+
+def test_the_ground_view_has_its_own_tab_and_panel():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    markup = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert '<button data-tab="ground">' in markup
+    assert 'id="panel-ground"' in markup
+    assert 'id="ground-canvas"' in markup
+    assert "/static/ground.js" in markup
+    assert '"ground", "flight"' in javascript
+    # Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
+    assert 'if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());' in javascript
+
+
+def test_the_ground_canvas_fills_its_stage_and_stays_decluttered():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    stylesheet = (static / "app.css").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    canvas_rule = stylesheet[stylesheet.index("#ground-canvas {"):]
+    canvas_rule = canvas_rule[: canvas_rule.index("}")]
+    assert "width: 100%;" in canvas_rule
+    assert "height: 100%;" in canvas_rule
+    assert "touch-action: none;" in canvas_rule
+    # Secondary links only appear once they are useful to the pilot.
+    assert 'taxiway.kind === "parking" || taxiway.kind === "path"' in ground
+    assert "secondary && !showSecondaryTaxiways" in ground
+    # Screen-space widths stay bounded on large airports.
+    assert "Math.min(4.5, (taxiway.width_m || 15) * view.scale * 0.48)" in ground
+
+
+def test_ground_secondary_taxiways_are_an_opt_in_control():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    markup = (static / "index.html").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="ground-secondary"' in markup
+    assert 'aria-pressed="false"' in markup
+    assert "let showSecondaryTaxiways = false;" in ground
+    assert "toggleSecondaryTaxiways()" in ground
+    assert 'GROUND.toggleSecondaryTaxiways()' in javascript
+
+
+def test_ground_uses_an_oriented_metric_background():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    assert "function drawGroundGrid()" in ground
+    assert "function drawNorthArrow()" in ground
+    assert ground.index("drawGroundGrid();") < ground.index("drawTaxiways();")
+
+
+def test_departure_taxi_route_is_proposed_from_the_aircraft_position():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert "nearestParking(state)" in ground
+    assert "function maybeRequestAutomaticTaxiRoute(aircraft)" in javascript
+    automatic = javascript[javascript.index("function maybeRequestAutomaticTaxiRoute"):]
+    automatic = automatic[: automatic.index("\n}")]
+    assert 'currentMapRole !== "departure"' in automatic
+    assert "nearest.distance_m > 180" in automatic
+    assert "requestTaxiRoute(nearest.label)" in automatic
 
 
 def test_the_taxi_guidance_follows_the_live_positions():
@@ -479,15 +658,54 @@ def test_the_taxi_guidance_follows_the_live_positions():
     assert "if (!aircraft?.on_ground)" in javascript
 
 
+def test_taxi_ui_uses_the_selected_language_not_backend_french():
+    """The service returns semantics; the browser owns display language."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    ground_hud = javascript[javascript.index("function updateGroundHud"):]
+    ground_hud = ground_hud[: ground_hud.index("\n}\n")]
+    assert "guidance.announce" not in ground_hud
+    assert 't("taxi_turn_left")' not in ground_hud  # selected dynamically
+    assert '"taxi_turn_left"' in ground_hud
+    assert 't("runway_selected")' in ground_hud
+    assert 'tf("metres_remaining"' in ground_hud
+
+    # French + English + the six additional supported languages.
+    for key in ("tab_ground", "ground_secondary_title", "taxi_turn_left"):
+        assert translations.count(f"{key}:") == 8
+
+
 def test_the_taxi_route_is_only_redrawn_when_it_changed():
-    """Le redéposer chaque seconde effacerait la portion déjà parcourue."""
+    """Le redéposer chaque seconde ramènerait la progression à zéro."""
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
     guard = javascript[javascript.index("async function pollTaxiGuidance"):]
     guard = guard[: guard.index("\n}\n")]
     assert "if (data.recomputed) {" in guard
-    assert guard.count("MAP.setTaxiPlan(") == 1
+    assert guard.count("GROUND.setPlan(") == 1
+
+
+def test_the_last_selected_parking_always_wins():
+    """Une ancienne réponse ne doit pas restaurer le premier itinéraire."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    request = javascript[javascript.index("async function requestTaxiRoute"):]
+    request = request[: request.index("\n}\n")]
+    assert "taxiRouteRequestController?.abort();" in request
+    assert "const revision = ++taxiRouteRevision;" in request
+    assert "signal: controller.signal" in request
+    assert "if (revision !== taxiRouteRevision) return;" in request
+    assert 'error?.name === "AbortError"' in request
+
+    guidance = javascript[javascript.index("async function pollTaxiGuidance"):]
+    guidance = guidance[: guidance.index("\n}\n")]
+    assert "const requestedPlan = currentTaxiPlan;" in guidance
+    assert "revision !== taxiRouteRevision || currentTaxiPlan !== requestedPlan" in guidance
+    assert "|| taxiRouteRequestController" in guidance
 
 
 def test_a_guidance_failure_stays_silent():
@@ -500,14 +718,14 @@ def test_a_guidance_failure_stays_silent():
     assert "showBanner" not in guard
 
 
-def test_dragging_the_map_does_not_select_a_parking():
+def test_dragging_the_ground_view_does_not_select_a_parking():
     static = Path(desktop.__file__).parent / "web" / "static"
-    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
 
-    assert "function parkingAt(px, py)" in map_javascript
-    assert "moved <= 4 && parkingListener" in map_javascript
+    assert "function parkingAt(px, py)" in ground
+    assert "moved <= 4 && parkingListener" in ground
     # Dézoomé, un poste ne fait que quelques pixels.
-    assert "Math.max(10, (parking.radius_m || 15) * pixelsPerMetre)" in map_javascript
+    assert "Math.max(11, (parking.radius_m || 15) * view.scale)" in ground
 
 
 def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():

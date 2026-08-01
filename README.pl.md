@@ -118,11 +118,29 @@ Mapa obejmuje:
 - pozycję i kurs samolotu;
 - ślad przemieszczenia;
 - tryb automatycznego śledzenia;
-- powiększanie, przesuwanie i dopasowanie do lotniska lub trasy;
-- opcjonalne szczegóły naziemne dla dróg kołowania i stanowisk postojowych.
+- powiększanie, przesuwanie i dopasowanie do lotniska lub trasy.
 
-Szczegóły naziemne są domyślnie ukryte, aby mapa pozostała czytelna. Przycisk
-**Szczegóły naziemne** wyświetla je w razie potrzeby.
+### Kołowanie
+
+Karta **Kołowanie** przedstawia osobny plan lotniska, niezależny od mapy lotu
+i zbudowany wyłącznie z natywnych obiektów MSFS:
+
+- obszar rysowania wypełnia całe dostępne miejsce, także w małych oknach;
+- ciemne tło lotnicze z siatką metryczną i strzałką północy daje skalę oraz
+  orientację bez bałaganu mapy drogowej;
+- drogi startowe, główne drogi kołowania, stanowiska i samolot mają priorytet wizualny;
+- drugorzędne drogi i dojazdy do stanowisk są domyślnie ukryte, a przycisk
+  **Drugorzędne** pokazuje je na żądanie;
+- przy odlocie NaviXav automatycznie proponuje trasę do wybranej drogi startowej,
+  gdy samolot stoi na ziemi w odległości do 180 m od stanowiska;
+- kliknięcie innego stanowiska natychmiast zastępuje propozycję; po przylocie
+  stanowisko docelowe wybiera się ręcznie;
+- widoczne są część przebyta i pozostała, potrzebne nazwy, punkty oczekiwania,
+  następny manewr i pozostała odległość;
+- po zjechaniu z trasy jest ona przeliczana od rzeczywistej pozycji samolotu.
+
+Ścieżki parkingowe SimConnect służą wyłącznie do łączenia stanowisk z siecią i
+nie mogą tworzyć sztucznych skrótów przez drogi startowe.
 
 ### Oficjalne krajowe mapy AIS
 
@@ -327,7 +345,8 @@ wygenerowaniu lub zmodyfikowaniu lotu w SimBrief.
 ## Korzystanie z mapy
 
 - **Podkład mapy**: pokazuje lub ukrywa OpenStreetMap.
-- **Szczegóły naziemne**: pokazuje drogi kołowania i stanowiska.
+- **Kołowanie**: otwiera osobny plan naziemny; **Drugorzędne** pokazuje lub
+  ukrywa dojazdy i mniej istotne drogi kołowania.
 - **Warstwa oficjalna**: pojawia się wyłącznie dla georeferencjonowanej mapy
   aktualnie wyświetlanego lotniska i reguluje jej krycie.
 - **Cała trasa**: kadruje całą trasę lotu.

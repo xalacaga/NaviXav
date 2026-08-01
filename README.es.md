@@ -117,12 +117,29 @@ El mapa incluye:
 - la posición y el rumbo del avión;
 - una traza del desplazamiento;
 - un modo de seguimiento automático;
-- el zoom, el desplazamiento y el ajuste al aeródromo o a la ruta;
-- detalles del terreno opcionales para calles de rodaje y puestos de
-  estacionamiento.
+- el zoom, el desplazamiento y el ajuste al aeródromo o a la ruta.
 
-Los detalles del terreno están ocultos por omisión para mantener un mapa
-legible. El botón **Detalles del terreno** los muestra cuando es necesario.
+### Rodaje en tierra
+
+La pestaña **Rodaje** ofrece un plano de aeródromo independiente del mapa de
+vuelo y construido únicamente con las instalaciones nativas de MSFS:
+
+- el lienzo ocupa toda la zona disponible, incluso en ventanas compactas;
+- un fondo aeronáutico oscuro con cuadrícula métrica y flecha norte aporta
+  escala y orientación sin el ruido de un mapa de carreteras;
+- pistas, calles principales, puestos y avión tienen prioridad visual;
+- las calles secundarias y los accesos a puestos están ocultos por defecto y
+  el botón **Secundarias** los muestra bajo demanda;
+- en salida, si el avión está en tierra a menos de 180 m de un puesto, NaviXav
+  propone automáticamente la ruta hasta la pista seleccionada;
+- al pulsar otro puesto se sustituye inmediatamente la propuesta; en llegada,
+  el puesto de destino sigue siendo una elección manual;
+- se muestran la parte recorrida y pendiente, los nombres útiles, puntos de
+  espera, próxima maniobra y distancia restante;
+- tras una desviación, la ruta se recalcula desde la posición real del avión.
+
+Los caminos de estacionamiento de SimConnect solo vinculan los puestos con la
+red y nunca pueden convertirse en atajos artificiales a través de las pistas.
 
 ### Cartas AIS nacionales oficiales
 
@@ -327,7 +344,8 @@ generar o modificar un vuelo en SimBrief.
 ## Uso del mapa
 
 - **Fondo del mapa**: muestra u oculta OpenStreetMap.
-- **Detalles del terreno**: muestra las calles de rodaje y los puestos.
+- **Rodaje**: abre el plano de suelo dedicado; **Secundarias** muestra u oculta
+  los accesos y calles de menor prioridad.
 - **Capa oficial**: aparece únicamente para la carta georreferenciada del
   aeródromo mostrado y ajusta su opacidad.
 - **Ruta completa**: encuadra toda la ruta del vuelo.

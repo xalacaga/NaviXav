@@ -115,11 +115,29 @@ La mappa comprende:
 - la posizione e la prua dell'aeromobile;
 - una traccia dello spostamento;
 - una modalità di inseguimento automatico;
-- lo zoom, lo spostamento e l'adattamento all'aeroporto o alla rotta;
-- dettagli del suolo opzionali per le vie di rullaggio e le piazzole.
+- lo zoom, lo spostamento e l'adattamento all'aeroporto o alla rotta.
 
-I dettagli del suolo sono nascosti per impostazione predefinita, per mantenere
-la mappa leggibile. Il pulsante **Dettagli suolo** li mostra quando serve.
+### Rullaggio a terra
+
+La scheda **Rullaggio** offre un diagramma aeroportuale separato dalla mappa di
+volo e costruito esclusivamente con le strutture native di MSFS:
+
+- il canvas occupa tutto lo spazio disponibile, anche nelle finestre compatte;
+- uno sfondo aeronautico scuro con griglia metrica e freccia nord fornisce scala
+  e orientamento senza il rumore di una carta stradale;
+- piste, vie principali, piazzole e aeromobile hanno priorità visiva;
+- vie secondarie e accessi alle piazzole sono nascosti per impostazione
+  predefinita e il pulsante **Secondarie** li mostra su richiesta;
+- alla partenza, se l'aeromobile è a terra entro 180 m da una piazzola, NaviXav
+  propone automaticamente il percorso verso la pista selezionata;
+- un clic su un'altra piazzola sostituisce subito la proposta; all'arrivo la
+  piazzola di destinazione resta una scelta manuale;
+- percorso effettuato e restante, nomi utili, punti di attesa, prossima manovra
+  e distanza residua sono presentati con chiarezza;
+- dopo una deviazione il percorso viene ricalcolato dalla posizione reale.
+
+I percorsi di parcheggio SimConnect servono solo a collegare le piazzole alla
+rete e non possono creare scorciatoie artificiali attraverso le piste.
 
 ### Carte AIS nazionali ufficiali
 
@@ -324,7 +342,8 @@ dopo aver generato o modificato un volo in SimBrief.
 ## Utilizzo della mappa
 
 - **Sfondo mappa**: mostra o nasconde OpenStreetMap.
-- **Dettagli suolo**: mostra le vie di rullaggio e le piazzole.
+- **Rullaggio**: apre il piano del suolo dedicato; **Secondarie** mostra o
+  nasconde gli accessi e le vie meno importanti.
 - **Livello ufficiale**: compare solo per la carta georeferenziata
   dell'aerodromo attualmente visualizzato e ne regola l'opacità.
 - **Rotta completa**: inquadra l'intera rotta del volo.

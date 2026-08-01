@@ -2,6 +2,108 @@
 
 const $ = (id) => document.getElementById(id);
 const t = (key) => window.I18N.t(key);
+const displayLocale = () => window.I18N.getLanguage();
+const tf = (key, values = {}) => Object.entries(values).reduce(
+  (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+  t(key)
+);
+
+/** Localises explanations produced by the planner while preserving identifiers. */
+function plannerText(value) {
+  const text = String(value || "");
+  if (!text || displayLocale() === "fr") return text;
+  const exact = new Map([
+    ["piste planifiée par SimBrief", t("reason_runway_simbrief")],
+    ["et confirmée par le vent", t("reason_wind_confirmed")],
+    ["point d'entrée de la STAR", t("reason_star_entry")],
+    ["enchaîne avec la route", t("reason_star_route")],
+    ["RNP requis, avion qualifié", t("reason_rnp_qualified")],
+    ["transition la plus proche de la fin de la STAR", t("reason_transition_nearest_star")],
+    ["transition imposée", t("reason_transition_forced")],
+    ["piste imposée", t("source_forced")],
+    ["approche imposée", t("source_forced")],
+    ["SID imposée", t("source_forced")],
+    ["STAR imposée", t("source_forced")],
+    ["forcée, non vérifiée", "user-selected, not verified"],
+    ["aucune SID en base", "no SID in the database"],
+    ["aucune STAR en base", "no STAR in the database"],
+    ["aucune approche en base", "no approach in the database"],
+    ["transition partant du point de sortie de la STAR", "transition starting at the STAR exit point"],
+    ["aucune transition publiée : guidage radar attendu", "no published transition: radar vectors expected"],
+    ["première transition publiée, aucun lien avec la STAR", "first published transition, no connection with the STAR"],
+    ["transition rejoignant le premier point en route", "transition connecting to the first en-route waypoint"],
+    ["transition la plus proche du premier point en route", "transition nearest to the first en-route waypoint"],
+    ["transition partant du dernier point en route", "transition starting at the last en-route waypoint"],
+    ["transition la plus proche du dernier point en route", "transition nearest to the last en-route waypoint"],
+    ["première transition publiée", "first published transition"],
+    ["point de sortie de la SID", "SID exit point"],
+    ["SID sans point de sortie identifiable", "SID with no identifiable exit point"],
+    ["STAR sans point d'entrée", "STAR with no entry point"],
+    ["rejoint la route", "connects with the route"],
+    ["variante guidage radar (entrée sur repère d'interception)", "radar-vector variant (entry at the intercept fix)"],
+    ["vent indisponible : piste la plus longue retenue", "wind unavailable: longest runway selected"],
+    ["aucun lien avec le premier point en route", "no connection with the first en-route waypoint"],
+    ["aucun lien avec le dernier point en route", "no connection with the last en-route waypoint"],
+  ]);
+  return text.split(" ; ").map((part) => {
+    if (exact.has(part)) return exact.get(part);
+    let match = part.match(/^type (.+) selon la préférence$/);
+    if (match) return tf("reason_approach_type", { type: match[1] });
+    match = part.match(/^(.+) à ([\d,.]+) NM de (.+)$/);
+    if (match) return tf("reason_fix_distance", { fix: match[1], distance: match[2], target: match[3] });
+    match = part.match(/^(sortie|entrée) sur (.+)$/);
+    if (match) return `${match[1] === "sortie" ? "exit" : "entry"} at ${match[2]}`;
+    match = part.match(/^transition publiée (vers|depuis) (.+)$/);
+    if (match) return `published transition ${match[1] === "vers" ? "to" : "from"} ${match[2]}`;
+    match = part.match(/^choix serré entre (.+) et (.+)$/);
+    if (match) return `close choice between ${match[1]} and ${match[2]}`;
+    match = part.match(/^meilleure composante de vent de face \(([+-]?\d+) kt, traversier (\d+) kt\)$/);
+    if (match) return `best headwind component (${match[1]} kt, crosswind ${match[2]} kt)`;
+    match = part.match(/^écartées faute de qualification RNP : (.+)$/);
+    if (match) return `excluded because the aircraft is not RNP-qualified: ${match[1]}`;
+    match = part.match(/^configuration préférentielle(?: \((.+)\))?$/);
+    if (match) return `preferred configuration${match[1] ? ` (${match[1]})` : ""}`;
+    match = part.match(/^piste planifiée par SimBrief( et confirmée par le vent)?$/);
+    if (match) return [t("reason_runway_simbrief"), match[1] ? t("reason_wind_confirmed") : ""].filter(Boolean).join(" ");
+    return part;
+  }).join("; ");
+}
+
+function warningText(value) {
+  const text = String(value || "");
+  if (!text || displayLocale() === "fr") return text;
+  const rules = [
+    [/^(.+) absent de la base de navigation\.$/, "$1 is missing from the navigation database."],
+    [/^Aucune piste de départ déterminable à (.+)\.$/, "No departure runway can be determined at $1."],
+    [/^Aucune piste d'arrivée déterminable à (.+)\.$/, "No arrival runway can be determined at $1."],
+    [/^Aucune SID publiée pour (.+) dans la base\.$/, "No SID is published for $1 in the database."],
+    [/^Aucune STAR publiée pour (.+) dans la base\.$/, "No STAR is published for $1 in the database."],
+    [/^Aucune procédure d'approche publiée pour (.+)\.$/, "No approach procedure is published for $1."],
+    [/^Aucune (SID|STAR) compatible avec la piste (.+) ; recherche élargie à toutes les pistes\.$/, "No $1 is compatible with runway $2; searching all runways."],
+    [/^(SID|STAR) forcée « (.+) » introuvable en base\.$/, "User-selected $1 “$2” was not found in the database."],
+    [/^La (SID|STAR) SimBrief « (.+) » n'est pas publiée pour la piste (.+)\.$/, "SimBrief $1 “$2” is not published for runway $3."],
+    [/^Aucune approche publiée pour la piste (.+)\.$/, "No approach is published for runway $1."],
+    [/^Approche forcée « (.+) » introuvable\.$/, "User-selected approach “$1” was not found."],
+    [/^Piste forcée « (.+) » inconnue à (.+)\.$/, "User-selected runway “$1” is unknown at $2."],
+    [/^Piste SimBrief « (.+) » inconnue à (.+)\.$/, "SimBrief runway “$1” is unknown at $2."],
+    [/^(.+) : SimBrief a prévu la piste (.+), le vent favoriserait (.+)\.$/, "$1: SimBrief planned runway $2, while the wind favours $3."],
+    [/^(.+) : la piste (.+) prévue par SimBrief est hors limites \((.+)\)\.$/, "$1: runway $2 planned by SimBrief is outside the configured limits ($3)."],
+    [/^METAR indisponible pour (.+) ; repli sur l'OFP SimBrief\.$/, "METAR unavailable for $1; using the SimBrief OFP instead."],
+    [/^Aucun METAR pour (.+) : sélection de piste dégradée\.$/, "No METAR for $1: runway selection has reduced confidence."],
+    [/^Cycles AIRAC différents : SimBrief (.+) contre navdata locale (.+)\. Une procédure peut avoir changé de nom ou disparu\.$/, "AIRAC cycle mismatch: SimBrief $1 versus local navdata $2. A procedure may have been renamed or removed."],
+  ];
+  for (const [pattern, replacement] of rules) {
+    if (pattern.test(text)) return text.replace(pattern, replacement);
+  }
+  if (text.startsWith("L'avion est déclaré non RNP")) {
+    return "The aircraft is declared non-RNP, but this airport does not publish RNP requirements. Check the approach chart.";
+  }
+  if (text.startsWith("Avion déclaré non RNP")) {
+    return text.replace("Avion déclaré non RNP", "Aircraft declared non-RNP")
+      .replace("écartée(s)", "excluded").replace("Régler", "Enable").replace("si c'est inexact", "if this is incorrect");
+  }
+  return plannerText(text);
+}
 
 const CONFIDENCE_CLASS = {
   "élevée": "high",
@@ -12,8 +114,8 @@ const CONFIDENCE_CLASS = {
 
 const SOURCE_LABEL = {
   simbrief: "SimBrief",
-  moteur: "calculé",
-  utilisateur: "imposé",
+  moteur: "source_computed",
+  utilisateur: "source_forced",
 };
 
 let currentPlan = null;
@@ -22,6 +124,10 @@ let currentIcao = null;
 let currentMapRole = null;
 let currentTaxiPlan = null;
 let currentTaxiGuidance = null;
+let automaticTaxiRouteKey = null;
+let automaticTaxiRoutePending = false;
+let taxiRouteRevision = 0;
+let taxiRouteRequestController = null;
 let liveTimer = null;
 let simulatorTimer = null;
 let activeRoutePointIndex = null;
@@ -245,13 +351,13 @@ async function openSimBriefPlanner() {
       headers: { "X-NaviXav-External": "simbrief" },
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || "Ouverture impossible");
-    showBanner("info", "SimBrief ouvert", [
-      "Créez puis générez l’OFP dans SimBrief.",
-      "Revenez ensuite dans NaviXav et cliquez sur « Importation du plan ».",
+    if (!response.ok) throw new Error(payload.detail || t("simbrief_open_failed"));
+    showBanner("info", t("simbrief_opened"), [
+      t("simbrief_open_step"),
+      t("simbrief_return_step"),
     ]);
   } catch (error) {
-    showBanner("error", "Impossible d’ouvrir SimBrief", [String(error)]);
+    showBanner("error", t("simbrief_open_failed"), [String(error)]);
   } finally {
     button.disabled = false;
   }
@@ -580,7 +686,7 @@ function renderPlan(plan) {
   $("panel-raw").append(el("pre", null, JSON.stringify(plan, null, 2)));
 
   if (plan.warnings?.length) {
-    showBanner("warn", "Avertissements", plan.warnings);
+    showBanner("warn", t("warnings"), plan.warnings.map(warningText));
   }
   selectTab(document.querySelector(".tabs button.active")?.dataset.tab || "constraints");
 }
@@ -1014,21 +1120,21 @@ function nextFlightConstraint(plan, projection, aircraft) {
 }
 
 function detectFlightPhase(aircraft, projection) {
-  if (!aircraft) return "Hors connexion";
+  if (!aircraft) return t("phase_offline");
   const speed = Number(aircraft.ground_speed_kt || 0);
   const verticalSpeed = Number(aircraft.vertical_speed_fpm || 0);
   if (aircraft.on_ground) {
-    if (projection?.remainingNm < 5) return speed > 35 ? "Atterrissage" : "Roulage arrivée";
-    return speed > 45 ? "Décollage" : "Roulage départ";
+    if (projection?.remainingNm < 5) return speed > 35 ? t("phase_landing") : t("phase_taxi_in");
+    return speed > 45 ? t("phase_takeoff") : t("phase_taxi_out");
   }
   if (projection?.activePoint?.stage === "approach" || projection?.remainingNm < 25) {
-    return "Approche";
+    return t("phase_approach");
   }
-  if (verticalSpeed > 300) return "Montée";
-  if (verticalSpeed < -300) return "Descente";
+  if (verticalSpeed > 300) return t("phase_climb");
+  if (verticalSpeed < -300) return t("phase_descent");
   const cruise = Number(currentPlan?.enroute?.cruise_altitude_ft || 0);
-  if (cruise && Math.abs(Number(aircraft.altitude_ft) - cruise) < 1200) return "Croisière";
-  return "En route";
+  if (cruise && Math.abs(Number(aircraft.altitude_ft) - cruise) < 1200) return t("phase_cruise");
+  return t("phase_enroute");
 }
 
 function descentGuidance(plan, aircraft, projection) {
@@ -1147,7 +1253,7 @@ const ALERT_RULES = [
       !c.onGround
       && c.aglFt !== null && c.aglFt < 2000
       && c.verticalSpeed < -300
-      && (c.phase === "Approche" || c.phase === "Atterrissage")
+      && (c.phase === t("phase_approach") || c.phase === t("phase_landing"))
     ),
     when: (c) => finiteOr(c.configuration.gear_extended_pct, 100) < 95,
   },
@@ -1162,41 +1268,41 @@ const ALERT_RULES = [
     id: "flaps_not_set",
     severity: "warning",
     needs: "flaps",
-    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 3000 && c.phase === "Approche",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 3000 && c.phase === t("phase_approach"),
     when: (c) => c.configuration.flaps_handle_index === 0,
   },
   {
     id: "flaps_still_out",
     severity: "warning",
     needs: "flaps",
-    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt > 3000 && c.phase === "Montée",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt > 3000 && c.phase === t("phase_climb"),
     when: (c) => finiteOr(c.configuration.flaps_handle_index, 0) > 0,
   },
   {
     id: "flaps_takeoff",
     severity: "warning",
     needs: "flaps",
-    armed: (c) => c.onGround && c.phase === "Décollage",
+    armed: (c) => c.onGround && c.phase === t("phase_takeoff"),
     when: (c) => c.configuration.flaps_handle_index === 0,
   },
   {
     id: "spoilers_not_armed",
     severity: "warning",
     needs: "spoilers",
-    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 2000 && c.phase === "Approche",
+    armed: (c) => !c.onGround && c.aglFt !== null && c.aglFt < 2000 && c.phase === t("phase_approach"),
     when: (c) => c.configuration.spoilers_armed === false,
   },
   {
     id: "spoilers_out",
     severity: "warning",
     needs: "spoilers",
-    armed: (c) => c.phase === "Montée",
+    armed: (c) => c.phase === t("phase_climb"),
     when: (c) => finiteOr(c.configuration.spoilers_handle_pct, 0) > 5,
   },
   {
     id: "strobe_off",
     severity: "warning",
-    armed: (c) => !c.onGround || c.phase === "Décollage",
+    armed: (c) => !c.onGround || c.phase === t("phase_takeoff"),
     when: (c) => c.configuration.lights?.strobe === false,
   },
   {
@@ -1223,14 +1329,14 @@ const ALERT_RULES = [
     armed: (c) => (
       !c.onGround
       && c.altitudeFt !== null && c.altitudeFt < 10000
-      && (c.phase === "Descente" || c.phase === "Approche")
+      && (c.phase === t("phase_descent") || c.phase === t("phase_approach"))
     ),
     when: (c) => c.configuration.lights?.landing === false,
   },
   {
     id: "landing_lights_on",
     severity: "info",
-    armed: (c) => c.phase === "Croisière" && c.altitudeFt !== null && c.altitudeFt > 10000,
+    armed: (c) => c.phase === t("phase_cruise") && c.altitudeFt !== null && c.altitudeFt > 10000,
     when: (c) => c.configuration.lights?.landing === true,
   },
   {
@@ -1239,7 +1345,7 @@ const ALERT_RULES = [
     armed: (c) => {
       const transition = finiteOr(c.plan?.departure?.transition_altitude_ft);
       return (
-        !c.onGround && c.phase === "Montée"
+        !c.onGround && c.phase === t("phase_climb")
         && transition !== null && c.altitudeFt !== null
         && c.altitudeFt > transition
       );
@@ -1256,7 +1362,7 @@ const ALERT_RULES = [
       const level = finiteOr(c.plan?.arrival?.transition_level_ft);
       return (
         !c.onGround
-        && (c.phase === "Descente" || c.phase === "Approche")
+        && (c.phase === t("phase_descent") || c.phase === t("phase_approach"))
         && level !== null && c.altitudeFt !== null
         && c.altitudeFt < level
       );
@@ -1286,7 +1392,7 @@ const ALERT_RULES = [
     severity: "warning",
     armed: (c) => (
       Boolean(finiteOr(c.plan?.arrival?.ils_frequency_mhz))
-      && (c.phase === "Descente" || c.phase === "Approche")
+      && (c.phase === t("phase_descent") || c.phase === t("phase_approach"))
       && finiteOr(c.projection?.remainingNm, Infinity) < 25
     ),
     when: (c) => {
@@ -1680,11 +1786,11 @@ function updateRecorderStatus() {
   if (!status) return;
   const speed = String(replaySpeed).replace(".", ",");
   const mode = replayActive
-    ? `rejeu ×${speed}${replaySourceLabel ? ` · ${replaySourceLabel}` : ""}`
-    : flightRecording ? "enregistrement actif" : "en pause";
-  status.textContent = `${mode} · ${flightLog.length} points`;
+    ? `${t("recorder_replay")} ×${speed}${replaySourceLabel ? ` · ${replaySourceLabel}` : ""}`
+    : flightRecording ? t("recorder_active") : t("recorder_paused");
+  status.textContent = `${mode} · ${flightLog.length} ${t("points")}`;
   const toggle = $("flight-record-toggle");
-  if (toggle) toggle.textContent = flightRecording ? "Mettre en pause" : "Reprendre";
+  if (toggle) toggle.textContent = flightRecording ? t("pause") : t("resume");
 }
 
 function stopFlightReplay() {
@@ -1824,7 +1930,7 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
     const point = samples[index];
     const projection = projections[index];
     if (previous.on_ground && !point.on_ground) {
-      addEvent("takeoff", index, "Décollage", `${Math.round(point.ground_speed_kt || 0)} kt`);
+      addEvent("takeoff", index, t("event_takeoff"), `${Math.round(point.ground_speed_kt || 0)} kt`);
     }
     if (
       !seen.has("descent")
@@ -1835,7 +1941,7 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
       addEvent(
         "descent",
         index,
-        "Début de descente",
+        t("event_descent"),
         `${Math.round(point.altitude_ft || 0)} ft`
       );
     }
@@ -1847,27 +1953,27 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
       addEvent(
         "approach",
         index,
-        "Entrée en approche",
+        t("event_approach"),
         projection?.activePoint?.ident || ""
       );
     }
     if (!previous.on_ground && point.on_ground) {
-      addEvent("landing", index, "Toucher", `${Math.round(point.ground_speed_kt || 0)} kt`);
+      addEvent("landing", index, t("event_touchdown"), `${Math.round(point.ground_speed_kt || 0)} kt`);
     }
 
     const configuration = point.configuration || {};
     if (configuration.overspeed_warning === true) {
-      addEvent("overspeed", index, "Survitesse détectée", "Alarme simulateur", "danger");
+      addEvent("overspeed", index, t("event_overspeed"), t("simulator_alert"), "danger");
     }
     if (configuration.stall_warning === true) {
-      addEvent("stall", index, "Décrochage détecté", "Alarme simulateur", "danger");
+      addEvent("stall", index, t("event_stall"), t("simulator_alert"), "danger");
     }
     if (configuration.flap_speed_exceeded === true) {
       addEvent(
         "flap_overspeed",
         index,
-        "Limite volets dépassée",
-        "Alarme simulateur",
+        t("event_flap_overspeed"),
+        t("simulator_alert"),
         "danger"
       );
     }
@@ -1881,7 +1987,7 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
         addEvent(
           "gear_below_1000",
           index,
-          "Train non confirmé sous 1 000 ft",
+          t("event_gear_1000"),
           `${Math.round(gear)} %`,
           "warning"
         );
@@ -1891,7 +1997,7 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
         addEvent(
           "vertical_speed_below_1000",
           index,
-          "Taux de descente élevé sous 1 000 ft",
+          t("event_descent_rate_1000"),
           `${Math.round(verticalSpeed)} ft/min`,
           "warning"
         );
@@ -1901,7 +2007,7 @@ function flightDebrief(points, routeSegments = currentDebriefRouteSegments()) {
         addEvent(
           "speed_below_1000",
           index,
-          "Vitesse élevée sous 1 000 ft",
+          t("event_speed_1000"),
           `${Math.round(airspeed)} kt`,
           "warning"
         );
@@ -1937,7 +2043,7 @@ function formatDebriefDuration(seconds) {
 
 function renderFlightDebrief(
   points = flightLog,
-  sourceLabel = "Vol courant",
+  sourceLabel = t("current_flight"),
   routeSegments = currentDebriefRouteSegments()
 ) {
   const container = $("flight-debrief-content");
@@ -1948,7 +2054,7 @@ function renderFlightDebrief(
     container.append(el(
       "p",
       "flight-archive-empty",
-      "Le débrief sera disponible après l’enregistrement d’au moins deux points."
+      t("debrief_waiting")
     ));
     return;
   }
@@ -1959,24 +2065,24 @@ function renderFlightDebrief(
     el(
       "span",
       null,
-      "Seuils indicatifs NaviXav : écart > 2 NM et vérifications sous 1 000 ft."
+      t("debrief_thresholds")
     )
   );
   container.append(heading);
 
   const stats = el("div", "flight-debrief-stats");
   for (const [label, value] of [
-    ["Durée", formatDebriefDuration(debrief.durationSeconds)],
-    ["Distance réelle", `${debrief.distanceNm.toFixed(1)} NM`],
+    [t("duration"), formatDebriefDuration(debrief.durationSeconds)],
+    [t("actual_distance"), `${debrief.distanceNm.toFixed(1)} NM`],
     [
-      "Écart maximal",
+      t("max_deviation"),
       debrief.routeAvailable ? `${debrief.maxDeviationNm.toFixed(1)} NM` : "—",
     ],
     [
-      "Temps hors route",
+      t("off_route_time"),
       debrief.routeAvailable ? formatDebriefDuration(debrief.offRouteSeconds) : "—",
     ],
-    ["Altitude maximale", `${Math.round(debrief.maxAltitudeFt)} ft`],
+    [t("maximum_altitude"), `${Math.round(debrief.maxAltitudeFt)} ft`],
   ]) {
     const card = el("article", "flight-live-stat");
     card.append(el("div", "stat-label", label), el("div", "stat-value", value));
@@ -1986,7 +2092,7 @@ function renderFlightDebrief(
 
   const timeline = el("div", "flight-debrief-timeline");
   if (!debrief.events.length) {
-    timeline.append(el("p", "flight-archive-empty", "Aucun événement notable détecté."));
+    timeline.append(el("p", "flight-archive-empty", t("no_notable_event")));
   }
   for (const event of debrief.events) {
     const row = el("button", "flight-debrief-event");
@@ -1999,13 +2105,13 @@ function renderFlightDebrief(
       el(
         "span",
         null,
-        [time ? new Date(time).toLocaleTimeString() : "", event.detail]
+        [time ? new Date(time).toLocaleTimeString(displayLocale()) : "", event.detail]
           .filter(Boolean)
           .join(" · ")
       )
     );
     row.append(el("span", "flight-debrief-event-mark", "▶"), description);
-    row.title = "Rejouer cette séquence";
+    row.title = t("replay_sequence");
     row.addEventListener("click", () => {
       const start = Math.max(0, event.index - 6);
       const end = Math.min(debrief.samples.length, event.index + 13);
@@ -2025,7 +2131,7 @@ function renderFlightArchive() {
   container.innerHTML = "";
   const entries = loadFlightArchive();
   if (!entries.length) {
-    container.append(el("p", "flight-archive-empty", "Aucun ancien vol enregistré."));
+    container.append(el("p", "flight-archive-empty", t("no_archived_flight")));
     return;
   }
 
@@ -2039,13 +2145,13 @@ function renderFlightArchive() {
         null,
         [
           entry.callsign,
-          entry.ended_at ? new Date(entry.ended_at).toLocaleString() : "",
+          entry.ended_at ? new Date(entry.ended_at).toLocaleString(displayLocale()) : "",
           `${entry.points} points`,
         ].filter(Boolean).join(" · ")
       )
     );
     const actions = el("div", "flight-archive-actions");
-    const analyse = el("button", "icon-btn", "Débriefer");
+    const analyse = el("button", "icon-btn", t("debrief"));
     analyse.type = "button";
     analyse.addEventListener("click", () => {
       const sameRoute = (
@@ -2059,7 +2165,7 @@ function renderFlightArchive() {
       );
       $("flight-debrief")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-    const replay = el("button", "icon-btn", "Rejouer");
+    const replay = el("button", "icon-btn", t("replay"));
     replay.type = "button";
     replay.addEventListener("click", () => {
       startFlightReplay(
@@ -2259,7 +2365,7 @@ function renderFlightSummaries() {
   const purge = $("flight-summary-purge");
   if (purge) purge.disabled = entries.length === 0;
   if (!entries.length) {
-    container.append(el("p", "flight-summary-empty", "Aucun vol terminé pour le moment."));
+    container.append(el("p", "flight-summary-empty", t("no_completed_flights")));
     return;
   }
 
@@ -2271,16 +2377,16 @@ function renderFlightSummaries() {
       el(
         "span",
         null,
-        [entry.callsign, entry.ended_at ? new Date(entry.ended_at).toLocaleString() : ""]
+        [entry.callsign, entry.ended_at ? new Date(entry.ended_at).toLocaleString(displayLocale()) : ""]
           .filter(Boolean)
           .join(" · ")
       )
     );
     const metrics = el("div", "flight-summary-metrics");
     for (const [label, value] of [
-      ["Durée", formatFlightSummaryDuration(entry.duration_seconds || 0)],
-      ["Distance", `${finiteOr(entry.distance_nm, 0).toFixed(1)} NM`],
-      ["Altitude max.", `${Math.round(finiteOr(entry.max_altitude_ft, 0))} ft`],
+      [t("duration"), formatFlightSummaryDuration(entry.duration_seconds || 0)],
+      [t("distance"), `${finiteOr(entry.distance_nm, 0).toFixed(1)} NM`],
+      [t("max_altitude"), `${Math.round(finiteOr(entry.max_altitude_ft, 0))} ft`],
     ]) {
       const metric = el("span");
       metric.append(el("small", null, label), el("b", null, value));
@@ -2700,7 +2806,7 @@ function progressAltitudeLabel(aircraft, ratio) {
   );
   const text = altitude >= transition
     ? `FL${String(Math.round(altitude / 100)).padStart(3, "0")}`
-    : `${Math.round(altitude).toLocaleString("fr-FR")} ft`;
+    : `${Math.round(altitude).toLocaleString(displayLocale())} ft`;
   const verticalSpeed = finiteOr(aircraft?.vertical_speed_fpm, 0);
   const trend = verticalSpeed > 300 ? " ↑" : verticalSpeed < -300 ? " ↓" : "";
   return `${text}${trend}`;
@@ -2809,7 +2915,7 @@ function updateFlightPanel(aircraft) {
     "flight-next-constraint",
     constraint
       ? `${constraint.label} · ${[constraint.altitude, constraint.speed].filter(Boolean).join(" · ")}`
-      : "Aucune"
+      : t("none")
   );
   liveValue(
     "flight-constraint-distance",
@@ -2830,23 +2936,23 @@ function updateFlightPanel(aircraft) {
 
   if (descent) {
     const todText = descent.todInNm > 2
-      ? `dans ${descent.todInNm.toFixed(0)} NM`
+      ? tf("tod_in", { distance: descent.todInNm.toFixed(0) })
       : descent.todInNm >= -2
-        ? "maintenant"
-        : `dépassé de ${Math.abs(descent.todInNm).toFixed(0)} NM`;
+        ? t("tod_now")
+        : tf("tod_passed", { distance: Math.abs(descent.todInNm).toFixed(0) });
     liveValue("flight-tod", todText, descent.todInNm < -2 ? "warning" : "good");
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
     const profileActive = (
-      phase === "Descente"
-      || phase === "Approche"
+      phase === t("phase_descent")
+      || phase === t("phase_approach")
       || verticalSpeed < -300
       || descent.todInNm <= 2
     );
     if (!profileActive) {
       const waiting = descent.todInNm > 2
-        ? `En attente du TOD · ${descent.todInNm.toFixed(0)} NM`
-        : "Profil disponible en descente";
+        ? tf("profile_waiting", { distance: descent.todInNm.toFixed(0) })
+        : t("profile_available_descent");
       liveValue("flight-vertical-profile", waiting);
     } else {
       const delta = descent.profileDeltaFt;
@@ -2855,10 +2961,10 @@ function updateFlightPanel(aircraft) {
       liveValue(
         "flight-vertical-profile",
         Math.abs(delta) <= 500
-          ? "Profil correct"
+          ? t("profile_correct")
           : delta > 0
-            ? `Trop haut de ${Math.abs(delta)} ft`
-            : `Trop bas de ${Math.abs(delta)} ft`,
+            ? tf("profile_high", { distance: Math.abs(delta) })
+            : tf("profile_low", { distance: Math.abs(delta) }),
         Math.abs(delta) <= 500 ? "good" : Math.abs(delta) <= 1200 ? "warning" : "danger"
       );
     }
@@ -2950,15 +3056,15 @@ function renderFlightPanel(plan) {
   panel.innerHTML = "";
   const header = el("div", "flight-panel-head");
   const title = el("div");
-  title.append(el("div", "card-kicker", "Guidage et progression"));
-  title.append(el("h2", null, "Suivi du vol en temps réel"));
+  title.append(el("div", "card-kicker", t("flight_guidance")));
+  title.append(el("h2", null, t("flight_tracking_title")));
   header.append(title);
   const pills = el("div", "flight-panel-pills");
   const master = el("span", "flight-alert-pill", t("alerts_none"));
   master.id = "flight-alert-master";
   master.dataset.severity = "none";
   pills.append(master);
-  const phase = el("span", "flight-phase-pill", "Hors connexion");
+  const phase = el("span", "flight-phase-pill", t("phase_offline"));
   phase.id = "flight-phase";
   pills.append(phase);
   header.append(pills);
@@ -2982,18 +3088,18 @@ function renderFlightPanel(plan) {
     if (note) node.append(el("div", "stat-note", note));
     grid.append(node);
   };
-  item("Prochain point", "flight-next-fix");
-  item("Distance du point", "flight-next-distance");
-  item("Écart latéral", "flight-deviation", "Distance par rapport au segment actif");
-  item("Distance restante", "flight-remaining");
+  item(t("flight_next_fix"), "flight-next-fix");
+  item(t("flight_fix_distance"), "flight-next-distance");
+  item(t("flight_lateral_deviation"), "flight-deviation", t("flight_lateral_deviation_note"));
+  item(t("flight_remaining_distance"), "flight-remaining");
   item(t("ground_speed"), "flight-ground-speed", t("ground_speed_note"));
   item(t("air_speed"), "flight-air-speed", t("air_speed_note"));
-  item("Prochaine contrainte", "flight-next-constraint");
-  item("Distance contrainte", "flight-constraint-distance");
-  item("Taux requis", "flight-required-vs", "Pour respecter la prochaine altitude");
+  item(t("flight_next_constraint"), "flight-next-constraint");
+  item(t("flight_constraint_distance"), "flight-constraint-distance");
+  item(t("flight_required_rate"), "flight-required-vs", t("flight_required_rate_note"));
   item("Top of Descent", "flight-tod");
-  item("Profil vertical", "flight-vertical-profile", "Évalué à partir du TOD");
-  item("Descente indicative", "flight-descent-vs", "Base 3° · à confirmer");
+  item(t("flight_vertical_profile"), "flight-vertical-profile", t("flight_vertical_profile_note"));
+  item(t("flight_descent_rate"), "flight-descent-vs", t("flight_descent_rate_note"));
   panel.append(grid);
 
   panel.append(buildConfigurationSection());
@@ -3001,13 +3107,13 @@ function renderFlightPanel(plan) {
   const journal = el("section", "flight-summary");
   const journalHead = el("div", "flight-summary-head");
   const journalTitle = el("div");
-  journalTitle.append(el("div", "card-kicker", "Journal local"));
-  journalTitle.append(el("h2", null, "Résumé des vols effectués"));
-  const purge = el("button", "icon-btn", "Purger l’historique des vols");
+  journalTitle.append(el("div", "card-kicker", t("local_journal")));
+  journalTitle.append(el("h2", null, t("flight_summaries")));
+  const purge = el("button", "icon-btn", t("purge_history"));
   purge.id = "flight-summary-purge";
   purge.type = "button";
   purge.addEventListener("click", () => {
-    if (!window.confirm("Supprimer définitivement tous les résumés de vol locaux ?")) return;
+    if (!window.confirm(t("purge_history_confirm"))) return;
     purgeFlightHistory();
   });
   journalHead.append(journalTitle, purge);
@@ -3015,7 +3121,7 @@ function renderFlightPanel(plan) {
   journal.append(el(
     "p",
     "flight-summary-note",
-    "Seuls la durée, la distance et l’altitude maximale des vols terminés sont conservés."
+    t("flight_summary_note")
   ));
   const summaryList = el("div", "flight-summary-list");
   summaryList.id = "flight-summary-list";
@@ -3033,7 +3139,9 @@ function choiceRow(label, choice, note) {
   row.append(value);
   row.append(el("span", `dot ${confidenceClass(choice)}`));
 
-  const reason = [SOURCE_LABEL[choice.source] || choice.source, choice.reason]
+  const sourceKey = SOURCE_LABEL[choice.source];
+  const source = sourceKey && sourceKey !== "SimBrief" ? t(sourceKey) : (sourceKey || choice.source);
+  const reason = [source, plannerText(choice.reason)]
     .filter(Boolean)
     .join(" · ");
   const parts = [note, reason].filter(Boolean).join(" — ");
@@ -3065,7 +3173,7 @@ function terminalCard(block, kicker, extraRows) {
 
   const rows = el("div", "rows");
   if (block.runway) {
-    rows.append(choiceRow("Piste", block.runway, runwayNote(block.runway)));
+    rows.append(choiceRow(t("runway"), block.runway, runwayNote(block.runway)));
   }
   for (const [label, choice, note] of extraRows) {
     rows.append(choiceRow(label, choice, note));
@@ -3078,7 +3186,7 @@ function windLabel(wind) {
   if (!wind) return "";
   if (wind.variable) return `VRB ${wind.speed_kt ?? 0} kt`;
   if (wind.direction_deg === null || wind.direction_deg === undefined) {
-    return wind.speed_kt === 0 ? "calme" : "vent inconnu";
+    return wind.speed_kt === 0 ? t("wind_calm") : t("wind_unknown");
   }
   const gust = wind.gust_kt ? `G${wind.gust_kt}` : "";
   return `${String(wind.direction_deg).padStart(3, "0")}°/${wind.speed_kt}${gust} kt`;
@@ -3095,12 +3203,12 @@ function runwayNote(runway) {
   const bits = [];
   if (runway.headwind_kt !== null && runway.headwind_kt !== undefined) {
     const sign = runway.headwind_kt >= 0 ? "+" : "";
-    bits.push(`face ${sign}${Math.round(runway.headwind_kt)} kt`);
+    bits.push(tf("headwind_short", { wind: `${sign}${Math.round(runway.headwind_kt)}` }));
   }
   if (runway.crosswind_kt !== null && runway.crosswind_kt !== undefined) {
-    bits.push(`trav. ${Math.round(runway.crosswind_kt)} kt`);
+    bits.push(tf("crosswind_short", { wind: Math.round(runway.crosswind_kt) }));
   }
-  if (runway.length_ft) bits.push(`${Math.round(runway.length_ft).toLocaleString("fr-FR")} ft`);
+  if (runway.length_ft) bits.push(`${Math.round(runway.length_ft).toLocaleString(displayLocale())} ft`);
   if (runway.ils_ident) bits.push(`ILS ${runway.ils_ident}`);
   return bits.join(" · ");
 }
@@ -3110,21 +3218,21 @@ function renderTerminal(plan) {
   departure.innerHTML = "";
   if (plan.departure) {
     departure.append(
-      terminalCard(plan.departure, "Départ", [
+      terminalCard(plan.departure, t("departure_title"), [
         ["SID", plan.departure.sid, ""],
-        ["Transition", plan.departure.sid_transition, "sortie de la SID"],
+        [t("transition"), plan.departure.sid_transition, t("sid_exit_note")],
       ])
     );
     if (plan.departure.transition_altitude_ft) {
       departure.append(
-        el("span", "badge", `Altitude de transition ${plan.departure.transition_altitude_ft} ft`)
+        el("span", "badge", tf("transition_altitude", { altitude: plan.departure.transition_altitude_ft }))
       );
     }
   }
 
   const route = $("card-route");
   route.innerHTML = "";
-  route.append(el("div", "card-kicker", "Route"));
+  route.append(el("div", "card-kicker", t("route_title")));
   route.append(el("div", "route-text", plan.atc_route || "—"));
   const meta = el("div", "route-meta");
   if (plan.enroute.cruise_altitude_ft) {
@@ -3142,11 +3250,11 @@ function renderTerminal(plan) {
   arrival.innerHTML = "";
   if (plan.arrival) {
     arrival.append(
-      terminalCard(plan.arrival, "Arrivée", [
+      terminalCard(plan.arrival, t("arrival_title"), [
         ["STAR", plan.arrival.star, ""],
-        ["Transition", plan.arrival.star_transition, "entrée de STAR — TRANS au MCDU"],
-        ["Approche", plan.arrival.approach, ""],
-        ["Trans. app.", plan.arrival.approach_transition, "transition d'approche — VIA au MCDU"],
+        [t("transition"), plan.arrival.star_transition, t("star_entry_note")],
+        [t("approach"), plan.arrival.approach, ""],
+        [t("approach_transition_short"), plan.arrival.approach_transition, t("approach_transition_note")],
       ])
     );
     const badges = el("div", "route-meta");
@@ -3154,10 +3262,10 @@ function renderTerminal(plan) {
       badges.append(el("span", "badge", `ILS ${plan.arrival.ils_frequency_mhz.toFixed(2)} MHz`));
     }
     if (plan.arrival.missed_approach_altitude_ft) {
-      badges.append(el("span", "badge", `Remise de gaz ${plan.arrival.missed_approach_altitude_ft} ft`));
+      badges.append(el("span", "badge", tf("missed_approach", { altitude: plan.arrival.missed_approach_altitude_ft })));
     }
     if (plan.arrival.transition_level_ft) {
-      badges.append(el("span", "badge", `Niveau de transition ${plan.arrival.transition_level_ft} ft`));
+      badges.append(el("span", "badge", tf("transition_level", { altitude: plan.arrival.transition_level_ft })));
     }
     if (badges.childElementCount) arrival.append(badges);
   }
@@ -3339,7 +3447,7 @@ function stat(label, value, note, fill) {
 
 function kg(value, unit) {
   if (value === null || value === undefined) return null;
-  return `${value.toLocaleString("fr-FR")} ${unit}`;
+  return `${value.toLocaleString(displayLocale())} ${unit}`;
 }
 
 function hhmm(seconds) {
@@ -4101,15 +4209,18 @@ function renderMcdu(plan) {
 /* ------------------------------------------------------------------ carte */
 
 function renderMapBar(plan) {
-  const bar = $("map-airports");
-  bar.innerHTML = "";
+  // La carte et le plan de roulage montrent le même terrain : les deux barres
+  // portent les mêmes boutons, et changer d'aérodrome depuis l'une suit dans
+  // l'autre.
+  const bars = [$("map-airports"), $("ground-airports")].filter(Boolean);
+  for (const bar of bars) bar.innerHTML = "";
 
   const entries = [];
   if (plan.departure) {
     entries.push({
       icao: plan.departure.icao,
       runway: plan.departure.runway?.value || null,
-      role: "départ",
+      role: t("departure"),
       mapRole: "departure",
     });
   }
@@ -4117,24 +4228,27 @@ function renderMapBar(plan) {
     entries.push({
       icao: plan.arrival.icao,
       runway: plan.arrival.runway?.value || null,
-      role: "arrivée",
+      role: t("arrival"),
       mapRole: "arrival",
     });
   }
 
-  for (const entry of entries) {
-    const button = el("button", "airport-btn");
-    button.dataset.mapRole = entry.mapRole;
-    button.textContent = entry.icao;
-    button.append(el("small", null, entry.runway ? `${entry.role} · ${entry.runway}` : entry.role));
-    button.addEventListener("click", () => loadChart(entry.icao, entry.runway, entry.mapRole));
-    bar.append(button);
+  for (const bar of bars) {
+    for (const entry of entries) {
+      const button = el("button", "airport-btn");
+      button.dataset.mapRole = entry.mapRole;
+      button.textContent = entry.icao;
+      button.append(el("small", null, entry.runway ? `${entry.role} · ${entry.runway}` : entry.role));
+      button.addEventListener("click", () => loadChart(entry.icao, entry.runway, entry.mapRole));
+      bar.append(button);
+    }
   }
 
   if (entries.length) loadChart(entries[0].icao, entries[0].runway, entries[0].mapRole);
 }
 
 async function loadChart(icao, runway, mapRole) {
+  cancelPendingTaxiRoute();
   for (const button of document.querySelectorAll(".airport-btn")) {
     button.classList.toggle(
       "active",
@@ -4149,16 +4263,23 @@ async function loadChart(icao, runway, mapRole) {
     const response = await fetch(`/api/chart/${icao}?${params}`);
     if (!response.ok) {
       const payload = await response.json();
-      showBanner("error", `Plan de ${icao} indisponible`, [payload.detail]);
+      showBanner("error", tf("chart_unavailable", { icao }), [t("network_error")]);
       return;
     }
     currentChart = await response.json();
     currentIcao = icao;
     currentMapRole = mapRole;
     currentTaxiPlan = null;
+    currentTaxiGuidance = null;
+    automaticTaxiRouteKey = null;
     syncSiaMapOverlay();
     MAP.setChart(currentChart);
-    MAP.onParkingSelect(requestTaxiRoute);
+    // Le plan de roulage reçoit le terrain brut, en mètres locaux : il n'a ni
+    // tuiles ni route de vol avec lesquelles s'aligner.
+    GROUND.setChart(currentChart);
+    GROUND.onParkingSelect(requestTaxiRoute);
+    updateGroundHud();
+    maybeRequestAutomaticTaxiRoute(latestAircraft);
     const routeSegments = flightStagePaths(currentPlan).map((segment) => ({
       stage: segment.stage,
       points: segment.points.map((point) => {
@@ -4172,13 +4293,19 @@ async function loadChart(icao, runway, mapRole) {
     updateHud(null);
 
     if (currentChart.geometry_source) {
-      showBanner("warn", "Géométrie du terrain empruntée", [
-        `La base sélectionnée ne contient pas le tracé du sol ; le plan provient de « ${currentChart.geometry_source} ». Les procédures, elles, restent celles de la base choisie.`,
+      showBanner("warn", t("borrowed_geometry"), [
+        tf("borrowed_geometry_body", { source: currentChart.geometry_source }),
       ]);
     }
   } catch (error) {
-    showBanner("error", "Erreur réseau", [String(error)]);
+    showBanner("error", t("network_error"), [String(error)]);
   }
+}
+
+function cancelPendingTaxiRoute() {
+  taxiRouteRevision += 1;
+  taxiRouteRequestController?.abort();
+  taxiRouteRequestController = null;
 }
 
 /**
@@ -4192,7 +4319,7 @@ function projectToChart(latitude, longitude) {
 }
 
 /**
- * Itinéraire de roulage vers le poste cliqué sur la carte.
+ * Itinéraire de roulage vers le poste cliqué sur le plan.
  *
  * Le sens découle du rôle du terrain affiché : au départ on va du poste à la
  * piste, à l'arrivée on en revient. La piste est celle que le plan a retenue,
@@ -4210,22 +4337,67 @@ async function requestTaxiRoute(parking) {
     runway,
     direction: currentMapRole === "arrival" ? "arrival" : "departure",
   });
+  taxiRouteRequestController?.abort();
+  const controller = new AbortController();
+  taxiRouteRequestController = controller;
+  const revision = ++taxiRouteRevision;
+  currentTaxiGuidance = null;
   try {
-    const response = await fetch(`/api/ground/${currentIcao}/route?${params}`);
+    const response = await fetch(`/api/ground/${currentIcao}/route?${params}`, {
+      signal: controller.signal,
+    });
     const payload = await response.json();
+    if (revision !== taxiRouteRevision) return;
     if (!response.ok) {
-      currentTaxiPlan = null;
-      MAP.clearTaxiPlan();
-      showBanner("warn", t("taxi_unavailable"), [payload.detail]);
+      clearTaxiPlan();
+      showBanner("warn", t("taxi_unavailable"), [t("taxi_unavailable_body")]);
       return;
     }
     currentTaxiPlan = payload;
     currentTaxiGuidance = null;
-    MAP.setTaxiPlan(payload);
-    updateHud(latestAircraft);
+    GROUND.setPlan(payload);
+    GROUND.fitPlan();
+    updateGroundHud();
   } catch (error) {
-    showBanner("error", "Erreur réseau", [String(error)]);
+    if (error?.name === "AbortError") return;
+    showBanner("error", t("network_error"), [String(error)]);
+  } finally {
+    if (taxiRouteRequestController === controller) {
+      taxiRouteRequestController = null;
+    }
   }
+}
+
+/**
+ * Propose le roulage depuis le poste où se trouve réellement l'avion.
+ *
+ * La proposition automatique ne concerne que le départ : à l'arrivée, la
+ * position sur la piste ne permet pas de deviner le poste souhaité. Au-delà
+ * de 180 m d'un parking, aucune supposition n'est faite.
+ */
+function maybeRequestAutomaticTaxiRoute(aircraft) {
+  if (
+    currentTaxiPlan || automaticTaxiRoutePending
+    || currentMapRole !== "departure" || !aircraft?.on_ground
+  ) return;
+  const nearest = GROUND.nearestParking(aircraft);
+  if (!nearest || nearest.distance_m > 180) return;
+  const key = `${currentIcao}:${currentChart?.highlight_runway}:${nearest.label}`;
+  if (automaticTaxiRouteKey === key) return;
+
+  automaticTaxiRouteKey = key;
+  automaticTaxiRoutePending = true;
+  requestTaxiRoute(nearest.label).finally(() => {
+    automaticTaxiRoutePending = false;
+  });
+}
+
+function clearTaxiPlan() {
+  cancelPendingTaxiRoute();
+  currentTaxiPlan = null;
+  currentTaxiGuidance = null;
+  GROUND.setPlan(null);
+  updateGroundHud();
 }
 
 /**
@@ -4236,24 +4408,26 @@ async function requestTaxiRoute(parking) {
  * millisecondes, bien moins que la seconde qui sépare deux positions.
  *
  * Une erreur reste muette. Le guidage au sol est un confort : le signaler
- * chaque seconde couvrirait la carte de bandeaux pour une information que le
+ * chaque seconde couvrirait l'écran de bandeaux pour une information que le
  * pilote lit déjà sur le tracé.
  */
 async function pollTaxiGuidance(aircraft) {
-  if (!currentTaxiPlan || !currentIcao) return;
+  if (!currentTaxiPlan || !currentIcao || taxiRouteRequestController) return;
   // En vol, il n'y a plus rien à guider au sol.
   if (!aircraft?.on_ground) {
     if (currentTaxiGuidance) {
       currentTaxiGuidance = null;
-      updateHud(aircraft);
+      updateGroundHud();
     }
     return;
   }
 
+  const requestedPlan = currentTaxiPlan;
+  const revision = taxiRouteRevision;
   const params = new URLSearchParams({
-    parking: currentTaxiPlan.parking.label,
-    runway: currentTaxiPlan.runway,
-    direction: currentTaxiPlan.direction,
+    parking: requestedPlan.parking.label,
+    runway: requestedPlan.runway,
+    direction: requestedPlan.direction,
     latitude: aircraft.latitude,
     longitude: aircraft.longitude,
   });
@@ -4261,17 +4435,89 @@ async function pollTaxiGuidance(aircraft) {
     const response = await fetch(`/api/ground/${currentIcao}/guidance?${params}`);
     if (!response.ok) return;
     const data = await response.json();
+    if (
+      revision !== taxiRouteRevision || currentTaxiPlan !== requestedPlan
+      || taxiRouteRequestController
+    ) return;
     currentTaxiGuidance = data.guidance;
     // Le tracé n'est remplacé que s'il a changé : le redéposer à chaque
-    // seconde effacerait la portion déjà parcourue.
+    // seconde ramènerait la progression à zéro.
     if (data.recomputed) {
       currentTaxiPlan = data.plan;
-      MAP.setTaxiPlan(data.plan);
+      GROUND.setPlan(data.plan);
     }
-    updateHud(aircraft);
+    GROUND.setProgress(data.guidance?.fix?.travelled_m ?? 0);
+    updateGroundHud();
   } catch (error) {
     currentTaxiGuidance = null;
   }
+}
+
+/**
+ * Bandeau du plan de roulage : la consigne du moment, puis le chemin.
+ *
+ * Il est distinct de celui de la carte, qui affiche cap, vitesse et altitude.
+ * Au sol, aucune de ces valeurs n'aide à trouver sa piste.
+ */
+function updateGroundHud() {
+  const hud = $("ground-hud");
+  if (!hud) return;
+  hud.innerHTML = "";
+  hud.append(el(
+    "div", "ground-title",
+    currentChart ? `${currentChart.icao} · ${currentChart.name}` : "—"
+  ));
+
+  if (!currentChart) {
+    hud.append(el("div", "ground-hint", t("ground_load_plan")));
+    return;
+  }
+  if (!currentTaxiPlan) {
+    const line = el("div");
+    line.append(document.createTextNode(`${t("runway_selected")} `));
+    line.append(el("b", null, currentChart.highlight_runway || "—"));
+    hud.append(line);
+    hud.append(el(
+      "div", "ground-hint",
+      t("ground_click_parking")
+    ));
+    return;
+  }
+
+  const guidance = currentTaxiGuidance;
+  if (guidance) {
+    const kind = guidance.arrived
+      ? "done"
+      : (!guidance.on_route && "lost") || (guidance.hold_short && "hold") || "go";
+    let announcement = null;
+    if (guidance.arrived) announcement = t("taxi_arrived");
+    else if (!guidance.on_route) announcement = t("taxi_off_route");
+    else if (guidance.hold_short && guidance.distance_to_hold_m <= 250) {
+      announcement = tf("taxi_hold_short", { runway: guidance.hold_short });
+    } else if (guidance.next_name && guidance.distance_to_next_m <= 250) {
+      const key = guidance.next_turn === "left"
+        ? "taxi_turn_left"
+        : guidance.next_turn === "right" ? "taxi_turn_right" : "taxi_continue";
+      announcement = tf(key, { taxiway: guidance.next_name });
+    }
+    if (announcement) hud.append(el("div", `ground-call is-${kind}`, announcement));
+  }
+
+  const heading = el("div");
+  heading.append(document.createTextNode(
+    `${currentTaxiPlan.direction === "arrival" ? t("ground_to") : t("ground_from")} `
+  ));
+  heading.append(el("b", null, currentTaxiPlan.parking?.label || "—"));
+  heading.append(document.createTextNode(
+    currentTaxiPlan.direction === "arrival" ? "" : ` · ${t("runway")} ${currentTaxiPlan.runway}`
+  ));
+  hud.append(heading);
+
+  hud.append(el("div", "ground-steps", currentTaxiPlan.summary.join(" › ")));
+  // Une fois le roulage commencé, c'est la distance restante qui compte.
+  hud.append(el("div", null, guidance
+    ? tf("metres_remaining", { distance: Math.round(guidance.remaining_m) })
+    : `${Math.round(currentTaxiPlan.distance_m)} m`));
 }
 
 function applyMapPreferences(values) {
@@ -4314,9 +4560,16 @@ async function loadMapPreferences(status = latestStatus) {
 }
 
 function setLiveState(online, text) {
-  const pill = $("live-pill");
-  pill.classList.toggle("online", online);
-  $("live-text").textContent = text;
+  // Les deux vues portent le même état : passer de l'une à l'autre ne doit pas
+  // laisser croire que le simulateur a été perdu.
+  for (const [pill, label] of [
+    [$("live-pill"), $("live-text")],
+    [$("ground-live-pill"), $("ground-live-text")],
+  ]) {
+    if (!pill) continue;
+    pill.classList.toggle("online", online);
+    if (label) label.textContent = text;
+  }
 }
 
 function updateHud(aircraft) {
@@ -4325,14 +4578,13 @@ function updateHud(aircraft) {
   hud.append(el("div", "hud-title", currentChart ? `${currentChart.icao} · ${currentChart.name}` : "—"));
 
   if (!aircraft) {
-    hud.append(el("div", null, "avion non localisé"));
+    hud.append(el("div", null, t("aircraft_not_located")));
     if (currentChart?.highlight_runway) {
       const line = el("div");
-      line.append(document.createTextNode("piste retenue "));
+      line.append(document.createTextNode(`${t("runway_selected")} `));
       line.append(el("b", null, currentChart.highlight_runway));
       hud.append(line);
     }
-    appendTaxiSummary(hud);
     return;
   }
 
@@ -4342,10 +4594,10 @@ function updateHud(aircraft) {
   const airspeed = finiteOr(aircraft.indicated_airspeed_kt);
   const temperature = finiteOr(aircraft.configuration?.total_air_temperature_c);
   const rows = [
-    ["cap", heading !== null ? `${String(Math.round(heading)).padStart(3, "0")}°` : "—"],
-    ["sol", groundSpeed !== null ? `${Math.round(groundSpeed)} kt` : "—"],
+    [t("heading_short"), heading !== null ? `${String(Math.round(heading)).padStart(3, "0")}°` : "—"],
+    [t("ground_short"), groundSpeed !== null ? `${Math.round(groundSpeed)} kt` : "—"],
     ["IAS", airspeed !== null ? `${Math.round(airspeed)} kt` : "—"],
-    ["alt", progressAltitudeLabel(aircraft, null)],
+    [t("altitude_short"), progressAltitudeLabel(aircraft, null)],
   ];
   // Le variomètre n'a de sens qu'en vol, et le bruit au sol le rendrait
   // illisible : il n'apparaît que si la trajectoire monte ou descend.
@@ -4353,8 +4605,8 @@ function updateHud(aircraft) {
     const rounded = Math.round(verticalSpeed / 50) * 50;
     rows.push(["Vz", `${rounded > 0 ? "+" : ""}${rounded} ft/min`]);
   }
-  if (temperature !== null) rows.push(["temp", `${Math.round(temperature)} °C`]);
-  rows.push(["phase", detectFlightPhase(aircraft, projectAircraftOnFlightPath(aircraft))]);
+  if (temperature !== null) rows.push([t("temperature_short"), `${Math.round(temperature)} °C`]);
+  rows.push([t("phase"), detectFlightPhase(aircraft, projectAircraftOnFlightPath(aircraft))]);
 
   for (const [label, value] of rows) {
     const line = el("div");
@@ -4364,45 +4616,10 @@ function updateHud(aircraft) {
   }
   if (currentChart?.highlight_runway) {
     const line = el("div");
-    line.append(document.createTextNode("piste "));
+    line.append(document.createTextNode(`${t("runway")} `));
     line.append(el("b", null, currentChart.highlight_runway));
     hud.append(line);
   }
-  appendTaxiSummary(hud);
-}
-
-/**
- * Itinéraire de roulage en cours, sous les informations de vol.
- *
- * L'enchaînement des voies est repris tel quel : ce sont les identifiants que
- * le contrôle emploie, et les traduire les rendrait méconnaissables.
- */
-function appendTaxiSummary(hud) {
-  if (!currentTaxiPlan?.summary?.length) return;
-  const block = el("div", "hud-taxi");
-  const heading = el("div");
-  heading.append(document.createTextNode(
-    currentTaxiPlan.direction === "arrival" ? "roulage vers " : "roulage depuis "
-  ));
-  heading.append(el("b", null, currentTaxiPlan.parking?.label || "—"));
-  block.append(heading);
-
-  const guidance = currentTaxiGuidance;
-  if (guidance?.announce) {
-    const kind = guidance.arrived
-      ? "done"
-      : (!guidance.on_route && "lost") || (guidance.hold_short && "hold") || "go";
-    block.append(el("div", `hud-taxi-call is-${kind}`, guidance.announce));
-  }
-
-  block.append(el("div", "hud-taxi-steps", currentTaxiPlan.summary.join(" › ")));
-  // Une fois le roulage commencé, c'est la distance qui reste qui compte, pas
-  // celle du trajet entier.
-  const distance = guidance
-    ? `${Math.round(guidance.remaining_m)} m restants`
-    : `${Math.round(currentTaxiPlan.distance_m)} m`;
-  block.append(el("div", null, distance));
-  hud.append(block);
 }
 
 function applyAircraftState(aircraft) {
@@ -4414,6 +4631,10 @@ function applyAircraftState(aircraft) {
       y: point.y,
       heading: aircraft.heading_true_deg,
     });
+    // Le plan de roulage reçoit la position telle quelle : il la projette
+    // lui-même dans le repère local du terrain.
+    GROUND.setAircraft(aircraft);
+    maybeRequestAutomaticTaxiRoute(aircraft);
   }
   updateHud(aircraft);
   updateRouteStripProgress(aircraft);
@@ -4434,20 +4655,23 @@ async function pollLive() {
   try {
     const data = await fetch(`/api/live?${params}`).then((r) => r.json());
     if (!data.connected) {
-      setLiveState(false, data.reason || "Simulateur non connecté");
+      setLiveState(false, t("sim_disconnected"));
       MAP.clearAircraft();
+      GROUND.clearAircraft();
       updateHud(null);
+      updateGroundHud();
       updateRouteStripProgress(null);
       latestAircraft = null;
       updateFlightPanel(null);
       return;
     }
     const aircraft = data.aircraft;
-    setLiveState(true, `${aircraft.source} · en direct`);
+    const source = aircraft.source === "Démonstration" ? t("demo") : aircraft.source;
+    setLiveState(true, `${source} · ${t("live")}`);
     applyAircraftState(aircraft);
     pollTaxiGuidance(aircraft);
   } catch (error) {
-    setLiveState(false, "Erreur de liaison");
+    setLiveState(false, t("connection_error"));
     updateRouteStripProgress(null);
     updateFlightPanel(null);
   }
@@ -4465,11 +4689,12 @@ function selectTab(name) {
   for (const button of document.querySelectorAll(".tabs button")) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
-  for (const key of ["map", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "raw"]) {
+  for (const key of ["map", "ground", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "raw"]) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
   if (name === "map") window.requestAnimationFrame(() => MAP.resize());
+  if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());
 }
 
 function openActiveAlerts() {
@@ -4516,6 +4741,14 @@ $("sia-opacity").addEventListener("input", (event) => {
   $("sia-map-frame").style.opacity = String(Number(event.target.value) / 100);
 });
 $("map-route").addEventListener("click", () => MAP.fitRoute());
+
+$("ground-fit").addEventListener("click", () => GROUND.fit());
+$("ground-plan").addEventListener("click", () => GROUND.fitPlan());
+$("ground-clear").addEventListener("click", () => clearTaxiPlan());
+$("ground-follow").addEventListener("click", () => GROUND.toggleFollow());
+$("ground-secondary").addEventListener("click", () => GROUND.toggleSecondaryTaxiways());
+$("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
+$("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
 $("update-install").addEventListener("click", handleUpdateButton);
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
@@ -4562,6 +4795,10 @@ window.I18N.apply();
 window.addEventListener("navixav:languagechange", () => {
   setTerminalCollapsed(localStorage.getItem(TERMINAL_COLLAPSED_KEY) === "true");
   if (currentPlan) renderPlan(currentPlan);
+  else {
+    updateHud(latestAircraft);
+    updateGroundHud();
+  }
   loadStatus().catch(() => {});
   pollSimulatorStatus();
   refreshUpdateButtonText();

@@ -95,6 +95,7 @@
 
   <nav class="tabs hidden" id="tabs">
     <button data-tab="map" class="active">Carte</button>
+    <button data-tab="ground">Roulage</button>
     <button data-tab="flight">Suivi du vol</button>
     <button data-tab="constraints">Contraintes</button>
     <button data-tab="dispatch">Dispatch</button>
@@ -156,6 +157,33 @@
       <a id="map-attribution" class="map-attribution"
          href="https://www.openstreetmap.org/copyright"
          target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+    </div>
+  </section>
+
+  <!--
+    Roulage : l'aérodrome seul, sans fond de carte ni route de vol. C'est ce
+    qu'on regarde en roulant, et tout le reste y nuirait.
+  -->
+  <section id="panel-ground" class="panel hidden panel-map">
+    <div class="map-bar">
+      <div class="map-airports" id="ground-airports"></div>
+      <div class="map-actions">
+        <span class="live-pill" id="ground-live-pill">
+          <span class="live-dot"></span><span id="ground-live-text">Recherche du simulateur…</span>
+        </span>
+        <button id="ground-plan" class="icon-btn" title="Cadrer sur l'itinéraire de roulage">Itinéraire</button>
+        <button id="ground-clear" class="icon-btn" title="Effacer l'itinéraire de roulage">Effacer</button>
+        <button id="ground-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
+        <button id="ground-secondary" class="icon-btn" type="button"
+                aria-pressed="false" title="Afficher les voies secondaires et les accès aux postes">Secondaires</button>
+        <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
+        <button id="ground-zoom-out" class="icon-btn" title="Dézoomer">−</button>
+        <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button>
+      </div>
+    </div>
+    <div class="map-stage ground-stage">
+      <canvas id="ground-canvas"></canvas>
+      <div class="ground-hud" id="ground-hud"></div>
     </div>
   </section>
 
@@ -330,6 +358,7 @@
 
 <script src="/static/i18n.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/map.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/ground.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/app.js?v=__NAVIXAV_VERSION__"></script>
 </body>
 </html>
