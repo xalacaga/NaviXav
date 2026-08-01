@@ -13,6 +13,7 @@ import sqlite3
 import time
 from pathlib import Path
 
+from navixav.geo import AXIS_FIX_RADIUS_NM, TERMINAL_FIX_RADIUS_NM, distance_nm
 from navixav.msfs.client import SimConnectClient, SimConnectError
 from navixav.msfs.extract import extract_airport, extract_navaid, extract_waypoint
 from navixav.navdata import msfs_store
@@ -31,6 +32,12 @@ LOGGER = logging.getLogger(__name__)
 
 # Repère synthétique désignant un seuil de piste : « RW18L », « RW05 ».
 _RUNWAY_FIX_RE = re.compile(r"^RW(\d{1,2}[LRC]?)$")
+
+# Repère nommé d'après une piste : « CF02 », « FI21L », « DER07 », « MD18L ».
+# Le préfixe n'est pas énuméré — il en existe des dizaines et ils varient d'un
+# fournisseur à l'autre — c'est le suffixe, confronté aux pistes du terrain,
+# qui décide.
+_RUNWAY_SUFFIX_RE = re.compile(r"^[A-Z]{1,3}(?P<runway>\d{1,2}[LRCB]?)$")
 
 
 class MsfsProvider:
@@ -428,13 +435,21 @@ class MsfsProvider:
         return row is not None
 
     def fix_position(
-        self, ident: str, icao: str | None = None
+        self,
+        ident: str,
+        icao: str | None = None,
+        near: tuple[float, float] | None = None,
     ) -> tuple[float, float] | None:
         """Position d'un repère, récupérée au simulateur si nécessaire.
 
-        `icao` désigne l'aérodrome dont on lit une procédure. Il lève
-        l'ambiguïté des repères de seuil, qui portent le même nom sur des
-        terrains différents.
+        Un identifiant de repère n'est unique que dans sa région du monde : la
+        base en contient des homonymes, et le retenir au hasard fait traverser
+        un continent au tracé. Deux ancrages lèvent l'ambiguïté :
+
+        `icao` désigne l'aérodrome dont on lit une procédure ; la recherche est
+        alors bornée à son voisinage. `near` donne le point de référence d'une
+        recherche en route — le repère précédemment résolu — et sert à
+        départager les homonymes sans les borner.
         """
         key = ident.strip().upper()
 
@@ -446,13 +461,22 @@ class MsfsProvider:
         if threshold:
             return self._runway_threshold(key, threshold.group(1), icao)
 
-        row = self._conn.execute(
-            "SELECT lat, lon FROM waypoint WHERE ident = ? LIMIT 1", (key,)
-        ).fetchone()
-        if row is not None:
-            return (row["lat"], row["lon"])
+        anchor = near or self._airport_position(icao)
+        # Hors procédure, l'ancrage sert à choisir, pas à écarter : le moteur
+        # juge la plausibilité d'un point en route sur la route entière.
+        radius = self._procedure_radius(key, icao) if near is None and icao else None
+
+        stored = _closest(
+            [(row["lat"], row["lon"]) for row in self._conn.execute(
+                "SELECT lat, lon FROM waypoint WHERE ident = ?", (key,)
+            ).fetchall()],
+            anchor,
+        )
+        if stored is not None:
+            return stored if _within(stored, anchor, radius) else None
 
         if self._allow_fetch and not self._missed(key, "waypoint"):
+            seen = False
             for region in self._candidate_regions(key):
                 try:
                     found = extract_waypoint(self._client_or_open(), key, region)
@@ -461,11 +485,52 @@ class MsfsProvider:
                     # repère. Le marquer introuvable le condamnerait dans la
                     # base, même une fois MSFS relancé.
                     return None
-                if found is not None:
-                    msfs_store.store_waypoint(self._conn, found)
-                    return (found["lat"], found["lon"])
-            msfs_store.store_miss(self._conn, key, "waypoint")
+                if found is None:
+                    continue
+                seen = True
+                msfs_store.store_waypoint(self._conn, found)
+                position = (found["lat"], found["lon"])
+                if _within(position, anchor, radius):
+                    return position
+                # Homonyme d'une autre région : conservé en base, mais la
+                # recherche continue là où le repère est réellement attendu.
+            if not seen:
+                msfs_store.store_miss(self._conn, key, "waypoint")
         return None
+
+    def _airport_position(self, icao: str | None) -> tuple[float, float] | None:
+        if not icao:
+            return None
+        row = self._conn.execute(
+            "SELECT lat, lon FROM airport WHERE icao = ?", (icao.strip().upper(),)
+        ).fetchone()
+        return (row["lat"], row["lon"]) if row else None
+
+    def _procedure_radius(self, ident: str, icao: str) -> float:
+        """Éloignement admis pour un repère cité par une procédure de `icao`.
+
+        Un repère dont l'identifiant se termine par une piste de ce terrain
+        — « CF02 », « FI21L », « DER07 » — appartient à sa géométrie d'axe :
+        il se tient à quelques milles du seuil. Le voir à 500 NM, c'est avoir
+        attrapé l'homonyme d'un autre terrain, car ces noms se répètent d'un
+        aérodrome à l'autre dans le monde entier.
+
+        Le critère n'énumère aucun préfixe : il vérifie que le suffixe est une
+        piste **de ce terrain-là**. « MD18L » à Madrid le serait, « MD19R » non
+        — et c'est bien ce qui distingue un point publié d'un point construit.
+        """
+        match = _RUNWAY_SUFFIX_RE.match(ident)
+        if match and normalise_runway(match.group("runway")) in self._runway_names(icao):
+            return AXIS_FIX_RADIUS_NM
+        return TERMINAL_FIX_RADIUS_NM
+
+    def _runway_names(self, icao: str) -> set[str]:
+        return {
+            normalise_runway(row["name"])
+            for row in self._conn.execute(
+                "SELECT name FROM runway WHERE icao = ?", (icao.strip().upper(),)
+            )
+        }
 
     def _runway_threshold(
         self, fix_ident: str, runway_name: str, icao: str | None
@@ -523,3 +588,28 @@ class MsfsProvider:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+def _closest(
+    positions: list[tuple[float, float]], anchor: tuple[float, float] | None
+) -> tuple[float, float] | None:
+    """Position la plus proche de l'ancrage, ou la première sans ancrage."""
+    if not positions:
+        return None
+    if anchor is None:
+        return positions[0]
+    return min(positions, key=lambda position: distance_nm(*anchor, *position))
+
+
+def _within(
+    position: tuple[float, float],
+    anchor: tuple[float, float] | None,
+    radius_nm: float | None,
+) -> bool:
+    if anchor is None or radius_nm is None:
+        return True
+    gap = distance_nm(*anchor, *position)
+    if gap <= radius_nm:
+        return True
+    LOGGER.debug("Repère écarté : %.0f NM de son ancrage", gap)
+    return False

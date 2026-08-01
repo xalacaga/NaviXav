@@ -234,7 +234,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
     connection.execute("PRAGMA foreign_keys = ON")
     _migrate(connection)
     connection.executescript(SCHEMA)
-    _purge_runway_pseudo_fixes(connection)
+    _purge_pseudo_fixes(connection)
     connection.execute(
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
         (str(SCHEMA_VERSION),),
@@ -315,23 +315,36 @@ def _table_names(connection: sqlite3.Connection) -> set[str]:
     }
 
 
-def _purge_runway_pseudo_fixes(connection: sqlite3.Connection) -> None:
-    """Supprime les seuils de piste enregistrés comme points de report.
+# Repères que seule une procédure construit : seuils de piste « RW18L » et
+# points d'interception de l'axe final « CF02 ». Enregistrés comme points de
+# report, ils y ramènent un homonyme réel d'une autre région du monde.
+_PSEUDO_FIX_PATTERNS = ("RW[0-9]*", "CF[0-9]*")
 
-    Une version antérieure résolvait « RW18L » par une recherche mondiale de
-    waypoint : la 18L de Madrid pouvait ainsi hériter des coordonnées d'une
-    piste homonyme à l'autre bout du monde. Ces positions sont désormais
-    calculées depuis la table des pistes ; les entrées polluées doivent
-    disparaître des bases déjà constituées.
+
+def _purge_pseudo_fixes(connection: sqlite3.Connection) -> None:
+    """Supprime les repères de procédure enregistrés comme points de report.
+
+    Une version antérieure résolvait « RW18L » et « CF02 » par une recherche
+    mondiale de waypoint : la 18L de Madrid héritait des coordonnées d'une
+    piste homonyme à l'autre bout du monde, et la finale d'Orly d'un repère
+    corse, à 430 NM du terrain. Ces positions viennent désormais de la table
+    des pistes ou de la géométrie de la procédure ; les entrées polluées
+    doivent disparaître des bases déjà constituées.
     """
-    removed = connection.execute(
-        "DELETE FROM waypoint WHERE ident GLOB 'RW[0-9]*'"
-    ).rowcount
-    connection.execute("DELETE FROM lookup_miss WHERE ident GLOB 'RW[0-9]*'")
-    connection.execute("DELETE FROM airway_segment WHERE from_ident GLOB 'RW[0-9]*'")
+    removed = 0
+    for pattern in _PSEUDO_FIX_PATTERNS:
+        removed += connection.execute(
+            "DELETE FROM waypoint WHERE ident GLOB ?", (pattern,)
+        ).rowcount
+        connection.execute(
+            "DELETE FROM lookup_miss WHERE ident GLOB ?", (pattern,)
+        )
+        connection.execute(
+            "DELETE FROM airway_segment WHERE from_ident GLOB ?", (pattern,)
+        )
     if removed:
         LOGGER.info(
-            "Base NaviXav : %d seuil(s) de piste mal positionné(s) supprimé(s)",
+            "Base NaviXav : %d repère(s) de procédure mal positionné(s) supprimé(s)",
             removed,
         )
 

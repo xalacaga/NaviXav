@@ -42,6 +42,8 @@ data/logs/
 data/private_admin/
 data/developer/
 data/webview/
+data/state_store.db/
+data/stream_store/
 out/
 
 # Éditeurs et système

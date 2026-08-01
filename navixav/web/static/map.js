@@ -169,6 +169,34 @@ const MAP = (() => {
     };
   }
 
+  /**
+   * Ramène une abscisse dans le tour du monde le plus proche de la référence.
+   *
+   * Le repère Mercator se referme sur lui-même : 179° E et 179° O sont voisins
+   * de 2° sur le globe, mais séparés par toute la largeur du monde dans le
+   * repère. Sans ce recollement, une route transpacifique se dessinerait à
+   * l'envers, en traversant la carte de part en part.
+   */
+  function nearestX(x, reference) {
+    return x - Math.round((x - reference) / MERCATOR_WORLD_M) * MERCATOR_WORLD_M;
+  }
+
+  /**
+   * Recolle une suite de points en une ligne continue, posée sur le tour du
+   * monde qu'affiche la vue. Sans passage de l'antiméridien, c'est l'identité.
+   */
+  function continuous(points, reference) {
+    if (!points.length) return points;
+    let previous = null;
+    const joined = points.map((point) => {
+      const x = previous === null ? point.x : nearestX(point.x, previous);
+      previous = x;
+      return { ...point, x };
+    });
+    const shift = nearestX(joined[0].x, reference) - joined[0].x;
+    return shift === 0 ? joined : joined.map((point) => ({ ...point, x: point.x + shift }));
+  }
+
   function toScreen(x, y) {
     return [
       canvas.clientWidth / 2 + (x - view.centerX) * view.scale,
@@ -414,13 +442,19 @@ const MAP = (() => {
     context.lineJoin = "round";
     context.beginPath();
     let drawing = false;
+    // Recollement au fil du parcours : la trace peut franchir l'antiméridien,
+    // et une rupture ramène la référence sur la vue.
+    let previousX = null;
     trail.forEach((point) => {
       if (!point) {
         drawing = false;
+        previousX = null;
         return;
       }
       const [wx, wy] = point;
-      const [x, y] = toScreen(wx, wy);
+      const worldX = nearestX(wx, previousX === null ? view.centerX : previousX);
+      previousX = worldX;
+      const [x, y] = toScreen(worldX, wy);
       if (!drawing) context.moveTo(x, y);
       else context.lineTo(x, y);
       drawing = true;
@@ -441,7 +475,16 @@ const MAP = (() => {
       star: "--route-star",
       approach: "--route-approach",
     };
-    for (const segment of segments) {
+    // La route se recolle d'un seul tenant, procédures comprises : chaque
+    // segment reprend là où le précédent s'arrête, antiméridien inclus.
+    const joined = continuous(segments.flatMap((entry) => entry.points), view.centerX);
+    let consumed = 0;
+    for (const source of segments) {
+      const segment = {
+        ...source,
+        points: joined.slice(consumed, consumed + source.points.length),
+      };
+      consumed += source.points.length;
       if (segment.points.length < 2) continue;
       context.strokeStyle = css(colours[segment.stage] || "--accent");
       context.lineWidth = segment.stage === "approach" ? 4 : 3;
@@ -476,7 +519,7 @@ const MAP = (() => {
 
   function drawAircraft() {
     if (!aircraft) return;
-    const [x, y] = toScreen(aircraft.x, aircraft.y);
+    const [x, y] = toScreen(nearestX(aircraft.x, view.centerX), aircraft.y);
     const heading = ((aircraft.heading ?? 0) * Math.PI) / 180;
 
     context.save();
@@ -661,7 +704,7 @@ const MAP = (() => {
       aircraft = position;
       if (position) {
         if (view.follow) {
-          view.centerX = position.x;
+          view.centerX = nearestX(position.x, view.centerX);
           view.centerY = position.y;
         }
       }
@@ -696,10 +739,10 @@ const MAP = (() => {
       draw();
     },
     fitRoute() {
-      const visiblePoints = [
+      const visiblePoints = continuous([
         ...route,
         ...trail.filter(Boolean).map(([x, y]) => ({ x, y })),
-      ];
+      ], view.centerX);
       if (visiblePoints.length < 2) return;
       const xs = visiblePoints.map((point) => point.x);
       const ys = visiblePoints.map((point) => point.y);
@@ -726,7 +769,7 @@ const MAP = (() => {
       view.follow = !view.follow;
       syncFollowButton();
       if (view.follow && aircraft) {
-        view.centerX = aircraft.x;
+        view.centerX = nearestX(aircraft.x, view.centerX);
         view.centerY = aircraft.y;
       }
       draw();

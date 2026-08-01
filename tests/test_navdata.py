@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+import shutil
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+from navixav.constraints import procedure_path
+from navixav.geo import distance_nm
 from navixav.navdata.base import ProcedureKind, expand_arinc_runways, normalise_runway
+from navixav.navdata.msfs import MsfsProvider
+
+# Position réelle du point de report « CF02 » de la base MSFS : un repère corse,
+# à 430 NM de l'axe de la 02 d'Orly, dont l'approche porte pourtant ce nom.
+CORSICA_CF02 = (41.717347, 8.674186)
 
 
 def test_normalise_runway():
@@ -145,3 +158,120 @@ def test_runway_fix_is_never_looked_up_as_a_waypoint(provider):
         )
     }
     assert not stored
+
+
+# --------------------------------------------------------------------------- #
+# Repères d'interception de l'axe final et homonymes lointains
+#
+# « CF02 » désigne le point où l'approche de la 02 rejoint l'axe : la procédure
+# le construit, la base mondiale n'en publie pas. MSFS connaît pourtant un vrai
+# point de report du même nom en Corse, et le tracé de la finale d'Orly y
+# filait tout droit avant d'en revenir.
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def polluted_provider(tmp_path: Path, provider):
+    """Base de test dont la table des waypoints contient le « CF02 » corse."""
+    target = tmp_path / "navdata.sqlite"
+    shutil.copyfile(provider._path, target)  # noqa: SLF001 - copie de la base
+    instance = MsfsProvider(target, allow_fetch=False)
+    with instance._conn:  # noqa: SLF001 - pollution volontaire, après la purge
+        instance._conn.execute(  # noqa: SLF001
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('CF02', 'LF', ?, ?)",
+            CORSICA_CF02,
+        )
+    yield instance
+    instance.close()
+
+
+def test_intercept_fix_never_lands_on_another_airport(polluted_provider):
+    """« CF02 » cité par Orly ne peut pas être le « CF02 » corse."""
+    assert polluted_provider.fix_position("CF02", "LFPO") is None
+    assert polluted_provider.fix_position("CF32R", "LFBO") is None
+
+
+def test_an_axis_fix_is_refused_even_from_a_neighbouring_airport(polluted_provider):
+    """Le piège suivant : l'homonyme du terrain voisin, pas de l'autre bout du monde."""
+    with polluted_provider._conn:  # noqa: SLF001 - pollution volontaire
+        # « CI24 » publié à Lyon, à 210 NM d'Orly, dont la 24 porte le même nom.
+        polluted_provider._conn.execute(  # noqa: SLF001
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('CI24', 'LF', 45.72, 5.08)"
+        )
+    assert "24" in polluted_provider._runway_names("LFPO")  # noqa: SLF001
+    assert polluted_provider.fix_position("CI24", "LFPO") is None
+
+
+def test_a_published_fix_named_after_a_runway_is_kept(polluted_provider):
+    """« MD18L » à Madrid a la forme d'un repère d'axe, mais il est publié.
+
+    C'est la distance au terrain qui tranche, jamais le préfixe : une liste de
+    préfixes aurait écarté ce point réel avec les repères construits.
+    """
+    with polluted_provider._conn:  # noqa: SLF001 - repère réel, à 20 NM d'Orly
+        polluted_provider._conn.execute(  # noqa: SLF001
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('PO02', 'LF', 49.05, 2.45)"
+        )
+    assert polluted_provider.fix_position("PO02", "LFPO") == (49.05, 2.45)
+
+
+def test_approach_path_stays_around_its_airport(polluted_provider):
+    """Aucun point de la finale d'Orly ne doit sortir de la région parisienne."""
+    def lookup(ident: str):
+        return polluted_provider.fix_position(ident, "LFPO")
+
+    orly = polluted_provider.airport("LFPO")
+    approaches = polluted_provider.procedures("LFPO", ProcedureKind.APPROACH)
+    for approach in approaches:
+        for point in procedure_path(approach, position_lookup=lookup):
+            assert distance_nm(orly.lat, orly.lon, point["lat"], point["lon"]) < 300
+
+
+def test_a_distant_homonym_is_refused_in_a_procedure(polluted_provider):
+    """Un repère de procédure à 400 NM du terrain est un homonyme, pas le bon."""
+    with polluted_provider._conn:  # noqa: SLF001 - pollution volontaire
+        polluted_provider._conn.execute(  # noqa: SLF001
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('LOINT', 'LI', ?, ?)",
+            CORSICA_CF02,
+        )
+    assert polluted_provider.fix_position("LOINT", "LFPO") is None
+    # Sans terrain de rattachement, la position reste exploitable : c'est au
+    # tracé en route de juger, sur la route entière.
+    assert polluted_provider.fix_position("LOINT") is not None
+
+
+def test_the_nearest_homonym_wins(polluted_provider):
+    """Deux repères du même nom : celui du voisinage l'emporte."""
+    with polluted_provider._conn:  # noqa: SLF001 - pollution volontaire
+        polluted_provider._conn.executemany(  # noqa: SLF001
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('DOUBL', ?, ?, ?)",
+            [("LF", 48.9, 2.5), ("NZ", -41.0, 174.0)],
+        )
+    assert polluted_provider.fix_position("DOUBL", "LFPO") == (48.9, 2.5)
+    assert polluted_provider.fix_position("DOUBL", near=(48.7, 2.4)) == (48.9, 2.5)
+    assert polluted_provider.fix_position("DOUBL", near=(-41.2, 174.5)) == (-41.0, 174.0)
+
+
+def test_pseudo_fixes_are_purged_from_an_existing_store(tmp_path: Path, provider):
+    """Une base déjà polluée se nettoie à l'ouverture."""
+    target = tmp_path / "navdata.sqlite"
+    shutil.copyfile(provider._path, target)  # noqa: SLF001 - copie de la base
+    connection = sqlite3.connect(target)
+    with connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) "
+            "VALUES ('CF02', 'LF', ?, ?)",
+            CORSICA_CF02,
+        )
+    connection.close()
+
+    with MsfsProvider(target, allow_fetch=False) as reopened:
+        remaining = reopened._conn.execute(  # noqa: SLF001 - vérification du cache
+            "SELECT COUNT(*) FROM waypoint WHERE ident GLOB 'CF[0-9]*'"
+        ).fetchone()[0]
+    assert remaining == 0

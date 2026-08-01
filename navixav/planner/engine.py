@@ -14,11 +14,12 @@ lien une confiance faible. Le moteur ne masque jamais un choix incertain.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Sequence
 
 from navixav.config import Settings
 from navixav.constraints import format_altitude, procedure_constraints, procedure_path
-from navixav.geo import distance_nm
+from navixav.geo import TERMINAL_FIX_RADIUS_NM, distance_nm, near_direct_route
 from navixav.models import (
     ArrivalBlock,
     Choice,
@@ -30,6 +31,7 @@ from navixav.models import (
     WindInfo,
 )
 from navixav.navdata.base import (
+    Airport,
     NavdataProvider,
     Procedure,
     ProcedureKind,
@@ -86,6 +88,7 @@ class CompletionEngine:
             settings.airport_preferences_path
         )
         self._warnings: list[str] = []
+        self._planned_nm: float | None = None
 
     # ------------------------------------------------------------------ #
     # Entrée principale
@@ -96,6 +99,9 @@ class CompletionEngine:
     ) -> FlightPlan:
         overrides = overrides or PlannerOverrides()
         self._warnings = []
+        # Un aller-retour ramène la route directe à zéro : c'est la distance
+        # annoncée par le plan qui dit alors jusqu'où le vol s'éloigne.
+        self._planned_nm = ofp.dispatch.route_distance_nm
 
         plan = FlightPlan(
             source={
@@ -119,21 +125,34 @@ class CompletionEngine:
         route_legs = [dict(leg) for leg in ofp.enroute_route]
         route_path: list[dict] = []
         origin = self.provider.airport(ofp.origin_icao)
+        destination = self.provider.airport(ofp.destination_icao)
         if origin is not None:
             route_path.append({
                 "ident": origin.ident, "lat": origin.lat, "lon": origin.lon, "via": "",
             })
+        # Les repères se résolvent de proche en proche : le précédent sert
+        # d'ancrage au suivant, et la route directe arbitre les cas restants.
+        # Sans cela, un homonyme d'un autre continent suffit à faire faire un
+        # aller-retour au tracé.
+        previous = (origin.lat, origin.lon) if origin is not None else None
         for leg in route_legs:
-            position = self.provider.fix_position(leg["to"])
-            if position is not None:
-                leg["lat"], leg["lon"] = position
-                route_path.append({
-                    "ident": leg["to"],
-                    "lat": position[0],
-                    "lon": position[1],
-                    "via": leg["via"],
-                })
-        destination = self.provider.airport(ofp.destination_icao)
+            position = self._enroute_position(leg["to"], previous)
+            if position is None:
+                continue
+            if not self._on_direct_corridor(position, origin, destination):
+                self._warn(
+                    f"Point « {leg['to']} » écarté du tracé : sa position en "
+                    "base s'écarte trop de la route."
+                )
+                continue
+            leg["lat"], leg["lon"] = position
+            route_path.append({
+                "ident": leg["to"],
+                "lat": position[0],
+                "lon": position[1],
+                "via": leg["via"],
+            })
+            previous = position
         if destination is not None:
             route_path.append({
                 "ident": destination.ident,
@@ -155,8 +174,76 @@ class CompletionEngine:
         plan.departure = self._build_departure(ofp, overrides)
         plan.arrival = self._build_arrival(ofp, overrides)
         self._anchor_route_on_runways(plan)
+        self._drop_stray_points(plan, origin, destination)
         plan.warnings = self._warnings
         return plan
+
+    def _drop_stray_points(
+        self, plan: FlightPlan, origin: Airport | None, destination: Airport | None
+    ) -> None:
+        """Dernier filet : écarte du tracé tout point hors de sa zone.
+
+        Le contrôle porte sur le plan assemblé, une fois toutes les positions
+        résolues — à l'import de l'OFP comme au recalcul d'une route. Peu
+        importe d'où vient la position fautive : homonyme d'un autre continent,
+        repère d'axe attrapé sur le terrain voisin, coordonnée héritée d'une
+        base constituée par une version antérieure, ou position fournie
+        directement par le simulateur.
+
+        Chaque point est jugé sur un ancrage **stable** — son aérodrome pour
+        une procédure, la route directe pour la croisière — jamais sur son
+        voisin. Deux points fautifs côte à côte, comme le « CF02 » et le
+        « FF02 » d'Orly tombés ensemble en Corse, se couvriraient l'un
+        l'autre dans une comparaison de proche en proche.
+
+        Le critère ne mesure aucune longueur de branche : une étape océanique
+        de 800 NM en ligne droite est parfaitement licite. Il vaut donc pour
+        toutes les routes du monde.
+        """
+        anchors: list[tuple[list[dict], Airport | None]] = []
+        if plan.departure is not None:
+            anchors.append((plan.departure.sid_path, origin))
+        if plan.arrival is not None:
+            anchors.append((plan.arrival.star_path, destination))
+            anchors.append((plan.arrival.approach_path, destination))
+
+        for path, airport in anchors:
+            if airport is None or not path:
+                continue
+            self._keep(
+                path,
+                lambda point, airport=airport: distance_nm(
+                    airport.lat, airport.lon, point["lat"], point["lon"]
+                ) <= TERMINAL_FIX_RADIUS_NM,
+                f"hors de la zone terminale de {airport.ident}",
+            )
+
+        # La croisière : ses extrémités sont les aérodromes, jamais en cause.
+        route = plan.enroute.route_path if plan.enroute else []
+        if len(route) > 2 and origin is not None and destination is not None:
+            middle = route[1:-1]
+            self._keep(
+                middle,
+                lambda point: self._on_direct_corridor(
+                    (point["lat"], point["lon"]), origin, destination
+                ),
+                "trop éloigné de la route directe",
+            )
+            route[1:-1] = middle
+
+    def _keep(self, path: list[dict], accepts, reason: str) -> None:
+        """Ne conserve du tracé que les points acceptés, en signalant les autres."""
+        kept = []
+        for point in path:
+            if not _positioned(point):
+                continue
+            if accepts(point):
+                kept.append(point)
+                continue
+            self._warn(
+                f"Point « {point.get('ident') or '?'} » retiré du tracé : {reason}."
+            )
+        path[:] = kept
 
     def _anchor_route_on_runways(self, plan: FlightPlan) -> None:
         """Ancre les extrémités du tracé sur les seuils de piste retenus.
@@ -1031,6 +1118,37 @@ class CompletionEngine:
 
         return lookup
 
+    def _enroute_position(
+        self, ident: str, near: tuple[float, float] | None
+    ) -> tuple[float, float] | None:
+        """Position d'un repère en route, ancrée sur le point précédent."""
+        try:
+            return self.provider.fix_position(ident, near=near)
+        except TypeError:
+            # Fournisseur ne connaissant pas l'ancrage en route.
+            return self.provider.fix_position(ident)
+
+    def _on_direct_corridor(
+        self,
+        position: tuple[float, float],
+        origin: Airport | None,
+        destination: Airport | None,
+    ) -> bool:
+        """Le point tient-il dans le couloir plausible de la route ?
+
+        Un repère absent de la base peut avoir un homonyme à l'autre bout du
+        monde. Faute de pouvoir choisir, mieux vaut ne pas le tracer que de
+        dessiner une branche qui traverse un continent et revient.
+        """
+        if origin is None or destination is None:
+            return True
+        return near_direct_route(
+            (origin.lat, origin.lon),
+            (destination.lat, destination.lon),
+            position,
+            self._planned_nm,
+        )
+
     def _warn(self, message: str) -> None:
         if message not in self._warnings:
             self._warnings.append(message)
@@ -1039,6 +1157,16 @@ class CompletionEngine:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+
+
+def _positioned(point: dict | None) -> bool:
+    """Le point porte-t-il une position exploitable ?"""
+    if not isinstance(point, dict):
+        return False
+    try:
+        return isfinite(float(point["lat"])) and isfinite(float(point["lon"]))
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def _find_by_ident(procedures: Sequence[Procedure], name: str) -> Procedure | None:
