@@ -1,20 +1,28 @@
-# NaviXav 1.4.5
+# NaviXav 1.4.6
 
-Publication du 1 août 2026.
+Publication du 2 août 2026.
+
+## Nouvelles fonctionnalités
+
+- Un onglet « Météo » remplace l'onglet « JSON » et réunit le briefing du départ, de la croisière, de l'arrivée et du dégagement.
+- Chaque terrain affiche l'essentiel décodé : vent, visibilité, plafond, température et point de rosée, QNH, phénomènes significatifs et catégorie de vol (VFR, MVFR, IFR, LIFR), avec l'ancienneté de l'observation.
+- La tendance TAF est résumée aux créneaux qui changent la donne, et le METAR comme le TAF bruts restent accessibles d'un clic.
+- La croisière reprend le vent moyen, la composante, l'écart ISA, la température extérieure et la tropopause calculés pour l'OFP.
+- Le briefing signale les points d'attention : observation périmée, risque de brume ou de brouillard, rafales, températures basses et conditions IFR basses.
+- En mode METAR direct, les observations sont actualisées au chargement puis toutes les cinq minutes, sans recalculer la route ni changer les procédures.
+- Un résumé graphique représente les conditions, la direction du vent, la visibilité et le plafond de chaque terrain.
+- L'onglet « Dispatch » compare en direct la prévision de l'OFP et ce que mesure le simulateur : carburant embarqué, quantité à bord, consommation réelle, masses au décollage et à l'atterrissage, temps et distance. Les valeurs se rafraîchissent toutes les deux secondes.
+- Le carburant projeté à l'arrivée alerte dès qu'il passe sous la réserve finale augmentée du dégagement, et la masse d'atterrissage projetée alerte au-dessus de la masse maximale.
+- La consommation horaire est mesurée sur une moyenne glissante de cinq minutes et reste juste lorsque le vol est accéléré.
+- Le suivi survit à une fermeture en cours de vol : le carburant bloc et l'heure de décollage relevés au départ sont retrouvés à la réouverture.
+- Les onglets « Dispatch » et « Avion » suivent enfin la langue choisie : intitulés, groupes et mentions y sont traduits, seuls les identifiants aéronautiques (ZFW, MTOW, MLW, SELCAL, cost index) restent tels quels.
 
 ## Corrections de bugs
 
-- Le tracé de l'approche ne part plus vers un repère homonyme situé à des centaines de milles du terrain : la finale d'Orly filait en Corse.
-- Un repère nommé d'après une piste — « CF02 », « FI21L », « DER07 » — est reconnu comme tel sur n'importe quel aérodrome du monde, et ne peut plus emprunter la position de son homonyme sur un terrain voisin.
-- Un point en route dont la base connaît plusieurs homonymes est désormais choisi près de la route, et écarté du tracé s'il l'allonge démesurément.
-- À l'import du plan et à chaque nouvelle route, le tracé complet est vérifié : tout point hors de sa zone est retiré et signalé dans les avertissements du plan, quelle que soit l'origine de la position fautive.
-- Une route qui franchit l'antiméridien se dessine d'un seul trait au lieu de traverser la carte à l'envers.
-- Un vol qui revient à son terrain de départ conserve son point de virage : la distance annoncée par le plan prend le relais de la route directe.
-- Les repères de procédure enregistrés à tort comme points de report sont supprimés de la base de navigation à l'ouverture.
+- L'avertissement « SimBrief a prévu la piste X, le vent favoriserait Y » ne s'affiche plus. Par vent faible, calme ou variable, il attribuait au vent un classement décidé en réalité par la configuration préférentielle de la plateforme et par l'ILS. La piste de l'OFP reste retenue, avec une confiance modérée lorsqu'elle diffère du classement du moteur.
 
 ## Autres changements
 
-- Correction bug.
-- Link official NaviXav website.
+- Ajout meteo, optimisation version mobile.
 
 L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
