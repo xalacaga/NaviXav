@@ -38,6 +38,15 @@ tabs and map height according to the space available, down to a minimum size of
 - weights, fuel, flight time, alternate and dispatch data;
 - aircraft information, registration and declared equipment.
 
+### Flight weather
+
+- essential METAR and TAF information for departure, arrival and alternate;
+- en-route wind and temperature from the SimBrief OFP;
+- in **Live METAR** mode, automatic refresh every five minutes from
+  aviationweather.gov, plus an immediate refresh button;
+- graphical conditions, wind, visibility and ceiling without automatically
+  changing the flight plan’s runway or procedures.
+
 ### IFR preparation
 
 NaviXav completes and presents:
@@ -183,6 +192,10 @@ EUROCONTROL/EAD:
 - France: SIA eAIP (`LF`);
 - Spain and the Canary Islands: ENAIRE AIP (`LE`, `GC`, `GE`);
 - Netherlands: LVNL eAIP (`EH`);
+- Sweden: LFV eAIP (`ES`);
+- Belgium and Luxembourg: skeyes eAIP (`EB`, `EL`);
+- Austria: Austro Control eAIP (`LO`);
+- United Kingdom: NATS eAIP (`EG`);
 - United States and covered territories: FAA d-TPP.
 
 For these aerodromes, NaviXav can:
@@ -208,6 +221,8 @@ This rule is identical for every source.
 A country is only added to the automatic list after direct, stable access to
 its official PDFs has been validated. A missing source is therefore never
 silently replaced by a third-party aggregator.
+The skeyes portal may return `HTTP 403` to automated access. In that case,
+NaviXav reports the source as unavailable and does not try another provider.
 
 ## Requirements
 
@@ -604,7 +619,8 @@ not have this component, use `NaviXav-Setup-<version>.exe`.
 
 ### An official chart is unavailable
 
-- check that the ICAO prefix is covered by SIA, ENAIRE, LVNL or FAA;
+- check that the ICAO prefix is covered by SIA, ENAIRE, LVNL, LFV, skeyes,
+  Austro Control, NATS or FAA;
 - check the Internet connection;
 - confirm that the runway and the approach have been determined;
 - use manual entry of the minima if extraction is unavailable.

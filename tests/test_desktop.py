@@ -17,7 +17,8 @@ from navixav.logging_setup import (
     LOG_MAX_BYTES,
     configure_logging,
 )
-from navixav.web.app import PlanRequest, create_app
+from navixav.models import AirportWeather, WeatherBriefing
+from navixav.web.app import PlanRequest, SettingsRequest, create_app
 
 
 class _Event:
@@ -275,6 +276,24 @@ def test_mobile_lan_interface_is_protected_and_responsive():
     assert '"0.0.0.0" if settings.lan_enabled' in (
         project / "navixav" / "desktop.py"
     ).read_text(encoding="utf-8")
+
+
+def test_mobile_module_navigation_uses_an_accessible_side_drawer():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="module-menu-toggle"' in html
+    assert 'aria-controls="tabs"' in html
+    assert 'id="module-menu-backdrop"' in html
+    assert '#simbrief-create { display: none; }' in css
+    assert ".tabs.mobile-open" in css
+    assert "transform: translateX(-105%);" in css
+    assert 'const MOBILE_MODULE_MENU = window.matchMedia("(max-width: 760px)");' in javascript
+    assert "setModuleMenuOpen(false, restoreMenuFocus);" in javascript
+    assert 'event.key === "Escape"' in javascript
+    assert 'event.key === "Tab" && menuOpen' in javascript
 
 
 def test_vertical_profile_waits_for_descent_before_reporting_too_low():
@@ -763,8 +782,12 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
     shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
     app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
 
-    def endpoint(path):
-        return next(route.endpoint for route in app.routes if route.path == path)
+    def endpoint(path, method=None):
+        return next(
+            route.endpoint
+            for route in app.routes
+            if route.path == path and (method is None or method in route.methods)
+        )
 
     try:
         current_plan = endpoint("/api/plan/current")
@@ -774,6 +797,11 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
 
         plan = endpoint("/api/plan")(PlanRequest(demo=True))
         assert current_plan() == plan
+        weather = endpoint("/api/weather/current")()
+        assert weather["enabled"] is False
+        assert weather["live"] is False
+        assert weather["weather"] == plan["weather"]
+        assert weather["refresh_interval_seconds"] == 300
         departure = plan["departure"]
         runway = departure["runway"]["value"]
         chart = endpoint("/api/chart/{icao}")(departure["icao"], runway)
@@ -817,13 +845,61 @@ def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
     ).read_text(encoding="utf-8")
 
     assert '@app.get("/api/plan/current")' in app_source
+    assert '@app.get("/api/weather/current")' in app_source
     assert (
         'request.url.path == "/api/plan" and request.method == "POST"'
         in app_source
     )
     assert 'fetch("/api/plan/current")' in javascript
+    assert 'fetch("/api/weather/current",' in javascript
     assert "if (status.remote_client)" in javascript
     assert "await loadCurrentPlan();" in javascript
+
+
+def test_live_weather_refresh_updates_the_cached_plan(monkeypatch, tmp_path):
+    project = Path(desktop.__file__).parent.parent
+    store = tmp_path / "navdata.sqlite"
+    shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
+    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
+
+    def endpoint(path, method=None):
+        return next(
+            route.endpoint
+            for route in app.routes
+            if route.path == path and (method is None or method in route.methods)
+        )
+
+    try:
+        plan = endpoint("/api/plan")(PlanRequest(demo=True))
+        monkeypatch.setattr(
+            "navixav.web.app.save_user_settings",
+            lambda _settings: None,
+        )
+        endpoint("/api/settings", "PUT")(SettingsRequest(metar_source="live"))
+        fresh = AirportWeather(
+            icao=plan["departure"]["icao"],
+            role="departure",
+            source="awc",
+            raw_metar=f"{plan['departure']['icao']} 021300Z 09004KT CAVOK",
+        )
+        captured = {}
+
+        def fake_briefing(_ofp, **options):
+            captured.update(options)
+            return WeatherBriefing(departure=fresh)
+
+        monkeypatch.setattr("navixav.web.app.build_briefing", fake_briefing)
+        result = endpoint("/api/weather/current")()
+
+        assert captured == {"metar_source": "live", "force_live": True}
+        assert result["enabled"] is True
+        assert result["live"] is True
+        assert result["partial"] is False
+        assert result["refreshed_at"].endswith("+00:00")
+        assert endpoint("/api/plan/current")()["weather"] == result["weather"]
+    finally:
+        for close in app.router.on_shutdown:
+            close()
 
 
 def test_route_progress_uses_sid_star_and_approach_geometry():
@@ -839,3 +915,99 @@ def test_route_progress_uses_sid_star_and_approach_geometry():
     assert "appendProcedureFixes(" in javascript
     assert "arr.star_path" in javascript
     assert "arr.approach_path" in javascript
+
+
+def test_dispatch_panel_tracks_the_flight_in_real_time():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    styles = (static / "app.css").read_text(encoding="utf-8")
+
+    # Le suivi s'alimente sur la boucle live et se repeint toutes les 2 s.
+    assert "updateDispatchLive(aircraft);" in javascript
+    assert "updateDispatchLive(null);" in javascript
+    assert "const DISPATCH_LIVE_INTERVAL_MS = 2000;" in javascript
+
+    # Les relevés viennent de SimConnect, jamais d'un service distant.
+    engine = javascript[javascript.index("function ingestDispatchSample(aircraft)"):]
+    engine = engine[: engine.index("\nfunction setDispatchLiveCell(")]
+    assert "configuration?.fuel_total_kg" in engine
+    assert "configuration?.total_weight_kg" in engine
+    assert "fetch(" not in engine
+
+    # Le temps est compté en secondes simulées : un vol accéléré ne doit pas
+    # multiplier la consommation horaire affichée.
+    assert "simulation_rate" in engine
+    assert "state.sim_seconds += (elapsedMs / 1000) * rate;" in engine
+
+    cells = javascript[javascript.index("function renderDispatchLiveCells(aircraft)"):]
+    cells = cells[: cells.index("\nfunction updateDispatchLive(")]
+    panel = javascript[javascript.index("function renderDispatch(plan)"):]
+    panel = panel[: panel.index("function renderAircraft(plan)")]
+    # Chaque cellule mise à jour doit exister dans le panneau construit.
+    for identifier in (
+        "dispatch-live-block", "dispatch-live-onboard", "dispatch-live-burn",
+        "dispatch-live-flow", "dispatch-live-landing-fuel", "dispatch-live-tow",
+        "dispatch-live-ldw", "dispatch-live-ete", "dispatch-live-block-time",
+        "dispatch-live-distance",
+    ):
+        assert f'"{identifier}"' in cells
+        assert f'"{identifier}"' in panel
+
+    # Le carburant projeté sous la réserve finale est une alerte, pas une nuance.
+    assert "landingFuelStatus = \"danger\"" in cells
+    assert "landingWeightStatus = \"danger\"" in cells
+    assert '.stat[data-live-status="danger"]' in styles
+
+    for key in (
+        "dispatch_live_title", "dispatch_live_hint", "dispatch_live_waiting",
+        "dispatch_live_ground", "dispatch_live_airborne", "dispatch_live_arrived",
+        "dispatch_actual", "dispatch_projected", "dispatch_loaded",
+        "dispatch_burned", "dispatch_measured", "dispatch_remaining",
+        "dispatch_elapsed", "dispatch_flown", "dispatch_as_planned",
+        "dispatch_onboard_note",
+    ):
+        assert f"{key}:" in translations
+        # Les états du bandeau passent par une variable : seul le libellé compte.
+        assert f'"{key}"' in javascript
+
+
+def test_dispatch_and_aircraft_panels_follow_the_selected_language():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    dispatch = javascript[javascript.index("function renderDispatch(plan)"):]
+    dispatch = dispatch[: dispatch.index("function renderAircraft(plan)")]
+    aircraft = javascript[javascript.index("function renderAircraft(plan)"):]
+    aircraft = aircraft[: aircraft.index("function mcduLine(")]
+
+    for french in (
+        "Aucune donnée de dispatch", "Charge marchande", "Réserve finale",
+        "Restant à l", "Conso horaire", "Distances et temps", "Orthodromie",
+        "Temps de vol", "Immatriculation", "Plan de vol OACI", "bagages",
+        "de fret", "capacité ", "composante ",
+    ):
+        assert french not in dispatch
+    for french in (
+        "Appareil utilisé", "Type inconnu", "Équipement de bord",
+        "Profil de montée", "Masse à vide", "Capacité carburant",
+        "codes déclarés dans le plan de vol SimBrief",
+    ):
+        assert french not in aircraft
+
+    # Les identifiants aéronautiques se lisent tels quels dans toutes les langues.
+    for identifier in ("ZFW", "SELCAL", "Cost index"):
+        assert f'"{identifier}"' in dispatch
+    for identifier in ("MZFW", "MTOW", "MLW"):
+        assert f'"{identifier}"' in aircraft
+
+    for key in (
+        "dsp_empty", "dsp_group_weights", "dsp_group_fuel", "dsp_payload",
+        "dsp_reserve", "dsp_landing_fuel", "dsp_fuel_flow", "dsp_bags",
+        "dsp_cargo_note", "dsp_max", "dsp_capacity_note", "dsp_wind_component",
+        "dsp_atc_flightplan", "acf_kicker", "acf_flight", "acf_oew",
+        "acf_equipment_note", "acf_planned_passengers",
+    ):
+        assert f"{key}:" in translations
+        assert f'"{key}"' in javascript

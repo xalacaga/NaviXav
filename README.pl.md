@@ -39,6 +39,15 @@ rozmiaru minimalnego 720 × 560 pikseli.
 - informacje o statku powietrznym, znaki rejestracyjne i zadeklarowane
   wyposażenie.
 
+### Pogoda dla lotu
+
+- najważniejsze dane METAR i TAF dla odlotu, przylotu i lotniska zapasowego;
+- wiatr i temperatura w przelocie z OFP SimBrief;
+- w trybie **METAR na żywo** automatyczne odświeżanie co pięć minut z
+  aviationweather.gov oraz przycisk natychmiastowego odświeżenia;
+- graficzna prezentacja pogody, wiatru, widzialności i podstawy chmur bez
+  automatycznej zmiany drogi startowej lub procedur planu.
+
 ### Przygotowanie IFR
 
 NaviXav uzupełnia i przedstawia:
@@ -152,6 +161,10 @@ EUROCONTROL/EAD:
 - Francja: SIA eAIP (`LF`);
 - Hiszpania i Wyspy Kanaryjskie: AIP ENAIRE (`LE`, `GC`, `GE`);
 - Holandia: LVNL eAIP (`EH`);
+- Szwecja: LFV eAIP (`ES`);
+- Belgia i Luksemburg: skeyes eAIP (`EB`, `EL`);
+- Austria: Austro Control eAIP (`LO`);
+- Zjednoczone Królestwo: NATS eAIP (`EG`);
 - Stany Zjednoczone i objęte terytoria: FAA d-TPP.
 
 Dla tych lotnisk NaviXav może:
@@ -576,7 +589,8 @@ bez tego składnika należy użyć pliku `NaviXav-Setup-<wersja>.exe`.
 
 ### Mapa oficjalna jest niedostępna
 
-- sprawdzić, czy przedrostek ICAO jest objęty przez SIA, ENAIRE, LVNL lub FAA;
+- sprawdzić, czy przedrostek ICAO jest objęty przez SIA, ENAIRE, LVNL, LFV,
+  skeyes, Austro Control, NATS lub FAA;
 - sprawdzić połączenie internetowe;
 - potwierdzić, że droga startowa i podejście zostały ustalone;
 - skorzystać z ręcznego wprowadzenia minimów, jeśli odczyt jest niedostępny.

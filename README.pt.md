@@ -38,6 +38,15 @@ tamanho mínimo de 720 × 560 píxeis.
 - massas, combustível, tempo de voo, alternante e dados de despacho;
 - informações sobre a aeronave, matrícula e equipamento declarado.
 
+### Meteorologia do voo
+
+- METAR e TAF essenciais para partida, chegada e alternante;
+- vento e temperatura de cruzeiro provenientes do OFP SimBrief;
+- no modo **METAR em direto**, atualização automática a cada cinco minutos a
+  partir de aviationweather.gov e botão de atualização imediata;
+- representação gráfica das condições, vento, visibilidade e teto sem alterar
+  automaticamente a pista ou os procedimentos do plano.
+
 ### Preparação IFR
 
 O NaviXav completa e apresenta:
@@ -151,6 +160,10 @@ passar pelo EUROCONTROL/EAD:
 - França: SIA eAIP (`LF`);
 - Espanha e Canárias: AIP da ENAIRE (`LE`, `GC`, `GE`);
 - Países Baixos: LVNL eAIP (`EH`);
+- Suécia: LFV eAIP (`ES`);
+- Bélgica e Luxemburgo: skeyes eAIP (`EB`, `EL`);
+- Áustria: Austro Control eAIP (`LO`);
+- Reino Unido: NATS eAIP (`EG`);
 - Estados Unidos e territórios abrangidos: FAA d-TPP.
 
 Para estes aeródromos, o NaviXav pode:
@@ -576,7 +589,8 @@ não possua este componente, utilizar `NaviXav-Setup-<versão>.exe`.
 
 ### Uma carta oficial não está disponível
 
-- verificar se o prefixo OACI é abrangido pelo SIA, ENAIRE, LVNL ou FAA;
+- verificar se o prefixo OACI é abrangido pelo SIA, ENAIRE, LVNL, LFV,
+  skeyes, Austro Control, NATS ou FAA;
 - verificar a ligação à Internet;
 - confirmar que a pista e a aproximação foram determinadas;
 - utilizar a introdução manual dos mínimos se a extração não estiver

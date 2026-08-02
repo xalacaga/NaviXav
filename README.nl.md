@@ -38,6 +38,15 @@ ruimte, tot een minimale grootte van 720 × 560 pixels.
 - massa's, brandstof, vluchttijd, uitwijkhaven en dispatchgegevens;
 - informatie over het toestel, registratie en opgegeven uitrusting.
 
+### Vluchtweer
+
+- essentiële METAR- en TAF-informatie voor vertrek, aankomst en uitwijkhaven;
+- wind en temperatuur tijdens de kruisvlucht uit het SimBrief-OFP;
+- in de modus **Live METAR** automatische vernieuwing om de vijf minuten via
+  aviationweather.gov en een knop voor directe vernieuwing;
+- grafische weergave van weer, wind, zicht en wolkenbasis zonder automatisch de
+  baan of procedures van het plan te wijzigen.
+
 ### IFR-voorbereiding
 
 NaviXav vult aan en toont:
@@ -150,6 +159,10 @@ zonder tussenkomst van EUROCONTROL/EAD:
 - Frankrijk: SIA eAIP (`LF`);
 - Spanje en de Canarische Eilanden: ENAIRE AIP (`LE`, `GC`, `GE`);
 - Nederland: LVNL eAIP (`EH`);
+- Zweden: LFV eAIP (`ES`);
+- België en Luxemburg: skeyes eAIP (`EB`, `EL`);
+- Oostenrijk: Austro Control eAIP (`LO`);
+- Verenigd Koninkrijk: NATS eAIP (`EG`);
 - Verenigde Staten en gedekte gebieden: FAA d-TPP.
 
 Voor deze luchthavens kan NaviXav:
@@ -581,7 +594,8 @@ zonder dit onderdeel `NaviXav-Setup-<versie>.exe`.
 
 ### Een officiële kaart is niet beschikbaar
 
-- nagaan of het ICAO-voorvoegsel gedekt is door SIA, ENAIRE, LVNL of FAA;
+- nagaan of het ICAO-voorvoegsel gedekt is door SIA, ENAIRE, LVNL, LFV,
+  skeyes, Austro Control, NATS of FAA;
 - de internetverbinding controleren;
 - bevestigen dat de baan en de nadering zijn bepaald;
 - de minima handmatig invoeren als het uitlezen niet beschikbaar is.

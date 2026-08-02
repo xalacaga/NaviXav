@@ -86,7 +86,6 @@ function warningText(value) {
     [/^Approche forcée « (.+) » introuvable\.$/, "User-selected approach “$1” was not found."],
     [/^Piste forcée « (.+) » inconnue à (.+)\.$/, "User-selected runway “$1” is unknown at $2."],
     [/^Piste SimBrief « (.+) » inconnue à (.+)\.$/, "SimBrief runway “$1” is unknown at $2."],
-    [/^(.+) : SimBrief a prévu la piste (.+), le vent favoriserait (.+)\.$/, "$1: SimBrief planned runway $2, while the wind favours $3."],
     [/^(.+) : la piste (.+) prévue par SimBrief est hors limites \((.+)\)\.$/, "$1: runway $2 planned by SimBrief is outside the configured limits ($3)."],
     [/^METAR indisponible pour (.+) ; repli sur l'OFP SimBrief\.$/, "METAR unavailable for $1; using the SimBrief OFP instead."],
     [/^Aucun METAR pour (.+) : sélection de piste dégradée\.$/, "No METAR for $1: runway selection has reduced confidence."],
@@ -130,6 +129,10 @@ let taxiRouteRevision = 0;
 let taxiRouteRequestController = null;
 let liveTimer = null;
 let simulatorTimer = null;
+let weatherTimer = null;
+let weatherRefreshInFlight = false;
+let weatherRefreshState = "idle";
+let weatherLastUpdatedAt = null;
 let activeRoutePointIndex = null;
 let latestAircraft = null;
 let flightGeometry = [];
@@ -143,6 +146,8 @@ let lastFlightLogAt = 0;
 let activeFlightSummary = null;
 let previousFlightSummarySample = null;
 let lastFlightSummaryAt = 0;
+let dispatchLive = null;
+let dispatchLiveRenderedAt = 0;
 let replayTimer = null;
 let replayActive = false;
 let replaySpeed = 1;
@@ -155,6 +160,7 @@ let siaOverlayKey = null;
 
 const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
+const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CURRENT_FLIGHT_TRAIL_INTERVAL_MS = 5000;
 const CURRENT_FLIGHT_TRAIL_MAX_POINTS = 3600;
 const FLIGHT_LOG_INTERVAL_MS = 5000;
@@ -164,6 +170,11 @@ const FLIGHT_REPLAY_BASE_MS = 300;
 const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
 const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
 const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
+const DISPATCH_LIVE_KEY = "navixav-dispatch-live";
+const DISPATCH_LIVE_INTERVAL_MS = 2000;
+const DISPATCH_SAMPLE_INTERVAL_S = 5;
+const DISPATCH_FLOW_WINDOW_S = 5 * 60;
+const DISPATCH_GAP_MS = 15000;
 const APP_SESSION_ID = Date.now().toString(36);
 const TERMINAL_COLLAPSED_KEY = "navixav-terminal-collapsed";
 const ONBOARDING_KEY = "navixav-onboarded";
@@ -666,7 +677,7 @@ function renderPlan(plan) {
   clearSiaMapOverlay();
   hideBanner();
   show($("empty"), false);
-  for (const id of ["strip", "terminal", "tabs"]) show($(id), true);
+  for (const id of ["strip", "terminal", "tabs", "module-menu-toggle"]) show($(id), true);
 
   // La progression du bandeau doit utiliser la route opérationnelle complète,
   // y compris les points de SID, STAR et d'approche.
@@ -680,10 +691,10 @@ function renderPlan(plan) {
   renderAircraft(plan);
   renderOfficialCharts(plan);
   renderMcdu(plan);
+  renderWeather(plan);
   renderMapBar(plan);
   startLiveLoop();
-  $("panel-raw").innerHTML = "";
-  $("panel-raw").append(el("pre", null, JSON.stringify(plan, null, 2)));
+  startWeatherLoop();
 
   if (plan.warnings?.length) {
     showBanner("warn", t("warnings"), plan.warnings.map(warningText));
@@ -3429,11 +3440,19 @@ function renderConstraints(plan) {
 
 /* -------------------------------------------------------------- dispatch */
 
-function stat(label, value, note, fill) {
-  if (value === null || value === undefined || value === "") return null;
+/**
+ * Tuile de dispatch.
+ *
+ * `live` ajoute une seconde ligne alimentée par SimConnect : la tuile survit
+ * alors à l'absence de valeur OFP, puisque le relevé réel garde un sens même
+ * quand SimBrief n'a pas fourni la prévision correspondante.
+ */
+function stat(label, value, note, fill, live) {
+  const missing = value === null || value === undefined || value === "";
+  if (missing && !live) return null;
   const node = el("div", "stat");
   node.append(el("div", "stat-label", label));
-  node.append(el("div", "stat-value", value));
+  node.append(el("div", "stat-value", missing ? "—" : value));
   if (note) node.append(el("div", "stat-note", note));
   if (fill !== undefined && fill !== null) {
     const meter = el("div", `meter${fill > 1 ? " over" : ""}`);
@@ -3442,6 +3461,28 @@ function stat(label, value, note, fill) {
     meter.append(bar);
     node.append(meter);
   }
+  if (live) node.append(dispatchLiveRow(live.id, live.label));
+  return node;
+}
+
+/** Ligne « réel » d'une tuile de dispatch, remplie par `updateDispatchLive`. */
+function dispatchLiveRow(id, label) {
+  const row = el("div", "stat-live");
+  row.id = id;
+  row.append(el("span", "stat-live-label", label));
+  row.append(el("span", "stat-live-value", "—"));
+  row.append(el("span", "stat-live-delta", ""));
+  return row;
+}
+
+/** Tuile sans équivalent OFP : la valeur principale vient du simulateur. */
+function liveOnlyStat(label, id, note) {
+  const node = el("div", "stat");
+  node.append(el("div", "stat-label", label));
+  const value = el("div", "stat-value", "—");
+  value.id = id;
+  node.append(value);
+  if (note) node.append(el("div", "stat-note", note));
   return node;
 }
 
@@ -3468,6 +3509,304 @@ function group(title, nodes) {
   return wrapper;
 }
 
+/* ------------------------------------------------- suivi dispatch en direct */
+
+/*
+ * Le dispatch de l'OFP est une prévision figée au moment de la génération.
+ * Ce suivi lui superpose ce que le simulateur mesure réellement : carburant
+ * embarqué, consommation, masses et temps écoulés. Rien n'est renvoyé au
+ * serveur, tout est calculé à partir de `/api/live`.
+ *
+ * Le temps est compté en secondes simulées — horloge murale multipliée par le
+ * taux de simulation — sans quoi un vol accéléré donnerait une consommation
+ * horaire plusieurs fois trop élevée.
+ */
+
+function emptyDispatchLive(planKey) {
+  return {
+    plan_key: planKey,
+    block_fuel_kg: null,
+    off_block_sim_s: null,
+    takeoff_sim_s: null,
+    takeoff_weight_kg: null,
+    landing_sim_s: null,
+    landing_fuel_kg: null,
+    landing_weight_kg: null,
+    flow_kg_per_h: null,
+    sim_seconds: 0,
+    sampled_at: null,
+    samples: [],
+    seen_on_ground: false,
+    airborne: false,
+  };
+}
+
+function loadDispatchLive(planKey) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISPATCH_LIVE_KEY) || "null");
+    if (parsed && parsed.plan_key === planKey) {
+      return { ...emptyDispatchLive(planKey), ...parsed, sampled_at: null };
+    }
+  } catch (_error) {
+    // Un suivi illisible n'empêche pas d'en démarrer un neuf.
+  }
+  return emptyDispatchLive(planKey);
+}
+
+function saveDispatchLive() {
+  try {
+    localStorage.setItem(DISPATCH_LIVE_KEY, JSON.stringify(dispatchLive));
+  } catch (_error) {
+    // Le suivi reste utilisable en mémoire même si le stockage est plein.
+  }
+}
+
+/** Consommation horaire moyenne sur la fenêtre glissante, en kg/h. */
+function dispatchFuelFlow(samples) {
+  if (samples.length < 2) return null;
+  const first = samples[0];
+  const last = samples.at(-1);
+  const seconds = last.sim_s - first.sim_s;
+  const burned = first.fuel_kg - last.fuel_kg;
+  if (seconds < 60 || burned <= 0) return null;
+  return (burned / seconds) * 3600;
+}
+
+/** Intègre un état SimConnect dans le suivi : jalons, fenêtre de consommation. */
+function ingestDispatchSample(aircraft) {
+  if (!currentPlan || !aircraft) return;
+  const planKey = flightSummaryPlanKey(currentPlan);
+  if (!dispatchLive || dispatchLive.plan_key !== planKey) {
+    dispatchLive = loadDispatchLive(planKey);
+  }
+  const state = dispatchLive;
+
+  const now = Date.now();
+  const rate = finiteOr(aircraft.configuration?.simulation_rate, 1) || 1;
+  const elapsedMs = state.sampled_at ? now - state.sampled_at : 0;
+  // Fenêtre masquée, simulateur en pause, reconnexion : au-delà de quelques
+  // secondes de trou l'échantillonnage n'est plus exploitable.
+  if (elapsedMs > DISPATCH_GAP_MS) state.samples = [];
+  else if (elapsedMs > 0) state.sim_seconds += (elapsedMs / 1000) * rate;
+  state.sampled_at = now;
+
+  const fuelKg = finiteOr(aircraft.configuration?.fuel_total_kg);
+  const weightKg = finiteOr(aircraft.configuration?.total_weight_kg);
+  const onGround = aircraft.on_ground === true;
+  const groundSpeedKt = finiteOr(aircraft.ground_speed_kt, 0);
+
+  if (onGround) {
+    state.seen_on_ground = true;
+    // Avitaillement : au sol, le plein le plus élevé devient le carburant bloc.
+    if (fuelKg !== null && (state.block_fuel_kg === null || fuelKg > state.block_fuel_kg + 1)) {
+      state.block_fuel_kg = fuelKg;
+      state.samples = [];
+    }
+    if (state.off_block_sim_s === null && groundSpeedKt > 3) {
+      state.off_block_sim_s = state.sim_seconds;
+    }
+  }
+
+  // Les jalons ne sont pris que si le vol a été suivi depuis le sol : démarrer
+  // NaviXav en croisière ne doit pas inventer une heure de décollage.
+  if (!onGround && !state.airborne) {
+    state.airborne = true;
+    // Remise en l'air après un poser : les valeurs d'arrivée capturées ne
+    // décrivent plus la fin du vol, les projections reprennent la main.
+    state.landing_sim_s = null;
+    state.landing_fuel_kg = null;
+    state.landing_weight_kg = null;
+    if (state.takeoff_sim_s === null && state.seen_on_ground) {
+      state.takeoff_sim_s = state.sim_seconds;
+      state.takeoff_weight_kg = weightKg;
+    }
+  } else if (onGround && state.airborne) {
+    state.airborne = false;
+    state.landing_sim_s = state.sim_seconds;
+    state.landing_fuel_kg = fuelKg;
+    state.landing_weight_kg = weightKg;
+  }
+
+  const last = state.samples.at(-1);
+  if (fuelKg !== null && (!last || state.sim_seconds - last.sim_s >= DISPATCH_SAMPLE_INTERVAL_S)) {
+    // Une remontée de niveau en vol signale un changement d'appareil ou un
+    // repositionnement : la moyenne repart de zéro plutôt que de mentir.
+    if (last && fuelKg > last.fuel_kg + 1) state.samples = [];
+    state.samples.push({ sim_s: state.sim_seconds, fuel_kg: fuelKg });
+    while (
+      state.samples.length > 2
+      && state.sim_seconds - state.samples[0].sim_s > DISPATCH_FLOW_WINDOW_S
+    ) {
+      state.samples.shift();
+    }
+    state.flow_kg_per_h = dispatchFuelFlow(state.samples);
+    saveDispatchLive();
+  }
+}
+
+function setDispatchLiveCell(id, value, delta = "", status = "") {
+  const node = $(id);
+  if (!node) return;
+  const valueNode = node.querySelector(".stat-live-value") || node;
+  valueNode.textContent = value === null || value === undefined || value === "" ? "—" : value;
+  const deltaNode = node.querySelector(".stat-live-delta");
+  if (deltaNode) deltaNode.textContent = delta || "";
+  node.closest(".stat")?.setAttribute("data-live-status", status);
+}
+
+function dispatchDelta(actual, planned, unit) {
+  if (actual === null || actual === undefined) return "";
+  const reference = finiteOr(planned);
+  if (reference === null) return "";
+  const delta = Math.round(actual - reference);
+  if (!delta) return `= ${t("dispatch_as_planned")}`;
+  return `${delta > 0 ? "+" : "−"}${Math.abs(delta).toLocaleString(displayLocale())} ${unit}`;
+}
+
+/**
+ * Recalcule les valeurs réelles et les projections du panneau Dispatch.
+ *
+ * `aircraft` vaut null quand le simulateur est absent : les relevés instantanés
+ * et les projections repassent à « — », les jalons déjà capturés restent.
+ */
+function renderDispatchLiveCells(aircraft) {
+  const d = currentPlan?.dispatch || {};
+  const unit = { KGS: "kg", LBS: "lb", kgs: "kg", lbs: "lb" }[d.units] || d.units || "";
+  const pounds = String(d.units || "").toLowerCase().startsWith("lb");
+  const toUnit = (valueKg) => (valueKg === null || valueKg === undefined
+    ? null
+    : Math.round(pounds ? valueKg / LBS_TO_KG : valueKg));
+  const state = dispatchLive;
+
+  const configuration = aircraft?.configuration || {};
+  const fuelKg = finiteOr(configuration.fuel_total_kg);
+  const weightKg = finiteOr(configuration.total_weight_kg);
+  const projection = aircraft ? projectAircraftOnFlightPath(aircraft) : null;
+  const groundSpeedKt = finiteOr(aircraft?.ground_speed_kt, 0);
+  const landed = Boolean(state?.landing_sim_s !== null && state?.landing_sim_s !== undefined);
+
+  const badge = $("dispatch-live-state");
+  if (badge) {
+    let key = "dispatch_live_waiting";
+    if (aircraft && landed && aircraft.on_ground) key = "dispatch_live_arrived";
+    else if (aircraft && !aircraft.on_ground) key = "dispatch_live_airborne";
+    else if (aircraft) key = "dispatch_live_ground";
+    badge.textContent = t(key);
+  }
+
+  // Temps restant estimé sur la vitesse sol réelle, comme l'onglet Suivi du vol.
+  const remainingSeconds = projection && groundSpeedKt >= 40
+    ? (projection.remainingNm / groundSpeedKt) * 3600
+    : null;
+
+  const flowKgPerH = finiteOr(state?.flow_kg_per_h);
+  let landingFuelKg = landed ? finiteOr(state?.landing_fuel_kg) : null;
+  if (landingFuelKg === null && fuelKg !== null && remainingSeconds !== null && flowKgPerH !== null) {
+    landingFuelKg = Math.max(0, fuelKg - flowKgPerH * (remainingSeconds / 3600));
+  }
+
+  const blockFuel = toUnit(state?.block_fuel_kg);
+  const onboard = toUnit(fuelKg);
+  const burned = state?.block_fuel_kg !== null && state?.block_fuel_kg !== undefined && fuelKg !== null
+    ? toUnit(Math.max(0, state.block_fuel_kg - fuelKg))
+    : null;
+  const flow = toUnit(flowKgPerH);
+  const landingFuel = toUnit(landingFuelKg);
+
+  setDispatchLiveCell("dispatch-live-block", kg(blockFuel, unit), dispatchDelta(blockFuel, d.block_fuel, unit));
+  setDispatchLiveCell("dispatch-live-onboard", kg(onboard, unit));
+  setDispatchLiveCell("dispatch-live-burn", kg(burned, unit));
+  setDispatchLiveCell("dispatch-live-flow", kg(flow, `${unit}/h`), dispatchDelta(flow, d.average_fuel_flow, `${unit}/h`));
+
+  // Le carburant projeté à l'arrivée est le chiffre qui décide d'un déroutement :
+  // sous la réserve finale il est rouge, sous réserve + dégagement il alerte.
+  const reserve = finiteOr(d.reserve_fuel);
+  const alternate = finiteOr(d.alternate_fuel, 0);
+  let landingFuelStatus = "";
+  if (landingFuel !== null && reserve !== null) {
+    if (landingFuel < reserve) landingFuelStatus = "danger";
+    else if (landingFuel < reserve + alternate) landingFuelStatus = "warning";
+    else landingFuelStatus = "good";
+  }
+  setDispatchLiveCell(
+    "dispatch-live-landing-fuel",
+    kg(landingFuel, unit),
+    dispatchDelta(landingFuel, d.landing_fuel, unit),
+    landingFuelStatus
+  );
+
+  const takeoffWeight = toUnit(state?.takeoff_weight_kg);
+  setDispatchLiveCell(
+    "dispatch-live-tow",
+    kg(takeoffWeight, unit),
+    dispatchDelta(takeoffWeight, d.takeoff_weight, unit),
+    takeoffWeight !== null && d.max_takeoff_weight && takeoffWeight > d.max_takeoff_weight ? "danger" : ""
+  );
+
+  let landingWeightKg = landed ? finiteOr(state?.landing_weight_kg) : null;
+  if (landingWeightKg === null && weightKg !== null && fuelKg !== null && landingFuelKg !== null) {
+    landingWeightKg = weightKg - (fuelKg - landingFuelKg);
+  }
+  const landingWeight = toUnit(landingWeightKg);
+  const maxLanding = finiteOr(d.max_landing_weight);
+  let landingWeightStatus = "";
+  if (landingWeight !== null && maxLanding) {
+    if (landingWeight > maxLanding) landingWeightStatus = "danger";
+    else if (landingWeight > maxLanding * 0.98) landingWeightStatus = "warning";
+    else landingWeightStatus = "good";
+  }
+  setDispatchLiveCell(
+    "dispatch-live-ldw",
+    kg(landingWeight, unit),
+    dispatchDelta(landingWeight, d.landing_weight, unit),
+    landingWeightStatus
+  );
+
+  const simNow = finiteOr(state?.sim_seconds, 0);
+  const endSim = landed ? state.landing_sim_s : simNow;
+  const airborneSeconds = state?.takeoff_sim_s === null || state?.takeoff_sim_s === undefined
+    ? null
+    : Math.max(0, endSim - state.takeoff_sim_s);
+  const blockSeconds = state?.off_block_sim_s === null || state?.off_block_sim_s === undefined
+    ? null
+    : Math.max(0, endSim - state.off_block_sim_s);
+
+  // Temps de vol total estimé : ce qui est déjà volé plus ce qui reste.
+  let eteDelta = "";
+  if (airborneSeconds !== null && remainingSeconds !== null && d.time_enroute_s) {
+    const minutes = Math.round((airborneSeconds + remainingSeconds - d.time_enroute_s) / 60);
+    eteDelta = minutes ? `${minutes > 0 ? "+" : "−"}${Math.abs(minutes)} min` : `= ${t("dispatch_as_planned")}`;
+  }
+  setDispatchLiveCell("dispatch-live-ete", airborneSeconds === null ? null : hhmm(airborneSeconds), eteDelta);
+  setDispatchLiveCell("dispatch-live-block-time", blockSeconds === null ? null : hhmm(blockSeconds));
+
+  const remainingNm = projection ? Math.round(projection.remainingNm) : null;
+  const flownNm = remainingNm !== null && d.route_distance_nm
+    ? Math.max(0, d.route_distance_nm - remainingNm)
+    : null;
+  setDispatchLiveCell(
+    "dispatch-live-distance",
+    remainingNm === null ? null : `${remainingNm.toLocaleString(displayLocale())} NM`,
+    flownNm === null ? "" : `${t("dispatch_flown")} ${flownNm.toLocaleString(displayLocale())} NM`
+  );
+}
+
+/**
+ * Point d'entrée appelé à chaque relevé live.
+ *
+ * L'échantillonnage suit la boucle à 1 Hz — une moyenne de consommation a
+ * besoin de points réguliers — mais le panneau n'est repeint que toutes les
+ * deux secondes, largement assez pour lire des masses et un carburant.
+ */
+function updateDispatchLive(aircraft) {
+  if (!$("dispatch-live-state")) return;
+  ingestDispatchSample(aircraft);
+  const now = Date.now();
+  if (now - dispatchLiveRenderedAt < DISPATCH_LIVE_INTERVAL_MS) return;
+  dispatchLiveRenderedAt = now;
+  renderDispatchLiveCells(aircraft);
+}
+
 function renderDispatch(plan) {
   const panel = $("panel-dispatch");
   panel.innerHTML = "";
@@ -3475,61 +3814,75 @@ function renderDispatch(plan) {
   const unit = { KGS: "kg", LBS: "lb", kgs: "kg", lbs: "lb" }[d.units] || d.units || "";
 
   if (!Object.keys(d).length) {
-    panel.append(el("p", "stat-note", "Aucune donnée de dispatch dans cet OFP."));
+    panel.append(el("p", "stat-note", t("dsp_empty")));
     return;
   }
 
+  const head = el("div", "dispatch-live-head");
+  const heading = el("div");
+  heading.append(el("div", "section-title", t("dispatch_live_title")));
+  heading.append(el("div", "stat-note", t("dispatch_live_hint")));
+  const badge = el("span", "badge", t("dispatch_live_waiting"));
+  badge.id = "dispatch-live-state";
+  head.append(heading, badge);
+  panel.append(head);
+
   const ratioOf = (value, max) => (value && max ? value / max : null);
+  const maxNote = (value) => (value ? t("dsp_max").replace("{value}", kg(value, unit)) : null);
 
   const blocks = [
-    group("Masses", [
-      stat("Passagers", d.passengers, d.bags ? `${d.bags} bagages` : null),
-      stat("Charge marchande", kg(d.payload, unit), d.cargo ? `dont ${kg(d.cargo, unit)} de fret` : null),
-      stat("ZFW", kg(d.zfw, unit), d.max_zfw ? `max ${kg(d.max_zfw, unit)}` : null, ratioOf(d.zfw, d.max_zfw)),
-      stat("Décollage", kg(d.takeoff_weight, unit), d.max_takeoff_weight ? `max ${kg(d.max_takeoff_weight, unit)}` : null, ratioOf(d.takeoff_weight, d.max_takeoff_weight)),
-      stat("Atterrissage", kg(d.landing_weight, unit), d.max_landing_weight ? `max ${kg(d.max_landing_weight, unit)}` : null, ratioOf(d.landing_weight, d.max_landing_weight)),
+    group(t("dsp_group_weights"), [
+      stat(t("dsp_passengers"), d.passengers, d.bags ? t("dsp_bags").replace("{value}", d.bags) : null),
+      stat(t("dsp_payload"), kg(d.payload, unit), d.cargo ? t("dsp_cargo_note").replace("{value}", kg(d.cargo, unit)) : null),
+      stat("ZFW", kg(d.zfw, unit), maxNote(d.max_zfw), ratioOf(d.zfw, d.max_zfw)),
+      stat(t("dsp_takeoff"), kg(d.takeoff_weight, unit), maxNote(d.max_takeoff_weight), ratioOf(d.takeoff_weight, d.max_takeoff_weight), { id: "dispatch-live-tow", label: t("dispatch_actual") }),
+      stat(t("dsp_landing"), kg(d.landing_weight, unit), maxNote(d.max_landing_weight), ratioOf(d.landing_weight, d.max_landing_weight), { id: "dispatch-live-ldw", label: t("dispatch_projected") }),
     ]),
-    group("Carburant", [
-      stat("Bloc", kg(d.block_fuel, unit), d.max_tanks ? `capacité ${kg(d.max_tanks, unit)}` : null, ratioOf(d.block_fuel, d.max_tanks)),
-      stat("Étape", kg(d.trip_fuel, unit)),
-      stat("Roulage", kg(d.taxi_fuel, unit)),
-      stat("Imprévus", kg(d.contingency_fuel, unit)),
-      stat("Dégagement", kg(d.alternate_fuel, unit)),
-      stat("Réserve finale", kg(d.reserve_fuel, unit)),
-      stat("Restant à l'arrivée", kg(d.landing_fuel, unit)),
-      stat("Conso horaire", kg(d.average_fuel_flow, `${unit}/h`)),
+    group(t("dsp_group_fuel"), [
+      stat(t("dsp_block"), kg(d.block_fuel, unit), d.max_tanks ? t("dsp_capacity_note").replace("{value}", kg(d.max_tanks, unit)) : null, ratioOf(d.block_fuel, d.max_tanks), { id: "dispatch-live-block", label: t("dispatch_loaded") }),
+      liveOnlyStat(t("dsp_onboard"), "dispatch-live-onboard", t("dispatch_onboard_note")),
+      stat(t("dsp_trip"), kg(d.trip_fuel, unit), null, null, { id: "dispatch-live-burn", label: t("dispatch_burned") }),
+      stat(t("dsp_taxi"), kg(d.taxi_fuel, unit)),
+      stat(t("dsp_contingency"), kg(d.contingency_fuel, unit)),
+      stat(t("dsp_alternate_fuel"), kg(d.alternate_fuel, unit)),
+      stat(t("dsp_reserve"), kg(d.reserve_fuel, unit)),
+      stat(t("dsp_landing_fuel"), kg(d.landing_fuel, unit), null, null, { id: "dispatch-live-landing-fuel", label: t("dispatch_projected") }),
+      stat(t("dsp_fuel_flow"), kg(d.average_fuel_flow, `${unit}/h`), null, null, { id: "dispatch-live-flow", label: t("dispatch_measured") }),
     ]),
-    group("Profil", [
+    group(t("dsp_group_profile"), [
+      // « Cost index » se lit tel quel dans toutes les langues du cockpit.
       stat("Cost index", d.cost_index),
-      stat("Croisière", d.cruise_profile),
+      stat(t("dsp_cruise"), d.cruise_profile),
       stat(
-        "Vent moyen",
+        t("dsp_average_wind"),
         d.average_wind_direction && d.average_wind_speed
           ? `${d.average_wind_direction}°/${d.average_wind_speed} kt`
           : null,
-        d.average_wind_component ? `composante ${d.average_wind_component} kt` : null
+        d.average_wind_component
+          ? t("dsp_wind_component").replace("{value}", d.average_wind_component)
+          : null
       ),
-      stat("Écart ISA", d.average_temperature_dev ? `${d.average_temperature_dev} °C` : null),
-      stat("Tropopause", d.tropopause_ft ? `FL${Math.round(d.tropopause_ft / 100)}` : null),
+      stat(t("dsp_isa_deviation"), d.average_temperature_dev ? `${d.average_temperature_dev} °C` : null),
+      stat(t("wx_tropopause"), d.tropopause_ft ? `FL${Math.round(d.tropopause_ft / 100)}` : null),
     ]),
-    group("Distances et temps", [
-      stat("Distance route", d.route_distance_nm ? `${d.route_distance_nm} NM` : null),
-      stat("Distance air", d.air_distance_nm ? `${d.air_distance_nm} NM` : null),
-      stat("Orthodromie", d.great_circle_distance_nm ? `${d.great_circle_distance_nm} NM` : null),
-      stat("Temps de vol", hhmm(d.time_enroute_s)),
-      stat("Temps bloc", hhmm(d.block_time_s)),
+    group(t("dsp_group_distances"), [
+      stat(t("dsp_route_distance"), d.route_distance_nm ? `${d.route_distance_nm} NM` : null, null, null, { id: "dispatch-live-distance", label: t("dispatch_remaining") }),
+      stat(t("dsp_air_distance"), d.air_distance_nm ? `${d.air_distance_nm} NM` : null),
+      stat(t("dsp_great_circle"), d.great_circle_distance_nm ? `${d.great_circle_distance_nm} NM` : null),
+      stat(t("dsp_time_enroute"), hhmm(d.time_enroute_s), null, null, { id: "dispatch-live-ete", label: t("dispatch_elapsed") }),
+      stat(t("dsp_block_time"), hhmm(d.block_time_s), null, null, { id: "dispatch-live-block-time", label: t("dispatch_elapsed") }),
     ]),
-    group("Dégagement", [
-      stat("Terrain", plan.alternate_icao),
-      stat("Distance", d.alternate_distance_nm ? `${d.alternate_distance_nm} NM` : null),
-      stat("Temps", hhmm(d.alternate_time_s)),
-      stat("Carburant", kg(d.alternate_burn, unit)),
-      stat("Niveau", d.alternate_altitude_ft ? `FL${Math.round(d.alternate_altitude_ft / 100)}` : null),
+    group(t("dsp_group_alternate"), [
+      stat(t("dsp_alternate_airport"), plan.alternate_icao),
+      stat(t("dsp_distance"), d.alternate_distance_nm ? `${d.alternate_distance_nm} NM` : null),
+      stat(t("dsp_time"), hhmm(d.alternate_time_s)),
+      stat(t("dsp_fuel"), kg(d.alternate_burn, unit)),
+      stat(t("dsp_level"), d.alternate_altitude_ft ? `FL${Math.round(d.alternate_altitude_ft / 100)}` : null),
     ]),
-    group("Avion", [
-      stat("Immatriculation", d.registration),
+    group(t("dsp_group_aircraft"), [
+      stat(t("dsp_registration"), d.registration),
       stat("SELCAL", d.selcal),
-      stat("Équipement", d.equipment),
+      stat(t("dsp_equipment"), d.equipment),
     ]),
   ].filter(Boolean);
 
@@ -3537,16 +3890,21 @@ function renderDispatch(plan) {
 
   if (d.alternate_metar) {
     const wrapper = el("div");
-    wrapper.append(el("div", "section-title", "METAR dégagement"));
+    wrapper.append(el("div", "section-title", t("dsp_alternate_metar")));
     wrapper.append(el("div", "card-metar", d.alternate_metar));
     panel.append(wrapper);
   }
   if (d.atc_flightplan_text) {
     const wrapper = el("div");
-    wrapper.append(el("div", "section-title", "Plan de vol OACI"));
+    wrapper.append(el("div", "section-title", t("dsp_atc_flightplan")));
     wrapper.append(el("pre", null, d.atc_flightplan_text));
     panel.append(wrapper);
   }
+
+  // Le panneau vient d'être reconstruit : le prochain relevé le remplit sans
+  // attendre la fenêtre de deux secondes.
+  dispatchLiveRenderedAt = 0;
+  renderDispatchLiveCells(latestAircraft);
 }
 
 /* --------------------------------------------------------------- aircraft */
@@ -3560,37 +3918,37 @@ function renderAircraft(plan) {
   const identity = el("div", "aircraft-identity");
   const mark = el("div", "aircraft-mark", plan.aircraft || "—");
   const title = el("div");
-  title.append(el("div", "card-kicker", "Appareil utilisé"));
-  title.append(el("h2", null, plan.aircraft_name || plan.aircraft || "Type inconnu"));
+  title.append(el("div", "card-kicker", t("acf_kicker")));
+  title.append(el("h2", null, plan.aircraft_name || plan.aircraft || t("acf_unknown_type")));
   const badges = el("div", "route-meta");
-  if (plan.callsign) badges.append(el("span", "badge", `Vol ${plan.callsign}`));
+  if (plan.callsign) badges.append(el("span", "badge", t("acf_flight").replace("{value}", plan.callsign)));
   if (d.registration) badges.append(el("span", "badge", d.registration));
   title.append(badges);
   identity.append(mark, title);
   panel.append(identity);
 
   const blocks = [
-    group("Identification", [
-      stat("Type OACI", plan.aircraft),
-      stat("Modèle", plan.aircraft_name),
-      stat("Immatriculation", d.registration),
-      stat("Indicatif", plan.callsign),
+    group(t("acf_group_identification"), [
+      stat(t("acf_icao_type"), plan.aircraft),
+      stat(t("acf_model"), plan.aircraft_name),
+      stat(t("dsp_registration"), d.registration),
+      stat(t("acf_callsign"), plan.callsign),
       stat("SELCAL", d.selcal),
     ]),
-    group("Équipement de bord", [
-      stat("Équipement OACI", d.equipment, "codes déclarés dans le plan de vol SimBrief"),
-      stat("Profil de montée", d.climb_profile),
-      stat("Profil de croisière", d.cruise_profile),
-      stat("Profil de descente", d.descent_profile),
+    group(t("acf_group_equipment"), [
+      stat(t("acf_icao_equipment"), d.equipment, t("acf_equipment_note")),
+      stat(t("acf_climb_profile"), d.climb_profile),
+      stat(t("acf_cruise_profile"), d.cruise_profile),
+      stat(t("acf_descent_profile"), d.descent_profile),
       stat("Cost index", d.cost_index),
     ]),
-    group("Masses et capacité", [
-      stat("Masse à vide", kg(d.oew, unit)),
+    group(t("acf_group_weights"), [
+      stat(t("acf_oew"), kg(d.oew, unit)),
       stat("MZFW", kg(d.max_zfw, unit)),
       stat("MTOW", kg(d.max_takeoff_weight, unit)),
       stat("MLW", kg(d.max_landing_weight, unit)),
-      stat("Capacité carburant", kg(d.max_tanks, unit)),
-      stat("Passagers prévus", d.passengers),
+      stat(t("acf_fuel_capacity"), kg(d.max_tanks, unit)),
+      stat(t("acf_planned_passengers"), d.passengers),
     ]),
   ].filter(Boolean);
 
@@ -4639,6 +4997,7 @@ function applyAircraftState(aircraft) {
   updateHud(aircraft);
   updateRouteStripProgress(aircraft);
   updateFlightPanel(aircraft);
+  updateDispatchLive(aircraft);
   recordCurrentFlightTrail(aircraft);
   updateFlightSummary(aircraft);
 }
@@ -4663,6 +5022,7 @@ async function pollLive() {
       updateRouteStripProgress(null);
       latestAircraft = null;
       updateFlightPanel(null);
+      updateDispatchLive(null);
       return;
     }
     const aircraft = data.aircraft;
@@ -4674,6 +5034,7 @@ async function pollLive() {
     setLiveState(false, t("connection_error"));
     updateRouteStripProgress(null);
     updateFlightPanel(null);
+    updateDispatchLive(null);
   }
 }
 
@@ -4683,18 +5044,448 @@ function startLiveLoop() {
   liveTimer = setInterval(pollLive, LIVE_INTERVAL_MS);
 }
 
+/* ---------------------------------------------------------------- weather */
+
+/* Les catégories de vol restent en notation OACI/FAA : elles ne se traduisent
+   pas, un pilote les lit telles quelles sur toutes les cartes. */
+const FLIGHT_CATEGORY_CLASS = {
+  VFR: "cat-vfr",
+  MVFR: "cat-mvfr",
+  IFR: "cat-ifr",
+  LIFR: "cat-lifr",
+};
+
+function metres(value) {
+  if (value === null || value === undefined) return null;
+  if (value >= 9999) return "≥ 10 km";
+  if (value >= 1000) return `${(value / 1000).toLocaleString(displayLocale(), {
+    maximumFractionDigits: 1,
+  })} km`;
+  return `${value} m`;
+}
+
+function feet(value) {
+  if (value === null || value === undefined) return null;
+  return `${value.toLocaleString(displayLocale())} ft`;
+}
+
+function celsius(value) {
+  if (value === null || value === undefined) return null;
+  return `${value} °C`;
+}
+
+function windText(wind) {
+  if (!wind) return null;
+  if (wind.variable) return `VRB ${wind.speed_kt ?? 0} kt`;
+  if (wind.direction_deg === null || wind.direction_deg === undefined) {
+    return wind.speed_kt === 0 ? t("wind_calm") : null;
+  }
+  const gust = wind.gust_kt ? ` G${wind.gust_kt}` : "";
+  return `${String(wind.direction_deg).padStart(3, "0")}° / ${wind.speed_kt}${gust} kt`;
+}
+
+function cloudsText(clouds) {
+  if (!clouds?.length) return null;
+  return clouds
+    .map((layer) => {
+      const convective = layer.convective ? ` ${layer.convective}` : "";
+      return `${layer.cover}${convective} ${layer.height_ft.toLocaleString(displayLocale())} ft`;
+    })
+    .join(" · ");
+}
+
+/* Un âge de 10 000 min ne se lit pas : au-delà de l'heure, on change d'unité. */
+function observedAgo(minutes) {
+  if (minutes < 60) return t("observed_ago_minutes").replace("{value}", minutes);
+  if (minutes < 48 * 60) {
+    return t("observed_ago_hours").replace("{value}", Math.round(minutes / 60));
+  }
+  return t("observed_ago_days").replace("{value}", Math.floor(minutes / (24 * 60)));
+}
+
+function categoryBadge(category) {
+  if (!category) return null;
+  return el("span", `wx-cat ${FLIGHT_CATEGORY_CLASS[category] || ""}`.trim(), category);
+}
+
+/** Bloc repliable qui garde le brut accessible sans encombrer le briefing. */
+function rawToggle(label, text) {
+  if (!text) return null;
+  const details = el("details", "wx-raw");
+  details.append(el("summary", null, label));
+  details.append(el("pre", null, text));
+  return details;
+}
+
+function weatherCondition(report) {
+  const phenomena = (report.phenomena || []).map((item) => item.code).join(" ");
+  if (/TS/.test(phenomena)) return { kind: "thunder", symbol: "ϟ", label: t("wx_condition_thunder") };
+  if (/(SN|SG|PL|IC)/.test(phenomena)) return { kind: "snow", symbol: "❄", label: t("wx_condition_snow") };
+  if (/(RA|DZ|SH)/.test(phenomena)) return { kind: "rain", symbol: "☂", label: t("wx_condition_rain") };
+  if (/(FG|BR|HZ|FU)/.test(phenomena)) return { kind: "fog", symbol: "≋", label: t("wx_condition_fog") };
+  if ((report.clouds || []).some((layer) => ["BKN", "OVC", "VV"].includes(layer.cover))) {
+    return { kind: "cloud", symbol: "☁", label: t("wx_condition_cloudy") };
+  }
+  return { kind: "clear", symbol: "☀", label: t("wx_condition_clear") };
+}
+
+function weatherMeter(label, value, maximum, textValue, fullWhenMissing = false) {
+  const item = el("div", "wx-meter");
+  const head = el("div", "wx-meter-head");
+  head.append(el("span", null, label), el("strong", null, textValue || "—"));
+  const track = el("div", "wx-meter-track");
+  const fill = el("span", "wx-meter-fill");
+  const percent = value === null || value === undefined
+    ? (fullWhenMissing ? 100 : 0)
+    : Math.max(0, Math.min(100, (value / maximum) * 100));
+  fill.style.width = `${percent}%`;
+  track.append(fill);
+  item.append(head, track);
+  return item;
+}
+
+function weatherVisual(report) {
+  const visual = el("div", "wx-visual");
+  const condition = weatherCondition(report);
+  const sky = el("div", `wx-sky wx-sky-${condition.kind}`);
+  const symbol = el("span", "wx-sky-symbol", condition.symbol);
+  symbol.setAttribute("aria-hidden", "true");
+  sky.append(symbol, el("span", "wx-sky-label", condition.label));
+
+  const dial = el("div", `wx-wind-dial${report.wind?.variable ? " variable" : ""}`);
+  dial.title = windText(report.wind) || t("wx_wind_unknown");
+  dial.setAttribute("aria-label", dial.title);
+  dial.style.setProperty(
+    "--wind-direction",
+    `${report.wind?.direction_deg ?? 0}deg`
+  );
+  dial.append(el("span", "wx-wind-north", "N"));
+  if (report.wind?.direction_deg !== null && report.wind?.direction_deg !== undefined) {
+    dial.append(el("span", "wx-wind-arrow", "➤"));
+  }
+  const speed = el("strong", "wx-wind-speed", report.wind?.speed_kt ?? "—");
+  speed.append(el("small", null, "kt"));
+  dial.append(speed);
+
+  const meters = el("div", "wx-visual-meters");
+  meters.append(
+    weatherMeter(
+      t("wx_visibility"),
+      report.visibility_m,
+      10000,
+      report.cavok ? "CAVOK" : metres(report.visibility_m),
+      report.cavok
+    ),
+    weatherMeter(
+      t("wx_ceiling"),
+      report.ceiling_ft,
+      3000,
+      feet(report.ceiling_ft) || t("wx_no_ceiling"),
+      report.ceiling_ft === null || report.ceiling_ft === undefined
+    )
+  );
+  visual.append(sky, dial, meters);
+  return visual;
+}
+
+function weatherAirport(report, kicker) {
+  const card = el("article", "wx-card");
+
+  const head = el("div", "wx-head");
+  const identity = el("div");
+  identity.append(el("div", "card-kicker", kicker));
+  identity.append(el("div", "card-icao", report.icao));
+  if (report.name) identity.append(el("div", "card-name", report.name));
+  head.append(identity);
+
+  const status = el("div", "wx-status");
+  const badge = categoryBadge(report.flight_category);
+  if (badge) status.append(badge);
+  if (report.age_minutes !== null && report.age_minutes !== undefined) {
+    status.append(
+      el("div", `wx-age${report.stale ? " stale" : ""}`, observedAgo(report.age_minutes))
+    );
+  }
+  if (report.source) {
+    status.append(el("div", "wx-source", report.source === "awc" ? "aviationweather.gov" : "SimBrief"));
+  }
+  head.append(status);
+  card.append(head);
+
+  if (!report.raw_metar) {
+    card.append(el("p", "stat-note", t("weather_unavailable")));
+    return card;
+  }
+
+  card.append(weatherVisual(report));
+
+  const grid = el("div", "stat-grid");
+  for (const node of [
+    stat(t("wx_wind"), windText(report.wind)),
+    stat(t("wx_visibility"), report.cavok ? "CAVOK" : metres(report.visibility_m)),
+    stat(t("wx_ceiling"), feet(report.ceiling_ft) || (report.clouds.length ? t("wx_no_ceiling") : null),
+      cloudsText(report.clouds)),
+    stat(
+      t("wx_temperature"),
+      celsius(report.temperature_c),
+      report.dew_point_c !== null && report.dew_point_c !== undefined
+        ? `${t("wx_dew_point")} ${report.dew_point_c} °C`
+        : null
+    ),
+    stat(
+      t("wx_qnh"),
+      report.qnh_hpa ? `${report.qnh_hpa} hPa` : null,
+      report.altimeter_inhg ? `${report.altimeter_inhg.toFixed(2)} inHg` : null
+    ),
+  ]) {
+    if (node) grid.append(node);
+  }
+  card.append(grid);
+
+  if (report.phenomena?.length) {
+    const row = el("div", "wx-phenomena");
+    for (const item of report.phenomena) {
+      const chip = el("span", "wx-phenomenon");
+      chip.append(el("strong", null, item.code));
+      chip.append(document.createTextNode(` ${item.label}`));
+      row.append(chip);
+    }
+    card.append(row);
+  }
+
+  if (report.notes?.length) {
+    const list = el("ul", "wx-notes");
+    for (const note of report.notes) list.append(el("li", null, note));
+    card.append(list);
+  }
+
+  if (report.taf_periods?.length) {
+    const taf = el("div", "wx-taf");
+    taf.append(el("div", "section-title", t("wx_taf")));
+    for (const period of report.taf_periods) {
+      const row = el("div", "wx-taf-row");
+      const head = el("div", "wx-taf-head");
+      head.append(el("span", "wx-taf-kind", period.kind === "base" ? t("wx_taf_base") : period.kind));
+      const window = [period.from_time, period.to_time].filter(Boolean).join(" → ");
+      if (window) head.append(el("span", "wx-taf-window", window));
+      const periodBadge = categoryBadge(period.flight_category);
+      if (periodBadge) head.append(periodBadge);
+      row.append(head);
+      row.append(el("div", "wx-taf-raw", period.raw));
+      taf.append(row);
+    }
+    card.append(taf);
+  }
+
+  const raws = el("div", "wx-raws");
+  for (const node of [
+    rawToggle(t("wx_raw_metar"), report.raw_metar),
+    rawToggle(t("wx_raw_taf"), report.raw_taf),
+  ]) {
+    if (node) raws.append(node);
+  }
+  if (raws.children.length) card.append(raws);
+  return card;
+}
+
+function weatherEnroute(enroute) {
+  const card = el("article", "wx-card");
+  const head = el("div", "wx-head");
+  const identity = el("div");
+  identity.append(el("div", "card-kicker", t("wx_enroute")));
+  identity.append(el("div", "card-icao", t("wx_cruise")));
+  head.append(identity);
+  if (enroute.cruise_altitude_ft) {
+    const status = el("div", "wx-status");
+    status.append(el("div", "wx-level", `FL${Math.round(enroute.cruise_altitude_ft / 100)}`));
+    head.append(status);
+  }
+  card.append(head);
+
+  const grid = el("div", "stat-grid");
+  const component = enroute.wind_component_kt;
+  for (const node of [
+    stat(
+      t("wx_wind"),
+      enroute.wind_direction_deg !== null && enroute.wind_direction_deg !== undefined
+        ? `${String(enroute.wind_direction_deg).padStart(3, "0")}° / ${enroute.wind_speed_kt} kt`
+        : null,
+      component !== null && component !== undefined
+        ? `${component > 0 ? "+" : ""}${component} kt ${
+            component < 0 ? t("wx_headwind") : t("wx_tailwind")
+          }`
+        : null
+    ),
+    stat(t("wx_oat"), celsius(enroute.outside_air_temperature_c),
+      enroute.temperature_dev_c !== null && enroute.temperature_dev_c !== undefined
+        ? `ISA ${enroute.temperature_dev_c > 0 ? "+" : ""}${enroute.temperature_dev_c}`
+        : null),
+    stat(t("wx_tropopause"), enroute.tropopause_ft
+      ? `FL${Math.round(enroute.tropopause_ft / 100)}`
+      : null),
+  ]) {
+    if (node) grid.append(node);
+  }
+  if (!grid.children.length) {
+    card.append(el("p", "stat-note", t("wx_enroute_unavailable")));
+    return card;
+  }
+  card.append(grid);
+
+  if (enroute.notes?.length) {
+    const list = el("ul", "wx-notes");
+    for (const note of enroute.notes) list.append(el("li", null, note));
+    card.append(list);
+  }
+  return card;
+}
+
+function weatherUpdatedLabel(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return tf("wx_updated_at", {
+    value: new Intl.DateTimeFormat(displayLocale(), {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(parsed),
+  });
+}
+
+function renderWeatherToolbar(panel) {
+  const toolbar = el("div", "wx-toolbar");
+  const live = el("div", "wx-live");
+  live.setAttribute("aria-live", "polite");
+  live.append(el("span", `wx-live-dot ${weatherRefreshState}`));
+
+  const labels = {
+    loading: t("wx_refreshing"),
+    error: t("wx_refresh_failed"),
+    off: t("wx_live_off"),
+    partial: t("wx_live_partial"),
+    idle: t("wx_live_ready"),
+  };
+  const text = el("div");
+  text.append(el("strong", null, labels[weatherRefreshState] || labels.idle));
+  const updated = weatherUpdatedLabel(weatherLastUpdatedAt);
+  if (updated) text.append(el("small", null, updated));
+  live.append(text);
+
+  const button = el("button", "icon-btn wx-refresh", t("wx_refresh"));
+  button.type = "button";
+  button.disabled = weatherRefreshInFlight || latestStatus?.metar_source !== "live";
+  button.addEventListener("click", () => refreshWeather());
+  toolbar.append(live, button);
+  panel.append(toolbar);
+}
+
+async function refreshWeather({ silent = false } = {}) {
+  if (!currentPlan || weatherRefreshInFlight) return;
+  weatherRefreshInFlight = true;
+  weatherRefreshState = "loading";
+  renderWeather(currentPlan);
+  try {
+    const response = await fetch("/api/weather/current", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("wx_refresh_failed"));
+    currentPlan.weather = payload.weather || currentPlan.weather;
+    weatherLastUpdatedAt = payload.refreshed_at;
+    weatherRefreshState = !payload.enabled
+      ? "off"
+      : payload.live
+        ? (payload.partial ? "partial" : "idle")
+        : "error";
+  } catch (error) {
+    weatherRefreshState = "error";
+    if (!silent) console.warn("Weather refresh failed", error);
+  } finally {
+    weatherRefreshInFlight = false;
+    renderWeather(currentPlan);
+  }
+}
+
+function startWeatherLoop() {
+  if (weatherTimer) clearInterval(weatherTimer);
+  weatherTimer = null;
+  weatherLastUpdatedAt = null;
+  if (latestStatus?.metar_source !== "live") {
+    weatherRefreshState = "off";
+    renderWeather(currentPlan);
+    return;
+  }
+  weatherRefreshState = "idle";
+  void refreshWeather({ silent: true });
+  weatherTimer = setInterval(
+    () => refreshWeather({ silent: true }),
+    WEATHER_REFRESH_INTERVAL_MS
+  );
+}
+
+function renderWeather(plan) {
+  const panel = $("panel-weather");
+  panel.innerHTML = "";
+  renderWeatherToolbar(panel);
+
+  const weather = plan.weather || {};
+  const grid = el("div", "wx-grid");
+
+  // L'ordre suit le vol : départ, croisière, arrivée, puis dégagement.
+  if (weather.departure) grid.append(weatherAirport(weather.departure, t("wx_departure")));
+  grid.append(weatherEnroute(weather.enroute || {}));
+  if (weather.arrival) grid.append(weatherAirport(weather.arrival, t("wx_arrival")));
+  if (weather.alternate) grid.append(weatherAirport(weather.alternate, t("wx_alternate")));
+
+  if (!grid.children.length) {
+    panel.append(el("p", "stat-note", t("weather_unavailable")));
+    return;
+  }
+  panel.append(grid);
+  panel.append(
+    el("p", "wx-disclaimer", t("wx_disclaimer"))
+  );
+}
+
 /* ------------------------------------------------------------------ tabs */
 
+const MOBILE_MODULE_MENU = window.matchMedia("(max-width: 760px)");
+
+function setModuleMenuOpen(open, restoreFocus = false) {
+  const tabs = $("tabs");
+  const toggle = $("module-menu-toggle");
+  const isOpen = Boolean(
+    open && MOBILE_MODULE_MENU.matches && !tabs.classList.contains("hidden")
+  );
+  tabs.classList.toggle("mobile-open", isOpen);
+  toggle.setAttribute("aria-expanded", String(isOpen));
+  toggle.querySelector("span").textContent = t(
+    isOpen ? "module_menu_close" : "module_menu"
+  );
+  show($("module-menu-backdrop"), isOpen);
+  document.body.classList.toggle("module-menu-open", isOpen);
+  if (isOpen) {
+    window.requestAnimationFrame(() => {
+      if (tabs.classList.contains("mobile-open")) {
+        tabs.querySelector("button.active")?.focus({ preventScroll: true });
+      }
+    });
+  } else if (restoreFocus) {
+    toggle.focus({ preventScroll: true });
+  }
+}
+
 function selectTab(name) {
+  const restoreMenuFocus = $("module-menu-toggle").getAttribute("aria-expanded") === "true";
   for (const button of document.querySelectorAll(".tabs button")) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
-  for (const key of ["map", "ground", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "raw"]) {
+  for (const key of ["map", "ground", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
   if (name === "map") window.requestAnimationFrame(() => MAP.resize());
   if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());
+  setModuleMenuOpen(false, restoreMenuFocus);
 }
 
 function openActiveAlerts() {
@@ -4718,6 +5509,29 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-tab]");
   if (button) selectTab(button.dataset.tab);
 });
+
+$("module-menu-toggle").addEventListener("click", () => {
+  setModuleMenuOpen($("module-menu-toggle").getAttribute("aria-expanded") !== "true");
+});
+$("module-menu-backdrop").addEventListener("click", () => setModuleMenuOpen(false, true));
+document.addEventListener("keydown", (event) => {
+  const menuOpen = $("module-menu-toggle").getAttribute("aria-expanded") === "true";
+  if (event.key === "Escape" && menuOpen) {
+    setModuleMenuOpen(false, true);
+  } else if (event.key === "Tab" && menuOpen) {
+    const focusable = [
+      ...$("tabs").querySelectorAll("button[data-tab]"),
+      $("module-menu-toggle"),
+    ];
+    const index = focusable.indexOf(document.activeElement);
+    const next = event.shiftKey
+      ? (index <= 0 ? focusable.length - 1 : index - 1)
+      : (index < 0 || index === focusable.length - 1 ? 0 : index + 1);
+    event.preventDefault();
+    focusable[next].focus({ preventScroll: true });
+  }
+});
+MOBILE_MODULE_MENU.addEventListener("change", () => setModuleMenuOpen(false));
 
 $("refresh").addEventListener("click", buildPlan);
 $("simbrief-create").addEventListener("click", openSimBriefPlanner);

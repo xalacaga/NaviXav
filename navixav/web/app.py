@@ -13,6 +13,7 @@ import logging
 import math
 import socket
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -57,6 +58,7 @@ from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 from navixav.sia import SiaClient, SiaError
 from navixav.updater import GitHubUpdater, UpdateError
+from navixav.weather.briefing import build_briefing
 
 STATIC_DIR = resource_path("navixav", "web", "static")
 DEMO_OFP = resource_path("tests", "data", "ofp_lfst_lfbo.json")
@@ -65,6 +67,7 @@ FAA_ICAO_PREFIXES = {
     "NS", "TI", "TJ",
 }
 LOGGER = logging.getLogger(__name__)
+WEATHER_REFRESH_SECONDS = 300
 
 
 class PlanRequest(BaseModel):
@@ -396,6 +399,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload["atc_route"] = plan.atc_route()
             payload["demo"] = request.demo
             current_plan_state["payload"] = copy.deepcopy(payload)
+            current_plan_state["ofp"] = ofp
             # Chaque import relance la démonstration au parking de départ,
             # même si la route calculée est identique à la précédente.
             demo_state.pop("key", None)
@@ -428,6 +432,62 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Aucun vol n’est actuellement chargé dans NaviXav sur le PC.",
             )
         return copy.deepcopy(payload)
+
+    @app.get("/api/weather/current")
+    def current_weather() -> dict[str, Any]:
+        """Actualise la météo sans recalculer la route ni les procédures."""
+        payload = current_plan_state.get("payload")
+        ofp = current_plan_state.get("ofp")
+        if payload is None or ofp is None:
+            raise HTTPException(404, "Aucun vol chargé pour actualiser la météo.")
+
+        if settings.metar_source != "live":
+            return {
+                "weather": copy.deepcopy(payload.get("weather") or {}),
+                "enabled": False,
+                "live": False,
+                "partial": False,
+                "refreshed_at": None,
+                "refresh_interval_seconds": WEATHER_REFRESH_SECONDS,
+            }
+
+        try:
+            briefing = build_briefing(
+                ofp,
+                metar_source="live",
+                force_live=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - conserver la météo précédente
+            LOGGER.warning(
+                "Actualisation météo directe indisponible : %s",
+                type(exc).__name__,
+            )
+            raise HTTPException(
+                503,
+                "La météo en direct est momentanément indisponible.",
+            ) from exc
+
+        reports = [
+            report
+            for report in (
+                briefing.departure,
+                briefing.arrival,
+                briefing.alternate,
+            )
+            if report is not None and report.raw_metar
+        ]
+        live_reports = sum(report.source == "awc" for report in reports)
+        weather = briefing.to_dict()
+        payload["weather"] = copy.deepcopy(weather)
+        refreshed_at = datetime.now(timezone.utc).isoformat()
+        return {
+            "weather": weather,
+            "enabled": True,
+            "live": live_reports > 0,
+            "partial": live_reports < len(reports),
+            "refreshed_at": refreshed_at,
+            "refresh_interval_seconds": WEATHER_REFRESH_SECONDS,
+        }
 
     @app.get("/api/airport/{icao}")
     def airport(icao: str) -> dict[str, Any]:

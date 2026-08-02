@@ -38,6 +38,15 @@ disponible, jusqu’à une taille minimale de 720 × 560 pixels.
 - masses, carburant, temps de vol, dégagement et données de dispatch ;
 - informations sur l’appareil, l’immatriculation et l’équipement déclaré.
 
+### Météo du vol
+
+- METAR et TAF essentiels pour le départ, l’arrivée et le dégagement ;
+- vent et température de croisière issus de l’OFP SimBrief ;
+- en mode **METAR en direct**, actualisation automatique toutes les cinq minutes
+  depuis aviationweather.gov, avec bouton d’actualisation immédiate ;
+- représentation graphique des conditions, du vent, de la visibilité et du
+  plafond, sans modifier automatiquement la piste ou les procédures du plan.
+
 ### Préparation IFR
 
 NaviXav complète et présente :
@@ -189,6 +198,10 @@ passer par EUROCONTROL/EAD :
 - France : SIA eAIP (`LF`) ;
 - Espagne et Canaries : ENAIRE AIP (`LE`, `GC`, `GE`) ;
 - Pays-Bas : LVNL eAIP (`EH`) ;
+- Suède : LFV eAIP (`ES`) ;
+- Belgique et Luxembourg : skeyes eAIP (`EB`, `EL`) ;
+- Autriche : Austro Control eAIP (`LO`) ;
+- Royaume-Uni : NATS eAIP (`EG`) ;
 - États-Unis et territoires couverts : FAA d-TPP.
 
 Pour ces aérodromes, NaviXav peut :
@@ -215,6 +228,8 @@ que sur l’arrivée. Cette règle est identique pour toutes les sources.
 Un pays n’est ajouté à la liste automatique qu’après validation d’un accès
 direct et stable à ses PDF officiels. Une source absente n’est donc jamais
 remplacée silencieusement par un agrégateur tiers.
+Le portail skeyes peut répondre `HTTP 403` aux accès automatisés : dans ce cas,
+NaviXav signale simplement l’indisponibilité et ne cherche aucune autre source.
 
 ## Prérequis
 
@@ -621,7 +636,8 @@ qui ne possède pas ce composant, utiliser `NaviXav-Setup-<version>.exe`.
 
 ### Une carte officielle n’est pas disponible
 
-- vérifier que le préfixe OACI est couvert par SIA, ENAIRE, LVNL ou FAA ;
+- vérifier que le préfixe OACI est couvert par SIA, ENAIRE, LVNL, LFV, skeyes,
+  Austro Control, NATS ou FAA ;
 - vérifier la connexion Internet ;
 - confirmer que la piste et l’approche ont été déterminées ;
 - utiliser la saisie manuelle des minima si l’extraction n’est pas disponible.

@@ -93,7 +93,27 @@
     <article class="card" id="card-arrival"></article>
   </section>
 
-  <nav class="tabs hidden" id="tabs">
+  <button
+    id="module-menu-toggle"
+    class="module-menu-toggle hidden"
+    type="button"
+    aria-controls="tabs"
+    aria-expanded="false"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+    <span>Modules</span>
+  </button>
+  <button
+    id="module-menu-backdrop"
+    class="module-menu-backdrop hidden"
+    type="button"
+    tabindex="-1"
+    aria-label="Fermer le menu des modules"
+  ></button>
+
+  <nav class="tabs hidden" id="tabs" aria-label="Modules">
     <button data-tab="map" class="active">Carte</button>
     <button data-tab="ground">Roulage</button>
     <button data-tab="flight">Suivi du vol</button>
@@ -102,7 +122,7 @@
     <button data-tab="aircraft">Avion</button>
     <button data-tab="sia">Cartes officielles</button>
     <button data-tab="mcdu">Fiche MCDU</button>
-    <button data-tab="raw">JSON</button>
+    <button data-tab="weather">Météo</button>
   </nav>
 
   <section id="panel-map" class="panel hidden panel-map">
@@ -193,7 +213,7 @@
   <section id="panel-aircraft" class="panel hidden"></section>
   <section id="panel-sia" class="panel hidden"></section>
   <section id="panel-mcdu" class="panel hidden"></section>
-  <section id="panel-raw" class="panel hidden"></section>
+  <section id="panel-weather" class="panel hidden"></section>
 
   <section id="empty" class="empty">
     <div class="empty-art">

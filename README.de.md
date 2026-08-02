@@ -39,6 +39,15 @@ an, bis zu einer Mindestgröße von 720 × 560 Pixeln.
 - Massen, Kraftstoff, Flugzeit, Ausweichflughafen und Dispatch-Daten;
 - Angaben zum Luftfahrzeug, Kennzeichen und gemeldete Ausrüstung.
 
+### Flugwetter
+
+- wesentliche METAR- und TAF-Daten für Abflug, Ankunft und Ausweichflugplatz;
+- Wind und Temperatur im Reiseflug aus dem SimBrief-OFP;
+- im Modus **Live-METAR** automatische Aktualisierung alle fünf Minuten über
+  aviationweather.gov sowie eine Schaltfläche zur sofortigen Aktualisierung;
+- grafische Darstellung von Wetter, Wind, Sicht und Wolkenuntergrenze, ohne
+  Startbahn oder Verfahren des Flugplans automatisch zu ändern.
+
 ### IFR-Vorbereitung
 
 NaviXav ergänzt und zeigt:
@@ -190,6 +199,10 @@ den Umweg über EUROCONTROL/EAD:
 - Frankreich: SIA eAIP (`LF`);
 - Spanien und Kanarische Inseln: ENAIRE AIP (`LE`, `GC`, `GE`);
 - Niederlande: LVNL eAIP (`EH`);
+- Schweden: LFV eAIP (`ES`);
+- Belgien und Luxemburg: skeyes eAIP (`EB`, `EL`);
+- Österreich: Austro Control eAIP (`LO`);
+- Vereinigtes Königreich: NATS eAIP (`EG`);
 - Vereinigte Staaten und abgedeckte Gebiete: FAA d-TPP.
 
 Für diese Flugplätze kann NaviXav:
@@ -629,7 +642,8 @@ ohne diese Komponente `NaviXav-Setup-<Version>.exe` verwenden.
 
 ### Eine amtliche Karte ist nicht verfügbar
 
-- prüfen, ob das ICAO-Präfix von SIA, ENAIRE, LVNL oder FAA abgedeckt ist;
+- prüfen, ob das ICAO-Präfix von SIA, ENAIRE, LVNL, LFV, skeyes,
+  Austro Control, NATS oder FAA abgedeckt ist;
 - die Internetverbindung prüfen;
 - bestätigen, dass Bahn und Anflug bestimmt wurden;
 - die manuelle Eingabe der Minima verwenden, wenn die Auswertung nicht

@@ -13,6 +13,7 @@ lien une confiance faible. Le moteur ne masque jamais un choix incertain.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from math import isfinite
 from typing import Sequence
@@ -28,6 +29,7 @@ from navixav.models import (
     EnrouteBlock,
     FlightPlan,
     RunwayChoice,
+    WeatherBriefing,
     WindInfo,
 )
 from navixav.navdata.base import (
@@ -41,7 +43,10 @@ from navixav.navdata.base import (
 from navixav.planner.runway import RunwayScore, margin_between_best_two, score_runways
 from navixav.preferences import AirportPreferences
 from navixav.simbrief.parser import OfpSummary
+from navixav.weather.briefing import build_briefing
 from navixav.weather.metar import fetch_metar, parse_wind
+
+LOGGER = logging.getLogger(__name__)
 
 VECTORS = "VECTORS"
 
@@ -175,8 +180,27 @@ class CompletionEngine:
         plan.arrival = self._build_arrival(ofp, overrides)
         self._anchor_route_on_runways(plan)
         self._drop_stray_points(plan, origin, destination)
+        plan.weather = self._build_weather(ofp, plan)
         plan.warnings = self._warnings
         return plan
+
+    def _build_weather(self, ofp: OfpSummary, plan: FlightPlan) -> WeatherBriefing:
+        """Briefing météo, construit sur les METAR déjà retenus pour les pistes."""
+        try:
+            briefing = build_briefing(
+                ofp,
+                metar_source=self.settings.metar_source,
+                departure_metar=plan.departure.wind.raw_metar if plan.departure else None,
+                arrival_metar=plan.arrival.wind.raw_metar if plan.arrival else None,
+            )
+        except Exception:  # noqa: BLE001 - la météo ne doit jamais bloquer un plan
+            LOGGER.exception("Échec de construction du briefing météo")
+            self._warn("Briefing météo indisponible : le plan reste exploitable.")
+            return WeatherBriefing()
+
+        for message in briefing.warnings:
+            self._warn(message)
+        return briefing
 
     def _drop_stray_points(
         self, plan: FlightPlan, origin: Airport | None, destination: Airport | None
@@ -933,13 +957,11 @@ class CompletionEngine:
             name = normalise_runway(simbrief_runway)
             entry = by_name.get(name)
             if entry is not None:
-                best = scores[0]
-                agrees = best.runway.name == name
-                if not agrees and not entry.disqualified:
-                    self._warn(
-                        f"{icao} : SimBrief a prévu la piste {name}, le vent "
-                        f"favoriserait {best.runway.name}."
-                    )
+                # Le classement du moteur ne sert plus qu'à nuancer la confiance.
+                # Il n'alerte plus quand il diverge de SimBrief : par vent faible,
+                # calme ou variable, il est départagé par la configuration
+                # préférentielle et l'ILS, pas par le vent.
+                agrees = scores[0].runway.name == name
                 confidence = Confidence.HIGH if agrees else Confidence.MEDIUM
                 if entry.disqualified:
                     confidence = Confidence.LOW

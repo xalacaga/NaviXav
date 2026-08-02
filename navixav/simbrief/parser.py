@@ -95,6 +95,7 @@ class DispatchSummary:
     alternate_burn: int | None = None
     alternate_altitude_ft: int | None = None
     alternate_metar: str | None = None
+    alternate_taf: str | None = None
 
     # Divers
     registration: str = ""
@@ -128,6 +129,9 @@ class OfpSummary:
 
     origin_metar: str | None = None
     destination_metar: str | None = None
+
+    origin_taf: str | None = None
+    destination_taf: str | None = None
 
     navlog: list[NavlogFix] = field(default_factory=list)
 
@@ -223,6 +227,8 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         destination_metar=_text(weather, "dest_metar")
         or _text(destination, "metar")
         or None,
+        origin_taf=_text(weather, "orig_taf") or _text(origin, "taf") or None,
+        destination_taf=_text(weather, "dest_taf") or _text(destination, "taf") or None,
         navlog=navlog,
         simbrief_sid=sid,
         simbrief_star=star,
@@ -294,6 +300,7 @@ def _parse_dispatch(data: dict[str, Any]) -> DispatchSummary:
         alternate_burn=_int(alternate, "burn"),
         alternate_altitude_ft=_int(alternate, "cruise_altitude"),
         alternate_metar=_text(weather, "altn_metar") or None,
+        alternate_taf=_text(weather, "altn_taf") or None,
         registration=_text(aircraft, "reg"),
         equipment=_text(aircraft, "equip"),
         selcal=_text(aircraft, "selcal"),
