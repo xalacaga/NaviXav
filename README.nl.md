@@ -2,7 +2,7 @@
 
 **Officiële website:** [navixav.fr](https://navixav.fr/en)
 
-**Documentatie:** [Français](README.md) · [English](README.en.md) ·
+**Documentatie:** [Français](README.fr.md) · [English](README.md) ·
 [Deutsch](README.de.md) · [Español](README.es.md) ·
 [Italiano](README.it.md) · [Português](README.pt.md) · Nederlands ·
 [Polski](README.pl.md)

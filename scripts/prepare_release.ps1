@@ -142,8 +142,8 @@ function Get-Highlights([string]$Path) {
             if ($Current) { $Items.Add($Current) }
             $Current = ""
             $Title = $Matches.title
-            if ($Title -match '^(Corrections?|Correctifs?)') { $Items = $Fixes }
-            elseif ($Title -match '^(Nouveaut|Nouvelles)') { $Items = $Features }
+            if ($Title -match '^(Fix|Fixed|Corrections?|Correctifs?)') { $Items = $Fixes }
+            elseif ($Title -match '^(Added|Features?|Nouveaut|Nouvelles)') { $Items = $Features }
             continue
         }
         if ($Line -match '^\s*[-*]\s+(?<text>.+?)\s*$') {
@@ -165,21 +165,21 @@ function Get-Highlights([string]$Path) {
 }
 
 $HighlightsTemplate = @"
-# Nouveautés de la prochaine version
+# Highlights for the next release
 
-À compléter à **chaque modification du code**, pas seulement avant de publier :
-une puce par changement, en français et du point de vue de l'utilisateur. Ce
-fichier remplace les sujets de commit dans les notes de version, puis il est
-réinitialisé par ``scripts\prepare_release.ps1``.
+Update this file for **every code change**, not only immediately before a
+release. Add one bullet per change, in English and from the user's perspective.
+This file is used instead of commit subjects in the release notes and is then
+reset by ``scripts\prepare_release.ps1``.
 
-<!-- Exemple, à supprimer :
-- Le suivi du vol affiche le temps restant avant l'arrivée.
+<!-- Example, remove before use:
+- Flight tracking displays the estimated time remaining before arrival.
 -->
 
-## Corrections
+## Fixes
 
-<!-- Exemple, à supprimer :
-- Le fond de carte ne laisse plus apparaître la grille des tuiles.
+<!-- Example, remove before use:
+- The basemap no longer shows seams between map tiles.
 -->
 "@
 
@@ -192,10 +192,6 @@ if ($Commits.Count -eq 0) {
 $EffectiveBump = if ($Bump -eq "auto") { Get-AutomaticBump $Commits } else { $Bump }
 $Next = Get-NextVersion $Current $EffectiveBump
 $Date = Get-Date -Format "yyyy-MM-dd"
-$FrenchDate = (Get-Date).ToString(
-    "d MMMM yyyy",
-    [System.Globalization.CultureInfo]::GetCultureInfo("fr-FR")
-)
 $HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.md"
 $Highlights = Get-Highlights $HighlightsPath
 
@@ -208,12 +204,12 @@ if (
     -not $AllowGenericNotes
 ) {
     throw @"
-RELEASE_HIGHLIGHTS.md ne décrit pas cette version.
+RELEASE_HIGHLIGHTS.md does not describe this release.
 
-Ajoutez-y une puce par changement, en français et du point de vue de
-l'utilisateur, sous « # Nouveautés » ou sous « ## Corrections », puis relancez.
+Add one bullet per change, in English and from the user's perspective, under
+"# Highlights" or "## Fixes", then run the command again.
 
-Publication sans changement visible : relancez avec -AllowGenericNotes.
+To publish without a visible change, run again with -AllowGenericNotes.
 "@
 }
 
@@ -232,17 +228,17 @@ $Other = @(
 $Notes = [System.Collections.Generic.List[string]]::new()
 $Notes.Add("# NaviXav $Next")
 $Notes.Add("")
-$Notes.Add("Publication du $FrenchDate.")
+$Notes.Add("Released on $Date.")
 $Notes.Add("")
 # Les textes rédigés à la main l'emportent, section par section : ils parlent
 # du produit, là où le sujet de commit ne décrit que le dépôt.
 $FeatureItems = if ($Highlights.Features.Count -gt 0) { $Highlights.Features } else { $Features }
 $FixItems = if ($Highlights.Fixes.Count -gt 0) { $Highlights.Fixes } else { $Fixes }
-Add-Category $Notes "Nouvelles fonctionnalités" $FeatureItems
-Add-Category $Notes "Corrections de bugs" $FixItems
-Add-Category $Notes "Autres changements" $Other
+Add-Category $Notes "Added" $FeatureItems
+Add-Category $Notes "Fixed" $FixItems
+Add-Category $Notes "Changed" $Other
 if ($Notes[$Notes.Count - 1] -ne "") { $Notes.Add("") }
-$Notes.Add("L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.")
+$Notes.Add("The installer is verified against its SHA-256 checksum before any automatic update.")
 $Notes.Add("")
 $ReleaseText = $Notes -join "`n"
 [System.IO.File]::WriteAllText(
@@ -254,7 +250,7 @@ $ReleaseText = $Notes -join "`n"
 $ChangelogEntry = "## [$Next] - $Date`n`n" + (($Notes | Select-Object -Skip 4) -join "`n")
 if (Test-Path -LiteralPath "CHANGELOG.md") {
     $Existing = Get-Content -LiteralPath "CHANGELOG.md" -Raw -Encoding UTF8
-    $Header = "# Journal des modifications`n`n"
+    $Header = "# Changelog`n`n"
     $Body = if ($Existing.StartsWith($Header)) { $Existing.Substring($Header.Length) } else { $Existing }
     [System.IO.File]::WriteAllText(
         (Join-Path $ProjectRoot "CHANGELOG.md"),
@@ -264,7 +260,7 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
 } else {
     [System.IO.File]::WriteAllText(
         (Join-Path $ProjectRoot "CHANGELOG.md"),
-        ("# Journal des modifications`n`n" + $ChangelogEntry),
+        ("# Changelog`n`n" + $ChangelogEntry),
         [System.Text.UTF8Encoding]::new($false)
     )
 }
@@ -277,6 +273,6 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
     [System.Text.UTF8Encoding]::new($false)
 )
 
-Write-Host "Version préparée : $Current -> $Next ($EffectiveBump)" -ForegroundColor Green
-Write-Host "Notes : $ProjectRoot\RELEASE_NOTES.md"
+Write-Host "Version prepared: $Current -> $Next ($EffectiveBump)" -ForegroundColor Green
+Write-Host "Notes: $ProjectRoot\RELEASE_NOTES.md"
 Write-Output $Next

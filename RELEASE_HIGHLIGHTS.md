@@ -1,16 +1,16 @@
-# Nouveautés de la prochaine version
+# Highlights for the next release
 
-À compléter à **chaque modification du code**, pas seulement avant de publier :
-une puce par changement, en français et du point de vue de l'utilisateur. Ce
-fichier remplace les sujets de commit dans les notes de version, puis il est
-réinitialisé par `scripts\prepare_release.ps1`.
+Update this file for **every code change**, not only immediately before a
+release. Add one bullet per change, in English and from the user's perspective.
+This file is used instead of commit subjects in the release notes and is then
+reset by `scripts\prepare_release.ps1`.
 
-<!-- Exemple, à supprimer :
-- Le suivi du vol affiche le temps restant avant l'arrivée.
+<!-- Example, remove before use:
+- Flight tracking displays the estimated time remaining before arrival.
 -->
 
-## Corrections
+## Fixes
 
-<!-- Exemple, à supprimer :
-- Le fond de carte ne laisse plus apparaître la grille des tuiles.
+<!-- Example, remove before use:
+- The basemap no longer shows seams between map tiles.
 -->

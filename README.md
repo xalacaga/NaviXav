@@ -1,283 +1,276 @@
 # NaviXav
 
-**Site officiel :** [navixav.fr](https://navixav.fr)
+**Official website:** [navixav.fr](https://navixav.fr/en)
 
-**Documentation :** Français · [English](README.en.md) ·
+**Documentation:** [Français](README.fr.md) · English ·
 [Deutsch](README.de.md) · [Español](README.es.md) ·
 [Italiano](README.it.md) · [Português](README.pt.md) ·
 [Nederlands](README.nl.md) · [Polski](README.pl.md)
 
-NaviXav est une application locale d’assistance au vol IFR pour Microsoft
-Flight Simulator. Elle récupère le dernier plan de vol SimBrief, complète les
-informations terminales avec les données du simulateur et les présente dans
-une interface adaptée à la préparation du vol et à la saisie du MCDU.
+NaviXav is a local IFR flight assistance application for Microsoft Flight
+Simulator. It retrieves the latest SimBrief flight plan, completes the terminal
+information using simulator data, and presents everything in an interface
+designed for flight preparation and MCDU entry.
 
-L’application possède sa propre fenêtre Windows. Son interface est rendue par
-Microsoft WebView2 et communique uniquement avec un service local lié à
-`127.0.0.1`. Aucun navigateur externe n’est ouvert, sauf lorsque l’utilisateur
-clique sur **Créer un plan SimBrief** pour ouvrir l’éditeur officiel. Les réglages, la base de
-navigation et les caches restent sur l’ordinateur.
+The application has its own Windows window. Its interface is rendered by
+Microsoft WebView2 and communicates only with a local service bound to
+`127.0.0.1`. No external browser is opened unless the user clicks **Create a
+SimBrief plan** to open the official editor. Settings, the navigation database
+and caches all stay on the computer.
 
-La fenêtre est entièrement redimensionnable. L’interface réorganise ses
-panneaux, ses commandes, ses onglets et la hauteur de la carte selon l’espace
-disponible, jusqu’à une taille minimale de 720 × 560 pixels.
+The window is fully resizable. The interface rearranges its panels, controls,
+tabs and map height according to the space available, down to a minimum size of
+720 × 560 pixels.
 
-> NaviXav est destiné à la simulation de vol uniquement. Les informations
-> affichées doivent être vérifiées avec les publications officielles et les
-> instructions ATC applicables.
+> NaviXav is intended for flight simulation only. The information displayed
+> must be checked against official publications and applicable ATC
+> instructions.
 
-## Fonctionnalités
+## Features
 
-### Plan de vol SimBrief
+### SimBrief flight plan
 
-- récupération automatique du dernier OFP au démarrage ;
-- prise en charge du Pilot ID ou du nom d’utilisateur SimBrief ;
-- affichage de la route complète, de l’origine à la destination ;
-- mise en évidence du prochain point de route selon la position réelle de
-  l’avion, avec atténuation des points déjà franchis ;
-- masses, carburant, temps de vol, dégagement et données de dispatch ;
-- informations sur l’appareil, l’immatriculation et l’équipement déclaré.
+- automatic retrieval of the latest OFP at startup;
+- support for either the SimBrief Pilot ID or username;
+- display of the complete route, from origin to destination;
+- highlighting of the next route point based on the aircraft's actual position,
+  with already-passed points dimmed;
+- weights, fuel, flight time, alternate and dispatch data;
+- aircraft information, registration and declared equipment.
 
-### Météo du vol
+### Flight weather
 
-- METAR et TAF essentiels pour le départ, l’arrivée et le dégagement ;
-- vent et température de croisière issus de l’OFP SimBrief ;
-- en mode **METAR en direct**, actualisation automatique toutes les cinq minutes
-  depuis aviationweather.gov, avec bouton d’actualisation immédiate ;
-- représentation graphique des conditions, du vent, de la visibilité et du
-  plafond, sans modifier automatiquement la piste ou les procédures du plan.
+- essential METAR and TAF information for departure, arrival and alternate;
+- en-route wind and temperature from the SimBrief OFP;
+- in **Live METAR** mode, automatic refresh every five minutes from
+  aviationweather.gov, plus an immediate refresh button;
+- graphical conditions, wind, visibility and ceiling without automatically
+  changing the flight plan’s runway or procedures.
 
-### Préparation IFR
+### IFR preparation
 
-NaviXav complète et présente :
+NaviXav completes and presents:
 
-- la piste de départ et la piste d’arrivée ;
-- la SID et sa transition ;
-- la STAR et sa transition ;
-- l’approche et sa VIA ;
-- la fréquence et l’identifiant ILS ;
-- les contraintes d’altitude et de vitesse ;
-- l’altitude de transition et le niveau de transition ;
-- l’altitude d’interception de l’approche ;
-- l’altitude d’approche interrompue ;
-- la justification et le niveau de confiance de chaque choix.
+- the departure runway and the arrival runway;
+- the SID and its transition;
+- the STAR and its transition;
+- the approach and its VIA;
+- the ILS frequency and identifier;
+- altitude and speed constraints;
+- the transition altitude and transition level;
+- the approach intercept altitude;
+- the missed approach altitude;
+- the rationale and confidence level behind every choice.
 
-Les blocs **Départ · Route · Arrivée** peuvent être réduits afin de libérer de
-l’espace dans l’interface.
+The **Departure · Route · Arrival** blocks can be collapsed to free up space in
+the interface.
 
-### Suivi du vol
+### Flight tracking
 
-L’onglet **Suivi du vol** exploite la position MSFS en temps réel pour afficher :
+The **Flight tracking** tab uses the real-time MSFS position to display:
 
-- la phase de vol détectée automatiquement ;
-- la vitesse sol (GS) et la vitesse air indiquée (IAS) fournies par MSFS ;
-- le prochain point et sa distance ;
-- l’écart latéral par rapport au segment actif ;
-- la distance restante ;
-- la prochaine contrainte d’altitude ou de vitesse ;
-- le taux vertical nécessaire pour atteindre cette contrainte ;
-- le Top of Descent et un taux de descente indicatif sur une pente de 3° ;
-- l’écart par rapport au profil vertical prévu.
+- the automatically detected flight phase;
+- the ground speed (GS) and indicated airspeed (IAS) reported by MSFS;
+- the next point and its distance;
+- the lateral deviation from the active segment;
+- the remaining distance;
+- the next altitude or speed constraint;
+- the vertical rate required to meet that constraint;
+- the Top of Descent and an indicative descent rate on a 3° path;
+- the deviation from the planned vertical profile.
 
-#### Configuration avion
+#### Aircraft configuration
 
-Le bloc **Configuration avion** lit directement dans MSFS l’état du train, des
-volets, des aérofreins, du frein de parc et des sept feux extérieurs, ainsi que
-le calage altimétrique, les modes du pilote automatique, l’altitude
-sélectionnée, le carburant à bord et le vent réel. Les unités sont demandées au
-simulateur, jamais recalculées.
+The **Aircraft configuration** block reads the landing gear, flaps,
+speedbrakes, parking brake and the seven exterior lights straight from MSFS,
+together with the altimeter setting, the autopilot modes, the selected
+altitude, the fuel on board and the actual wind. Units are requested from the
+simulator and never recomputed locally.
 
-#### Alarmes visuelles
+#### Visual alerts
 
-NaviXav surveille cette configuration et signale les oublis : train non sorti
-en approche, volets ou aérofreins non configurés, strobes ou landing lights
-éteints, frein de parc resté serré, calage QNH ou STD non effectué au
-franchissement de l’altitude de transition, altitude sélectionnée au-delà de la
-prochaine contrainte, fréquence ILS différente de celle prévue, antigivrage
-coupé en conditions givrantes, carburant sous la réserve finale.
+NaviXav monitors that configuration and flags anything left out: gear not down
+on approach, flaps or speedbrakes not configured, strobes or landing lights
+off, parking brake still set, QNH or standard setting not selected when
+crossing the transition altitude, selected altitude above the next constraint,
+ILS frequency different from the planned one, anti-ice off in icing conditions,
+fuel below the final reserve.
 
-Trois précautions évitent les fausses alarmes :
+Three safeguards keep false alarms away:
 
-- les règles qui dépendent du train rentrant, des volets ou des aérofreins ne
-  sont évaluées que si le simulateur confirme que l’avion en possède ;
-- une condition doit tenir quelques secondes avant de lever une alarme, ce qui
-  supprime les clignotements au franchissement d’un seuil ;
-- les alarmes sont suspendues lorsque le simulateur tourne en vitesse
-  accélérée.
+- rules that depend on retractable gear, flaps or speedbrakes are only
+  evaluated once the simulator confirms the aircraft has them;
+- a condition must hold for a few seconds before an alert is raised, which
+  removes the flicker when a threshold is crossed;
+- alerts are suspended whenever the simulator runs at an accelerated rate.
 
-Chaque alarme disparaît et se réarme automatiquement dès que la correction est
-stable ; un clic permet toujours de l’acquitter immédiatement. Une
-pastille `MASTER CAUTION` ou `MASTER WARNING` résume la situation, et
-l’ensemble peut être désactivé depuis le panneau. Le clignotement, réservé aux
-alarmes critiques, disparaît si le système demande des animations réduites.
+Each alert clears and re-arms automatically once the correction is stable; a
+click can still acknowledge it immediately. A
+`MASTER CAUTION` or `MASTER WARNING` pill summarises the situation, and the
+whole system can be switched off from the panel. Blinking, reserved for
+critical alerts, is dropped when the system asks for reduced motion.
 
-Le journal local ne conserve aucune trace détaillée : après l’atterrissage, il
-mémorise seulement un résumé du vol (durée, distance et altitude maximale).
-Tous les résumés peuvent être purgés depuis l’interface et aucune donnée de vol
-n’est envoyée vers un service externe.
+The local journal keeps no detailed track: after landing, it stores only a
+flight summary (duration, distance and maximum altitude). All summaries can be
+purged from the interface, and no flight data is sent to any external service.
 
-### Fiche MCDU
+### MCDU card
 
-L’onglet **Fiche MCDU** adapte ses pages au type d’avion : terminologie MCDU
-pour Airbus, CDU pour Boeing et FMS générique pour les autres appareils. Il ne
-propose pas de performances de décollage qui ne peuvent pas être automatisées :
+The **MCDU card** tab adapts its pages to the aircraft type: Airbus MCDU,
+Boeing CDU, or a generic FMS for other aircraft. It does not offer takeoff
+performance values that cannot be automated:
 
-- `FROM/TO`, numéro de vol et dégagement ;
-- Cost Index et niveau de croisière ;
-- ZFW, carburant bloc, roulage, trajet et réserves ;
-- piste, SID, transition et altitude de transition ;
-- route `VIA/TO` ;
-- STAR, transition, approche et VIA ;
-- QNH, température, vent, fréquence ILS et axe final ;
-- minima RADIO ou BARO et RVR.
+- `FROM/TO`, flight number and alternate;
+- Cost Index and cruise level;
+- ZFW, block, taxi, trip and reserve fuel;
+- runway, SID, transition and transition altitude;
+- `VIA/TO` route;
+- STAR, transition, approach and VIA;
+- QNH, temperature, wind, ILS frequency and final course;
+- RADIO or BARO minima and RVR.
 
-### Connexion directe à MSFS
+### Direct connection to MSFS
 
-NaviXav utilise SimConnect pour :
+NaviXav uses SimConnect to:
 
-- détecter la présence du simulateur ;
-- afficher un voyant vert ou rouge dans la barre supérieure ;
-- suivre la position de l’avion en temps réel ;
-- lire l’altitude, la hauteur sol, le cap, la vitesse sol et la vitesse
-  verticale ;
-- récupérer les aéroports, pistes, procédures, repères et installations radio ;
-- constituer progressivement une base locale dans `data/navixav.sqlite`.
+- detect the presence of the simulator;
+- show a green or red indicator in the top bar;
+- track the aircraft position in real time;
+- read altitude, height above ground, heading, ground speed and vertical speed;
+- retrieve airports, runways, procedures, waypoints and radio navigation aids;
+- progressively build a local database in `data/navixav.sqlite`.
 
-Le simulateur doit être lancé avec un vol chargé pour récupérer de nouvelles
-données. Les informations déjà mises en cache restent disponibles hors ligne.
+The simulator must be running with a flight loaded in order to retrieve new
+data. Information already cached remains available offline.
 
-### Carte
+### Map
 
-La carte comprend :
+The map includes:
 
-- un fond OpenStreetMap ;
-- la route SimBrief dessinée avec ses points ;
-- des couleurs distinctes pour la SID, la partie en route, la STAR et
-  l’approche ;
-- les pistes et la piste sélectionnée ;
-- la position et le cap de l’avion ;
-- une trace du déplacement ;
-- un mode de suivi automatique ;
-- le zoom, le déplacement et l’ajustement au terrain ou à la route ;
-- la trace complète réellement parcourue, conservée du départ à l’arrivée ;
-- une couleur de trace personnalisable ;
-- le choix entre OpenStreetMap Standard, OpenTopoMap, CartoDB Positron (clair)
-  et CartoDB Dark Matter (sombre, cockpit), directement depuis la barre de la
-  carte ou depuis les paramètres.
+- an OpenStreetMap background;
+- the SimBrief route drawn with its waypoints;
+- distinct colours for the SID, the enroute portion, the STAR and the approach;
+- the runways and the selected runway;
+- the aircraft position and heading;
+- a trail of the movement;
+- an automatic follow mode;
+- zoom, panning and fitting to the airport or the route;
+- the complete track actually flown from departure to arrival;
+- a customisable flight-track colour;
+- a choice between OpenStreetMap Standard, OpenTopoMap, CartoDB Positron
+  (light) and CartoDB Dark Matter (dark, cockpit), straight from the map bar or
+  from Settings.
 
-### Roulage au sol
+### Ground taxiing
 
-L’onglet **Roulage** affiche un plan d’aérodrome dédié, indépendant de la carte
-de vol et construit uniquement avec les installations natives de MSFS :
+The **Taxiing** tab provides a dedicated airport diagram, separate from the
+flight map and built only from native MSFS facilities:
 
-- le canvas occupe toute la zone disponible et reste adapté aux petites fenêtres ;
-- un fond aéronautique sombre avec quadrillage métrique et flèche du nord donne
-  l’échelle et l’orientation sans ajouter les rues d’un fond routier ;
-- les pistes, les voies principales, les postes et l’avion sont hiérarchisés
-  pour conserver un tracé lisible ;
-- les voies secondaires et les accès aux postes sont masqués par défaut ; le
-  bouton **Secondaires** les affiche à la demande ;
-- au départ, si l’avion est au sol à moins de 180 m d’un poste, NaviXav propose
-  automatiquement le roulage de ce poste vers la piste retenue ;
-- un clic sur un autre poste remplace immédiatement cette proposition ; à
-  l’arrivée, le poste reste un choix manuel ;
-- l’itinéraire distingue la partie parcourue de la partie restante, affiche
-  uniquement les noms utiles, les points d’attente, la prochaine manœuvre et
-  la distance restante ;
-- en cas d’écart, le trajet est recalculé depuis la position réelle de l’avion.
+- the canvas fills the available area and remains usable in compact windows;
+- a dark aviation background with a metric grid and north arrow provides scale
+  and orientation without the noise of a road map;
+- runways, primary taxiways, stands and the aircraft are visually prioritised;
+- secondary taxiways and stand access paths are hidden by default; the
+  **Secondary** button reveals them on demand;
+- on departure, when the aircraft is on the ground within 180 m of a stand,
+  NaviXav automatically proposes a route from that stand to the selected runway;
+- clicking another stand immediately replaces the proposal; on arrival, the
+  destination stand remains a manual choice;
+- the route separates travelled and remaining portions and shows only useful
+  names, hold-short points, the next manoeuvre and remaining distance;
+- after a deviation, the route is recalculated from the aircraft’s real position.
 
-Les chemins SimConnect de type parking servent uniquement à rattacher un poste
-au réseau. Ils ne sont jamais utilisés comme raccourcis entre deux taxiways, ce
-qui évite les diagonales artificielles à travers les pistes.
+SimConnect parking paths are used only to attach stands to the taxi network.
+They can never become shortcuts between taxiways, preventing artificial lines
+across runways.
 
-### Cartes AIS nationales officielles
+### Official national AIS charts
 
-NaviXav interroge directement les publications des autorités nationales, sans
-passer par EUROCONTROL/EAD :
+NaviXav queries national authority publications directly, without going through
+EUROCONTROL/EAD:
 
-- France : SIA eAIP (`LF`) ;
-- Espagne et Canaries : ENAIRE AIP (`LE`, `GC`, `GE`) ;
-- Pays-Bas : LVNL eAIP (`EH`) ;
-- Suède : LFV eAIP (`ES`) ;
-- Belgique et Luxembourg : skeyes eAIP (`EB`, `EL`) ;
-- Autriche : Austro Control eAIP (`LO`) ;
-- Royaume-Uni : NATS eAIP (`EG`) ;
-- États-Unis et territoires couverts : FAA d-TPP.
+- France: SIA eAIP (`LF`);
+- Spain and the Canary Islands: ENAIRE AIP (`LE`, `GC`, `GE`);
+- Netherlands: LVNL eAIP (`EH`);
+- Sweden: LFV eAIP (`ES`);
+- Belgium and Luxembourg: skeyes eAIP (`EB`, `EL`);
+- Austria: Austro Control eAIP (`LO`);
+- United Kingdom: NATS eAIP (`EG`);
+- United States and covered territories: FAA d-TPP.
 
-Pour ces aérodromes, NaviXav peut :
+For these aerodromes, NaviXav can:
 
-- présenter dans l’onglet **Cartes officielles** tous les PDF du départ et de
-  l’arrivée, classés par type ;
-- ouvrir chaque document dans l’interface ou séparément ;
-- sélectionner par défaut la SID, la STAR ou l’approche correspondant au vol
-  courant ;
-- retrouver automatiquement la carte d’approche correspondant à la piste et au
-  type d’approche retenus ;
-- télécharger à la demande uniquement les PDF consultés ;
-- conserver la publication dans le cache AIRAC local ;
-- afficher la carte officielle dans la fiche MCDU ;
-- extraire les minima ILS CAT I SIA lorsque le format est reconnu ;
-- proposer la DA, la DH et la RVR avant validation.
+- present every departure and arrival PDF in the **Official charts** tab, sorted
+  by type;
+- open each document inside the interface or separately;
+- select by default the SID, STAR or approach matching the current flight;
+- automatically find the approach chart matching the selected runway and
+  approach type;
+- download on demand only the PDFs actually consulted;
+- keep the publication in the local AIRAC cache;
+- display the official chart in the MCDU card;
+- extract SIA ILS CAT I minima when the format is recognised;
+- propose the DA, DH and RVR before validation.
 
-Les valeurs extraites ne sont jamais appliquées silencieusement : elles doivent
-être validées dans l’interface. Le bouton **Calque officiel** n’est proposé que pour
-un document possédant un géoréférencement validé. Il suit le choix de carte :
-le PDF du départ ne peut être superposé que sur le départ, et celui de l’arrivée
-que sur l’arrivée. Cette règle est identique pour toutes les sources.
+Extracted values are never applied silently: they must be validated in the
+interface. The **Official overlay** button is offered only for a document with
+validated georeferencing. It follows the chart selection: the departure PDF can
+only be overlaid on the departure, and the arrival PDF only on the arrival.
+This rule is identical for every source.
 
-Un pays n’est ajouté à la liste automatique qu’après validation d’un accès
-direct et stable à ses PDF officiels. Une source absente n’est donc jamais
-remplacée silencieusement par un agrégateur tiers.
-Le portail skeyes peut répondre `HTTP 403` aux accès automatisés : dans ce cas,
-NaviXav signale simplement l’indisponibilité et ne cherche aucune autre source.
+A country is only added to the automatic list after direct, stable access to
+its official PDFs has been validated. A missing source is therefore never
+silently replaced by a third-party aggregator.
+The skeyes portal may return `HTTP 403` to automated access. In that case,
+NaviXav reports the source as unavailable and does not try another provider.
 
-## Prérequis
+## Requirements
 
-- Windows 10 ou Windows 11 en 64 bits ;
-- Microsoft WebView2 Runtime, installé automatiquement par l’installateur ;
-- Microsoft Flight Simulator pour les données et le suivi en temps réel ;
-- un compte SimBrief avec un OFP généré ;
-- une connexion Internet pour SimBrief, le fond cartographique et les
-  publications AIS nationales ou FAA.
+- Windows 10 or Windows 11, 64-bit;
+- Microsoft WebView2 Runtime, installed automatically by the installer;
+- Microsoft Flight Simulator for data and real-time tracking;
+- a SimBrief account with a generated OFP;
+- an Internet connection for SimBrief, the map background and the national AIS
+  or FAA publications.
 
-L’installateur inclut Python, les bibliothèques, pywebview, le connecteur
-SimConnect autonome de NaviXav et le bootstrapper Microsoft WebView2 signé. Aucun de ces outils
-n’est à installer séparément. MSFS n’est pas obligatoire pour essayer le mode
-Démo ou consulter les données déjà enregistrées.
+The installer includes Python, the libraries, pywebview, NaviXav's standalone
+SimConnect connector and the signed Microsoft WebView2 bootstrapper. None of
+these tools need to be installed separately. MSFS is not required to try the
+Demo mode or to consult data already saved.
 
-SimConnect n’est jamais installé ni réinstallé dans Windows par NaviXav.
-L’application embarque une copie privée de la DLL moderne dans son propre
-dossier. Si la machine possède déjà SimConnect, son installation, sa version et
-ses réglages ne sont ni remplacés ni modifiés. Cette DLL privée dialogue avec le
-service SimConnect de MSFS : seul le simulateur doit être installé et lancé pour
-recevoir les données en direct.
+SimConnect is never installed or reinstalled into Windows by NaviXav. The
+application ships a private copy of the modern DLL in its own folder. If the
+machine already has SimConnect, its installation, version and settings are
+neither replaced nor modified. This private DLL talks to the MSFS SimConnect
+service: only the simulator needs to be installed and running to receive live
+data.
 
-### Langues de l’interface
+### Interface languages
 
-La langue se choisit dans **Paramètres**, s’applique immédiatement et reste
-mémorisée sur l’ordinateur. NaviXav fournit les interfaces française, anglaise,
-allemande, espagnole, italienne, portugaise, néerlandaise et polonaise. Les
-abréviations aéronautiques, identifiants de procédures, METAR et valeurs MCDU
-restent volontairement dans leur notation internationale.
+The language is chosen in **Settings**, applies immediately and is remembered on
+the computer. NaviXav provides French, English, German, Spanish, Italian,
+Portuguese, Dutch and Polish interfaces. Aeronautical abbreviations, procedure
+identifiers, METAR and MCDU values deliberately remain in their international
+notation.
 
-## Installation rapide sous Windows
+## Quick installation on Windows
 
-1. Télécharger le fichier `NaviXav-Setup-<version>.exe` de la dernière
-   [Release GitHub](https://github.com/xalacaga/NaviXav/releases/latest).
-2. Lancer l’installateur.
-3. Vérifier la page de contrôle des prérequis.
-4. Conserver ou modifier le dossier proposé, puis cliquer sur **Installer**.
-5. Lancer NaviXav depuis le menu Démarrer ou le raccourci facultatif du bureau.
+1. Download the `NaviXav-Setup-<version>.exe` file from the latest
+   [GitHub Release](https://github.com/xalacaga/NaviXav/releases/latest).
+2. Run the installer.
+3. Check the prerequisites verification page.
+4. Keep or change the proposed folder, then click **Install**.
+5. Start NaviXav from the Start menu or the optional desktop shortcut.
 
-L’installateur vérifie Microsoft WebView2 et l’installe automatiquement s’il
-manque. L’installation se fait pour l’utilisateur courant et ne demande
-normalement pas de droits administrateur.
+The installer checks Microsoft WebView2 and installs it automatically if
+missing. Installation is done for the current user and normally does not
+require administrator rights.
 
-Une archive portable est également disponible : extraire
-`NaviXav-<version>-windows-x64-portable.zip`, puis lancer `NaviXav.exe`. Sur une
-machine dépourvue de WebView2, utiliser d’abord l’installateur complet.
+A portable archive is also available: extract
+`NaviXav-<version>-windows-x64-portable.zip`, then run `NaviXav.exe`. On a
+machine without WebView2, use the full installer first.
 
-### Depuis les sources
+### From source
 
 ```powershell
 git clone https://github.com/xalacaga/NaviXav.git
@@ -285,54 +278,53 @@ cd NaviXav
 .\NaviXav.bat
 ```
 
-Au premier lancement, le script :
+On first launch, the script:
 
-1. recherche Python ;
-2. crée l’environnement virtuel `.venv` ;
-3. installe NaviXav et ses dépendances ;
-4. démarre le service local privé ;
-5. ouvre l’interface dans la fenêtre NaviXav.
+1. looks for Python;
+2. creates the `.venv` virtual environment;
+3. installs NaviXav and its dependencies;
+4. starts the private local service;
+5. opens the interface in the NaviXav window.
 
-Les lancements suivants réutilisent l’environnement déjà installé.
+Subsequent launches reuse the environment already installed.
 
-### Construire une distribution
+### Building a distribution
 
-Depuis PowerShell, dans le dossier du projet :
+From PowerShell, in the project folder:
 
 ```powershell
 .\scripts\build_windows.ps1
 ```
 
-Le script :
+The script:
 
-1. contrôle Windows 64 bits, Python et le SDK SimConnect ;
-2. installe les outils de construction manquants ;
-3. récupère le bootstrapper WebView2 officiel et vérifie sa signature
-   Microsoft ;
-4. exécute les tests hors intégration MSFS en direct ;
-5. produit l’installateur, l’archive portable et leurs sommes SHA-256 dans
+1. checks 64-bit Windows, Python and the SimConnect SDK;
+2. installs any missing build tools;
+3. downloads the official WebView2 bootstrapper and verifies its Microsoft
+   signature;
+4. runs the tests excluding live MSFS integration;
+5. produces the installer, the portable archive and their SHA-256 checksums in
    `release\`.
 
-Le SDK SimConnect mentionné à l’étape 1 concerne uniquement la machine qui
-construit NaviXav. Il n’est pas installé sur les machines des utilisateurs.
+The SimConnect SDK mentioned in step 1 concerns only the machine that builds
+NaviXav. It is not installed on user machines.
 
-### Fichiers de distribution
+### Distribution files
 
-Après une construction réussie :
+After a successful build:
 
-| Fichier | Usage |
+| File | Purpose |
 |---|---|
-| `release\NaviXav-Setup-<version>.exe` | installateur Windows recommandé |
-| `release\NaviXav-<version>-windows-x64-portable.zip` | version portable |
-| `release\*.sha256` | empreintes de contrôle des fichiers distribués |
+| `release\NaviXav-Setup-<version>.exe` | recommended Windows installer |
+| `release\NaviXav-<version>-windows-x64-portable.zip` | portable version |
+| `release\*.sha256` | checksums of the distributed files |
 
-Le dossier `release\` est volontairement ignoré par Git. Les exécutables sont
-des artefacts de construction à publier dans une version GitHub, pas des
-sources à versionner.
+The `release\` folder is deliberately ignored by Git. The executables are build
+artefacts to be published in a GitHub Release, not sources to be versioned.
 
-## Installation manuelle
+## Manual installation
 
-Depuis PowerShell, dans le dossier du projet :
+From PowerShell, in the project folder:
 
 ```powershell
 py -3 -m venv .venv
@@ -341,367 +333,373 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m navixav.desktop
 ```
 
-Cette commande ouvre la fenêtre NaviXav. Pour un diagnostic du service local
-sans fenêtre :
+This command opens the NaviXav window. To diagnose the local service without a
+window:
 
 ```powershell
 .\.venv\Scripts\python.exe -m navixav.desktop --no-open
 ```
 
-Le service reste alors accessible uniquement sur `http://127.0.0.1:8765`.
+The service then remains reachable only at `http://127.0.0.1:8765`.
 
 ## Configuration
 
-La configuration courante se fait depuis le bouton **Paramètres** de
-l’interface.
+Day-to-day configuration is done from the **Settings** button in the interface.
 
-### Compte SimBrief
+### SimBrief account
 
-Renseigner l’un des deux champs :
+Fill in one of the two fields:
 
-- **Pilot ID SimBrief** : identifiant numérique affiché dans les paramètres du
-  compte SimBrief ;
-- **Nom d’utilisateur SimBrief** : alias du compte.
+- **SimBrief Pilot ID**: the numeric identifier shown in the SimBrief account
+  settings;
+- **SimBrief username**: the account alias.
 
-Le Pilot ID est recommandé. Après enregistrement, NaviXav récupère
-immédiatement le dernier OFP disponible. À chaque nouveau démarrage, ce dernier
-plan est chargé automatiquement.
+The Pilot ID is recommended. After saving, NaviXav immediately retrieves the
+latest available OFP. On every subsequent startup, that last plan is loaded
+automatically.
 
-### Réglages disponibles
+### Available settings
 
-L’interface permet également de configurer :
+The interface also lets you configure:
 
-- la source METAR ;
-- l’ordre de préférence des approches ;
-- la composante maximale de vent arrière ;
-- la composante maximale de vent traversier ;
-- la longueur minimale de piste ;
-- la capacité RNP de l’appareil.
+- the METAR source;
+- the approach preference order;
+- the maximum tailwind component;
+- the maximum crosswind component;
+- the minimum runway length;
+- the aircraft's RNP capability.
 
-Dans la version installée, les valeurs sont conservées dans
+In the installed version, the values are kept in
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
 
-## Première utilisation
+## First use
 
-1. Générer un plan de vol dans SimBrief.
-2. Lancer Microsoft Flight Simulator et charger un vol.
-3. Démarrer NaviXav depuis le menu Démarrer, ou avec `NaviXav.bat` en mode
-   développement.
-4. Ouvrir **Paramètres** et enregistrer le Pilot ID SimBrief.
-5. Attendre le chargement automatique du dernier OFP.
-6. Vérifier le voyant **MSFS connecté** en haut à droite.
-7. Contrôler les choix de piste, SID, STAR et approche.
-8. Consulter les contraintes et la carte officielle.
-9. Valider les minima avant de les recopier dans le MCDU.
+1. Generate a flight plan in SimBrief.
+2. Start Microsoft Flight Simulator and load a flight.
+3. Start NaviXav from the Start menu, or with `NaviXav.bat` in development
+   mode.
+4. Open **Settings** and save the SimBrief Pilot ID.
+5. Wait for the latest OFP to load automatically.
+6. Check the **MSFS connected** indicator in the top right.
+7. Review the runway, SID, STAR and approach choices.
+8. Consult the constraints and the official chart.
+9. Validate the minima before copying them into the MCDU.
 
-Le bouton **Importation du plan** permet de récupérer à nouveau le dernier OFP
-après avoir généré ou modifié un vol dans SimBrief.
+The **Complete the plan** button retrieves the latest OFP again after
+generating or modifying a flight in SimBrief.
 
-## Utilisation de la carte
+## Using the map
 
-- **Fond carte** : affiche ou masque le fond libre sélectionné.
-- **Sélecteur de fond** : bascule directement sur la carte entre OpenStreetMap
-  Standard, OpenTopoMap, CartoDB Positron (clair) et CartoDB Dark Matter
-  (sombre, cockpit). Le choix est enregistré dans les paramètres.
-- **Paramètres** : reprend le même choix de fond et la couleur de la trace
-  complète du vol.
-- **Calque officiel** : apparaît uniquement pour la fiche géoréférencée de
-  l’aérodrome actuellement affiché et règle son opacité.
-- **Route complète** : cadre toute la route du vol.
-- **Suivre** : maintient l’avion au centre.
-- **Ajuster** : cadre l’aéroport sélectionné.
-- **+ / −** : modifie le niveau de zoom.
-- **Molette** : zoome sous le pointeur.
-- **Glisser** : déplace la carte.
+- **Map background**: shows or hides the selected open-source map.
+- **Base-map picker**: switches straight from the map between OpenStreetMap
+  Standard, OpenTopoMap, CartoDB Positron (light) and CartoDB Dark Matter
+  (dark, cockpit). The choice is saved into the settings.
+- **Settings**: offers the same base-map choice and the colour of the complete
+  flight track.
+- **Official overlay**: appears only for the georeferenced chart of the
+  aerodrome currently displayed, and adjusts its opacity.
+- **Full route**: frames the entire flight route.
+- **Follow**: keeps the aircraft centred.
+- **Fit**: frames the selected airport.
+- **+ / −**: changes the zoom level.
+- **Wheel**: zooms under the pointer.
+- **Drag**: pans the map.
 
-Les boutons d’aéroport permettent de passer rapidement du terrain de départ au
-terrain d’arrivée.
+The airport buttons make it quick to switch between the departure and the
+arrival aerodrome.
 
-## Fenêtre et affichage responsive
+## Window and responsive display
 
-### Téléphone et tablette sur le réseau local
+### Phone and tablet access on the local network
 
-Active **Accès téléphone et tablette** dans **Paramètres**, enregistre puis
-redémarre NaviXav. L’adresse protégée affichée sur le PC s’ouvre depuis un
-téléphone ou une tablette connecté au même Wi-Fi. L’interface mobile donne
-accès au suivi temps réel, à la carte, aux contraintes, au MCDU, aux données
-avion et aux cartes officielles. Les réglages, l’arrêt et les mises à jour
-restent réservés au PC. Si Windows le demande, autorise NaviXav uniquement sur
-les réseaux privés.
+Enable **Phone and tablet access** in **Settings**, save, then restart NaviXav.
+Open the protected address shown on the PC from a phone or tablet connected to
+the same Wi-Fi. The mobile interface provides live tracking, the map,
+constraints, MCDU data, aircraft data and official charts. Settings, shutdown
+and updates remain restricted to the PC. If Windows asks, allow NaviXav on
+private networks only.
 
-NaviXav adapte automatiquement son interface au redimensionnement :
+NaviXav adapts its interface automatically when resized:
 
-- au-dessus de 1100 px, les cartes Départ, Route et Arrivée peuvent être
-  présentées côte à côte ;
-- sous 1100 px, ces cartes passent sur une seule colonne ;
-- sous 980 px, la barre d’outils et les commandes de carte occupent toute la
-  largeur disponible ;
-- sous 760 px, les onglets deviennent défilables, les boutons se redistribuent
-  et les tableaux restent consultables horizontalement ;
-- sous 520 px, les statistiques et les panneaux complexes passent en colonne.
+- above 1100 px, the Departure, Route and Arrival cards can be shown side by
+  side;
+- below 1100 px, these cards move to a single column;
+- below 980 px, the toolbar and map controls take the full available width;
+- below 760 px, the tabs become scrollable, buttons are redistributed and
+  tables remain readable horizontally;
+- below 520 px, statistics and complex panels switch to a column layout.
 
-La carte écoute chaque changement de taille de la fenêtre et recalcule
-immédiatement son canevas. La taille minimale de la fenêtre native est
-720 × 560 pixels.
+The map listens for every window size change and recomputes its canvas
+immediately. The minimum size of the native window is 720 × 560 pixels.
 
-## Mode Démo
+## Demo mode
 
-Le commutateur **Démo** charge un vol d’exemple et simule un déplacement au
-sol. Il permet de découvrir l’interface sans compte SimBrief ou sans
-simulateur.
+The **Demo** switch loads a sample flight and simulates movement on the ground.
+It lets you explore the interface without a SimBrief account or a simulator.
 
-Le mode Démo est toujours désactivé au démarrage afin que NaviXav privilégie le
-dernier plan SimBrief.
+Demo mode is always disabled at startup so that NaviXav gives priority to the
+latest SimBrief plan.
 
-## Arrêt de l’application
+## Stopping the application
 
-Utiliser le bouton **Quitter** dans la barre supérieure. NaviXav arrête
-proprement le serveur, ferme la fenêtre et la connexion SimConnect, puis libère
-le port `8765`. Fermer directement la fenêtre produit le même résultat.
+Use the **Quit** button in the top bar. NaviXav shuts the server down cleanly,
+closes the window and the SimConnect connection, then releases port `8765`.
+Closing the window directly produces the same result.
 
-En mode diagnostic `--no-open`, la combinaison `Ctrl+C` dans la console
-effectue également un arrêt normal.
+In `--no-open` diagnostic mode, `Ctrl+C` in the console also performs a normal
+shutdown.
 
-## Options de démarrage
+## Startup options
 
-Le lanceur Windows accepte les options suivantes :
+The Windows launcher accepts the following options:
 
 ```powershell
 .\NaviXav.bat --port 9000
 .\NaviXav.bat --no-open
 ```
 
-- `--port` change le port local ;
-- `--no-open` lance uniquement le service local, pour le diagnostic.
+- `--port` changes the local port;
+- `--no-open` starts only the local service, for diagnostics.
 
-L’adresse d’écoute reste volontairement fixée à `127.0.0.1`.
+The listening address deliberately stays fixed at `127.0.0.1`.
 
-## Commandes complémentaires
+## Additional commands
 
-NaviXav peut aussi être utilisé depuis PowerShell :
+NaviXav can also be used from PowerShell:
 
 ```powershell
-# Afficher le dernier plan SimBrief
+# Show the latest SimBrief plan
 .\.venv\Scripts\navixav.exe plan
 
-# Générer une fiche MCDU textuelle
+# Generate a text MCDU card
 .\.venv\Scripts\navixav.exe plan --mcdu
 
-# Produire une sortie JSON
+# Produce JSON output
 .\.venv\Scripts\navixav.exe plan --json
 
-# Importer des aéroports depuis MSFS
+# Import airports from MSFS
 .\.venv\Scripts\navixav.exe import LFBO LFPO
 
-# Examiner la base locale
+# Examine the local database
 .\.venv\Scripts\navixav.exe navdata
 
-# Afficher les informations d’un aéroport
+# Show an airport's information
 .\.venv\Scripts\navixav.exe airport LFBO --runway 32R
 ```
 
-## Données locales
+## Local data
 
-NaviXav utilise les emplacements suivants :
+NaviXav uses the following locations:
 
-| Emplacement | Contenu |
+| Location | Contents |
 |---|---|
-| `%LOCALAPPDATA%\NaviXav\user_settings.json` | configuration de la version installée |
-| `%LOCALAPPDATA%\NaviXav\navixav.sqlite` | base de navigation construite depuis MSFS |
-| `%LOCALAPPDATA%\NaviXav\cache\` | cartes AIS nationales et FAA mises en cache |
-| `%LOCALAPPDATA%\NaviXav\webview\` | stockage local de la fenêtre WebView2 |
-| `%LOCALAPPDATA%\NaviXav\logs\navixav.log` | journal de la version installée |
-| `data\` et `.venv\` | données et environnement du mode développement |
+| `%LOCALAPPDATA%\NaviXav\user_settings.json` | configuration of the installed version |
+| `%LOCALAPPDATA%\NaviXav\navixav.sqlite` | navigation database built from MSFS |
+| `%LOCALAPPDATA%\NaviXav\cache\` | cached national AIS and FAA charts |
+| `%LOCALAPPDATA%\NaviXav\webview\` | local storage of the WebView2 window |
+| `%LOCALAPPDATA%\NaviXav\logs\navixav.log` | log of the installed version |
+| `data\` and `.venv\` | development-mode data and environment |
 
-Ces données locales, les secrets et les caches ne sont pas destinés à être
-versionnés.
+This local data, the secrets and the caches are not meant to be versioned.
 
-Le journal enregistre les démarrages et arrêts, erreurs, appels API lents,
-durées de récupération SimBrief, temps de complétion MSFS et remplissages du
-cache. Il n’enregistre ni le Pilot ID, ni le nom d’utilisateur, ni la route
-complète. Sa taille est limitée à 2 Mo avec cinq anciennes versions conservées
-(`navixav.log.1` à `navixav.log.5`).
+The log records startups and shutdowns, errors, slow API calls, SimBrief
+retrieval times, MSFS completion times and cache fills. It records neither the
+Pilot ID, nor the username, nor the complete route. Its size is capped at 2 MB
+with five older versions kept (`navixav.log.1` to `navixav.log.5`).
 
-Lors d’un premier accès à un aérodrome ou à une procédure, l’interface prévient
-que le cache MSFS est en cours de remplissage et que l’opération peut prendre
-plusieurs dizaines de secondes. Les accès suivants réutilisent les données
-locales.
+On first access to an aerodrome or a procedure, the interface warns that the
+MSFS cache is being filled and that the operation may take several tens of
+seconds. Subsequent accesses reuse the local data.
 
-## Versionnement Git
+## Git versioning
 
-Le dépôt source est prévu pour être hébergé sur :
+The source repository is intended to be hosted at:
 `https://github.com/xalacaga/NaviXav.git`.
 
-Le fichier `.gitignore` exclut notamment :
+The `.gitignore` file excludes in particular:
 
-- `.env`, les réglages utilisateur et les bases locales ;
-- `.claude/`, `CLAUDE.md`, `.codex/`, `AGENTS.md` et `CODEX.md` ;
-- les données Graphify et `graphify-out/` ;
-- les environnements Python, caches de tests et sorties de construction ;
-- `dist\`, `build\` et `release\`.
+- `.env`, user settings and local databases;
+- `.claude/`, `CLAUDE.md`, `.codex/`, `AGENTS.md` and `CODEX.md`;
+- Graphify data and `graphify-out/`;
+- Python environments, test caches and build outputs;
+- `dist\`, `build\` and `release\`.
 
-Les mémoires Claude/Codex peuvent donc être maintenues localement sans être
-publiées dans le dépôt Git.
+Claude/Codex memories can therefore be maintained locally without being
+published in the Git repository.
 
-### Mises à jour automatiques
+### Automatic updates
 
-Au démarrage, NaviXav interroge uniquement la dernière Release publique du
-dépôt `xalacaga/NaviXav`. Si sa version est supérieure à la version installée,
-un bouton **Mise à jour** apparaît dans la barre supérieure. L’installation ne
-commence qu’après confirmation de l’utilisateur.
+At startup, NaviXav queries only the latest public Release of the
+`xalacaga/NaviXav` repository. If its version is higher than the installed one,
+an **Update** button appears in the top bar. Installation starts only after the
+user confirms.
 
-L’installateur est téléchargé dans
-`%LOCALAPPDATA%\NaviXav\updates\`, puis son empreinte SHA-256 est comparée à
-celle publiée par GitHub. En cas d’empreinte absente ou différente, le fichier
-est supprimé et n’est jamais exécuté. Une panne de GitHub ou d’Internet ne
-bloque ni le démarrage ni les fonctions de vol.
+The installer is downloaded to `%LOCALAPPDATA%\NaviXav\updates\`, then its
+SHA-256 checksum is compared with the one published by GitHub. If the checksum
+is missing or different, the file is deleted and never executed. A GitHub or
+Internet outage blocks neither startup nor the flight functions.
 
-Le dépôt est public en lecture. Un utilisateur peut consulter le code et
-télécharger les Releases sans compte GitHub, mais seuls les collaborateurs
-autorisés peuvent écrire dans le dépôt.
+The repository is publicly readable. A user can browse the code and download
+Releases without a GitHub account, but only authorised collaborators can write
+to the repository.
 
-### Version et notes de Release
+### Version and Release notes
 
-La version suit le format sémantique `MAJEURE.MINEURE.CORRECTIF`. Les messages
-de commit conventionnels déterminent automatiquement le niveau suivant :
+The version follows the semantic format `MAJOR.MINOR.PATCH`. Conventional
+commit messages automatically determine the next level:
 
-- `feat:` produit normalement une version mineure ;
-- `fix:` produit une version corrective ;
-- `BREAKING CHANGE` ou `!:` produit une version majeure ;
-- les autres changements produisent une version corrective.
+- `feat:` normally produces a minor version;
+- `fix:` produces a patch version;
+- `BREAKING CHANGE` or `!:` produces a major version;
+- other changes produce a patch version.
 
-Préparer localement la version et ses notes :
+Prepare the version and its notes locally:
 
 ```powershell
 .\scripts\prepare_release.ps1 -Bump auto
 ```
 
-Publier l’installateur, l’archive portable, leurs empreintes et les notes dans
-une Release GitHub :
+Publish the installer, the portable archive, their checksums and the notes in a
+GitHub Release:
 
 ```powershell
 .\scripts\publish_release.ps1 -Bump auto
 ```
 
-Le second script exige un dépôt propre et GitHub CLI authentifié. Il exécute
-les tests, construit les livrables, crée le commit et le tag de version, pousse
-`main` et le tag, puis crée la Release GitHub. `CHANGELOG.md` conserve
-l’historique et `RELEASE_NOTES.md` contient les notes de la version courante.
+The second script requires a clean repository and an authenticated GitHub CLI.
+It runs the tests, builds the deliverables, creates the version commit and tag,
+pushes `main` and the tag, then creates the GitHub Release. `CHANGELOG.md`
+keeps the history and `RELEASE_NOTES.md` contains the current version's notes.
 
-## Dépannage
+## Troubleshooting
 
-### Le port 8765 est déjà utilisé
+### Port 8765 is already in use
 
-Une instance de NaviXav est probablement encore ouverte. Fermer sa fenêtre ou
-cliquer sur **Quitter** dans l’interface. L’exécutable détecte une instance
-existante ; si une autre application occupe 8765, il choisit automatiquement
-un port libre entre 8766 et 8775.
+A NaviXav instance is probably still open. Close its window or click **Quit** in
+the interface. The executable detects an existing instance; if another
+application occupies 8765, it automatically picks a free port between 8766 and
+8775.
 
-Pour identifier le processus :
+To identify the process:
 
 ```powershell
 Get-NetTCPConnection -LocalPort 8765 -State Listen
 ```
 
-Il est aussi possible de démarrer l’application sur un autre port :
+It is also possible to start the application on another port:
 
 ```powershell
 .\NaviXav.bat --port 9000
 ```
 
-### La fenêtre NaviXav ne s’ouvre pas
+### The NaviXav window does not open
 
-- relancer l’installateur complet afin qu’il contrôle WebView2 ;
-- vérifier que Windows et Microsoft Edge WebView2 Runtime sont à jour ;
-- consulter `%LOCALAPPDATA%\NaviXav\logs\navixav.log` ;
-- vérifier qu’un antivirus ne bloque pas `NaviXav.exe` ou les processus
-  `msedgewebview2.exe`.
+- run the full installer again so that it checks WebView2;
+- make sure Windows and Microsoft Edge WebView2 Runtime are up to date;
+- consult `%LOCALAPPDATA%\NaviXav\logs\navixav.log`;
+- check that an antivirus is not blocking `NaviXav.exe` or the
+  `msedgewebview2.exe` processes.
 
-L’archive portable ne peut pas installer elle-même WebView2. Sur une machine
-qui ne possède pas ce composant, utiliser `NaviXav-Setup-<version>.exe`.
+The portable archive cannot install WebView2 by itself. On a machine that does
+not have this component, use `NaviXav-Setup-<version>.exe`.
 
-### Le voyant MSFS reste rouge
+### The MSFS indicator stays red
 
-- vérifier que le simulateur est lancé ;
-- charger complètement un vol ;
-- attendre quelques secondes puis cliquer sur le voyant ;
-- relancer l’installateur si la copie privée de `SimConnect.dll` livrée avec
-  NaviXav a été supprimée ou mise en quarantaine par un antivirus.
+- check that the simulator is running;
+- load a flight completely;
+- wait a few seconds then click the indicator;
+- run the installer again if the private copy of `SimConnect.dll` shipped with
+  NaviXav has been deleted or quarantined by an antivirus.
 
-### Aucun plan SimBrief n’est chargé
+### No SimBrief plan is loaded
 
-- vérifier le Pilot ID ou le nom d’utilisateur dans **Paramètres** ;
-- générer un OFP sur SimBrief avant de relancer la récupération ;
-- vérifier la connexion Internet.
+- check the Pilot ID or username in **Settings**;
+- generate an OFP on SimBrief before retrying the retrieval;
+- check the Internet connection.
 
-### Une carte officielle n’est pas disponible
+### An official chart is unavailable
 
-- vérifier que le préfixe OACI est couvert par SIA, ENAIRE, LVNL, LFV, skeyes,
-  Austro Control, NATS ou FAA ;
-- vérifier la connexion Internet ;
-- confirmer que la piste et l’approche ont été déterminées ;
-- utiliser la saisie manuelle des minima si l’extraction n’est pas disponible.
+- check that the ICAO prefix is covered by SIA, ENAIRE, LVNL, LFV, skeyes,
+  Austro Control, NATS or FAA;
+- check the Internet connection;
+- confirm that the runway and the approach have been determined;
+- use manual entry of the minima if extraction is unavailable.
 
-## Limites actuelles
+## Current limitations
 
-- la procédure réellement autorisée peut différer du plan selon l’ATIS, la
-  météo et les instructions ATC ;
-- les minima dépendent de la catégorie de l’avion, de son équipement et des
-  conditions opérationnelles ;
-- l’extraction automatique des minima est limitée aux formats SIA reconnus ;
-- un PDF sans géoréférencement validé reste consultable, mais ne peut pas être
-  utilisé comme calque ;
-- les nouvelles données MSFS nécessitent que le simulateur soit accessible.
+- the procedure actually cleared may differ from the plan depending on the
+  ATIS, the weather and ATC instructions;
+- minima depend on the aircraft category, its equipment and operational
+  conditions;
+- automatic extraction of minima is limited to recognised SIA formats;
+- a PDF without validated georeferencing remains readable, but cannot be used
+  as an overlay;
+- new MSFS data requires the simulator to be reachable.
 
-Toujours confirmer les informations importantes avant leur saisie dans le
-simulateur.
+Always confirm important information before entering it into the simulator.
 
-## Architecture et confidentialité
+## Architecture and privacy
 
-- `navixav/desktop.py` gère la fenêtre native et le cycle de vie du processus ;
-- `navixav/web/app.py` fournit l’API FastAPI liée uniquement à
-  `127.0.0.1` ;
-- `navixav/web/static/` contient l’interface responsive HTML/CSS/JavaScript ;
-- `navixav/planner/` complète le plan IFR ;
-- `navixav/navdata/` construit et interroge la base issue de MSFS ;
-- `navixav/live/` assure le suivi SimConnect ;
-- `navixav/sia.py`, `navixav/faa.py` et `navixav/national_aip.py` gèrent les
-  publications officielles.
+- `navixav/desktop.py` manages the native window and the process lifecycle;
+- `navixav/web/app.py` provides the FastAPI API bound only to `127.0.0.1`;
+- `navixav/web/static/` contains the responsive HTML/CSS/JavaScript interface;
+- `navixav/planner/` completes the IFR plan;
+- `navixav/navdata/` builds and queries the database derived from MSFS;
+- `navixav/live/` handles SimConnect tracking;
+- `navixav/sia.py`, `navixav/faa.py` and `navixav/national_aip.py` handle the
+  official publications.
 
-Le service local n’écoute jamais sur le réseau extérieur. Le Pilot ID
-SimBrief, les préférences, les résumés de vol et les PDF mis en cache restent sur
-la machine. Seules les requêtes nécessaires à SimBrief, OpenStreetMap, la
-météo et aux publications AIS officielles quittent l’ordinateur.
+The local service never listens on the external network. The SimBrief Pilot ID,
+the preferences, the flight summaries and the cached PDFs stay on the machine. Only
+the requests needed for SimBrief, OpenStreetMap, the weather and the official
+AIS publications leave the computer.
+
+## Development process and AI transparency
+
+NaviXav is developed with substantial assistance from generative AI tools, an
+approach sometimes described as **AI-assisted development** or **vibe coding**.
+AI is used for tasks including exploring implementation options, generating and
+refactoring code, writing tests, translating the interface and maintaining
+documentation.
+
+The project is directed and maintained by Xavier BEGUE. The maintainer defines
+the product goals, chooses which changes are accepted, reviews their behaviour,
+runs the test suite and validates release builds. AI output is treated as a
+draft, not as an authority: it can be incomplete or wrong, and issues and code
+review from the community are welcome.
+
+Transparency is part of the project rather than a claim that the process is
+perfect. The source code, tests and commit history are public so that users and
+contributors can inspect the result, report defects and propose improvements.
 
 ## Licence
 
-NaviXav est un logiciel libre distribué sous licence
-[Apache 2.0](LICENSE).
+NaviXav is free software distributed under the
+[Apache 2.0](LICENSE) licence.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-Tu peux librement utiliser, modifier, redistribuer et intégrer NaviXav, y
-compris dans un projet commercial. En contrepartie, la licence impose de
-**créditer l'auteur** :
+You may freely use, modify, redistribute and integrate NaviXav, including in a
+commercial project. In return, the licence requires that you **credit the
+author**:
 
-- conserver la mention de copyright et une copie de la licence dans toute
-  redistribution ;
-- conserver le fichier [NOTICE](NOTICE) et son contenu d'attribution ;
-- **signaler de manière visible tout fichier que tu as modifié**, conformément
-  à la section 4(b) de la licence.
+- retain the copyright notice and a copy of the licence in any redistribution;
+- retain the [NOTICE](NOTICE) file and its attribution content;
+- **state prominently which files you have modified**, as required by
+  section 4(b) of the licence.
 
-La licence accorde également une concession de brevets et exclut toute
-garantie. Les données de navigation, les cartes officielles et le fond
-cartographique ne sont pas couverts par cette licence : ils restent soumis aux
-conditions de leurs fournisseurs respectifs, détaillées dans le fichier NOTICE.
+The licence also grants a patent licence and excludes any warranty. Navigation
+data, official charts and the map background are not covered by this licence:
+they remain subject to their respective providers' terms, detailed in the
+NOTICE file.
 
 ## Tests
 
-Le profil reproductible utilisé pour construire la distribution est :
+The reproducible profile used to build the distribution is:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -m "not live_msfs"
 ```
 
-Les tests marqués `live_msfs` interrogent un simulateur réellement démarré et
-ne font donc pas partie du contrôle automatique de l’installateur.
+Tests marked `live_msfs` query a simulator that is actually running and are
+therefore not part of the installer's automatic check.

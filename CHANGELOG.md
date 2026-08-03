@@ -1,350 +1,342 @@
-# Journal des modifications
+# Changelog
 
 ## [1.4.6] - 2026-08-02
 
-## Nouvelles fonctionnalités
+### Added
 
-- Un onglet « Météo » remplace l'onglet « JSON » et réunit le briefing du départ, de la croisière, de l'arrivée et du dégagement.
-- Chaque terrain affiche l'essentiel décodé : vent, visibilité, plafond, température et point de rosée, QNH, phénomènes significatifs et catégorie de vol (VFR, MVFR, IFR, LIFR), avec l'ancienneté de l'observation.
-- La tendance TAF est résumée aux créneaux qui changent la donne, et le METAR comme le TAF bruts restent accessibles d'un clic.
-- La croisière reprend le vent moyen, la composante, l'écart ISA, la température extérieure et la tropopause calculés pour l'OFP.
-- Le briefing signale les points d'attention : observation périmée, risque de brume ou de brouillard, rafales, températures basses et conditions IFR basses.
-- En mode METAR direct, les observations sont actualisées au chargement puis toutes les cinq minutes, sans recalculer la route ni changer les procédures.
-- Un résumé graphique représente les conditions, la direction du vent, la visibilité et le plafond de chaque terrain.
-- L'onglet « Dispatch » compare en direct la prévision de l'OFP et ce que mesure le simulateur : carburant embarqué, quantité à bord, consommation réelle, masses au décollage et à l'atterrissage, temps et distance. Les valeurs se rafraîchissent toutes les deux secondes.
-- Le carburant projeté à l'arrivée alerte dès qu'il passe sous la réserve finale augmentée du dégagement, et la masse d'atterrissage projetée alerte au-dessus de la masse maximale.
-- La consommation horaire est mesurée sur une moyenne glissante de cinq minutes et reste juste lorsque le vol est accéléré.
-- Le suivi survit à une fermeture en cours de vol : le carburant bloc et l'heure de décollage relevés au départ sont retrouvés à la réouverture.
-- Les onglets « Dispatch » et « Avion » suivent enfin la langue choisie : intitulés, groupes et mentions y sont traduits, seuls les identifiants aéronautiques (ZFW, MTOW, MLW, SELCAL, cost index) restent tels quels.
+- A **Weather** tab replaces the **JSON** tab and brings together departure, cruise, arrival and alternate briefings.
+- Each airport shows decoded essentials: wind, visibility, ceiling, temperature and dew point, QNH, significant phenomena and flight category (VFR, MVFR, IFR or LIFR), including the observation age.
+- The TAF summary focuses on meaningful changes, while raw METAR and TAF reports remain available with one click.
+- The cruise briefing includes OFP average wind, wind component, ISA deviation, outside air temperature and tropopause.
+- The briefing flags stale observations, mist or fog risk, gusts, low temperatures and low IFR conditions.
+- In live METAR mode, observations refresh on load and every five minutes without recalculating the route or changing procedures.
+- A graphical summary shows conditions, wind direction, visibility and ceiling for each airport.
+- The **Dispatch** tab compares the OFP forecast with live simulator values: loaded and remaining fuel, actual burn, take-off and landing weights, time and distance. Values refresh every two seconds.
+- Projected arrival fuel warns when it falls below final reserve plus alternate fuel, and projected landing weight warns above maximum landing weight.
+- Hourly fuel burn uses a five-minute rolling average and remains accurate when simulation rate is increased.
+- Tracking survives closing the application during a flight: block fuel and take-off time recorded at departure are restored when NaviXav reopens.
+- The **Dispatch** and **Aircraft** tabs now follow the selected language. Only standard aviation identifiers such as ZFW, MTOW, MLW, SELCAL and cost index remain unchanged.
 
-## Corrections de bugs
+### Fixed
 
-- L'avertissement « SimBrief a prévu la piste X, le vent favoriserait Y » ne s'affiche plus. Par vent faible, calme ou variable, il attribuait au vent un classement décidé en réalité par la configuration préférentielle de la plateforme et par l'ILS. La piste de l'OFP reste retenue, avec une confiance modérée lorsqu'elle diffère du classement du moteur.
+- Removed the misleading “SimBrief planned runway X, but wind would favour Y” warning. In light, calm or variable wind, it incorrectly attributed a ranking driven by airport preference and ILS availability to the wind. The OFP runway remains selected, with moderate confidence when it differs from the planner ranking.
 
-## Autres changements
+### Changed
 
-- Ajout meteo, optimisation version mobile.
+- Added weather features and improved the mobile layout.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.5] - 2026-08-01
 
-## Corrections de bugs
+### Fixed
 
-- Le tracé de l'approche ne part plus vers un repère homonyme situé à des centaines de milles du terrain : la finale d'Orly filait en Corse.
-- Un repère nommé d'après une piste — « CF02 », « FI21L », « DER07 » — est reconnu comme tel sur n'importe quel aérodrome du monde, et ne peut plus emprunter la position de son homonyme sur un terrain voisin.
-- Un point en route dont la base connaît plusieurs homonymes est désormais choisi près de la route, et écarté du tracé s'il l'allonge démesurément.
-- À l'import du plan et à chaque nouvelle route, le tracé complet est vérifié : tout point hors de sa zone est retiré et signalé dans les avertissements du plan, quelle que soit l'origine de la position fautive.
-- Une route qui franchit l'antiméridien se dessine d'un seul trait au lieu de traverser la carte à l'envers.
-- Un vol qui revient à son terrain de départ conserve son point de virage : la distance annoncée par le plan prend le relais de la route directe.
-- Les repères de procédure enregistrés à tort comme points de report sont supprimés de la base de navigation à l'ouverture.
+- Approach lines no longer jump to a same-named waypoint hundreds of miles away; the Orly final approach could previously lead to Corsica.
+- Runway-related waypoint names such as `CF02`, `FI21L` and `DER07` are recognised at any airport and can no longer borrow a same-named position from a neighbouring airport.
+- En-route waypoints with multiple database matches are selected near the route and rejected when they would create an excessive detour.
+- On flight-plan import and whenever the route changes, the full path is validated. Out-of-area points are removed and reported in planner warnings regardless of the source of the bad position.
+- Routes crossing the antimeridian are drawn continuously instead of crossing the map in the wrong direction.
+- Flights returning to their departure airport keep their turning point; the planned distance is used instead of a direct route.
+- Procedure fixes incorrectly stored as reporting points are removed from the navigation database at startup.
 
-## Autres changements
+### Changed
 
-- Correction bug.
-- Link official NaviXav website.
+- Fixed route rendering issues.
+- Added a link to the official NaviXav website.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.4] - 2026-08-01
 
-## Nouvelles fonctionnalités
+### Added
 
-- Nouvel onglet « Roulage » : un plan d'aérodrome dédié sur fond aéronautique sombre, avec quadrillage métrique et indication du nord, sans fond routier ni route de vol.
-- Le plan de roulage occupe toute la zone disponible et reste lisible dans les fenêtres compactes. Les voies secondaires sont masquées par défaut et le bouton « Secondaires » les affiche à la demande.
-- Au départ, NaviXav reconnaît automatiquement le poste proche de l'avion et propose son itinéraire vers la piste retenue. Cliquer un autre poste remplace immédiatement cette proposition.
-- Seules les voies de l'itinéraire portent leur nom : le chemin se lit d'un coup d'œil.
-- La consigne du moment s'affiche en grand sur le plan de roulage, avec le chemin restant et la distance jusqu'au bout.
-- L’onglet Roulage, le suivi du vol, le journal local, les phases de vol, les états de la carte et la commande de création SimBrief suivent désormais immédiatement la langue choisie. Les identifiants et la phraséologie aéronautiques normalisés restent inchangés.
-- Les fiches Départ, Route et Arrivée traduisent aussi leurs libellés, les composantes de vent, les justifications du moteur et les avertissements, sans modifier les procédures, repères ni valeurs issus de SimBrief.
+- A new **Taxi** tab provides a dedicated aerodrome chart on a dark aviation background with a metric grid and north indicator, separate from the road basemap and flight route.
+- The taxi chart fills the available area and remains readable in compact windows. Secondary taxiways are hidden by default and can be shown on demand.
+- At departure, NaviXav automatically identifies the stand near the aircraft and proposes a route to the selected runway. Selecting another stand immediately replaces the proposal.
+- Only taxiways used by the route are labelled, keeping the path easy to read.
+- The current taxi instruction is displayed prominently with the remaining path and distance.
+- The Taxi tab, flight tracking, local history, flight phases, map states and SimBrief creation command now follow the selected language. Standard aviation identifiers and phraseology remain unchanged.
+- Departure, Route and Arrival cards also translate their labels, wind components, planner explanations and warnings without altering SimBrief procedures, fixes or values.
 
-## Corrections de bugs
+### Fixed
 
-- La carte redevient lisible : les voies de circulation, les postes et leurs étiquettes ne s'affichent plus par-dessus les tuiles, la route et l'avion. Le détail du sol est passé dans le nouvel onglet « Roulage ».
-- Changer de poste de stationnement annule désormais les anciennes demandes : une réponse réseau ou de guidage retardée ne peut plus restaurer le premier itinéraire.
-- Les chemins de parking SimConnect ne sont plus confondus avec des segments de taxiway. Ils ne peuvent donc plus créer de longues diagonales artificielles à travers le terrain, comme entre T41 et N1 à LFBO.
-- Le recalcul après un écart reste sur le réseau principal praticable et ne sélectionne plus un point isolé ou une route de service.
+- Ground taxiways, stands and labels no longer obscure map tiles, the flight route or the aircraft. Ground detail now belongs to the dedicated Taxi tab.
+- Changing the selected stand cancels previous requests, preventing a delayed network or routing response from restoring the old route.
+- SimConnect parking paths are no longer treated as taxiway segments and cannot create artificial diagonals across an airport, such as between T41 and N1 at LFBO.
+- Rerouting after a deviation stays on the usable main network and no longer selects an isolated node or service road.
 
-## Autres changements
+### Changed
 
-- Ajout roulage et amélioration traductions.
+- Added taxi guidance and improved translations.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.3] - 2026-07-31
 
-## Nouvelles fonctionnalités
+### Added
 
-- Le plan de terrain retient désormais le nom des voies de circulation, la nature de chaque segment et les points d'attente avant piste : c'est la base du guidage du parking à la piste.
-- Les terrains déjà enregistrés sont repris automatiquement à la prochaine ouverture du simulateur, et restent consultables entre-temps.
-- NaviXav calcule l'itinéraire de roulage entre un poste de stationnement et la piste : il suit les voies de circulation, contourne les segments fermés et les routes de service, n'emprunte une piste qu'en dernier recours et signale devant quelle piste s'arrêter.
-- La carte dessine enfin les voies de circulation et les postes de stationnement, avec le nom des voies.
-- Cliquer un poste sur la carte trace l'itinéraire de roulage vers la piste retenue par le plan : vert derrière l'avion, bleu devant, avec les barres d'arrêt et la distance restante. Rien à saisir.
-- Au départ, le point d'attente est celui du seuil réellement utilisé ; à l'arrivée, la sortie de piste la plus proche du poste est choisie automatiquement.
-- Pendant le roulage, NaviXav annonce la manœuvre suivante — « Tournez à gauche sur Q », « Arrêt avant la piste 05 » — et affiche la distance restante.
-- S'écarter de l'itinéraire ne bloque plus rien : un nouveau tracé est calculé depuis la position de l'avion, sans le renvoyer à son point de départ.
+- Airport data now retains taxiway names, segment types and runway holding points as the basis for stand-to-runway guidance.
+- Previously stored airports are refreshed automatically the next time the simulator is available and remain accessible offline.
+- NaviXav calculates taxi routes between a stand and a runway, follows taxiways, avoids closed segments and service roads, uses a runway only as a last resort and identifies the runway holding point.
+- The map displays taxiways and stands with taxiway names.
+- Selecting a stand draws the taxi route to the planned runway: green behind the aircraft, blue ahead, with holding bars and remaining distance.
+- At departure, the holding point matches the runway threshold in use; on arrival, the exit nearest the selected stand is chosen automatically.
+- During taxi, NaviXav displays the next instruction, such as “Turn left onto Q” or “Hold short of runway 05”, together with the remaining distance.
+- Deviating from the route triggers a new calculation from the aircraft’s current position instead of sending it back to the starting point.
 
-## Autres changements
+### Changed
 
-- Ajout taxiway et suivi roulage.
+- Added taxiway data and taxi tracking.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.2] - 2026-07-30
 
-## Corrections de bugs
+### Fixed
 
-- Le fond de carte ne laisse plus apparaître la grille des tuiles : sa transparence s'applique désormais à l'ensemble du calque et les tuiles ne se chevauchent plus.
+- The basemap no longer shows tile-grid seams: opacity now applies to the complete layer and tiles no longer overlap.
 
-## Autres changements
+### Changed
 
-- Optimisation carte.
-- Optimisation carte.
+- Improved map rendering.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.1] - 2026-07-30
 
-## Autres changements
+### Changed
 
-- Optimisation carte.
+- Improved map rendering.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.4.0] - 2026-07-30
 
-## Nouvelles fonctionnalités
+### Added
 
-- Le suivi du vol affiche une ligne départ vers arrivée sur laquelle l'avion avance en temps réel, avec le pourcentage parcouru et la distance restante.
-- L'altitude courante suit l'avion sur cette ligne, en niveau de vol au-dessus de l'altitude de transition et en pieds en dessous, avec la tendance verticale.
-- Le temps de vol prévu par SimBrief, le temps écoulé et le temps restant avant l'arrivée sont affichés sous la trajectoire.
-- Le mode démonstration rejoue désormais un vol complet du plan, du roulage au départ jusqu'à l'arrêt au parking d'arrivée, en passant par la montée, la croisière, la descente et l'approche.
-- Le bandeau de la carte indique la vitesse indiquée, l'altitude, la vitesse verticale, la température extérieure et la phase de vol.
+- Flight tracking displays a departure-to-arrival progress line with the aircraft’s real-time position, percentage completed and remaining distance.
+- Current altitude follows the aircraft along that line, shown as a flight level above transition altitude and in feet below it, with vertical trend.
+- Planned flight time, elapsed time and estimated remaining time appear below the path.
+- Demo mode now replays a complete flight, from departure taxi to arrival parking through climb, cruise, descent and approach.
+- The map banner shows indicated airspeed, altitude, vertical speed, outside air temperature and flight phase.
 
-## Corrections de bugs
+### Fixed
 
-- Prise en compte de RELEASE_HIGHLIGHTS.md dans le commit de version.
+- `RELEASE_HIGHLIGHTS.md` is now included in version commits.
 
-## Autres changements
+### Changed
 
-- Mise à jour fonctionnalités.
+- Updated the feature set.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.3.0] - 2026-07-30
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.2.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.1.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [1.0.0] - 2026-07-29
 
-## Corrections de bugs
+### Fixed
 
-- restaurer la trace en mémoire et les crans Airbus
+- Restored the in-memory flight trace and Airbus detents.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.13.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.12.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.11.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.10.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.9.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.8.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises Ã  jour de l'application
+- Application updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.7.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises à jour de la configuration et des tests
+- Configuration and test updates.
 
-## Autres changements
+### Changed
 
-- release updates
+- Release maintenance.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.6.0] - 2026-07-29
 
-## Nouvelles fonctionnalités
+### Added
 
-- mises à jour de la configuration et des tests
+- Configuration and test updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.5.0] - 2026-07-26
 
-## Nouvelles fonctionnalités
+### Added
 
-- personnaliser la carte et fiabiliser la distribution
+- Map customisation and distribution reliability improvements.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.4.2] - 2026-07-26
 
-## Corrections de bugs
+### Fixed
 
-- relancer l'application après mise à jour
+- Relaunched the application after an update.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.4.1] - 2026-07-26
 
-## Corrections de bugs
+### Fixed
 
-- forcer le rafraichissement de l'interface
+- Forced an interface refresh after updates.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.4.0] - 2026-07-26
 
-## Nouvelles fonctionnalités
+### Added
 
-- personnaliser la carte et fiabiliser la distribution
+- Map customisation and distribution reliability improvements.
 
-## Corrections de bugs
+### Fixed
 
-- nettoyer les effets secondaires du build
+- Removed build side effects.
 
-## Autres changements
+### Changed
 
-- detailler la documentation polonaise
+- Expanded the Polish documentation.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.3.2] - 2026-07-26
 
-## Corrections de bugs
+### Fixed
 
-- afficher correctement les accents PowerShell
-- ajouter un lanceur de publication Windows
-- fiabiliser la detection des releases GitHub
+- Corrected PowerShell accent handling.
+- Added a Windows release launcher.
+- Improved GitHub release detection reliability.
 
-## Autres changements
+### Changed
 
-- detailler la documentation neerlandaise
-- detailler les traductions europeennes
+- Expanded the Dutch documentation.
+- Expanded European translations.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.3.1] - 2026-07-26
 
-## Corrections de bugs
+### Fixed
 
-- fiabiliser la publication GitHub
-- locate GitHub CLI after winget installation
+- Improved GitHub publishing reliability.
+- Located GitHub CLI after installation through Winget.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.3.0] - 2026-07-26
 
-## Nouvelles fonctionnalités
+### Added
 
-- Progression temps réel sur la géométrie complète SID–route–STAR–approche.
-- Affichage et activation successive des fixes de procédure.
-- Protection monotone contre les sauts de progression aux croisements.
-- Bouton permanent de recherche manuelle des mises à jour.
-- Icône avion appliquée explicitement à la fenêtre et à l’identité Windows.
+- Real-time progress along the complete SID–route–STAR–approach geometry.
+- Display and progressive activation of procedure fixes.
+- Monotonic progress protection against jumps at route crossings.
+- A permanent manual update-check button.
+- Explicit aircraft icon assignment for the window and Windows identity.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.2.1] - 2026-07-26
 
-## Corrections de bugs
+### Fixed
 
-- Activation du contrôle du profil vertical uniquement pendant la descente ou
-  l’approche.
-- Affichage « En attente du TOD » avant le début de la descente.
-- Tolérance du profil stabilisée à 500 ft pour éviter les alertes oscillantes.
+- Vertical-profile monitoring is enabled only during descent or approach.
+- “Waiting for TOD” is shown before descent begins.
+- Profile tolerance is stabilised at 500 ft to prevent oscillating warnings.
 
-L’installateur est contrôlé par une empreinte SHA-256 avant toute mise à jour automatique.
+The installer is verified against its SHA-256 checksum before any automatic update.
 
 ## [0.2.0] - 2026-07-26
 
-### Nouvelles fonctionnalités
+### Added
 
-- Mise à jour automatique depuis les Releases GitHub avec confirmation et
-  validation SHA-256.
-- Versionnement sémantique et génération automatisée des notes de Release.
-- Fenêtre Windows responsive et interface en huit langues.
-- Dernier OFP SimBrief, route cartographique, cartes officielles, fiche MCDU,
-  QNH, minima et données d’approche.
-- Suivi MSFS avec progression, vitesse sol GS, vitesse indiquée IAS et
-  enregistrement local.
-- Journaux rotatifs respectant la confidentialité.
+- Automatic updates from GitHub Releases with confirmation and SHA-256 validation.
+- Semantic versioning and automated release-note generation.
+- A responsive Windows window and an interface in eight languages.
+- Latest SimBrief OFP, mapped route, official charts, MCDU card, QNH, minima and approach data.
+- MSFS tracking with progress, ground speed, indicated airspeed and local recording.
+- Privacy-conscious rotating logs.
 
-### Corrections
+### Fixed
 
-- Libération réelle du processus et du port `8765` à la fermeture.
-- Correction de l’erreur JavaScript `stage is not defined`.
-- Information pendant le remplissage initial du cache MSFS.
-- Filtrage des détails au sol trop denses.
-- Contrôle de WebView2 et connecteur SimConnect autonome non intrusif.
+- The complete process and port `8765` are released when the application closes.
+- Fixed the JavaScript error `stage is not defined`.
+- Added status information while initially filling the MSFS cache.
+- Filtered overly dense ground detail.
+- Added WebView2 checks and a non-intrusive, application-private SimConnect connector.
 
 ### Maintenance
 
-- Installateur, archive portable et empreintes SHA-256.
-- Documentation détaillée en français, anglais, allemand, espagnol, italien,
-  portugais, néerlandais et polonais.
-- Exclusion Git des données locales Claude, Codex, Graphify, caches et
-  livrables.
+- Installer, portable archive and SHA-256 checksums.
+- Detailed documentation in French, English, German, Spanish, Italian, Portuguese, Dutch and Polish.
+- Git exclusions for local Claude, Codex and Graphify data, caches and build artifacts.
