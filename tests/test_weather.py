@@ -162,7 +162,7 @@ def _ofp() -> OfpSummary:
 
 
 def test_build_briefing_covers_the_whole_flight():
-    briefing = build_briefing(_ofp(), metar_source="none")
+    briefing = build_briefing(_ofp(), metar_source="none", now=NOW)
     assert briefing.departure.icao == "LFPG"
     assert briefing.departure.role == "departure"
     assert briefing.departure.flight_category == "IFR"
@@ -181,6 +181,7 @@ def test_build_briefing_uses_the_metar_already_chosen_by_the_engine():
         arrival_metar="LFBO 021300Z 18008KT CAVOK 25/12 Q1015",
         metar_fetcher=_no_fetch,
         taf_fetcher=_no_fetch,
+        now=NOW,
     )
     assert briefing.departure.raw_metar.startswith("LFPG 021300Z")
     assert briefing.departure.flight_category == "VFR"
@@ -193,7 +194,7 @@ def test_build_briefing_in_simbrief_mode_never_touches_the_network():
     ofp.dispatch.alternate_metar = None
     ofp.dispatch.alternate_taf = None
     briefing = build_briefing(
-        ofp, metar_source="simbrief", metar_fetcher=_no_fetch, taf_fetcher=_no_fetch
+        ofp, metar_source="simbrief", metar_fetcher=_no_fetch, taf_fetcher=_no_fetch, now=NOW
     )
     assert briefing.departure.raw_taf is None
     assert briefing.departure.taf_periods == []
@@ -210,6 +211,7 @@ def test_build_briefing_completes_a_missing_taf_when_the_source_is_live():
         taf_fetcher=lambda icao: "TAF LFPG 021100Z 0212/0318 27010KT 9999 SCT025"
         if icao == "LFPG"
         else None,
+        now=NOW,
     )
     assert briefing.departure.raw_taf is not None
     assert [period.kind for period in briefing.departure.taf_periods] == ["base"]
@@ -228,6 +230,7 @@ def test_build_briefing_fetches_the_alternate_metar_when_the_source_is_live():
         if icao == "LFML"
         else None,
         taf_fetcher=lambda icao: None,
+        now=NOW,
     )
     assert briefing.alternate.source == "awc"
     assert briefing.alternate.flight_category == "VFR"
@@ -244,6 +247,7 @@ def test_forced_live_refresh_replaces_ofp_metar_and_taf():
         taf_fetcher=lambda icao: (
             f"TAF {icao} 021100Z 0212/0318 09005KT CAVOK"
         ),
+        now=NOW,
     )
     assert briefing.departure.raw_metar.startswith("LFPG 021300Z")
     assert briefing.departure.raw_taf.startswith("TAF LFPG")
@@ -253,7 +257,7 @@ def test_forced_live_refresh_replaces_ofp_metar_and_taf():
 
 
 def test_build_briefing_enroute_comes_from_the_ofp():
-    briefing = build_briefing(_ofp(), metar_source="none")
+    briefing = build_briefing(_ofp(), metar_source="none", now=NOW)
     enroute = briefing.enroute
     assert enroute.cruise_altitude_ft == 36000
     assert (enroute.wind_direction_deg, enroute.wind_speed_kt) == (270, 45)
@@ -265,7 +269,7 @@ def test_build_briefing_enroute_comes_from_the_ofp():
 
 
 def test_build_briefing_raises_operational_notes():
-    briefing = build_briefing(_ofp(), metar_source="none")
+    briefing = build_briefing(_ofp(), metar_source="none", now=NOW)
     notes = " ".join(briefing.departure.notes)
     assert "brouillard" in notes  # écart température/point de rosée de 1 °C
     assert "28 kt" in notes  # rafales
@@ -275,14 +279,14 @@ def test_build_briefing_warns_when_weather_is_missing():
     ofp = _ofp()
     ofp.origin_metar = None
     briefing = build_briefing(
-        ofp, metar_source="none", metar_fetcher=_no_fetch, taf_fetcher=_no_fetch
+        ofp, metar_source="none", metar_fetcher=_no_fetch, taf_fetcher=_no_fetch, now=NOW
     )
     assert "Météo indisponible pour LFPG." in briefing.warnings
     assert briefing.departure.notes == ["Aucun METAR disponible pour ce terrain."]
 
 
 def test_briefing_serialises_for_the_interface():
-    payload = build_briefing(_ofp(), metar_source="none").to_dict()
+    payload = build_briefing(_ofp(), metar_source="none", now=NOW).to_dict()
     assert set(payload) == {"departure", "enroute", "arrival", "alternate", "warnings"}
     departure = payload["departure"]
     assert departure["stale"] is False

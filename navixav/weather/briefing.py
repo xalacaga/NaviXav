@@ -9,6 +9,7 @@ l'OFP.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 
 from navixav.models import AirportWeather, EnrouteWeather, WeatherBriefing
 from navixav.simbrief.parser import OfpSummary
@@ -37,11 +38,16 @@ def build_briefing(
     metar_fetcher: MetarFetcher = fetch_metar,
     taf_fetcher: TafFetcher = fetch_taf,
     force_live: bool = False,
+    now: datetime | None = None,
 ) -> WeatherBriefing:
     """Construit le briefing météo du vol.
 
     `departure_metar` et `arrival_metar` sont les METAR déjà retenus par le
     moteur : les passer évite de réinterroger le service météo.
+
+    `now` fixe l'instant de référence servant à dater les observations ; laissé
+    à None, il vaut l'heure courante. Les tests le renseignent pour que l'âge
+    d'un METAR figé ne dépende pas du jour où la suite est exécutée.
     """
     briefing = WeatherBriefing()
     live = metar_source.strip().lower() in LIVE_SOURCES
@@ -55,6 +61,7 @@ def build_briefing(
         force_live=force_live,
         metar_fetcher=metar_fetcher,
         taf_fetcher=taf_fetcher,
+        now=now,
     )
     briefing.arrival = _airport(
         ofp.destination_icao,
@@ -65,6 +72,7 @@ def build_briefing(
         force_live=force_live,
         metar_fetcher=metar_fetcher,
         taf_fetcher=taf_fetcher,
+        now=now,
     )
     if ofp.alternate_icao:
         briefing.alternate = _airport(
@@ -76,6 +84,7 @@ def build_briefing(
             force_live=force_live,
             metar_fetcher=metar_fetcher,
             taf_fetcher=taf_fetcher,
+            now=now,
         )
 
     briefing.enroute = _enroute(ofp)
@@ -93,6 +102,7 @@ def _airport(
     force_live: bool,
     metar_fetcher: MetarFetcher,
     taf_fetcher: TafFetcher,
+    now: datetime | None = None,
 ) -> AirportWeather | None:
     if not icao:
         return None
@@ -105,7 +115,7 @@ def _airport(
         if fetched:
             metar, source = fetched, "awc"
 
-    report = decode_metar(icao, metar, role=role, source=source)
+    report = decode_metar(icao, metar, role=role, source=source, now=now)
 
     # Le TAF n'est complété par le réseau que si l'utilisateur a demandé une
     # source live : en mode « simbrief », le briefing se limite à ce que porte
