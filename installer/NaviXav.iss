@@ -2,7 +2,7 @@
 #ifndef MyAppVersion
 #define MyAppVersion "0.1.0"
 #endif
-#define MyAppPublisher "Galvo"
+#define MyAppPublisher "Xalacaga"
 #define MyAppExeName "NaviXav.exe"
 
 [Setup]

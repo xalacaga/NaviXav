@@ -56,6 +56,7 @@ Thumbs.db
 marketing-site/
 navixav-marketing-site.zip
 Voir-site-local.bat
+.png
 
 # Docker et déploiement conteneurisé
 # Hors du périmètre publié : NaviXav se distribue en installeur Windows.

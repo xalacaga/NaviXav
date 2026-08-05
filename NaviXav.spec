@@ -1,10 +1,54 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import re
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
 
 project_root = Path(SPECPATH)
+
+# Ressource VERSIONINFO : un binaire Windows sans métadonnées d'éditeur est
+# traité comme suspect par les moteurs heuristiques (Wacatac.B!ml et voisins).
+version_source = (project_root / "navixav" / "__init__.py").read_text(encoding="utf-8")
+version_match = re.search(r'__version__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', version_source)
+if not version_match:
+    raise SystemExit("Version NaviXav introuvable dans navixav/__init__.py.")
+version_tuple = tuple(int(part) for part in version_match.groups()) + (0,)
+version_text = ".".join(str(part) for part in version_tuple)
+
+version_resource = project_root / "build" / "version_info.txt"
+version_resource.parent.mkdir(parents=True, exist_ok=True)
+version_resource.write_text(
+    f"""VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={version_tuple},
+    prodvers={version_tuple},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '040C04B0',
+        [StringStruct('CompanyName', 'Xalacaga'),
+         StringStruct('FileDescription', 'NaviXav - assistant de vol IFR pour MSFS'),
+         StringStruct('FileVersion', '{version_text}'),
+         StringStruct('InternalName', 'NaviXav'),
+         StringStruct('LegalCopyright', 'Xalacaga'),
+         StringStruct('OriginalFilename', 'NaviXav.exe'),
+         StringStruct('ProductName', 'NaviXav'),
+         StringStruct('ProductVersion', '{version_text}')])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1036, 1200])])
+  ]
+)
+""",
+    encoding="utf-8",
+)
 webview_datas, webview_binaries, webview_hidden = collect_all("webview")
 sdk_simconnect = Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll")
 if not sdk_simconnect.is_file():
@@ -58,10 +102,14 @@ exe = EXE(
     exclude_binaries=True,
     name="NaviXav",
     icon=str(project_root / "assets" / "navixav.ico"),
+    version=str(version_resource),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX reste désactivé : la compression d'exécutable est le principal
+    # déclencheur des détections heuristiques génériques sur les binaires
+    # PyInstaller non signés.
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -75,7 +123,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="NaviXav",
 )
