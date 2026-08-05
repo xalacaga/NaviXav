@@ -1,4 +1,4 @@
-# Flightsim.to Publication Pack — NaviXav 1.4.8
+# Flightsim.to Publication Pack — NaviXav 1.4.9
 
 This document contains the English copy and checklist for publishing NaviXav
 on Flightsim.to. It is not intended to be included in the application.
@@ -21,7 +21,7 @@ MSFS 2020 should not be selected until it has been tested and validated.
 
 **Version**
 
-1.4.8
+1.4.9
 
 **Release status**
 
@@ -71,7 +71,7 @@ Flight Simulator through SimConnect.
 > information against current official publications and applicable ATC
 > instructions.
 
-### What's New in 1.4.8
+### What's New in 1.4.9
 
 **Modern desktop navigation.** On wide desktop windows, modules now sit in a
 compact floating rail at the upper left with a clear active marker and a subtle glass
@@ -228,7 +228,7 @@ Unsigned executables built this way are sometimes flagged by generic
 machine-learning heuristics — typically as `Wacatac` or a similar generic
 label — without any actual malicious code being present.
 
-The 1.4.8 build ships uncompressed and carries full publisher metadata, which
+The 1.4.9 build ships uncompressed and carries full publisher metadata, which
 removes the usual cause of these warnings. Every uploaded archive is checked
 before publication, and the SHA-256 checksum of each file is published so you
 can verify the download.
@@ -349,7 +349,7 @@ Simulator.
 ### Installation
 
 1. Extract the downloaded Flightsim.to ZIP archive.
-2. Run `NaviXav-Setup-1.4.8.exe`.
+2. Run `NaviXav-Setup-1.4.9.exe`.
 3. Follow the installation wizard.
 4. Start NaviXav from the Windows Start menu or the optional desktop shortcut.
 5. Open **Settings** and enter your SimBrief Pilot ID or username.
@@ -452,7 +452,7 @@ providers.
 NaviXav is an independent project and is not affiliated with or endorsed by
 Microsoft, Navigraph, SimBrief, national AIS authorities or the FAA.
 
-## Version 1.4.8 Changelog
+## Version 1.4.9 Changelog
 
 - Added a **Weather** tab with departure, cruise, arrival and alternate
   briefings, decoded METAR, summarised TAF and operational warnings.
@@ -525,7 +525,7 @@ Use only images and logos for which you hold the necessary rights.
 
 ### Primary File
 
-`NaviXav-1.4.8-FlightsimTo-Installer.zip`
+`NaviXav-1.4.9-FlightsimTo-Installer.zip`
 
 Label:
 
@@ -537,7 +537,7 @@ Description:
 
 ### Optional Secondary File
 
-`NaviXav-1.4.8-windows-x64-portable.zip`
+`NaviXav-1.4.9-windows-x64-portable.zip`
 
 Label:
 
@@ -555,12 +555,12 @@ files as separate download options.
 - [ ] Use the title exactly as written above and preserve title case.
 - [ ] Select **Utilities / Miscellaneous**.
 - [ ] Select **Microsoft Flight Simulator 2024** only.
-- [ ] Set version to **1.4.8**.
+- [ ] Set version to **1.4.9**.
 - [ ] Upload the installer ZIP as the primary file.
 - [ ] Optionally upload the portable ZIP as a secondary independent file.
 - [ ] Paste the full English description, including the development
       transparency and antivirus sections.
-- [ ] Paste the version 1.4.8 changelog.
+- [ ] Paste the version 1.4.9 changelog.
 - [ ] Add at least two original, relevant screenshots of 512 × 512 px or
       larger.
 - [ ] Add a clear thumbnail without clickbait wording.
