@@ -43,7 +43,11 @@ function Test-PythonImports([string]$Imports) {
 }
 
 function New-PortableArchive([string]$Source, [string]$Destination) {
-    for ($Attempt = 1; $Attempt -le 5; $Attempt++) {
+    # Defender et l'indexeur Windows inspectent parfois les ZIP créés par
+    # PyInstaller pendant quelques dizaines de secondes. Une attente bornée
+    # rend la construction fiable sans arrêter de processus utilisateur.
+    $MaxAttempts = 30
+    for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
         try {
             if (Test-Path -LiteralPath $Destination) {
                 Remove-Item -LiteralPath $Destination -Force
@@ -52,8 +56,17 @@ function New-PortableArchive([string]$Source, [string]$Destination) {
             return
         }
         catch {
-            if ($Attempt -eq 5) { throw }
-            Write-Warning "Fichier de construction encore verrouillé ; nouvelle tentative $($Attempt + 1)/5."
+            if ($Attempt -eq $MaxAttempts) {
+                throw (
+                    "Archive portable impossible après $MaxAttempts tentatives. " +
+                    "Ferme toute copie de NaviXav lancée depuis dist puis relance. " +
+                    $_.Exception.Message
+                )
+            }
+            Write-Warning (
+                "Fichier de construction encore verrouillé ; nouvelle tentative " +
+                "$($Attempt + 1)/$MaxAttempts."
+            )
             Start-Sleep -Seconds 2
         }
     }

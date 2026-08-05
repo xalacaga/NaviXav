@@ -19,7 +19,12 @@ $ReleaseFiles = @(
     "RELEASE_NOTES.md",
     # Vidé par prepare_release.ps1 une fois les nouveautés reprises dans les
     # notes : la remise à zéro appartient donc au commit de Release.
-    "RELEASE_HIGHLIGHTS.md"
+    "RELEASE_HIGHLIGHTS.md",
+    # prepare_release.ps1 aligne également les textes et noms d'archives
+    # publiés sur Flightsim.to. Ils font partie du même commit de Release.
+    "publishing/flightsim-to-description.txt",
+    "publishing/flightsim-to-installer/README-FIRST.txt",
+    "publishing/flightsim-to-listing.md"
 )
 $BuildSideEffectFiles = @(
     "tests/data/navdata_test.sqlite"
