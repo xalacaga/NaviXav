@@ -1,4 +1,4 @@
-NaviXav 1.4.7 - Recommended Windows Installer
+NaviXav 1.4.8 - Recommended Windows Installer
 ================================================
 
 NaviXav is an external IFR flight assistance application for Microsoft Flight
@@ -6,7 +6,7 @@ Simulator 2024.
 
 INSTALLATION
 
-1. Run NaviXav-Setup-1.4.7.exe.
+1. Run NaviXav-Setup-1.4.8.exe.
 2. Follow the installation wizard.
 3. Start NaviXav from the Windows Start menu or the optional desktop shortcut.
 4. Open Settings and enter your SimBrief Pilot ID or username.
