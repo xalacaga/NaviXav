@@ -386,8 +386,7 @@ def guided_app(store):
     forget_graphs()
     app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
     yield app
-    for close in app.router.on_shutdown:
-        close()
+    app.state.close_resources()
     forget_graphs()
 
 

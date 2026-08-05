@@ -11,6 +11,11 @@ reset by `scripts\prepare_release.ps1`.
 
 ## Fixes
 
+- Application shutdown now uses FastAPI's supported lifespan lifecycle without
+  deprecation warnings.
+- The bundled LCPH-EHAM demonstration no longer warns about its expected
+  offline navigation-cache fallback.
+
 <!-- Example, remove before use:
 - The basemap no longer shows seams between map tiles.
 -->

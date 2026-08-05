@@ -1,5 +1,6 @@
 """Fenêtre native et cycle de vie du service local."""
 
+import asyncio
 import re
 import sys
 import time
@@ -29,6 +30,28 @@ class _Event:
     def __iadd__(self, handler):
         self.handlers.append(handler)
         return self
+
+
+def test_fastapi_lifespan_closes_live_resources_once(monkeypatch):
+    import navixav.web.app as web_app
+
+    closed = []
+
+    class _Tracker:
+        def close(self):
+            closed.append("tracker")
+
+    monkeypatch.setattr(web_app, "LiveTracker", _Tracker)
+    app = web_app.create_app(Settings(metar_source="simbrief"))
+
+    async def run_lifespan():
+        async with app.router.lifespan_context(app):
+            pass
+
+    asyncio.run(run_lifespan())
+    app.state.close_resources()
+
+    assert closed == ["tracker"]
 
 
 class _Window:
@@ -1081,16 +1104,25 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(monkeypatch, tmp_path):
                 )
             assert refused.value.status_code == 404
     finally:
-        for close in app.router.on_shutdown:
-            close()
+        app.state.close_resources()
 
 
-def test_bundled_demo_is_lcph_to_eham_and_keeps_an_offline_flight_path(tmp_path):
-    project = Path(desktop.__file__).parent.parent
-    store = tmp_path / "navdata.sqlite"
-    shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
+def test_bundled_demo_is_lcph_to_eham_and_keeps_an_offline_flight_path(
+    monkeypatch, tmp_path,
+):
+    import navixav.navdata.msfs as msfs_module
+
+    class _ForbiddenSimConnect:
+        def __init__(self):
+            raise AssertionError("la démo ne doit pas ouvrir SimConnect")
+
+    monkeypatch.setattr(msfs_module, "SimConnectClient", _ForbiddenSimConnect)
+    # Le fichier n'existe pas encore : cela représente une installation qui
+    # n'a jamais lancé MSFS ni importé le moindre aérodrome.
+    store = tmp_path / "empty-navdata.sqlite"
     app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
     endpoint = next(route.endpoint for route in app.routes if route.path == "/api/plan")
+    live_endpoint = next(route.endpoint for route in app.routes if route.path == "/api/live")
 
     try:
         plan = endpoint(PlanRequest(demo=True))
@@ -1098,9 +1130,15 @@ def test_bundled_demo_is_lcph_to_eham_and_keeps_an_offline_flight_path(tmp_path)
         assert plan["arrival"]["icao"] == "EHAM"
         assert plan["enroute"]["route_path"][0]["ident"] == "LCPH"
         assert plan["enroute"]["route_path"][-1]["ident"] == "EHAM"
+        assert not any(
+            "absent de la base de navigation" in warning
+            for warning in plan["warnings"]
+        )
+        live = live_endpoint(True, "LCPH", None, plan["aircraft"])
+        assert live["connected"] is True
+        assert live["aircraft"]["source"] == "Démonstration"
     finally:
-        for close in app.router.on_shutdown:
-            close()
+        app.state.close_resources()
 
 
 def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
@@ -1185,8 +1223,7 @@ def test_live_weather_refresh_updates_the_cached_plan(monkeypatch, tmp_path):
         assert result["refreshed_at"].endswith("+00:00")
         assert endpoint("/api/plan/current")()["weather"] == result["weather"]
     finally:
-        for close in app.router.on_shutdown:
-            close()
+        app.state.close_resources()
 
 
 def test_route_progress_uses_sid_star_and_approach_geometry():

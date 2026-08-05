@@ -511,8 +511,7 @@ def routable_app(tmp_path_factory):
 
     app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
     yield app
-    for close in app.router.on_shutdown:
-        close()
+    app.state.close_resources()
 
 
 def _endpoint(app, path):

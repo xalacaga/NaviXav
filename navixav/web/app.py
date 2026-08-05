@@ -13,9 +13,10 @@ import logging
 import math
 import socket
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
@@ -152,7 +153,6 @@ def _local_ipv4() -> str | None:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
-    app = FastAPI(title="NaviXav", version=__version__, docs_url="/api/docs")
     tracker = LiveTracker()
     sia = SiaClient()
     faa = FaaClient()
@@ -163,6 +163,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     demo_state: dict[str, Any] = {}
     current_plan_state: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
+    resources_closed = False
+
+    def close_resources() -> None:
+        """Ferme une seule fois toutes les connexions détenues par l'API."""
+        nonlocal resources_closed
+        if resources_closed:
+            return
+        resources_closed = True
+        LOGGER.info("Fermeture des connexions et sessions NaviXav")
+        tracker.close()
+        sia.session.close()
+        faa.session.close()
+        for client in national_aip.values():
+            client.session.close()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            close_resources()
+
+    app = FastAPI(
+        title="NaviXav",
+        version=__version__,
+        docs_url="/api/docs",
+        lifespan=lifespan,
+    )
+    # Les tests unitaires appellent directement les fonctions de route, sans
+    # démarrer un serveur ASGI. Ils doivent néanmoins emprunter le même chemin
+    # de fermeture que le cycle de vie FastAPI.
+    app.state.close_resources = close_resources
 
     @app.middleware("http")
     async def log_relevant_requests(request: Request, call_next):
@@ -221,15 +253,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
-    @app.on_event("shutdown")
-    def _close_tracker() -> None:
-        LOGGER.info("Fermeture des connexions et sessions NaviXav")
-        tracker.close()
-        sia.session.close()
-        faa.session.close()
-        for client in national_aip.values():
-            client.session.close()
-
     def official_chart_backend(
         airport: str,
     ) -> tuple[str, str, Any, type[Exception]]:
@@ -250,9 +273,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             f"Aucune source AIS nationale officielle intégrée pour {airport}.",
         )
 
-    def open_provider() -> MsfsProvider:
+    def open_provider(*, allow_fetch: bool = True) -> MsfsProvider:
         try:
-            return MsfsProvider(settings.navdata_store)
+            return MsfsProvider(settings.navdata_store, allow_fetch=allow_fetch)
         except NavdataError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -386,7 +409,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not ofp.origin_icao or not ofp.destination_icao:
             raise HTTPException(422, "OFP inexploitable : origine ou destination absente.")
 
-        provider = open_provider()
+        # La démo embarquée est autonome : même avec un cache vierge, elle ne
+        # doit jamais tenter d'ouvrir SimConnect. Les coordonnées de son OFP
+        # suffisent au tracé et à DemoFlightSource.
+        provider = open_provider(allow_fetch=not request.demo)
         try:
             cache_before = provider.stats()
             completion_started = time.monotonic()
@@ -396,6 +422,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             )
             plan = engine.complete(ofp, request.to_overrides())
+            if request.demo:
+                # Le jeu embarqué porte ses propres coordonnées LCPH/EHAM afin
+                # que son animation reste disponible avant le premier import
+                # MSFS. L'absence éventuelle de ces deux terrains dans le cache
+                # est donc attendue et ne doit pas inquiéter pendant la démo.
+                expected_missing = {
+                    f"{ofp.origin_icao} absent de la base de navigation.",
+                    f"{ofp.destination_icao} absent de la base de navigation.",
+                }
+                plan.warnings = [
+                    warning for warning in plan.warnings
+                    if warning not in expected_missing
+                ]
             payload = plan.to_dict()
             payload["atc_route"] = plan.atc_route()
             payload["demo"] = request.demo
@@ -885,12 +924,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         callback()
         return {"opened": True}
 
-    def _airport_elevation_ft(icao: str | None) -> float:
+    def _airport_elevation_ft(
+        icao: str | None, *, allow_fetch: bool = True,
+    ) -> float:
         """Altitude du terrain, ou 0 ft si la base ne la fournit pas."""
         if not icao:
             return 0.0
         try:
-            provider = open_provider()
+            provider = open_provider(allow_fetch=allow_fetch)
         except HTTPException:
             # Sans base de navigation la démonstration reste possible : le
             # terrain est alors supposé au niveau de la mer.
@@ -925,9 +966,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             "cruise_altitude_ft"
                         ),
                         departure_elevation_ft=_airport_elevation_ft(
-                            departure.get("icao")
+                            departure.get("icao"), allow_fetch=False,
                         ),
-                        arrival_elevation_ft=_airport_elevation_ft(arrival.get("icao")),
+                        arrival_elevation_ft=_airport_elevation_ft(
+                            arrival.get("icao"), allow_fetch=False,
+                        ),
                         ils_frequency_mhz=arrival.get("ils_frequency_mhz"),
                     )
                 )
