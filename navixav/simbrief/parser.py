@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from math import isfinite
 from typing import Any, Iterable
 
 # Points calculés par SimBrief, absents de la navdata réelle.
@@ -23,6 +24,8 @@ class NavlogFix:
     via_airway: str = ""
     is_sid_star: bool = False
     stage: str = ""
+    lat: float | None = None
+    lon: float | None = None
 
     @property
     def is_real_fix(self) -> bool:
@@ -126,6 +129,10 @@ class OfpSummary:
 
     origin_planned_runway: str | None = None
     destination_planned_runway: str | None = None
+    origin_lat: float | None = None
+    origin_lon: float | None = None
+    destination_lat: float | None = None
+    destination_lon: float | None = None
 
     origin_metar: str | None = None
     destination_metar: str | None = None
@@ -162,9 +169,9 @@ class OfpSummary:
         return fixes
 
     @property
-    def enroute_route(self) -> list[dict[str, str]]:
+    def enroute_route(self) -> list[dict[str, Any]]:
         """Séquence VIA/TO du navlog, hors procédures et points calculés."""
-        route: list[dict[str, str]] = []
+        route: list[dict[str, Any]] = []
         for fix in self.navlog:
             if fix.is_sid_star or not fix.is_real_fix:
                 continue
@@ -172,11 +179,15 @@ class OfpSummary:
                 continue
             if route and route[-1]["to"] == fix.ident:
                 continue
-            route.append({
+            leg: dict[str, Any] = {
                 "via": fix.via_airway or "DCT",
                 "to": fix.ident,
                 "stage": fix.stage.upper(),
-            })
+            }
+            if fix.lat is not None and fix.lon is not None:
+                leg["lat"] = fix.lat
+                leg["lon"] = fix.lon
+            route.append(leg)
         return route
 
     @property
@@ -223,6 +234,20 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         airac=_text(params, "airac"),
         origin_planned_runway=_runway(origin, "plan_rwy"),
         destination_planned_runway=_runway(destination, "plan_rwy"),
+        origin_lat=_coordinate(
+            origin, "pos_lat", "lat", "latitude", minimum=-90, maximum=90,
+        ),
+        origin_lon=_coordinate(
+            origin, "pos_long", "pos_lon", "lon", "longitude",
+            minimum=-180, maximum=180,
+        ),
+        destination_lat=_coordinate(
+            destination, "pos_lat", "lat", "latitude", minimum=-90, maximum=90,
+        ),
+        destination_lon=_coordinate(
+            destination, "pos_long", "pos_lon", "lon", "longitude",
+            minimum=-180, maximum=180,
+        ),
         origin_metar=_text(weather, "orig_metar") or _text(origin, "metar") or None,
         destination_metar=_text(weather, "dest_metar")
         or _text(destination, "metar")
@@ -336,6 +361,11 @@ def _parse_navlog(raw: Any) -> list[NavlogFix]:
                 via_airway=_text(item, "via_airway").upper(),
                 is_sid_star=_text(item, "is_sid_star") in {"1", "true", "True"},
                 stage=_text(item, "stage"),
+                lat=_coordinate(item, "pos_lat", "lat", "latitude", minimum=-90, maximum=90),
+                lon=_coordinate(
+                    item, "pos_long", "pos_lon", "lon", "longitude",
+                    minimum=-180, maximum=180,
+                ),
             )
         )
     return fixes
@@ -424,6 +454,26 @@ def _int(source: dict[str, Any] | None, key: str) -> int | None:
         return int(float(raw))
     except ValueError:
         return None
+
+
+def _coordinate(
+    source: dict[str, Any],
+    *keys: str,
+    minimum: float,
+    maximum: float,
+) -> float | None:
+    """Coordonnée SimBrief finie et comprise dans les bornes terrestres."""
+    for key in keys:
+        raw = _text(source, key)
+        if not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        if isfinite(value) and minimum <= value <= maximum:
+            return value
+    return None
 
 
 def _runway(source: dict[str, Any] | None, key: str) -> str | None:

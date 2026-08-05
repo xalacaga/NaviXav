@@ -65,7 +65,7 @@ app_binaries += webview_binaries
 datas = [
     (str(project_root / "navixav" / "web" / "static"), "navixav/web/static"),
     (str(project_root / "assets" / "navixav.ico"), "assets"),
-    (str(project_root / "tests" / "data" / "ofp_lfst_lfbo.json"), "tests/data"),
+    (str(project_root / "tests" / "data" / "ofp_lcph_eham.json"), "tests/data"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),
 ]
 datas += webview_datas

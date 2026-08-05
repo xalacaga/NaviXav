@@ -87,6 +87,14 @@ le calage altimétrique, les modes du pilote automatique, l’altitude
 sélectionnée, le carburant à bord et le vent réel. Les unités sont demandées au
 simulateur, jamais recalculées.
 
+Pour les volets, les aérofreins et le frein de parc, NaviXav recoupe les SimVars
+officielles de poignée, de position effective, de surface et d’indicateur
+cockpit. Configuration avion et Flight events restent ainsi actifs lorsqu’un
+avion tiers laisse figée l’une des valeurs standard de MSFS.
+Un adaptateur dédié aux Fenix A319/A320/A321 lit directement les trois commandes
+du cockpit : les changements de volets, d’aérofreins et de frein de parc sont
+donc signalés même lorsque les moteurs et les circuits hydrauliques sont coupés.
+
 #### Alarmes visuelles
 
 NaviXav surveille cette configuration et signale les oublis : train non sorti
@@ -111,10 +119,13 @@ pastille `MASTER CAUTION` ou `MASTER WARNING` résume la situation, et
 l’ensemble peut être désactivé depuis le panneau. Le clignotement, réservé aux
 alarmes critiques, disparaît si le système demande des animations réduites.
 
-Le journal local ne conserve aucune trace détaillée : après l’atterrissage, il
-mémorise seulement un résumé du vol (durée, distance et altitude maximale).
-Tous les résumés peuvent être purgés depuis l’interface et aucune donnée de vol
-n’est envoyée vers un service externe.
+Après l’atterrissage, le journal local conserve un résumé concis et une
+chronologie limitée : phases du vol, piste de décollage et d’atterrissage avec
+le vent observé, puis changements stables du train, des volets, des spoilers,
+du frein de parc, des feux et des modes du pilote automatique. Les événements
+sont enregistrés comme des données et se relisent dans la langue actuellement
+sélectionnée. Tous les résumés peuvent être purgés depuis l’interface et aucune
+donnée de vol n’est envoyée vers un service externe.
 
 ### Fiche MCDU
 
@@ -146,6 +157,13 @@ NaviXav utilise SimConnect pour :
 Le simulateur doit être lancé avec un vol chargé pour récupérer de nouvelles
 données. Les informations déjà mises en cache restent disponibles hors ligne.
 
+Lorsque le journal de navigation détaillé de SimBrief fournit des coordonnées
+validées, NaviXav les utilise immédiatement pour tracer la route et n’interroge
+les Facilities MSFS que pour les positions manquantes. Les liens de procédures
+publiés évitent aussi les recherches de position inutiles. Le premier chargement
+du plan est ainsi plus rapide, tout en conservant les contrôles de corridor et
+le cache MSFS local comme solution de repli.
+
 ### Carte
 
 La carte comprend :
@@ -175,8 +193,10 @@ de vol et construit uniquement avec les installations natives de MSFS :
   l’échelle et l’orientation sans ajouter les rues d’un fond routier ;
 - les pistes, les voies principales, les postes et l’avion sont hiérarchisés
   pour conserver un tracé lisible ;
-- les voies secondaires et les accès aux postes sont masqués par défaut ; le
-  bouton **Secondaires** les affiche à la demande ;
+- les taxiways nommés restent visibles même lorsque MSFS les classe comme des
+  segments génériques `path` ; seuls les raccordements sans nom et les accès
+  aux postes sont masqués par défaut, et le bouton **Secondaires** les affiche
+  à la demande ;
 - au départ, si l’avion est au sol à moins de 180 m d’un poste, NaviXav propose
   automatiquement le roulage de ce poste vers la piste retenue ;
 - un clic sur un autre poste remplace immédiatement cette proposition ; à
@@ -429,8 +449,23 @@ avion et aux cartes officielles. Les réglages, l’arrêt et les mises à jour
 restent réservés au PC. Si Windows le demande, autorise NaviXav uniquement sur
 les réseaux privés.
 
+Sur un écran distant de moins de 760 px, l’état de connexion MSFS est réduit à
+sa pastille colorée afin que `MSFS connected` ne déborde plus de la barre
+d’outils. Le libellé traduit reste disponible pour les technologies
+d’assistance. La barre mobile propose aussi son propre sélecteur de langue sans
+ouvrir les réglages réservés au PC.
+
 NaviXav adapte automatiquement son interface au redimensionnement :
 
+- au-dessus de 1100 px, le changement de module passe dans un rail flottant
+  compact en haut à gauche, avec un repère actif clair ; l’entrée courte **Plan de vol**
+  ouvre les cartes Départ, Route et Arrivée comme un module exclusif normal,
+  sans commande de réduction, est sélectionnée par défaut et chaque choix place directement la fenêtre sur
+  son contenu. La zone principale utilise toute la largeur restante et un PDF
+  officiel ouvert s’étend sur toute la grille. Les fenêtres plus étroites
+  conservent le sélecteur horizontal et les écrans mobiles leur tiroir accessible.
+  Lorsqu’une alerte de vol globale ajoute une seconde ligne à l’en-tête, le rail
+  descend automatiquement sous celle-ci puis remonte après sa disparition ;
 - au-dessus de 1100 px, les cartes Départ, Route et Arrivée peuvent être
   présentées côte à côte ;
 - sous 1100 px, ces cartes passent sur une seule colonne ;

@@ -409,27 +409,6 @@ main {
 }
 @media (max-width: 1100px) { .grid-terminal { grid-template-columns: 1fr; } }
 
-.terminal-toolbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.grid-terminal.collapsed {
-  grid-template-columns: 1fr;
-}
-
-.grid-terminal.collapsed > .card {
-  display: none;
-}
-
 .card {
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -486,6 +465,20 @@ main {
 .row-value { font-size: 1.02rem; font-weight: 650; letter-spacing: 0.02em; }
 .row-value.empty { color: var(--text-faint); font-weight: 400; }
 .row-reason { grid-column: 2 / -1; font-size: 0.74rem; color: var(--text-faint); line-height: 1.45; }
+.choice-select {
+  grid-column: 2 / -1;
+  width: min(100%, 420px);
+  min-height: 34px;
+  padding: 6px 32px 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  font: 600 0.72rem var(--sans);
+}
+.choice-select:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); }
+.choice-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.choice-select:disabled { cursor: wait; opacity: 0.6; }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .dot.high { background: var(--high); box-shadow: 0 0 9px color-mix(in srgb, var(--high) 70%, transparent); }
@@ -534,8 +527,107 @@ main {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+
+@media (min-width: 1101px) {
+  body {
+    --module-rail-inset: clamp(14px, 2vw, 28px);
+    --module-rail-width: clamp(168px, 14vw, 198px);
+    --module-rail-top: clamp(84px, 11vh, 112px);
+  }
+
+  body:has(.global-flight-alert:not(.hidden)) {
+    --module-rail-top: clamp(116px, 16vh, 150px);
+  }
+
+  main {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    padding-left: calc(var(--module-rail-inset) + var(--module-rail-width) + 18px);
+    padding-right: clamp(16px, 4vw, 40px);
+  }
+
+  .tabs {
+    position: fixed;
+    z-index: 35;
+    top: var(--module-rail-top);
+    left: var(--module-rail-inset);
+    width: var(--module-rail-width);
+    max-height: calc(100dvh - var(--module-rail-top) - 16px);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 3px;
+    padding: 8px;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
+    border-radius: 18px;
+    background:
+      linear-gradient(145deg, color-mix(in srgb, var(--surface-solid) 94%, var(--accent) 6%),
+        color-mix(in srgb, var(--bg) 93%, transparent));
+    box-shadow: 0 22px 54px -24px #000c, inset 0 1px #ffffff0a;
+    backdrop-filter: blur(20px) saturate(145%);
+  }
+
+  .tabs button {
+    position: relative;
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 34px 9px 13px;
+    border-color: transparent;
+    border-radius: 11px;
+    background: transparent;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition:
+      color 0.16s ease,
+      border-color 0.16s ease,
+      background 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .tabs button::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transform: translateY(-50%);
+    transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  }
+
+  .tabs button:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+    transform: translateX(-2px);
+  }
+
+  .tabs button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .tabs button.active {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+    background: linear-gradient(90deg, var(--accent-soft), transparent 92%);
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  .tabs button.active::after {
+    background: var(--accent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 88%, transparent);
+    transform: translateY(-50%) scale(1.35);
+  }
+}
 .module-menu-toggle,
 .module-menu-backdrop { display: none; }
+
+.grid-terminal,
+.panel { scroll-margin-top: 92px; }
 
 .panel {
   border-radius: var(--radius);
@@ -736,6 +828,19 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   color: var(--accent);
   font-size: 0.74rem;
   font-weight: 650;
+}
+
+/* Sur le PC, la langue se choisit dans les paramètres : ce sélecteur n'existe
+   que pour le client distant, à qui ces paramètres sont fermés. */
+.mobile-language { display: none; }
+body.remote-client .mobile-language {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 160px;
+  padding: 8px 30px 8px 11px;
+  background-position: right 10px center;
+  color: var(--text-dim);
+  font-size: 0.82rem;
 }
 
 .settings-dialog {
@@ -1390,6 +1495,159 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .light-chip[data-state="off"] { opacity: 0.55; }
 .light-chip[data-state="unknown"] { opacity: 0.35; font-style: italic; }
 
+/* ---------------------------------------------------- chronologie du vol */
+
+/* Deux lectures du même vol. Le ruban donne sa forme — chaque phase occupe la
+   largeur du temps qu'elle a duré — et le journal en dessous donne le détail,
+   groupé sous la phase où il s'est produit. */
+
+.flight-events {
+  margin-top: 18px; padding: 18px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+}
+.flight-events-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+}
+.flight-events-head h2 { margin: 4px 0 0; }
+.flight-events-count {
+  min-width: 30px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-raised);
+  color: var(--text-dim); text-align: center;
+  font: 700 0.74rem var(--mono); font-variant-numeric: tabular-nums;
+}
+
+/* Le ruban ne s'écrase jamais : sous une largeur où les noms de phase
+   deviendraient illisibles, il défile plutôt que de les tronquer. */
+.flight-events-ribbon {
+  display: flex; align-items: stretch; gap: 3px;
+  margin-top: 14px; min-height: 44px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+.flight-events-ribbon-empty {
+  margin: 0; align-self: center; color: var(--text-muted); font-size: 0.8rem;
+}
+.flight-events-phase {
+  flex: 1 0 auto; min-width: 76px; padding: 7px 8px 9px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  display: flex; flex-direction: column; justify-content: space-between; gap: 7px;
+}
+.flight-events-phase-name {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.flight-events-phase-track {
+  position: relative; display: block; height: 3px; border-radius: 999px;
+  background: color-mix(in srgb, var(--text-faint) 30%, transparent);
+}
+/* La phase en cours se distingue par la couleur et par le trait plein : la
+   couleur seule ne porte jamais l'information. */
+.flight-events-phase[data-current="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
+}
+.flight-events-phase[data-current="true"] .flight-events-phase-name { color: var(--accent); }
+.flight-events-phase[data-current="true"] .flight-events-phase-track { background: var(--accent); }
+.flight-events-tick {
+  position: absolute; top: 50%; width: 5px; height: 5px;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: var(--text-dim);
+}
+.flight-events-tick[data-kind="phase"] { background: var(--accent); }
+.flight-events-tick[data-kind="runway"] { background: var(--high); }
+.flight-events-tick[data-kind="lights"] { background: var(--medium); }
+.flight-events-tick[data-kind="auto"] { background: var(--magenta); }
+
+.flight-events-list {
+  margin-top: 14px; max-height: 320px; overflow-y: auto;
+  scrollbar-width: thin;
+}
+.flight-events-empty { margin: 0; color: var(--text-muted); font-size: 0.8rem; }
+.flight-events-group + .flight-events-group { margin-top: 10px; }
+.flight-events-group-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 6px 4px; border: 0; border-bottom: 1px solid var(--border);
+  background: none; color: inherit; cursor: pointer; text-align: left;
+}
+.flight-events-group-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.flight-events-group-name {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent);
+}
+.flight-events-group-meta {
+  font: 0.7rem/1 var(--mono); color: var(--text-faint);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.flight-events-group.is-collapsed .flight-events-group-body { display: none; }
+.flight-events-group.is-collapsed .flight-events-group-name { color: var(--text-dim); }
+
+.flight-events-group-body {
+  --events-time: 62px;
+  --events-mark: 14px;
+  --events-gap: 8px;
+  position: relative; padding: 6px 0 2px;
+}
+/* L'épine relie les événements d'une même phase et passe derrière les marques. */
+.flight-events-group-body::before {
+  content: ""; position: absolute; top: 10px; bottom: 6px; width: 1px;
+  left: calc(var(--events-time) + var(--events-gap) + var(--events-mark) / 2);
+  background: var(--border-strong);
+}
+.flight-events-row {
+  display: grid; align-items: center; gap: var(--events-gap);
+  grid-template-columns: var(--events-time) var(--events-mark) minmax(0, 1fr) auto;
+  padding: 4px 4px 4px 0; border-radius: var(--radius-sm);
+}
+.flight-events-row:hover { background: color-mix(in srgb, var(--surface-raised) 55%, transparent); }
+.flight-events-time {
+  font: 0.68rem/1 var(--mono); color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.flight-events-label { font-size: 0.82rem; overflow-wrap: anywhere; }
+.flight-events-value {
+  font: 700 0.72rem var(--mono); color: var(--text-dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* Chaque famille d'événements porte une forme, pas seulement une couleur. */
+.flight-events-mark {
+  position: relative; justify-self: center;
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid var(--text-dim); background: var(--surface-solid);
+}
+.flight-events-row[data-kind="phase"] .flight-events-mark {
+  border: 0; border-radius: 1px; width: 8px; height: 8px;
+  background: var(--accent); transform: rotate(45deg);
+}
+.flight-events-row[data-kind="runway"] .flight-events-mark {
+  border: 0; border-radius: 1px; width: 4px; height: 12px; background: var(--high);
+}
+.flight-events-row[data-kind="lights"] .flight-events-mark {
+  border-color: var(--medium);
+  background: linear-gradient(90deg, var(--medium) 50%, var(--surface-solid) 50%);
+}
+.flight-events-row[data-kind="auto"] .flight-events-mark {
+  border: 0; border-radius: 1px; width: 7px; height: 7px; background: var(--magenta);
+}
+.flight-events-row[data-kind="phase"] .flight-events-label { font-weight: 700; }
+.flight-events-row[data-kind="runway"] .flight-events-label { font-weight: 700; color: var(--high); }
+
+.flight-summary-events {
+  grid-column: 1 / -1; margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.flight-summary-heading .icon-btn { justify-self: start; margin-top: 4px; }
+
+@media (max-width: 620px) {
+  .flight-events-group-body { --events-time: 54px; }
+  .flight-events-phase { min-width: 66px; }
+  .flight-events-phase-name { font-size: 0.55rem; letter-spacing: 0.06em; }
+}
+
 .flight-summary {
   margin-top: 18px; padding: 18px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -1505,6 +1763,7 @@ pre {
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
+.sia-airport-library.pdf-open { grid-column: 1 / -1; }
 .sia-library-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
 }
@@ -1887,7 +2146,7 @@ pre {
   .banner, .card, .panel, .sia-airport-library, .minima-editor {
     padding: 13px;
   }
-  .terminal-toolbar, .card-head, .sia-card-head {
+  .card-head, .sia-card-head {
     align-items: flex-start;
   }
   .tabs {
@@ -2075,6 +2334,26 @@ body.remote-client .toolbar {
   body.remote-client .toolbar {
     width: auto;
     flex-wrap: nowrap;
+  }
+  body.remote-client .toolbar .sim-status {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+  body.remote-client #sim-status-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
   body.remote-client main { padding-top: 10px; }
   body.remote-client .map-stage {

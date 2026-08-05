@@ -10,6 +10,7 @@ from navixav.live.registry import LiveTracker
 from navixav.live.simconnect import (
     _CAPABILITY_VARIABLES,
     _CONFIGURATION_VARIABLES,
+    _FENIX_CONTROL_VARIABLES,
     _VARIABLES,
     SimConnectSource,
 )
@@ -118,11 +119,15 @@ class FakeClient:
                 "GEAR LEFT POSITION": 100.0,
                 "GEAR RIGHT POSITION": 100.0,
                 "FLAPS HANDLE INDEX": 2.0,
+                "TRAILING EDGE FLAPS LEFT ANGLE": 15.0,
                 "SPOILERS ARMED": 1.0,
                 "LIGHT LANDING": 1.0,
                 "LIGHT STROBE": 1.0,
                 "KOHLSMAN SETTING MB": 1013.25,
+                # Trois altitudes distinctes : vraie 5100, indiquée 5000,
+                # standard 4800. Les confondre passerait inaperçu autrement.
                 "INDICATED ALTITUDE": 5000.0,
+                "PRESSURE ALTITUDE": 4800.0,
                 "AUTOPILOT MASTER": 1.0,
                 "AUTOPILOT ALTITUDE LOCK VAR": 6000.0,
                 "AUTOPILOT HEADING LOCK DIR": 361.0,
@@ -184,6 +189,9 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.gear_handle_down is True
     assert configuration.gear_extended_pct == 100.0
     assert configuration.flaps_handle_index == 2
+    # Le braquage réel accompagne le rang de manette : sur un avion dont le
+    # marquage des crans est inconnu, c'est lui qui les rend lisibles.
+    assert configuration.flaps_angle_deg == 15.0
     assert configuration.spoilers_armed is True
     assert configuration.lights["landing"] is True
     assert configuration.lights["taxi"] is False
@@ -195,6 +203,129 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.selected_heading_deg == 1.0
     assert configuration.nav1_course_deg == 253.0
     assert configuration.wind_direction_deg == 40.0
+
+
+def test_stale_control_simvars_fall_back_to_the_values_that_move(monkeypatch):
+    """Les avions tiers ne mettent pas tous à jour la même SimVar standard."""
+
+    class MovingControlsClient(FakeClient):
+        def __init__(self):
+            super().__init__()
+            self.configuration_reads = 0
+
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            values = super().read_simvars(variables, timeout_s)
+            if variables != _CONFIGURATION_VARIABLES:
+                return values
+            self.configuration_reads += 1
+            if self.configuration_reads == 1:
+                values.update({
+                    "FLAPS HANDLE INDEX": 4.0,
+                    "FLAPS EFFECTIVE HANDLE INDEX": 4.0,
+                    "TRAILING EDGE FLAPS LEFT INDEX": 4.0,
+                    "SPOILERS HANDLE POSITION": 0.0,
+                    "SPOILERS LEFT POSITION": 0.0,
+                    "SPOILERS RIGHT POSITION": 0.0,
+                    "BRAKE PARKING POSITION": 1.0,
+                    "BRAKE PARKING INDICATOR": 1.0,
+                })
+            else:
+                # Poignée volets et frein POSITION restent figés ; les index
+                # effectif/surface, spoilers et indicateur continuent de vivre.
+                values.update({
+                    "FLAPS HANDLE INDEX": 4.0,
+                    "FLAPS EFFECTIVE HANDLE INDEX": 2.0,
+                    "TRAILING EDGE FLAPS LEFT INDEX": 2.0,
+                    "SPOILERS HANDLE POSITION": 0.0,
+                    "SPOILERS LEFT POSITION": 42.0,
+                    "SPOILERS RIGHT POSITION": 40.0,
+                    "BRAKE PARKING POSITION": 1.0,
+                    "BRAKE PARKING INDICATOR": 0.0,
+                })
+            return values
+
+    source = SimConnectSource()
+    fake = MovingControlsClient()
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    first = source.read().configuration
+    second = source.read().configuration
+
+    assert first is not None and second is not None
+    assert first.flaps_handle_index == 4
+    assert second.flaps_handle_index == 2
+    assert first.spoilers_handle_pct == 0.0
+    assert second.spoilers_handle_pct == 42.0
+    assert first.parking_brake is True
+    assert second.parking_brake is False
+
+
+@pytest.mark.parametrize("model", ("FENIX A319", "FENIX A320", "FENIX A321"))
+def test_fenix_family_reads_its_cockpit_levers_with_engines_off(monkeypatch, model):
+    class FenixClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                return {
+                    "L:S_FC_FLAPS": 2.0,
+                    "L:A_FC_SPEEDBRAKE": 3.0,
+                    "L:S_MIP_PARKING_BRAKE": 1.0,
+                }
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint(model)
+    monkeypatch.setattr(source, "_connect", lambda: FenixClient())
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.flaps_handle_index == 2
+    assert configuration.spoilers_handle_pct == 100.0
+    assert configuration.spoilers_armed is False
+    assert configuration.parking_brake is True
+
+
+def test_fenix_speedbrake_zero_means_armed(monkeypatch):
+    class ArmedFenixClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                return {
+                    "L:S_FC_FLAPS": 0.0,
+                    "L:A_FC_SPEEDBRAKE": 0.0,
+                    "L:S_MIP_PARKING_BRAKE": 0.0,
+                }
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint("Fenix A320")
+    monkeypatch.setattr(source, "_connect", lambda: ArmedFenixClient())
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.flaps_handle_index == 0
+    assert configuration.spoilers_handle_pct == 0.0
+    assert configuration.spoilers_armed is True
+    assert configuration.parking_brake is False
+
+
+def test_the_three_altitudes_stay_distinct(monkeypatch):
+    """Le niveau de vol se lit dans l'atmosphère standard, pas en altitude vraie.
+
+    En air chaud l'altitude vraie dépasse la pression de plus de mille pieds :
+    les confondre affichait FL342 pour un avion stabilisé au FL330.
+    """
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient())
+
+    state = source.read()
+
+    assert state.altitude_ft == 5100.0
+    assert state.configuration is not None
+    assert state.configuration.indicated_altitude_ft == 5000.0
+    assert state.configuration.pressure_altitude_ft == 4800.0
+    # La pression est demandée en pieds, sans conversion locale.
+    assert dict(_CONFIGURATION_VARIABLES)["PRESSURE ALTITUDE"] == "Feet"
 
 
 def test_configuration_uses_individual_gear_positions_when_total_is_stale(monkeypatch):

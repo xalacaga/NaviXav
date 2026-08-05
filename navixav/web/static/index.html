@@ -28,7 +28,21 @@
       Source · MSFS
     </span>
     <span id="mobile-mode" class="mobile-mode hidden">Mode mobile</span>
-    <label class="switch" title="Utiliser le vol de démonstration LFST → LFBO">
+    <!-- Les paramètres restent réservés au PC : le client distant garde
+         néanmoins le choix de sa langue, qui ne concerne que son écran. -->
+    <select id="mobile-language" class="mobile-language"
+            aria-label="Langue de l’interface"
+            title="Langue de l’interface">
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+      <option value="es">Español</option>
+      <option value="it">Italiano</option>
+      <option value="pt">Português</option>
+      <option value="nl">Nederlands</option>
+      <option value="pl">Polski</option>
+    </select>
+    <label class="switch" title="Utiliser le vol de démonstration LCPH → EHAM">
       <input type="checkbox" id="demo-toggle" />
       <span class="switch-track"><span class="switch-thumb"></span></span>
       <span class="switch-label">Démo</span>
@@ -78,16 +92,6 @@
   <section id="strip" class="strip hidden"></section>
 
   <section id="terminal" class="grid-terminal hidden">
-    <div class="terminal-toolbar">
-      <span>Départ · Route · Arrivée</span>
-      <button
-        id="terminal-toggle"
-        class="icon-btn"
-        type="button"
-        aria-expanded="true"
-        aria-controls="card-departure card-route card-arrival"
-      >Réduire</button>
-    </div>
     <article class="card" id="card-departure"></article>
     <article class="card card-route" id="card-route"></article>
     <article class="card" id="card-arrival"></article>
@@ -114,7 +118,8 @@
   ></button>
 
   <nav class="tabs hidden" id="tabs" aria-label="Modules">
-    <button data-tab="map" class="active">Carte</button>
+    <button data-tab="terminal" class="active">Plan de vol</button>
+    <button data-tab="map">Carte</button>
     <button data-tab="ground">Roulage</button>
     <button data-tab="flight">Suivi du vol</button>
     <button data-tab="constraints">Contraintes</button>

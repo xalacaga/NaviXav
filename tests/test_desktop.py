@@ -1,5 +1,6 @@
 """Fenêtre native et cycle de vie du service local."""
 
+import re
 import sys
 import time
 import logging
@@ -124,6 +125,35 @@ def test_flight_tracking_and_local_logbook_follow_the_selected_language():
         "simbrief_create", "simbrief_create_title",
     ):
         assert f'{key}:' in translations
+
+
+def test_the_flight_timeline_records_keys_and_replays_in_the_selected_language():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    watchers = javascript[javascript.index("const FLIGHT_EVENT_WATCHERS = ["):]
+    watchers = watchers[: watchers.index("\nfunction resetFlightEvents")]
+
+    # Un événement conserve sa clé et ses valeurs brutes : un vol enregistré en
+    # français doit se relire en anglais sans réécrire l'historique.
+    assert re.search(r"(?<![A-Za-z_$])t\(", watchers) is None
+    for key in (
+        "events_title", "events_replay", "evt_phase", "evt_takeoff_runway",
+        "evt_gear_up", "evt_flaps_set", "evt_light_on", "evt_light_landing",
+        "evt_spoilers_armed", "evt_ap_off",
+    ):
+        assert f"{key}:" in translations
+
+    # La chronologie suit l'anti-rebond des alarmes et date l'événement de sa
+    # première observation, pas de sa confirmation.
+    assert "now - state.since < FLIGHT_EVENT_CONFIRM_MS" in javascript
+    assert "appendFlightEvent(watcher, previous, value, aircraft, observedAt)" in javascript
+
+    # Elle est rattachée au vol terminé et rejouable depuis le journal local.
+    assert "completed.events = storedFlightEvents()" in javascript
+    assert "panel.append(buildFlightEventsSection())" in javascript
+    assert 'toggle = el("button", "icon-btn", t("events_replay"))' in javascript
 
 
 def test_flight_rules_do_not_depend_on_french_phase_names():
@@ -266,16 +296,66 @@ def test_mobile_lan_interface_is_protected_and_responsive():
     assert 'name="mobile-web-app-capable"' in html
     assert "env(safe-area-inset-bottom)" in css
     assert "body.remote-client" in css
+    assert "body.remote-client .toolbar .sim-status" in css
+    assert "body.remote-client #sim-status-text" in css
+    assert "clip-path: inset(50%)" in css
     assert 'document.body.classList.toggle("remote-client"' in javascript
     # L'accès depuis un téléphone ne demande aucun jeton : seules les commandes
     # qui modifient ou arrêtent l'application restent réservées au PC hôte.
     assert "navixav_lan" not in server
     assert "compare_digest" not in server
     assert '"/api/settings",' in server
+    assert '"/api/demo/restart",' in server
     assert '"/api/shutdown",' in server
     assert '"0.0.0.0" if settings.lan_enabled' in (
         project / "navixav" / "desktop.py"
     ).read_text(encoding="utf-8")
+
+
+def test_the_flight_level_comes_from_the_standard_atmosphere():
+    """L'altitude vraie affichait FL342 pour un avion stabilisé au FL330."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    helper = javascript[javascript.index("function standardAltitude(aircraft)"):]
+    helper = helper[: helper.index("\n}")]
+    assert "configuration?.pressure_altitude_ft" in helper
+    # Le bloc de configuration peut être refusé : l'altitude vraie sert de repli.
+    assert "aircraft?.altitude_ft" in helper
+
+    label = javascript[javascript.index("function progressAltitudeLabel"):]
+    label = label[: label.index("\n}")]
+    assert "standardAltitude(aircraft)" in label
+    assert "aircraft?.altitude_ft" not in label
+
+    phase = javascript[javascript.index("function detectFlightPhase"):]
+    phase = phase[: phase.index("\n}")]
+    # Le niveau de croisière du plan est un niveau de vol, lui aussi.
+    assert "standardAltitude(aircraft)" in phase
+
+
+def test_a_remote_client_can_still_choose_its_display_language():
+    """Les paramètres lui sont fermés : sans ce sélecteur, la langue est figée."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="mobile-language"' in html
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        assert f'<option value="{language}">' in html
+    # Caché sur le PC, où les paramètres portent déjà le choix de la langue.
+    assert ".mobile-language { display: none; }" in css
+    assert "body.remote-client .mobile-language" in css
+    assert 'body.remote-client #settings-open' in css
+
+    listener = javascript[javascript.index('$("mobile-language").addEventListener'):]
+    listener = listener[: listener.index("});")]
+    # La langue ne vit que dans le navigateur : aucun écriture côté service.
+    assert "window.I18N.setLanguage(event.target.value);" in listener
+    assert "fetch(" not in listener
+    assert '"#mobile-language"' in translations
 
 
 def test_mobile_module_navigation_uses_an_accessible_side_drawer():
@@ -294,6 +374,51 @@ def test_mobile_module_navigation_uses_an_accessible_side_drawer():
     assert "setModuleMenuOpen(false, restoreMenuFocus);" in javascript
     assert 'event.key === "Escape"' in javascript
     assert 'event.key === "Tab" && menuOpen' in javascript
+
+
+def test_wide_desktop_module_navigation_uses_a_left_side_rail_and_scrolls():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    wide_desktop = css[css.index("@media (min-width: 1101px)") :]
+    wide_desktop = wide_desktop[: wide_desktop.index(".module-menu-toggle")]
+    assert "position: fixed;" in wide_desktop
+    assert "--module-rail-inset: clamp(" in wide_desktop
+    assert "left: var(--module-rail-inset);" in wide_desktop
+    assert "max-width: none;" in wide_desktop
+    assert "padding-left: calc(var(--module-rail-inset) + var(--module-rail-width) + 18px);" in wide_desktop
+    assert "flex-direction: column;" in wide_desktop
+    assert "--module-rail-top: clamp(84px, 11vh, 112px);" in wide_desktop
+    assert "body:has(.global-flight-alert:not(.hidden))" in wide_desktop
+    assert "--module-rail-top: clamp(116px, 16vh, 150px);" in wide_desktop
+    assert "top: var(--module-rail-top);" in wide_desktop
+    assert "max-height: calc(100dvh - var(--module-rail-top) - 16px);" in wide_desktop
+    assert ".tabs button.active::after" in wide_desktop
+    assert '<button data-tab="terminal" class="active">Plan de vol</button>' in html
+    assert '<button data-tab="map">Carte</button>' in html
+    assert "selectTab(button.dataset.tab, true);" in javascript
+    assert 'name === "terminal" ? $("terminal") : $(`panel-${name}`)' in javascript
+    assert "target?.scrollIntoView({" in javascript
+    assert "scroll-margin-top: 92px;" in css
+    assert '\'[data-tab="terminal"]\': "tab_terminal"' in translations
+    assert 'tab_terminal: "Flight plan"' in translations
+    assert 'id="terminal-toggle"' not in html
+    assert "TERMINAL_COLLAPSED_KEY" not in javascript
+    assert 'show($("terminal"), name === "terminal");' in javascript
+
+
+def test_an_open_official_pdf_uses_the_full_content_width():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert ".sia-airport-library.pdf-open { grid-column: 1 / -1; }" in css
+    display_pdf = javascript[javascript.index('display.addEventListener("click"'):]
+    display_pdf = display_pdf[: display_pdf.index("});")]
+    assert 'card.classList.add("pdf-open");' in display_pdf
 
 
 def test_vertical_profile_waits_for_descent_before_reporting_too_low():
@@ -343,13 +468,78 @@ def test_flap_detents_adapt_to_known_aircraft_families():
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
     assert "function flapDetentLabels(aircraft, plan, positions)" in javascript
-    assert 'return ["UP", "1", "1", "2", "3", "FULL"]' in javascript
-    assert 'extended >= 98' in javascript
+    # Six positions déclarées : le cran 1 en occupe deux, 1 et 1+F.
+    assert "isAirbus && positions >= 6" in javascript
+    assert 'return ["0", "1", "1", "2", "3", "FULL"]' in javascript
+    # Cinq positions : les crans se lisent sans décalage, manette sur 2 → « 2 ».
+    assert "isAirbus && positions === 5" in javascript
+    assert 'return ["0", "1", "2", "3", "FULL"]' in javascript
+    # Le cran rentré suit le marquage Airbus, mais garde « UP » traduit ailleurs.
+    assert 'retracted !== "UP" ? retracted : t("cfg_flaps_up")' in javascript
+    describe = javascript[javascript.index("function describeFlaps("):]
+    describe = describe[: describe.index("\n}")]
+    # Une ancienne extension physique à 100 % ne doit jamais figer l'affichage
+    # sur FULL après que la source a annoncé un autre cran.
+    assert 'const detent = detents?.[Math.round(index)];' in describe
+    assert 'extended >= 98' not in describe
     assert 'return ["UP", "1", "2", "5", "10", "15", "25", "30", "40"]' in javascript
     assert 'return ["UP", "1", "5", "10", "20", "25", "30"]' in javascript
     assert 'return ["UP", "1", "5", "15", "20", "25", "30"]' in javascript
     assert "`${Math.round(extended)} %`" in javascript
     assert "describeFlaps(configuration, capabilities, aircraft, currentPlan)" in javascript
+
+
+def test_aircraft_controls_have_live_simvar_fallbacks_shared_with_events():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    live = (Path(desktop.__file__).parent / "live" / "simconnect.py").read_text(
+        encoding="utf-8"
+    )
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    for simvar in (
+        "FLAPS EFFECTIVE HANDLE INDEX",
+        "TRAILING EDGE FLAPS LEFT INDEX",
+        "FLAPS HANDLE PERCENT",
+        "SPOILERS LEFT POSITION",
+        "SPOILERS RIGHT POSITION",
+        "BRAKE PARKING INDICATOR",
+    ):
+        assert f'("{simvar}",' in live
+    assert "self._resolve_flaps_index(" in live
+    assert "self._resolve_spoilers_pct(" in live
+    assert "self._resolve_parking_brake(" in live
+    # Le panneau et la chronologie lisent le même état résolu.
+    assert "finiteOr(configuration.flaps_handle_index)" in javascript
+    assert "finiteOr(configuration.spoilers_handle_pct)" in javascript
+    assert "aircraft?.configuration?.parking_brake" in javascript
+    assert 'aircraft: currentPlan?.aircraft_name || currentPlan?.aircraft || ""' in javascript
+
+    for model in ("A319", "A320", "A321"):
+        assert f'"{model}"' in live
+    assert '("L:S_FC_FLAPS", "Number")' in live
+    assert '("L:A_FC_SPEEDBRAKE", "Number")' in live
+    assert '("L:S_MIP_PARKING_BRAKE", "Number")' in live
+
+
+def test_an_unknown_aircraft_still_reads_its_flap_detents():
+    """Aucune table ne couvrira tous les avions : le repli doit rester juste."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    live = (Path(desktop.__file__).parent / "live" / "simconnect.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '("TRAILING EDGE FLAPS LEFT ANGLE", "Degrees")' in live
+    assert 'flaps_angle_deg=values["TRAILING EDGE FLAPS LEFT ANGLE"]' in live
+
+    describe = javascript[javascript.index("function describeFlaps("):]
+    describe = describe[: describe.index("\n}")]
+    # Le rang de manette reste lisible sur n'importe quelle aile.
+    assert "const position = steps ? `${index} / ${steps}` : String(index);" in describe
+    assert "finiteOr(configuration.flaps_angle_deg)" in describe
+    assert "`${Math.round(angle)}°`" in describe
+    # Le pourcentage ne sert plus que si l'angle manque.
+    assert "(extended !== null ? `${Math.round(extended)} %` : null)" in describe
 
 
 def test_local_flight_journal_keeps_only_completed_flight_summaries():
@@ -395,11 +585,49 @@ def test_terminal_choices_and_planner_warnings_are_localized():
     assert 'terminalCard(plan.arrival, t("arrival_title")' in terminal
     assert '[t("approach"), plan.arrival.approach' in terminal
     assert 'plannerText(choice.reason)' in javascript
+    assert (
+        '["STAR donnée par SimBrief et validée en base", '
+        't("reason_star_simbrief_validated")]'
+        in javascript
+    )
+    assert (
+        '["SID donnée par SimBrief et validée en base", '
+        't("reason_sid_simbrief_validated")]'
+        in javascript
+    )
     assert 'plan.warnings.map(warningText)' in javascript
     for key in (
         "warnings", "source_computed", "departure_title", "route_title",
         "arrival_title", "approach", "reason_runway_simbrief",
         "reason_transition_nearest_star", "reason_fix_distance",
+        "reason_sid_simbrief_validated", "reason_star_simbrief_validated",
+    ):
+        assert f"{key}:" in translations
+    assert translations.count("reason_sid_simbrief_validated:") == 8
+    assert translations.count("reason_star_simbrief_validated:") == 8
+
+
+def test_terminal_choices_can_be_recalculated_from_safe_published_alternatives():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert '...plannerOverrides' in javascript
+    assert 'alternative?.value && !alternative.disqualified' in javascript
+    assert 'confidenceClass(choice) === "low"' in javascript
+    assert 'await applyPlannerOverride(overrideField, select.value)' in javascript
+    assert 'departure_runway: ["sid", "sid_transition"]' in javascript
+    assert (
+        'arrival_runway: ["star", "star_transition", "approach", "approach_transition"]'
+        in javascript
+    )
+    assert 'dot.setAttribute("aria-label", confidenceDescription)' in javascript
+    assert 'dot.title = confidenceDescription' in javascript
+    assert ".choice-select" in css
+    for key in (
+        "confidence_high", "confidence_medium", "confidence_low",
+        "confidence_none", "change_choice", "change_choice_action",
     ):
         assert f"{key}:" in translations
 
@@ -623,8 +851,11 @@ def test_the_ground_canvas_fills_its_stage_and_stays_decluttered():
     assert "width: 100%;" in canvas_rule
     assert "height: 100%;" in canvas_rule
     assert "touch-action: none;" in canvas_rule
-    # Secondary links only appear once they are useful to the pilot.
-    assert 'taxiway.kind === "parking" || taxiway.kind === "path"' in ground
+    # MSFS may classify published taxiways as generic paths (LCPH does this for
+    # A, B, K, etc.). Named paths stay on the main plan; only anonymous links
+    # and stand lead-ins remain behind the Secondary control.
+    assert 'taxiway.kind === "parking" || (' in ground
+    assert 'taxiway.kind === "path" && !String(taxiway.name || "").trim()' in ground
     assert "secondary && !showSecondaryTaxiways" in ground
     # Screen-space widths stay bounded on large airports.
     assert "Math.min(4.5, (taxiway.width_m || 15) * view.scale * 0.48)" in ground
@@ -776,8 +1007,15 @@ def test_basemap_is_composited_once_so_tiles_show_no_seams():
     assert "Math.ceil(screenPixelsPerTile) + 1" not in map_javascript
 
 
-def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
+def test_demo_plan_chart_and_live_flow_does_not_crash(monkeypatch, tmp_path):
     project = Path(desktop.__file__).parent.parent
+    import navixav.web.app as web_app
+
+    # Cette vérification détaillée des cartes et du roulage utilise la base
+    # historique LFST/LFBO, qui contient précisément ces deux aérodromes.
+    monkeypatch.setattr(
+        web_app, "DEMO_OFP", project / "tests" / "data" / "ofp_lfst_lfbo.json",
+    )
     store = tmp_path / "navdata.sqlite"
     shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
     app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
@@ -791,9 +1029,13 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
 
     try:
         current_plan = endpoint("/api/plan/current")
+        restart_demo = endpoint("/api/demo/restart", "POST")
         with pytest.raises(HTTPException) as missing:
             current_plan()
         assert missing.value.status_code == 404
+        with pytest.raises(HTTPException) as no_demo_route:
+            restart_demo()
+        assert no_demo_route.value.status_code == 409
 
         plan = endpoint("/api/plan")(PlanRequest(demo=True))
         assert current_plan() == plan
@@ -812,6 +1054,13 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
         assert live["aircraft"]["source"] == "Démonstration"
         # La démonstration doit rejouer le vol complet du plan, pas un roulage.
         assert live["aircraft"]["title"] == "Démonstration NaviXav"
+
+        restarted = restart_demo()
+        assert restarted == {
+            "started": True,
+            "departure": plan["departure"]["icao"],
+            "arrival": plan["arrival"]["icao"],
+        }
 
         # Changer d'aéroport sur la carte ne doit pas relancer le vol au départ.
         arrival = plan["arrival"]["icao"]
@@ -836,6 +1085,24 @@ def test_demo_plan_chart_and_live_flow_does_not_crash(tmp_path):
             close()
 
 
+def test_bundled_demo_is_lcph_to_eham_and_keeps_an_offline_flight_path(tmp_path):
+    project = Path(desktop.__file__).parent.parent
+    store = tmp_path / "navdata.sqlite"
+    shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
+    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
+    endpoint = next(route.endpoint for route in app.routes if route.path == "/api/plan")
+
+    try:
+        plan = endpoint(PlanRequest(demo=True))
+        assert plan["departure"]["icao"] == "LCPH"
+        assert plan["arrival"]["icao"] == "EHAM"
+        assert plan["enroute"]["route_path"][0]["ident"] == "LCPH"
+        assert plan["enroute"]["route_path"][-1]["ident"] == "EHAM"
+    finally:
+        for close in app.router.on_shutdown:
+            close()
+
+
 def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
     app_source = (
         Path(desktop.__file__).parent / "web" / "app.py"
@@ -854,6 +1121,26 @@ def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
     assert 'fetch("/api/weather/current",' in javascript
     assert "if (status.remote_client)" in javascript
     assert "await loadCurrentPlan();" in javascript
+
+
+def test_demo_toggle_restarts_the_current_plan_instead_of_loading_lfst_lfbo():
+    app_source = (
+        Path(desktop.__file__).parent / "web" / "app.py"
+    ).read_text(encoding="utf-8")
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert '@app.post("/api/demo/restart")' in app_source
+    assert 'fetch("/api/demo/restart", { method: "POST" })' in javascript
+    assert 'if (currentPlan) await restartCurrentPlanDemo();' in javascript
+    assert '$("refresh").addEventListener("click", refreshPlanOrDemo);' in javascript
+    assert '$("demo-toggle").addEventListener("change", toggleDemoMode);' in javascript
+    assert 'demo: useBundledDemo' in javascript
+    assert 'demoOfp ?? (' in javascript
+    assert 'demo_title: "Simuler le plan de vol actuellement chargé"' in translations
+    assert 'demo_title: "Use the LFST → LFBO demonstration flight"' not in translations
+    assert translations.count("demo_restart_failed:") == 8
 
 
 def test_live_weather_refresh_updates_the_cached_plan(monkeypatch, tmp_path):
@@ -1011,3 +1298,86 @@ def test_dispatch_and_aircraft_panels_follow_the_selected_language():
     ):
         assert f"{key}:" in translations
         assert f'"{key}"' in javascript
+
+
+def test_constraints_charts_and_mcdu_panels_follow_the_selected_language():
+    """Ces trois modules affichaient encore leurs libellés en dur, en français."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    constraints = javascript[javascript.index("function constraintTable("):]
+    constraints = constraints[: constraints.index("/* -------------------------------------------------------------- dispatch */")]
+    charts = javascript[javascript.index("function siaApproachCard(plan)"):]
+    charts = charts[: charts.index("function aircraftFmsProfile(plan)")]
+    mcdu = javascript[javascript.index("function renderMcdu(plan)"):]
+    mcdu = mcdu[: mcdu.index("/* ------------------------------------------------------------------ carte */")]
+
+    for french in (
+        "Aucune contrainte", "Repère", "Vitesse", "Ne pas descendre",
+        "Profil vertical", "Axe LOC", "Interception", "remise de gaz",
+        "minima officiels",
+    ):
+        assert french not in constraints
+    for french in (
+        "Source officielle", "Carte d", "Recherche", "Indisponible",
+        "Cartes des aérodromes", "Afficher le PDF", "nouvel onglet",
+        "Calque", "Catégorie", "Mémoriser",
+    ):
+        assert french not in charts
+    for french in ("Fiche ", "sortie de la SID", "entrée de STAR", "À confirmer"):
+        assert french not in mcdu
+
+    # Les rubriques du catalogue AIS servent au classement : le service les
+    # publie en français, l'interface ne traduit que l'affichage.
+    assert 'chart.category === "Départs SID"' in javascript
+    assert "chartCategory(chart.category)" in javascript
+    assert 'role === "departure"' in javascript
+
+    for key in (
+        "cst_empty", "cst_fix", "cst_speed", "cst_not_below", "cst_maintain",
+        "cst_sid", "cst_approach", "vprof_kicker", "vprof_loc", "vprof_intercept",
+        "vprof_intercept_note", "vprof_empty", "vprof_missed", "vprof_caution",
+        "chart_kicker", "chart_title", "chart_intro", "chart_document",
+        "chart_show_pdf", "chart_open_tab", "chart_overlay",
+        "chart_overlay_available", "chart_overlay_missing", "sia_kicker",
+        "sia_title", "sia_use_values", "sia_extraction_caution", "min_kicker",
+        "min_title", "min_field", "min_dh", "min_altitude", "min_rvr",
+        "min_save", "mcdu_kicker", "mcdu_profile_note", "mcdu_sid_exit",
+        "mcdu_star_entry", "mcdu_confirm",
+    ):
+        assert f"{key}:" in translations
+        assert f'"{key}"' in javascript
+
+    # Les libellés que le service compose sont traduits dans i18n.js même.
+    for key in (
+        "cst_between", "chart_cat_iac", "chart_cat_sid", "chart_cat_star",
+        "chart_cat_airport", "chart_cat_visual", "chart_cat_other",
+    ):
+        assert f"{key}:" in translations
+        assert f'"{key}"' in translations
+
+
+def test_the_taxi_labels_of_the_service_are_translated_for_display():
+    """« porte V 6 » et « attente 24 » viennent du service, en français."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert "groundLabel," in translations
+    assert "window.I18N.groundLabel(parking.label)" in ground
+    # La sélection et la requête d'itinéraire gardent l'étiquette d'origine.
+    assert "parking.label === selected" in ground
+    assert "parking: requestedPlan.parking.label," in javascript
+
+    hud = javascript[javascript.index("function updateGroundHud"):]
+    hud = hud[: hud.index("\n}\n")]
+    assert "groundLabel(currentTaxiPlan.parking?.label)" in hud
+    assert "currentTaxiPlan.summary.map(groundLabel)" in hud
+
+    for key in (
+        "gnd_hold_short", "gnd_gate", "gnd_gate_small", "gnd_parking",
+        "gnd_ramp_ga", "gnd_deicing",
+    ):
+        assert f"{key}:" in translations

@@ -7,6 +7,10 @@ const tf = (key, values = {}) => Object.entries(values).reduce(
   (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
   t(key)
 );
+/* Libellés que le service compose en français, traduits à l'affichage. */
+const constraintText = (value) => window.I18N.constraintText(value);
+const groundLabel = (value) => window.I18N.groundLabel(value);
+const chartCategory = (value) => window.I18N.chartCategory(value);
 
 /** Localises explanations produced by the planner while preserving identifiers. */
 function plannerText(value) {
@@ -14,6 +18,8 @@ function plannerText(value) {
   if (!text || displayLocale() === "fr") return text;
   const exact = new Map([
     ["piste planifiée par SimBrief", t("reason_runway_simbrief")],
+    ["SID donnée par SimBrief et validée en base", t("reason_sid_simbrief_validated")],
+    ["STAR donnée par SimBrief et validée en base", t("reason_star_simbrief_validated")],
     ["et confirmée par le vent", t("reason_wind_confirmed")],
     ["point d'entrée de la STAR", t("reason_star_entry")],
     ["enchaîne avec la route", t("reason_star_route")],
@@ -118,6 +124,7 @@ const SOURCE_LABEL = {
 };
 
 let currentPlan = null;
+let plannerOverrides = {};
 let currentChart = null;
 let currentIcao = null;
 let currentMapRole = null;
@@ -146,6 +153,12 @@ let lastFlightLogAt = 0;
 let activeFlightSummary = null;
 let previousFlightSummarySample = null;
 let lastFlightSummaryAt = 0;
+let flightEvents = [];
+let flightEventSequence = 0;
+let flightEventsPlanKey = "";
+let flightEventsRenderKey = "";
+const flightEventStates = new Map();
+const collapsedFlightEventGroups = new Set();
 let dispatchLive = null;
 let dispatchLiveRenderedAt = 0;
 let replayTimer = null;
@@ -170,13 +183,18 @@ const FLIGHT_REPLAY_BASE_MS = 300;
 const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
 const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
 const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
+/* Chronologie du vol : un changement doit tenir avant d'entrer au journal, et
+   le journal conservé avec le résumé reste court pour ne pas saturer le
+   stockage local d'un pilote qui garde cent vols. */
+const FLIGHT_EVENT_CONFIRM_MS = 800;
+const FLIGHT_EVENT_MAX = 200;
+const FLIGHT_EVENT_STORED_MAX = 60;
 const DISPATCH_LIVE_KEY = "navixav-dispatch-live";
 const DISPATCH_LIVE_INTERVAL_MS = 2000;
 const DISPATCH_SAMPLE_INTERVAL_S = 5;
 const DISPATCH_FLOW_WINDOW_S = 5 * 60;
 const DISPATCH_GAP_MS = 15000;
 const APP_SESSION_ID = Date.now().toString(36);
-const TERMINAL_COLLAPSED_KEY = "navixav-terminal-collapsed";
 const ONBOARDING_KEY = "navixav-onboarded";
 const DEFAULT_TRAIL_COLOR = "#22d3ee";
 
@@ -191,20 +209,6 @@ function el(tag, className, text) {
 
 function show(node, visible) {
   node.classList.toggle("hidden", !visible);
-}
-
-function setTerminalCollapsed(collapsed) {
-  const terminal = $("terminal");
-  const button = $("terminal-toggle");
-  terminal.classList.toggle("collapsed", collapsed);
-  button.textContent = collapsed ? t("expand") : t("collapse");
-  button.setAttribute("aria-expanded", String(!collapsed));
-}
-
-function toggleTerminal() {
-  const collapsed = !$("terminal").classList.contains("collapsed");
-  localStorage.setItem(TERMINAL_COLLAPSED_KEY, String(collapsed));
-  setTerminalCollapsed(collapsed);
 }
 
 function confidenceClass(choice) {
@@ -325,8 +329,8 @@ async function pollSimulatorStatus() {
     indicator.classList.toggle("offline", !status.connected);
     $("sim-status-text").textContent = status.connected ? t("sim_connected") : t("sim_offline");
     indicator.title = status.connected
-      ? `Connexion directe active · ${status.source || "SimConnect"}`
-      : (status.reason || "Microsoft Flight Simulator ne répond pas");
+      ? tf("sim_connected_title", { source: status.source || "SimConnect" })
+      : (status.reason || t("sim_no_answer"));
   } catch (_error) {
     indicator.classList.remove("online");
     indicator.classList.add("offline");
@@ -340,7 +344,7 @@ async function shutdownApplication() {
   button.textContent = t("stopping");
   try {
     const response = await fetch("/api/shutdown", { method: "POST" });
-    if (!response.ok) throw new Error("Le serveur n’a pas accepté l’arrêt");
+    if (!response.ok) throw new Error(t("err_shutdown_refused"));
     clearInterval(simulatorTimer);
     document.body.innerHTML = "";
     const stopped = el("main", "empty");
@@ -349,7 +353,7 @@ async function shutdownApplication() {
   } catch (error) {
     button.disabled = false;
     button.textContent = t("quit");
-    showBanner("error", "Impossible d’arrêter NaviXav", [String(error)]);
+    showBanner("error", t("err_shutdown"), [String(error)]);
   }
 }
 
@@ -415,7 +419,7 @@ async function openSettings() {
   message.className = "settings-message";
   try {
     const response = await fetch("/api/settings");
-    if (!response.ok) throw new Error("Paramètres indisponibles");
+    if (!response.ok) throw new Error(t("err_settings_unavailable"));
     const values = await response.json();
     $("settings-pilot-id").value = values.simbrief_pilot_id || "";
     $("settings-username").value = values.simbrief_username || "";
@@ -433,7 +437,7 @@ async function openSettings() {
     $("settings-language").value = window.I18N.getLanguage();
     $("settings-dialog").showModal();
   } catch (error) {
-    showBanner("error", "Impossible d’ouvrir les paramètres", [String(error)]);
+    showBanner("error", t("err_settings_open"), [String(error)]);
   }
 }
 
@@ -465,7 +469,7 @@ async function saveSettings(event) {
       body: JSON.stringify(payload),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
+    if (!response.ok) throw new Error(result.detail || t("err_save_refused"));
     applyMapPreferences(result);
     message.textContent = result.lan_restart_required
       ? t("lan_restart_required")
@@ -567,7 +571,7 @@ async function submitWelcome(event) {
       body: JSON.stringify({ ...current, ...identifiers, navdata_store: "" }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || "Enregistrement refusé");
+    if (!response.ok) throw new Error(result.detail || t("err_save_refused"));
     applyMapPreferences(result);
     closeWelcome();
     await initialiseApplication();
@@ -587,10 +591,70 @@ async function skipWelcomeWithDemo() {
 
 /* ------------------------------------------------------------------- plan */
 
-async function buildPlan() {
+function resetDemoSession() {
+  const planKey = flightSummaryPlanKey(currentPlan);
+  currentFlightTrail = [];
+  currentFlightTrailPlanKey = planKey;
+  lastCurrentFlightTrailAt = 0;
+  MAP.setTrail([]);
+  resetFlightEvents();
+  flightEventsPlanKey = planKey;
+  activeFlightSummary = null;
+  previousFlightSummarySample = null;
+  lastFlightSummaryAt = 0;
+  dispatchLive = emptyDispatchLive(planKey);
+  dispatchLiveRenderedAt = 0;
+  updateRouteStripProgress(null);
+  renderFlightPanel(currentPlan);
+}
+
+async function restartCurrentPlanDemo() {
+  if (!currentPlan) return false;
+  try {
+    const response = await fetch("/api/demo/restart", { method: "POST" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("demo_restart_failed"));
+    resetDemoSession();
+    await pollLive();
+    return true;
+  } catch (error) {
+    $("demo-toggle").checked = false;
+    showBanner("error", t("demo_restart_failed"), [String(error)]);
+    return false;
+  }
+}
+
+async function toggleDemoMode() {
+  if ($("demo-toggle").checked) {
+    if (currentPlan) await restartCurrentPlanDemo();
+    else await buildPlan();
+    return;
+  }
+  if (currentPlan?.demo && latestStatus?.simbrief_configured) {
+    await buildPlan(null, false);
+  } else {
+    await pollLive();
+  }
+}
+
+async function refreshPlanOrDemo() {
+  if ($("demo-toggle").checked && currentPlan) {
+    await restartCurrentPlanDemo();
+    return;
+  }
+  await buildPlan();
+}
+
+async function buildPlan(nextOverride = null, demoOfp = null) {
   if (latestStatus?.remote_client) {
     await loadCurrentPlan();
     return;
+  }
+
+  if (nextOverride) {
+    plannerOverrides = { ...plannerOverrides, ...nextOverride };
+  } else {
+    plannerOverrides = {};
   }
 
   const button = $("refresh");
@@ -599,22 +663,26 @@ async function buildPlan() {
   showBanner("info", t("cache_title"), [t("cache_body")]);
 
   try {
+    const useBundledDemo = demoOfp ?? (
+      nextOverride && currentPlan ? Boolean(currentPlan.demo) : $("demo-toggle").checked
+    );
     const response = await fetch("/api/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        demo: $("demo-toggle").checked,
+        demo: useBundledDemo,
+        ...plannerOverrides,
       }),
     });
     const payload = await response.json();
     if (!response.ok) {
-      showBanner("error", "Impossible de récupérer le plan", [payload.detail]);
+      showBanner("error", t("err_plan_fetch"), [payload.detail]);
       return;
     }
     currentPlan = payload;
     renderPlan(payload);
   } catch (error) {
-    showBanner("error", "Erreur réseau", [String(error)]);
+    showBanner("error", t("err_network"), [String(error)]);
   } finally {
     button.disabled = false;
     button.querySelector("span").textContent = t("complete");
@@ -640,7 +708,7 @@ async function loadCurrentPlan() {
     currentPlan = payload;
     renderPlan(payload);
   } catch (error) {
-    showBanner("error", "Erreur réseau", [String(error)]);
+    showBanner("error", t("err_network"), [String(error)]);
   } finally {
     button.disabled = false;
     button.querySelector("span").textContent = t("refresh_current_flight");
@@ -677,7 +745,7 @@ function renderPlan(plan) {
   clearSiaMapOverlay();
   hideBanner();
   show($("empty"), false);
-  for (const id of ["strip", "terminal", "tabs", "module-menu-toggle"]) show($(id), true);
+  for (const id of ["strip", "tabs", "module-menu-toggle"]) show($(id), true);
 
   // La progression du bandeau doit utiliser la route opérationnelle complète,
   // y compris les points de SID, STAR et d'approche.
@@ -1130,22 +1198,36 @@ function nextFlightConstraint(plan, projection, aircraft) {
   return candidates[0] || null;
 }
 
-function detectFlightPhase(aircraft, projection) {
-  if (!aircraft) return t("phase_offline");
+/*
+ * La phase est déterminée sous forme de clé de traduction, jamais de libellé.
+ * La chronologie du vol la conserve telle quelle : un vol enregistré en
+ * français se relit en anglais sans réécrire l'historique.
+ */
+function detectFlightPhaseKey(aircraft, projection) {
+  if (!aircraft) return "phase_offline";
   const speed = Number(aircraft.ground_speed_kt || 0);
   const verticalSpeed = Number(aircraft.vertical_speed_fpm || 0);
   if (aircraft.on_ground) {
-    if (projection?.remainingNm < 5) return speed > 35 ? t("phase_landing") : t("phase_taxi_in");
-    return speed > 45 ? t("phase_takeoff") : t("phase_taxi_out");
+    if (projection?.remainingNm < 5) return speed > 35 ? "phase_landing" : "phase_taxi_in";
+    return speed > 45 ? "phase_takeoff" : "phase_taxi_out";
   }
   if (projection?.activePoint?.stage === "approach" || projection?.remainingNm < 25) {
-    return t("phase_approach");
+    return "phase_approach";
   }
-  if (verticalSpeed > 300) return t("phase_climb");
-  if (verticalSpeed < -300) return t("phase_descent");
+  if (verticalSpeed > 300) return "phase_climb";
+  if (verticalSpeed < -300) return "phase_descent";
+  // Le niveau de croisière du plan est un niveau de vol : le comparer à
+  // l'altitude vraie faisait perdre la croisière dès que l'air s'écartait de
+  // l'atmosphère standard.
   const cruise = Number(currentPlan?.enroute?.cruise_altitude_ft || 0);
-  if (cruise && Math.abs(Number(aircraft.altitude_ft) - cruise) < 1200) return t("phase_cruise");
-  return t("phase_enroute");
+  if (cruise && Math.abs(finiteOr(standardAltitude(aircraft), 0) - cruise) < 1200) {
+    return "phase_cruise";
+  }
+  return "phase_enroute";
+}
+
+function detectFlightPhase(aircraft, projection) {
+  return t(detectFlightPhaseKey(aircraft, projection));
 }
 
 function descentGuidance(plan, aircraft, projection) {
@@ -2354,6 +2436,9 @@ function updateFlightSummary(aircraft) {
 
   if (activeFlightSummary && landed) {
     const { plan_key, last_position, last_sampled_at, ...completed } = activeFlightSummary;
+    // La chronologie commence au roulage, avant que le résumé n'existe : elle
+    // est rattachée entière au vol terminé, pas seulement depuis le décollage.
+    completed.events = storedFlightEvents();
     storeCompletedFlightSummary(completed);
     activeFlightSummary = null;
     lastFlightSummaryAt = 0;
@@ -2404,6 +2489,27 @@ function renderFlightSummaries() {
       metrics.append(metric);
     }
     row.append(heading, metrics);
+
+    // Les vols enregistrés avant cette version n'ont pas de chronologie : le
+    // bouton n'apparaît que lorsqu'il y a quelque chose à rejouer.
+    const events = Array.isArray(entry.events) ? entry.events : [];
+    if (events.length) {
+      const timeline = el("div", "flight-summary-events hidden");
+      const toggle = el("button", "icon-btn", t("events_replay"));
+      toggle.type = "button";
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.addEventListener("click", () => {
+        const opened = timeline.classList.contains("hidden");
+        if (opened && !timeline.childElementCount) {
+          const endedAt = Date.parse(entry.ended_at) || Date.now();
+          timeline.append(flightEventGroups(flightEventSegments(events, endedAt)));
+        }
+        show(timeline, opened);
+        toggle.setAttribute("aria-expanded", opened ? "true" : "false");
+      });
+      heading.append(toggle);
+      row.append(timeline);
+    }
     container.append(row);
   }
 }
@@ -2442,11 +2548,18 @@ function flapDetentLabels(aircraft, plan, positions) {
     identity.includes("AIRBUS")
     || /\bA(?:19|20|21|30|31|32|33|34|35|38)[A-Z0-9]*\b/.test(identity)
   );
-  // Les avions Airbus exposent souvent deux états SimConnect pour le même
-  // cran physique 1 : configuration 1 en vol et 1+F au sol. L'interface doit
-  // afficher la position de la manette, pas le sous-état aérodynamique.
-  if (isAirbus && positions >= 5) {
-    return ["UP", "1", "1", "2", "3", "FULL"];
+  // Deux familles d'Airbus coexistent, et c'est le nombre de positions
+  // déclarées qui les sépare. Certains exposent deux états SimConnect pour le
+  // même cran physique 1 — configuration 1 en vol, 1+F au sol — et annoncent
+  // donc six positions ; l'interface affiche alors la position de la manette,
+  // pas le sous-état aérodynamique. Les autres s'en tiennent aux cinq crans
+  // réels. Appliquer la table à six entrées à ces derniers décalait tout
+  // au-dessus du cran 1 : la manette sur 2 s'affichait « 1 ».
+  if (isAirbus && positions >= 6) {
+    return ["0", "1", "1", "2", "3", "FULL"];
+  }
+  if (isAirbus && positions === 5) {
+    return ["0", "1", "2", "3", "FULL"];
   }
 
   const isBoeing737 = (
@@ -2488,22 +2601,34 @@ function describeFlaps(configuration, capabilities, aircraft, plan) {
   const positions = finiteOr(capabilities?.flap_positions, 0);
   // MSFS compte la position lisse : quatre crans utiles sur cinq positions.
   const steps = positions > 1 ? positions - 1 : 0;
-  if (index === 0) return { text: t("cfg_flaps_up"), status: "" };
   const detents = flapDetentLabels(aircraft, plan, positions);
+  if (index === 0) {
+    // Le premier cran porte le marquage du constructeur : « 0 » chez Airbus.
+    // Là où il vaut UP, c'est le libellé traduit qui reste affiché.
+    const retracted = detents?.[0];
+    return {
+      text: retracted && retracted !== "UP" ? retracted : t("cfg_flaps_up"),
+      status: "",
+    };
+  }
   const extended = finiteOr(configuration.flaps_extended_pct);
-  // Certains Airbus annoncent FULL sur le dernier index déclaré (4), d'autres
-  // sur un index supplémentaire (5). L'extension réelle lève l'ambiguïté.
-  const detent = (
-    detents && extended !== null && extended >= 98
-      ? "FULL"
-      : detents?.[Math.round(index)]
-  );
+  // Le marquage suit toujours l'index résolu par la source temps réel. Utiliser
+  // une ancienne extension physique à 100 % maintenait abusivement FULL
+  // pendant toute la rentrée des volets.
+  const detent = detents?.[Math.round(index)];
+  if (detent) return { text: detent, status: "good" };
+
+  // Avion sans profil connu — et il y en aura toujours. Le rang de la manette
+  // reste lisible sur n'importe quelle aile, et l'angle mesuré dit ce que ce
+  // cran vaut : c'est d'ailleurs le marquage même de la plupart des leviers
+  // hors Airbus. Le pourcentage ne sert que si l'angle manque.
+  const angle = finiteOr(configuration.flaps_angle_deg);
+  const position = steps ? `${index} / ${steps}` : String(index);
+  const measured = angle !== null && angle >= 1
+    ? `${Math.round(angle)}°`
+    : (extended !== null ? `${Math.round(extended)} %` : null);
   return {
-    text: detent || (
-      extended !== null
-        ? `${Math.round(extended)} %`
-        : (steps ? `${index} / ${steps}` : String(index))
-    ),
+    text: [position, measured].filter(Boolean).join(" · "),
     status: "good",
   };
 }
@@ -2634,6 +2759,475 @@ function updateConfigurationBlock(aircraft) {
     liveValue(id, description.text, description.status);
   }
   updateLights(configuration);
+}
+
+/* ------------------------------------------------------ chronologie du vol */
+
+/*
+ * La chronologie n'observe rien de plus que le bloc de configuration : elle
+ * compare deux états successifs et retient ce qui a changé. Trois règles la
+ * rendent lisible en vol.
+ *
+ * L'anti-rebond d'abord : un cran de volets traverse plusieurs positions
+ * pendant sa course, et un levier relâché oscille. Un changement n'entre au
+ * journal qu'après être resté stable, comme pour les alarmes.
+ *
+ * Le premier échantillon ensuite : la configuration trouvée à l'ouverture du
+ * plan n'est pas un changement. Seule la phase ouvre la chronologie, pour lui
+ * donner une origine ; le reste est mémorisé en silence.
+ *
+ * Les clés enfin : un événement conserve la clé de traduction et ses valeurs
+ * brutes, jamais un libellé. Un vol enregistré en français se relit en
+ * anglais, et les marquages constructeur — UP, FULL, FL350 — ne bougent pas.
+ */
+
+const FLIGHT_EVENT_LIGHT_KEYS = {
+  landing: "evt_light_landing",
+  taxi: "evt_light_taxi",
+  strobe: "evt_light_strobe",
+  nav: "evt_light_nav",
+  beacon: "evt_light_beacon",
+  logo: "evt_light_logo",
+  wing: "evt_light_wing",
+};
+
+/** Marquage inscrit sur le levier de volets, à défaut le rang de la manette. */
+function flapMarking(aircraft, index) {
+  const rank = Math.round(finiteOr(index, 0));
+  const capabilities = aircraft?.configuration?.capabilities || null;
+  const detents = flapDetentLabels(
+    aircraft,
+    currentPlan,
+    finiteOr(capabilities?.flap_positions, 0)
+  );
+  return detents?.[rank] || (rank === 0 ? "UP" : String(rank));
+}
+
+/** Piste retenue pour le décollage ou l'atterrissage, sans invention. */
+function flightEventRunway(landed) {
+  const planned = landed
+    ? currentPlan?.arrival?.runway?.value
+    : currentPlan?.departure?.runway?.value;
+  return String(planned || currentChart?.highlight_runway || "").trim();
+}
+
+function flightEventWind(aircraft) {
+  const direction = finiteOr(aircraft?.configuration?.wind_direction_deg);
+  const speed = finiteOr(aircraft?.configuration?.wind_speed_kt);
+  if (direction === null || speed === null) return "";
+  return `${String(Math.round(direction)).padStart(3, "0")}°/${Math.round(speed)} kt`;
+}
+
+function flightEventAltitude(aircraft) {
+  const altitude = standardAltitude(aircraft);
+  if (altitude === null) return "";
+  const transition = finiteOr(
+    currentPlan?.departure?.transition_altitude_ft,
+    finiteOr(currentPlan?.arrival?.transition_level_ft, 5000)
+  );
+  return altitude >= transition
+    ? `FL${String(Math.round(altitude / 100)).padStart(3, "0")}`
+    : `${Math.round(altitude)} ft`;
+}
+
+/* Une phase se lit avec la grandeur qui la définit : le taux en montée et en
+   descente, la vitesse au sol et au décollage, le niveau partout ailleurs. */
+function flightEventPhaseValue(phaseKey, aircraft) {
+  if (phaseKey === "phase_climb" || phaseKey === "phase_descent") {
+    const rate = finiteOr(aircraft?.vertical_speed_fpm);
+    if (rate !== null) {
+      const rounded = Math.round(rate / 50) * 50;
+      return `${rounded > 0 ? "+" : ""}${rounded} ft/min`;
+    }
+  }
+  if (["phase_takeoff", "phase_landing", "phase_taxi_out", "phase_taxi_in"].includes(phaseKey)) {
+    const speed = finiteOr(
+      aircraft?.indicated_airspeed_kt,
+      finiteOr(aircraft?.ground_speed_kt)
+    );
+    if (speed !== null) return `${Math.round(speed)} kt`;
+  }
+  return flightEventAltitude(aircraft);
+}
+
+/*
+ * Un observateur lit une valeur discrète et stable — jamais un pourcentage qui
+ * bouge en continu — puis décrit la transition. `read` rend `null` quand le
+ * simulateur ne publie pas la donnée : rien n'est alors observé, et surtout
+ * rien n'est inventé sur un avion à train fixe ou sans aérofreins.
+ */
+const FLIGHT_EVENT_WATCHERS = [
+  {
+    key: "phase",
+    kind: "phase",
+    read: (_aircraft, phaseKey) => phaseKey || null,
+    describe: (_previous, value, aircraft) => ({
+      key: "evt_phase",
+      value: flightEventPhaseValue(value, aircraft),
+    }),
+  },
+  {
+    key: "ground",
+    kind: "runway",
+    read: (aircraft) => (
+      aircraft?.on_ground === true || aircraft?.on_ground === false
+        ? Boolean(aircraft.on_ground)
+        : null
+    ),
+    describe: (_previous, landed, aircraft) => {
+      const runway = flightEventRunway(landed);
+      const base = landed ? "evt_landing" : "evt_takeoff";
+      return {
+        key: runway ? `${base}_runway` : base,
+        params: { runway },
+        value: flightEventWind(aircraft),
+      };
+    },
+  },
+  {
+    key: "gear",
+    kind: "config",
+    read: (aircraft) => {
+      const configuration = aircraft?.configuration;
+      if (!configuration) return null;
+      if (configuration.capabilities && !configuration.capabilities.retractable_gear) {
+        return null;
+      }
+      const extended = finiteOr(configuration.gear_extended_pct);
+      if (extended === null) return null;
+      if (extended >= 99) return "down";
+      if (extended <= 1) return "up";
+      return "transit";
+    },
+    describe: (_previous, value) => ({
+      key: `evt_gear_${value}`,
+      value: value === "down" ? "DOWN" : value === "up" ? "UP" : "",
+    }),
+  },
+  {
+    key: "flaps",
+    kind: "config",
+    read: (aircraft) => {
+      const configuration = aircraft?.configuration;
+      if (!configuration) return null;
+      if (configuration.capabilities && !configuration.capabilities.flaps) return null;
+      const index = finiteOr(configuration.flaps_handle_index);
+      return index === null ? null : Math.round(index);
+    },
+    describe: (previous, value, aircraft) => {
+      const angle = finiteOr(aircraft?.configuration?.flaps_angle_deg);
+      const marking = flapMarking(aircraft, value);
+      const measured = angle !== null && angle >= 1 ? `${Math.round(angle)}°` : marking;
+      if (value === 0) return { key: "evt_flaps_up", value: marking };
+      return {
+        key: "evt_flaps_set",
+        params: { from: flapMarking(aircraft, previous ?? 0), to: marking },
+        value: measured,
+      };
+    },
+  },
+  {
+    key: "spoilers",
+    kind: "config",
+    read: (aircraft) => {
+      const configuration = aircraft?.configuration;
+      if (!configuration) return null;
+      if (configuration.spoilers_armed === true) return "armed";
+      if (configuration.capabilities && !configuration.capabilities.spoilers) return null;
+      const handle = finiteOr(configuration.spoilers_handle_pct);
+      if (handle === null) return null;
+      return handle > 5 ? "extended" : "retracted";
+    },
+    describe: (_previous, value, aircraft) => ({
+      key: `evt_spoilers_${value}`,
+      value: value === "extended"
+        ? `${Math.round(finiteOr(aircraft?.configuration?.spoilers_handle_pct, 0))} %`
+        : "",
+    }),
+  },
+  {
+    key: "brake",
+    kind: "config",
+    read: (aircraft) => {
+      const parking = aircraft?.configuration?.parking_brake;
+      return parking === true || parking === false ? parking : null;
+    },
+    describe: (_previous, value) => ({
+      key: value ? "evt_brake_set" : "evt_brake_released",
+    }),
+  },
+  {
+    key: "autopilot",
+    kind: "auto",
+    read: (aircraft) => {
+      if (!aircraft?.configuration) return null;
+      // Les modes sont des sigles de cockpit : ils ne se traduisent pas et
+      // font donc une valeur stable, comparable d'un échantillon au suivant.
+      const description = describeAutopilot(aircraft.configuration);
+      return description.status === "good" ? description.text : "";
+    },
+    // Les modes tiennent dans la colonne de droite : les répéter dans le
+    // libellé écrivait deux fois la même chose sur la même ligne.
+    describe: (_previous, value) => (
+      value ? { key: "evt_ap_modes", value } : { key: "evt_ap_off" }
+    ),
+  },
+  ...Object.entries(FLIGHT_EVENT_LIGHT_KEYS).map(([light, labelKey]) => ({
+    key: `light:${light}`,
+    kind: "lights",
+    read: (aircraft) => {
+      const state = aircraft?.configuration?.lights?.[light];
+      return state === true || state === false ? state : null;
+    },
+    describe: (_previous, value) => ({
+      key: value ? "evt_light_on" : "evt_light_off",
+      params: { light: labelKey },
+    }),
+  })),
+];
+
+function resetFlightEvents() {
+  flightEvents = [];
+  flightEventSequence = 0;
+  flightEventStates.clear();
+  collapsedFlightEventGroups.clear();
+  flightEventsRenderKey = "";
+}
+
+function appendFlightEvent(watcher, previous, value, aircraft, occurredAt) {
+  const description = watcher.describe(previous, value, aircraft);
+  if (!description) return;
+  flightEventSequence += 1;
+  flightEvents.push({
+    id: flightEventSequence,
+    at: new Date(occurredAt).toISOString(),
+    phase: flightEventStates.get("phase")?.value || "phase_offline",
+    kind: watcher.kind,
+    key: description.key,
+    params: description.params || {},
+    value: description.value || "",
+  });
+  if (flightEvents.length > FLIGHT_EVENT_MAX) {
+    flightEvents.splice(0, flightEvents.length - FLIGHT_EVENT_MAX);
+  }
+}
+
+function updateFlightEvents(aircraft, phaseKey) {
+  if (!aircraft || !currentPlan) return;
+  const now = Date.now();
+  for (const watcher of FLIGHT_EVENT_WATCHERS) {
+    const value = watcher.read(aircraft, phaseKey);
+    if (value === null || value === undefined) continue;
+    const state = flightEventStates.get(watcher.key);
+    if (!state) {
+      flightEventStates.set(watcher.key, { value, pending: value, since: now });
+      if (watcher.kind === "phase") appendFlightEvent(watcher, null, value, aircraft, now);
+      continue;
+    }
+    if (value === state.value || value !== state.pending) {
+      state.pending = value;
+      state.since = now;
+      continue;
+    }
+    if (now - state.since < FLIGHT_EVENT_CONFIRM_MS) continue;
+    const previous = state.value;
+    // L'heure retenue est celle du premier échantillon qui portait la nouvelle
+    // valeur, pas celle de sa confirmation : la chronologie doit coïncider avec
+    // le vol, pas avec le délai que s'accorde l'anti-rebond.
+    const observedAt = state.since;
+    state.value = value;
+    state.since = now;
+    appendFlightEvent(watcher, previous, value, aircraft, observedAt);
+  }
+}
+
+/* Le journal conservé avec le résumé garde d'abord les jalons — phases,
+   décollage, atterrissage — puis complète avec la configuration la plus
+   récente. Un vol de trois heures tient ainsi dans quelques kilo-octets. */
+function storedFlightEvents() {
+  if (flightEvents.length <= FLIGHT_EVENT_STORED_MAX) return flightEvents.slice();
+  const isMilestone = (event) => event.kind === "phase" || event.kind === "runway";
+  const milestones = flightEvents.filter(isMilestone);
+  const room = Math.max(0, FLIGHT_EVENT_STORED_MAX - milestones.length);
+  const kept = new Set(
+    flightEvents.filter((event) => !isMilestone(event)).slice(-room).map((event) => event.id)
+  );
+  return flightEvents
+    .filter((event) => isMilestone(event) || kept.has(event.id))
+    .slice(-FLIGHT_EVENT_STORED_MAX);
+}
+
+function flightEventLabel(event) {
+  if (event.kind === "phase") return tf("evt_phase", { phase: t(event.phase) });
+  const params = { ...(event.params || {}) };
+  if (params.light) params.light = t(params.light);
+  return tf(event.key, params);
+}
+
+function formatFlightEventClock(milliseconds) {
+  // L'heure d'un vol se lit sur vingt-quatre heures dans toutes les langues :
+  // un « 08:36:54 AM » ne se compare à aucune horloge de cockpit.
+  return new Date(milliseconds).toLocaleTimeString(displayLocale(), {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatFlightEventDuration(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  return total < 60 ? `${total} s` : formatFlightSummaryDuration(total);
+}
+
+/** Découpe la chronologie en segments de phase, du plus ancien au plus récent. */
+function flightEventSegments(events, endedAt) {
+  const segments = [];
+  for (const event of events) {
+    const last = segments.at(-1);
+    if (last && last.phase === event.phase) {
+      last.events.push(event);
+      continue;
+    }
+    segments.push({ phase: event.phase, from: Date.parse(event.at), events: [event] });
+  }
+  for (const [index, segment] of segments.entries()) {
+    segment.to = Math.max(segment.from, segments[index + 1]?.from ?? endedAt);
+  }
+  return segments;
+}
+
+/*
+ * Le ruban donne au vol sa forme d'ensemble : chaque phase occupe la largeur
+ * du temps qu'elle a duré, et chaque événement y laisse une marque à sa place.
+ * C'est ce que la liste seule ne montre jamais — une montée deux fois plus
+ * longue que prévu se voit avant d'être lue.
+ */
+function renderFlightEventRibbon(node, segments) {
+  node.innerHTML = "";
+  if (!segments.length) {
+    node.append(el("p", "flight-events-ribbon-empty", t("events_waiting")));
+    return;
+  }
+  for (const [index, segment] of segments.entries()) {
+    const span = Math.max(1, segment.to - segment.from);
+    const cell = el("div", "flight-events-phase");
+    // L'échelle est compressée en racine carrée. Proportionnelle au temps, une
+    // croisière d'une heure réduisait le décollage à quelques pixels et son
+    // nom à une lettre ; la racine garde l'ordre des durées lisible tout en
+    // laissant une phase brève occuper une place où elle se lit encore.
+    cell.style.flexGrow = String(Math.sqrt(span / 1000));
+    if (index === segments.length - 1) cell.dataset.current = "true";
+    cell.title = `${t(segment.phase)} · ${formatFlightEventDuration(span / 1000)}`;
+    cell.append(el("span", "flight-events-phase-name", t(segment.phase)));
+    const track = el("span", "flight-events-phase-track");
+    for (const event of segment.events) {
+      const tick = el("span", "flight-events-tick");
+      tick.dataset.kind = event.kind;
+      const ratio = (Date.parse(event.at) - segment.from) / span;
+      tick.style.left = `${Math.min(100, Math.max(0, ratio * 100))}%`;
+      tick.title = `${formatFlightEventClock(Date.parse(event.at))} · ${flightEventLabel(event)}`;
+      track.append(tick);
+    }
+    cell.append(track);
+    node.append(cell);
+  }
+}
+
+/** Journal groupé par phase, du plus récent au plus ancien. */
+function flightEventGroups(segments) {
+  const fragment = document.createDocumentFragment();
+  for (const segment of [...segments].reverse()) {
+    const group = el("div", "flight-events-group");
+    const groupId = `${segment.phase}:${segment.from}`;
+    const collapsed = collapsedFlightEventGroups.has(groupId);
+    if (collapsed) group.classList.add("is-collapsed");
+
+    const head = el("button", "flight-events-group-head");
+    head.type = "button";
+    head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    head.append(el("span", "flight-events-group-name", t(segment.phase)));
+    head.append(el(
+      "span",
+      "flight-events-group-meta",
+      `${formatFlightEventClock(segment.from)} · ${formatFlightEventDuration((segment.to - segment.from) / 1000)}`
+    ));
+    head.addEventListener("click", () => {
+      const hidden = group.classList.toggle("is-collapsed");
+      head.setAttribute("aria-expanded", hidden ? "false" : "true");
+      if (hidden) collapsedFlightEventGroups.add(groupId);
+      else collapsedFlightEventGroups.delete(groupId);
+    });
+    group.append(head);
+
+    const body = el("div", "flight-events-group-body");
+    for (const event of [...segment.events].reverse()) {
+      const row = el("div", "flight-events-row");
+      row.dataset.kind = event.kind;
+      const occurredAt = Date.parse(event.at);
+      const time = el("time", "flight-events-time", formatFlightEventClock(occurredAt));
+      time.dateTime = event.at;
+      // La marque ne porte pas d'information seule : le libellé dit toujours
+      // ce qui a changé, la forme ne fait que trier l'œil.
+      const mark = el("span", "flight-events-mark");
+      mark.setAttribute("aria-hidden", "true");
+      row.append(time, mark, el("span", "flight-events-label", flightEventLabel(event)));
+      if (event.value) row.append(el("span", "flight-events-value", event.value));
+      body.append(row);
+    }
+    group.append(body);
+    fragment.append(group);
+  }
+  return fragment;
+}
+
+function renderFlightEvents() {
+  const ribbon = $("flight-events-ribbon");
+  const list = $("flight-events-list");
+  if (!ribbon || !list) return;
+  const segments = flightEventSegments(flightEvents, Date.now());
+  renderFlightEventRibbon(ribbon, segments);
+
+  const count = $("flight-events-count");
+  if (count) count.textContent = String(flightEvents.length);
+
+  // La liste ne se reconstruit qu'à l'arrivée d'un événement ou au changement
+  // de langue : sans cela, chaque seconde effacerait le défilement en cours.
+  const renderKey = `${displayLocale()}:${flightEvents.length}:${flightEvents.at(-1)?.id || 0}`;
+  if (renderKey === flightEventsRenderKey) return;
+  flightEventsRenderKey = renderKey;
+  list.innerHTML = "";
+  if (!flightEvents.length) {
+    list.append(el("p", "flight-events-empty", t("events_empty")));
+    return;
+  }
+  list.append(flightEventGroups(segments));
+}
+
+function buildFlightEventsSection() {
+  const section = el("section", "flight-events");
+  const head = el("div", "flight-events-head");
+  const heading = el("div");
+  heading.append(el("div", "card-kicker", t("events_kicker")));
+  heading.append(el("h2", null, t("events_title")));
+  head.append(heading);
+  const count = el("span", "flight-events-count", "0");
+  count.id = "flight-events-count";
+  count.title = t("events_count_title");
+  head.append(count);
+  section.append(head);
+
+  const ribbon = el("div", "flight-events-ribbon");
+  ribbon.id = "flight-events-ribbon";
+  ribbon.setAttribute("aria-label", t("events_ribbon_label"));
+  section.append(ribbon);
+
+  const list = el("div", "flight-events-list");
+  list.id = "flight-events-list";
+  list.setAttribute("role", "log");
+  list.setAttribute("aria-live", "polite");
+  section.append(list);
+  return section;
 }
 
 /* -------------------------------------------------------- rendu des alarmes */
@@ -2806,8 +3400,23 @@ function buildFlightProgressSection(plan) {
  * verticale. La transition retenue suit la phase : celle du départ tant que
  * l'avion n'a pas dépassé la mi-route, celle de l'arrivée ensuite.
  */
+/**
+ * Altitude dont se déduit le niveau de vol : celle de l'atmosphère standard.
+ *
+ * SimConnect publie aussi l'altitude vraie, mais elle ne fait niveau de vol
+ * qu'en atmosphère standard : par air chaud elle dépasse la pression de plus
+ * de mille pieds, et FL330 s'affichait FL342. Le simulateur peut refuser le
+ * bloc de configuration ; l'altitude vraie reste alors le seul repli.
+ */
+function standardAltitude(aircraft) {
+  return finiteOr(
+    aircraft?.configuration?.pressure_altitude_ft,
+    finiteOr(aircraft?.altitude_ft)
+  );
+}
+
 function progressAltitudeLabel(aircraft, ratio) {
-  const altitude = finiteOr(aircraft?.altitude_ft);
+  const altitude = standardAltitude(aircraft);
   if (altitude === null) return "—";
   const transition = finiteOr(
     ratio !== null && ratio >= 0.5
@@ -2867,11 +3476,14 @@ function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEte
 
 function updateFlightPanel(aircraft) {
   const projection = projectAircraftOnFlightPath(aircraft);
-  const phase = detectFlightPhase(aircraft, projection);
+  const phaseKey = detectFlightPhaseKey(aircraft, projection);
+  const phase = t(phaseKey);
   const constraint = nextFlightConstraint(currentPlan, projection, aircraft || {});
   const descent = descentGuidance(currentPlan, aircraft, projection);
 
   updateConfigurationBlock(aircraft);
+  updateFlightEvents(aircraft, phaseKey);
+  renderFlightEvents();
   updateAlertsDisplay(flightContext(aircraft, projection, phase, constraint));
 
   liveValue("flight-phase", phase);
@@ -3062,6 +3674,13 @@ function renderFlightPanel(plan) {
     previousFlightSummarySample = null;
     lastFlightSummaryAt = 0;
   }
+  // La chronologie ne suit que le plan : un changement de langue reconstruit
+  // le panneau sans effacer ce que le vol en cours a déjà enregistré.
+  if (flightEventsPlanKey !== flightSummaryPlanKey(plan)) {
+    resetFlightEvents();
+    flightEventsPlanKey = flightSummaryPlanKey(plan);
+  }
+  flightEventsRenderKey = "";
   resetAlertStates();
   const panel = $("panel-flight");
   panel.innerHTML = "";
@@ -3114,6 +3733,7 @@ function renderFlightPanel(plan) {
   panel.append(grid);
 
   panel.append(buildConfigurationSection());
+  panel.append(buildFlightEventsSection());
 
   const journal = el("section", "flight-summary");
   const journalHead = el("div", "flight-summary-head");
@@ -3142,13 +3762,39 @@ function renderFlightPanel(plan) {
   updateFlightPanel(latestAircraft);
 }
 
-function choiceRow(label, choice, note) {
+const PLANNER_OVERRIDE_DEPENDENCIES = {
+  departure_runway: ["sid", "sid_transition"],
+  sid: ["sid_transition"],
+  arrival_runway: ["star", "star_transition", "approach", "approach_transition"],
+  star: ["star_transition", "approach", "approach_transition"],
+  approach: ["approach_transition"],
+};
+
+async function applyPlannerOverride(field, value) {
+  for (const dependent of PLANNER_OVERRIDE_DEPENDENCIES[field] || []) {
+    delete plannerOverrides[dependent];
+  }
+  await buildPlan({ [field]: value });
+}
+
+function alternativeLabel(alternative) {
+  const details = [];
+  if (Number.isFinite(alternative.headwind_kt)) {
+    const sign = alternative.headwind_kt >= 0 ? "+" : "";
+    details.push(tf("headwind_short", { wind: `${sign}${Math.round(alternative.headwind_kt)}` }));
+  }
+  if (Number.isFinite(alternative.crosswind_kt)) {
+    details.push(tf("crosswind_short", { wind: Math.round(alternative.crosswind_kt) }));
+  }
+  return [alternative.value, ...details].join(" · ");
+}
+
+function choiceRow(label, choice, note, overrideField = null) {
   const row = el("div", "row");
   row.append(el("span", "row-label", label));
 
   const value = el("span", `row-value${choice.value ? "" : " empty"}`, choice.value || "—");
   row.append(value);
-  row.append(el("span", `dot ${confidenceClass(choice)}`));
 
   const sourceKey = SOURCE_LABEL[choice.source];
   const source = sourceKey && sourceKey !== "SimBrief" ? t(sourceKey) : (sourceKey || choice.source);
@@ -3156,11 +3802,51 @@ function choiceRow(label, choice, note) {
     .filter(Boolean)
     .join(" · ");
   const parts = [note, reason].filter(Boolean).join(" — ");
+  const confidence = t(`confidence_${confidenceClass(choice)}`);
+  const confidenceDescription = [confidence, parts].filter(Boolean).join(" — ");
+  const dot = el("span", `dot ${confidenceClass(choice)}`);
+  dot.setAttribute("role", "img");
+  dot.setAttribute("aria-label", confidenceDescription);
+  dot.title = confidenceDescription;
+  row.append(dot);
   if (parts) row.append(el("span", "row-reason", parts));
+
+  const alternatives = (choice.alternatives || []).filter(
+    (alternative) => alternative?.value && !alternative.disqualified
+  );
+  if (
+    overrideField
+    && confidenceClass(choice) === "low"
+    && alternatives.length
+    && !latestStatus?.remote_client
+  ) {
+    const select = el("select", "choice-select");
+    select.setAttribute("aria-label", tf("change_choice", { label }));
+    select.title = tf("change_choice", { label });
+    const prompt = el("option", null, t("change_choice_action"));
+    prompt.value = "";
+    prompt.selected = true;
+    select.append(prompt);
+    for (const alternative of alternatives) {
+      const option = el("option", null, alternativeLabel(alternative));
+      option.value = alternative.value;
+      select.append(option);
+    }
+    select.addEventListener("change", async () => {
+      if (!select.value) return;
+      select.disabled = true;
+      try {
+        await applyPlannerOverride(overrideField, select.value);
+      } finally {
+        select.disabled = false;
+      }
+    });
+    row.append(select);
+  }
   return row;
 }
 
-function terminalCard(block, kicker, extraRows) {
+function terminalCard(block, kicker, runwayOverrideField, extraRows) {
   const card = document.createDocumentFragment();
 
   const head = el("div", "card-head");
@@ -3184,10 +3870,10 @@ function terminalCard(block, kicker, extraRows) {
 
   const rows = el("div", "rows");
   if (block.runway) {
-    rows.append(choiceRow(t("runway"), block.runway, runwayNote(block.runway)));
+    rows.append(choiceRow(t("runway"), block.runway, runwayNote(block.runway), runwayOverrideField));
   }
-  for (const [label, choice, note] of extraRows) {
-    rows.append(choiceRow(label, choice, note));
+  for (const [label, choice, note, overrideField] of extraRows) {
+    rows.append(choiceRow(label, choice, note, overrideField));
   }
   card.append(rows);
   return card;
@@ -3229,9 +3915,9 @@ function renderTerminal(plan) {
   departure.innerHTML = "";
   if (plan.departure) {
     departure.append(
-      terminalCard(plan.departure, t("departure_title"), [
-        ["SID", plan.departure.sid, ""],
-        [t("transition"), plan.departure.sid_transition, t("sid_exit_note")],
+      terminalCard(plan.departure, t("departure_title"), "departure_runway", [
+        ["SID", plan.departure.sid, "", "sid"],
+        [t("transition"), plan.departure.sid_transition, t("sid_exit_note"), "sid_transition"],
       ])
     );
     if (plan.departure.transition_altitude_ft) {
@@ -3261,11 +3947,11 @@ function renderTerminal(plan) {
   arrival.innerHTML = "";
   if (plan.arrival) {
     arrival.append(
-      terminalCard(plan.arrival, t("arrival_title"), [
-        ["STAR", plan.arrival.star, ""],
-        [t("transition"), plan.arrival.star_transition, t("star_entry_note")],
-        [t("approach"), plan.arrival.approach, ""],
-        [t("approach_transition_short"), plan.arrival.approach_transition, t("approach_transition_note")],
+      terminalCard(plan.arrival, t("arrival_title"), "arrival_runway", [
+        ["STAR", plan.arrival.star, "", "star"],
+        [t("transition"), plan.arrival.star_transition, t("star_entry_note"), "star_transition"],
+        [t("approach"), plan.arrival.approach, "", "approach"],
+        [t("approach_transition_short"), plan.arrival.approach_transition, t("approach_transition_note"), "approach_transition"],
       ])
     );
     const badges = el("div", "route-meta");
@@ -3288,13 +3974,13 @@ function constraintTable(title, rows) {
   const wrapper = el("div");
   wrapper.append(el("div", "section-title", title));
   if (!rows?.length) {
-    wrapper.append(el("p", "stat-note", "Aucune contrainte publiée."));
+    wrapper.append(el("p", "stat-note", t("cst_empty")));
     return wrapper;
   }
   const table = el("table");
   const head = el("thead");
   const headRow = el("tr");
-  for (const label of ["Repère", "Altitude", "Vitesse"]) headRow.append(el("th", null, label));
+  for (const key of ["cst_fix", "cst_altitude", "cst_speed"]) headRow.append(el("th", null, t(key)));
   head.append(headRow);
   table.append(head);
 
@@ -3302,8 +3988,8 @@ function constraintTable(title, rows) {
   for (const row of rows) {
     const line = el("tr");
     line.append(el("td", `fix${row.is_fix ? "" : " segment"}`, row.label));
-    line.append(el("td", "constraint", row.altitude || "—"));
-    line.append(el("td", "constraint", row.speed || "—"));
+    line.append(el("td", "constraint", constraintText(row.altitude) || "—"));
+    line.append(el("td", "constraint", constraintText(row.speed) || "—"));
     body.append(line);
   }
   table.append(body);
@@ -3314,26 +4000,26 @@ function constraintTable(title, rows) {
 function altitudeInstruction(altitude) {
   if (!altitude) return "";
   if (altitude.startsWith("≥ ")) {
-    return `Ne pas descendre sous ${altitude.slice(2)}`;
+    return tf("cst_not_below", { altitude: altitude.slice(2) });
   }
   if (altitude.startsWith("≤ ")) {
-    return `Être à ou sous ${altitude.slice(2)}`;
+    return tf("cst_at_or_below", { altitude: altitude.slice(2) });
   }
   if (altitude.startsWith("entre ")) {
-    return `Rester ${altitude}`;
+    return tf("cst_stay", { altitude: constraintText(altitude) });
   }
-  return `Maintenir ${altitude}`;
+  return tf("cst_maintain", { altitude });
 }
 
 function approachProfile(arrival) {
   const wrapper = el("div", "approach-profile");
   const head = el("div", "approach-profile-head");
   const title = el("div");
-  title.append(el("div", "card-kicker", "Profil vertical"));
+  title.append(el("div", "card-kicker", t("vprof_kicker")));
   title.append(el(
     "h2",
     null,
-    `${arrival.approach?.value || "Approche"}${arrival.runway?.value ? ` · RWY ${arrival.runway.value}` : ""}`
+    `${arrival.approach?.value || t("vprof_approach")}${arrival.runway?.value ? ` · RWY ${arrival.runway.value}` : ""}`
   ));
   head.append(title);
   if (arrival.ils_frequency_mhz) {
@@ -3348,21 +4034,21 @@ function approachProfile(arrival) {
         arrival.ils_ident,
         arrival.ils_frequency_mhz ? `${arrival.ils_frequency_mhz.toFixed(2)} MHz` : null,
       ].filter(Boolean).join(" · ")],
-      ["Axe LOC", arrival.ils_course_deg !== null && arrival.ils_course_deg !== undefined
+      [t("vprof_loc"), arrival.ils_course_deg !== null && arrival.ils_course_deg !== undefined
         ? `${String(Math.round(arrival.ils_course_deg)).padStart(3, "0")}°`
         : null],
-      ["Pente", arrival.glide_slope_deg
+      [t("vprof_slope"), arrival.glide_slope_deg
         ? `${Number(arrival.glide_slope_deg).toFixed(2)}°`
         : null],
-      ["Interception", arrival.glide_intercept_altitude],
-      ["Point", arrival.glide_intercept_fix],
-      ["Finale", arrival.final_approach_distance_nm
+      [t("vprof_intercept"), constraintText(arrival.glide_intercept_altitude), true],
+      [t("vprof_point"), arrival.glide_intercept_fix],
+      [t("vprof_final"), arrival.final_approach_distance_nm
         ? `${arrival.final_approach_distance_nm.toFixed(1)} NM`
         : null],
     ];
-    for (const [label, value] of items) {
+    for (const [label, value, primary] of items) {
       if (!value) continue;
-      const item = el("div", label === "Interception" ? "final-item primary" : "final-item");
+      const item = el("div", primary ? "final-item primary" : "final-item");
       item.append(el("span", null, label));
       item.append(el("strong", null, value));
       briefing.append(item);
@@ -3373,7 +4059,10 @@ function approachProfile(arrival) {
       wrapper.append(el(
         "p",
         "intercept-explanation",
-        `${altitudeInstruction(arrival.glide_intercept_altitude)} à ${arrival.glide_intercept_fix || "l’interception"} pour établir la finale publiée.`
+        tf("vprof_intercept_note", {
+          instruction: altitudeInstruction(arrival.glide_intercept_altitude),
+          fix: arrival.glide_intercept_fix || t("vprof_intercept_fallback"),
+        })
       ));
     }
   }
@@ -3385,31 +4074,23 @@ function approachProfile(arrival) {
       if (index) flow.append(el("span", "altitude-arrow", "→"));
       const step = el("div", "altitude-step");
       step.append(el("span", "altitude-fix", row.label));
-      step.append(el("strong", null, row.altitude));
+      step.append(el("strong", null, constraintText(row.altitude)));
       step.append(el("small", null, altitudeInstruction(row.altitude)));
-      if (row.speed) step.append(el("small", "altitude-speed", row.speed));
+      if (row.speed) step.append(el("small", "altitude-speed", constraintText(row.speed)));
       flow.append(step);
     });
     wrapper.append(flow);
   } else {
-    wrapper.append(el(
-      "p",
-      "stat-note",
-      "Aucune contrainte d’altitude publiée dans la base pour cette approche."
-    ));
+    wrapper.append(el("p", "stat-note", t("vprof_empty")));
   }
 
   if (arrival.missed_approach_altitude_ft) {
     const missed = el("div", "missed-altitude");
-    missed.append(el("span", null, "En remise de gaz, monter vers"));
+    missed.append(el("span", null, t("vprof_missed")));
     missed.append(el("strong", null, `${arrival.missed_approach_altitude_ft} ft`));
     wrapper.append(missed);
   }
-  wrapper.append(el(
-    "p",
-    "approach-caution",
-    "Les minima officiels sont recherchés dans la fiche MCDU. Toujours confirmer la carte SIA, la catégorie avion et les conditions applicables."
-  ));
+  wrapper.append(el("p", "approach-caution", t("vprof_caution")));
   return wrapper;
 }
 
@@ -3420,18 +4101,21 @@ function renderConstraints(plan) {
   if (plan.departure) {
     panel.append(
       constraintTable(
-        `SID ${plan.departure.sid.value || ""}`.trim(),
+        tf("cst_sid", { procedure: plan.departure.sid.value || "" }).trim(),
         plan.departure.sid_constraints
       )
     );
   }
   if (plan.arrival) {
     panel.append(
-      constraintTable(`STAR ${plan.arrival.star.value || ""}`.trim(), plan.arrival.star_constraints)
+      constraintTable(
+        tf("cst_star", { procedure: plan.arrival.star.value || "" }).trim(),
+        plan.arrival.star_constraints
+      )
     );
     panel.append(
       constraintTable(
-        `Approche ${plan.arrival.approach.value || ""}`.trim(),
+        tf("cst_approach", { procedure: plan.arrival.approach.value || "" }).trim(),
         plan.arrival.approach_constraints
       )
     );
@@ -4054,9 +4738,9 @@ function syncSiaMapOverlay() {
     $("sia-map-frame").src = candidate.pdf_url;
   }
   const provider = officialProviderName(candidate);
-  $("map-sia").textContent = `Calque ${provider}`;
-  $("map-sia").title = `Afficher la carte ${provider} géoréférencée de cet aérodrome`;
-  $("sia-overlay-title").textContent = `Calque ${provider}`;
+  $("map-sia").textContent = tf("chart_overlay", { provider });
+  $("map-sia").title = tf("chart_overlay_title", { provider });
+  $("sia-overlay-title").textContent = tf("chart_overlay", { provider });
   $("map-sia").classList.remove("hidden");
 }
 
@@ -4082,21 +4766,21 @@ function siaApproachCard(plan) {
   const wrapper = el("section", "sia-card");
   const head = el("div", "sia-card-head");
   const title = el("div");
-  title.append(el("div", "card-kicker", "Source officielle"));
-  title.append(el("h2", null, "Carte d’approche officielle"));
+  title.append(el("div", "card-kicker", t("sia_kicker")));
+  title.append(el("h2", null, t("sia_title")));
   head.append(title);
-  const status = el("span", "badge", "Recherche…");
+  const status = el("span", "badge", t("sia_searching_badge"));
   head.append(status);
   wrapper.append(head);
   const content = el("div", "sia-card-content");
-  content.append(el("p", "stat-note", "Recherche de la carte correspondant à l’approche sélectionnée."));
+  content.append(el("p", "stat-note", t("sia_searching")));
   wrapper.append(content);
 
   const arrival = plan.arrival;
   if (!arrival?.icao || !arrival?.runway?.value || !arrival?.approach?.value) {
-    status.textContent = "Plan incomplet";
+    status.textContent = t("sia_incomplete");
     content.innerHTML = "";
-    content.append(el("p", "stat-note", "Aucune approche d’arrivée ne permet de rechercher une carte."));
+    content.append(el("p", "stat-note", t("sia_no_approach")));
     return wrapper;
   }
 
@@ -4110,14 +4794,14 @@ function siaApproachCard(plan) {
     if (data.minima) {
       const values = el("div", "sia-minima-values");
       values.append(
-        stat("Catégorie", data.minima.category),
+        stat(t("min_category"), data.minima.category),
         stat("RADIO / DH", `${data.minima.dh_ft} ft`),
         stat("BARO / DA", `${data.minima.altitude_ft} ft`),
         stat("RVR", `${data.minima.rvr_m} m`)
       );
       content.append(values);
 
-      const use = el("button", "btn-primary", "Valider ces valeurs pour le MCDU");
+      const use = el("button", "btn-primary", t("sia_use_values"));
       use.type = "button";
       use.addEventListener("click", () => {
         localStorage.setItem(minimaStorageKey(plan), JSON.stringify({
@@ -4130,28 +4814,23 @@ function siaApproachCard(plan) {
       });
       content.append(use);
     } else {
-      content.append(el(
-        "p",
-        "approach-caution",
-        "La carte officielle a été trouvée, mais ses minima n’ont pas pu être extraits avec une confiance suffisante. Les saisir après lecture de la carte."
-      ));
+      content.append(el("p", "approach-caution", t("sia_minima_unreadable")));
     }
 
     const details = el("details", "sia-chart-preview");
-    details.append(el("summary", null, "Afficher la carte officielle"));
+    details.append(el("summary", null, t("sia_show_chart")));
     const frame = el("iframe");
     frame.src = data.pdf_url;
-    frame.title = `Carte ${officialProviderName(data)} ${data.chart.title}`;
+    frame.title = tf("chart_frame_title", {
+      provider: officialProviderName(data),
+      title: data.chart.title,
+    });
     frame.loading = "lazy";
     details.append(frame);
     content.append(details);
-    content.append(el(
-      "p",
-      "approach-caution",
-      "Extraction automatique à confirmer : vérifier la variante d’approche, la catégorie avion, les NOTAM et les consignes ATC."
-    ));
+    content.append(el("p", "approach-caution", t("sia_extraction_caution")));
   }).catch((error) => {
-    status.textContent = "Indisponible";
+    status.textContent = t("chart_unavailable");
     content.innerHTML = "";
     content.append(el("p", "stat-note", String(error.message || error)));
   });
@@ -4163,7 +4842,7 @@ function fetchOfficialAirport(icao) {
   if (officialAirportRequests.has(key)) return officialAirportRequests.get(key);
   const request = fetch(`/api/charts/airport/${encodeURIComponent(key)}`).then(async (response) => {
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || "Catalogue officiel indisponible.");
+    if (!response.ok) throw new Error(payload.detail || t("chart_catalogue_unavailable"));
     return payload;
   });
   officialAirportRequests.set(key, request);
@@ -4179,6 +4858,11 @@ function normaliseChartText(value) {
     .replace(/[^A-Z0-9]+/g, "");
 }
 
+/*
+ * `role` vaut « departure » ou « arrival » : le classement se fait sur les
+ * rubriques que le service publie, jamais sur le libellé affiché, qui change
+ * avec la langue.
+ */
 function preferredOfficialChartIndex(charts, role, airport) {
   const runway = normaliseChartText(airport?.runway?.value);
   const sid = normaliseChartText(airport?.sid?.value);
@@ -4193,7 +4877,7 @@ function preferredOfficialChartIndex(charts, role, airport) {
       `${chart.title} ${chart.filename} ${chart.procedure_ident || ""}`
     );
     let score = 0;
-    if (role === "Départ") {
+    if (role === "departure") {
       if (chart.category === "Départs SID") score += 120;
       if (chart.category === "Aérodrome et roulage") score += 30;
       if (sid && title.includes(sid)) score += 220;
@@ -4218,33 +4902,34 @@ function preferredOfficialChartIndex(charts, role, airport) {
   );
 }
 
-function officialAirportLibrary(icao, role, mapRole, airport, plan) {
+function officialAirportLibrary(icao, role, airport, plan) {
+  const roleLabel = t(role === "departure" ? "departure" : "arrival");
   const card = el("article", "sia-airport-library");
   const head = el("div", "sia-library-head");
   const heading = el("div");
-  heading.append(el("div", "card-kicker", role), el("h2", null, icao));
-  const status = el("span", "badge", "Chargement…");
+  heading.append(el("div", "card-kicker", roleLabel), el("h2", null, icao));
+  const status = el("span", "badge", t("chart_loading"));
   head.append(heading, status);
-  card.append(head, el("p", "stat-note", "Recherche des publications officielles en vigueur."));
+  card.append(head, el("p", "stat-note", t("chart_searching")));
 
   fetchOfficialAirport(icao).then((data) => {
     if (currentPlan !== plan) return;
     card.replaceChildren(head);
     status.textContent = `${officialProviderName(data)} · AIRAC ${data.effective_date}`;
     if (!data.charts.length) {
-      card.append(el("p", "stat-note", "Aucun document publié pour cet aérodrome."));
+      card.append(el("p", "stat-note", t("chart_none")));
       return;
     }
 
     const controls = el("div", "sia-document-controls");
     const field = el("label", "field");
-    field.append(el("span", null, "Document"));
+    field.append(el("span", null, t("chart_document")));
     const select = el("select");
     const groups = new Map();
     data.charts.forEach((chart, index) => {
       if (!groups.has(chart.category)) {
         const group = document.createElement("optgroup");
-        group.label = chart.category;
+        group.label = chartCategory(chart.category);
         groups.set(chart.category, group);
         select.append(group);
       }
@@ -4256,9 +4941,9 @@ function officialAirportLibrary(icao, role, mapRole, airport, plan) {
     field.append(select);
 
     const actions = el("div", "sia-document-actions");
-    const display = el("button", "btn-primary", "Afficher le PDF");
+    const display = el("button", "btn-primary", t("chart_show_pdf"));
     display.type = "button";
-    const external = el("a", "icon-btn", "Ouvrir dans un nouvel onglet");
+    const external = el("a", "icon-btn", t("chart_open_tab"));
     external.target = "_blank";
     external.rel = "noopener";
     actions.append(display, external);
@@ -4271,31 +4956,38 @@ function officialAirportLibrary(icao, role, mapRole, airport, plan) {
     const updateSelection = () => {
       const chart = data.charts[Number(select.value)];
       external.href = chart.pdf_url;
-      setSiaMapCandidate(mapRole, icao, {
+      setSiaMapCandidate(role, icao, {
         provider: data.provider,
         source: data.source,
         chart,
         pdf_url: chart.pdf_url,
       });
       availability.textContent = chart.georeferenced
-        ? `Calque disponible lorsque la carte affiche ${role.toLowerCase()} ${icao}.`
-        : `PDF ${officialProviderName(data)} consultable. Aucun calque proposé : ce document n’a pas de géoréférencement validé.`;
+        ? tf("chart_overlay_available", { role: roleLabel.toLowerCase(), icao })
+        : tf("chart_overlay_missing", { provider: officialProviderName(data) });
       if (!frame.classList.contains("hidden")) {
         frame.src = chart.pdf_url;
-        frame.title = `Carte ${officialProviderName(data)} ${chart.title}`;
+        frame.title = tf("chart_frame_title", {
+          provider: officialProviderName(data),
+          title: chart.title,
+        });
       }
     };
     select.addEventListener("change", updateSelection);
     display.addEventListener("click", () => {
       const chart = data.charts[Number(select.value)];
+      card.classList.add("pdf-open");
       frame.src = chart.pdf_url;
-      frame.title = `Carte ${officialProviderName(data)} ${chart.title}`;
+      frame.title = tf("chart_frame_title", {
+        provider: officialProviderName(data),
+        title: chart.title,
+      });
       frame.classList.remove("hidden");
     });
     card.append(controls, availability, frame);
     updateSelection();
   }).catch((error) => {
-    status.textContent = "Indisponible";
+    status.textContent = t("chart_unavailable");
     card.append(el("p", "stat-note", String(error.message || error)));
   });
   return card;
@@ -4307,25 +4999,22 @@ function renderOfficialCharts(plan) {
   const intro = el("div", "section-head");
   const title = el("div");
   title.append(
-    el("div", "card-kicker", "Sources AIS nationales officielles · FAA d-TPP"),
-    el("h2", null, "Cartes des aérodromes du vol")
+    el("div", "card-kicker", t("chart_kicker")),
+    el("h2", null, t("chart_title"))
   );
   intro.append(title);
-  panel.append(
-    intro,
-    el("p", "stat-note", "Le document proposé par défaut correspond au plan courant. Vous pouvez ensuite choisir un autre PDF du départ ou de l’arrivée. Le calque n’apparaît que pour un document géoréférencé et pour l’aérodrome actuellement affiché.")
-  );
+  panel.append(intro, el("p", "stat-note", t("chart_intro")));
   const grid = el("div", "sia-library-grid");
-  for (const [role, mapRole, airport] of [
-    ["Départ", "departure", plan.departure],
-    ["Arrivée", "arrival", plan.arrival],
+  for (const [role, airport] of [
+    ["departure", plan.departure],
+    ["arrival", plan.arrival],
   ]) {
     const icao = airport?.icao;
     if (!icao) continue;
-    grid.append(officialAirportLibrary(icao, role, mapRole, airport, plan));
+    grid.append(officialAirportLibrary(icao, role, airport, plan));
   }
   if (!grid.childElementCount) {
-    grid.append(el("p", "stat-note", "Chargez un plan contenant un départ et une arrivée."));
+    grid.append(el("p", "stat-note", t("chart_need_plan")));
   }
   panel.append(grid);
 }
@@ -4334,10 +5023,10 @@ function minimaEditor(plan, minima) {
   const wrapper = el("form", "minima-editor");
   const header = el("div", "minima-editor-head");
   const title = el("div");
-  title.append(el("div", "card-kicker", "Minima de la carte"));
-  title.append(el("h2", null, "Valeurs à saisir dans le MCDU"));
+  title.append(el("div", "card-kicker", t("min_kicker")));
+  title.append(el("h2", null, t("min_title")));
   header.append(title);
-  if (minima.source) header.append(el("span", "badge", "SIA confirmé"));
+  if (minima.source) header.append(el("span", "badge", t("min_confirmed")));
   wrapper.append(header);
 
   const fields = el("div", "minima-fields");
@@ -4354,9 +5043,11 @@ function minimaEditor(plan, minima) {
     return input;
   };
 
-  const category = field("Catégorie", "minima-category", "text", "CAT I, CAT III, LOC…");
+  const category = field(
+    t("min_category"), "minima-category", "text", t("min_category_placeholder")
+  );
   const modeLabel = el("label", "field");
-  modeLabel.append(el("span", null, "Champ MCDU"));
+  modeLabel.append(el("span", null, t("min_field")));
   const mode = el("select");
   mode.id = "minima-mode";
   for (const [value, label] of [["RADIO", "RADIO (DH)"], ["BARO", "BARO (DA/MDA)"]]) {
@@ -4366,9 +5057,9 @@ function minimaEditor(plan, minima) {
   }
   modeLabel.append(mode);
   fields.append(modeLabel);
-  const dh = field("DH / hauteur radio (ft)", "minima-dh", "number", "ex. 100");
-  const altitude = field("DA ou MDA barométrique (ft)", "minima-altitude", "number", "ex. 588");
-  const rvr = field("RVR / visibilité (m)", "minima-rvr", "number", "ex. 300");
+  const dh = field(t("min_dh"), "minima-dh", "number", "ex. 100");
+  const altitude = field(t("min_altitude"), "minima-altitude", "number", "ex. 588");
+  const rvr = field(t("min_rvr"), "minima-rvr", "number", "ex. 300");
 
   category.value = minima.category || "";
   mode.value = minima.mode || (plan.arrival?.approach?.value?.includes("ILS") ? "RADIO" : "BARO");
@@ -4378,12 +5069,8 @@ function minimaEditor(plan, minima) {
   wrapper.append(fields);
 
   const actions = el("div", "minima-actions");
-  actions.append(el(
-    "p",
-    "approach-caution",
-    "Recopier les valeurs de la carte correspondant à la catégorie avion et à l’équipement disponible."
-  ));
-  const save = el("button", "btn-primary", "Mémoriser ces minima");
+  actions.append(el("p", "approach-caution", t("min_note")));
+  const save = el("button", "btn-primary", t("min_save"));
   save.type = "submit";
   actions.append(save);
   wrapper.append(actions);
@@ -4462,14 +5149,14 @@ function renderMcdu(plan) {
   panel.append(minimaEditor(plan, minima));
   const profileHeader = el("div", "mcdu-profile");
   profileHeader.append(
-    el("div", "card-kicker", `Fiche ${profile.label}`),
-    el("h2", null, plan.aircraft_name || plan.aircraft || "Type d’avion inconnu"),
+    el("div", "card-kicker", tf("mcdu_kicker", { system: profile.label })),
+    el("h2", null, plan.aircraft_name || plan.aircraft || t("mcdu_unknown_aircraft")),
     el(
       "p",
       null,
       profile.kind === "generic"
-        ? "Présentation FMS générique : vérifiez les libellés propres à l’avion."
-        : `Présentation adaptée au système ${profile.label} de cet avion.`
+        ? t("mcdu_generic_note")
+        : tf("mcdu_profile_note", { system: profile.label })
     )
   );
   panel.append(profileHeader);
@@ -4500,7 +5187,7 @@ function renderMcdu(plan) {
       mcduPage(profile.departure, [
         dep.runway && mcduLine("RWY", dep.runway.value || "—", null, needsCheck(dep.runway)),
         mcduLine("SID", dep.sid.value || "—", null, needsCheck(dep.sid)),
-        mcduLine("TRANS", dep.sid_transition.value || "—", "sortie de la SID", needsCheck(dep.sid_transition)),
+        mcduLine("TRANS", dep.sid_transition.value || "—", t("mcdu_sid_exit"), needsCheck(dep.sid_transition)),
         dep.transition_altitude_ft && mcduLine("TRANS ALT", String(dep.transition_altitude_ft)),
       ]),
     plan.enroute.route_legs?.length &&
@@ -4513,12 +5200,12 @@ function renderMcdu(plan) {
       mcduPage(profile.arrival, [
         arr.runway && mcduLine("RWY", arr.runway.value || "—", null, needsCheck(arr.runway)),
         mcduLine("APPR", arr.approach.value || "—", null, needsCheck(arr.approach)),
-        mcduLine(profile.approachTransition, arr.approach_transition.value || "—", "transition d'APPROCHE", needsCheck(arr.approach_transition)),
+        mcduLine(profile.approachTransition, arr.approach_transition.value || "—", t("mcdu_approach_transition"), needsCheck(arr.approach_transition)),
         mcduLine("STAR", arr.star.value || "—", null, needsCheck(arr.star)),
-        mcduLine(profile.starTransition, arr.star_transition.value || "—", "entrée de STAR", needsCheck(arr.star_transition)),
+        mcduLine(profile.starTransition, arr.star_transition.value || "—", t("mcdu_star_entry"), needsCheck(arr.star_transition)),
         arr.transition_level_ft && mcduLine("TRANS LVL", String(arr.transition_level_ft)),
         arr.missed_approach_altitude_ft &&
-          mcduLine("GA ALT", `${arr.missed_approach_altitude_ft} ft`, "remise de gaz"),
+          mcduLine("GA ALT", `${arr.missed_approach_altitude_ft} ft`, t("mcdu_missed")),
       ]),
     arr?.ils_frequency_mhz &&
       mcduPage(profile.radio, [
@@ -4532,9 +5219,9 @@ function renderMcdu(plan) {
         arr.wind?.qnh_hpa && mcduLine("QNH", `${Math.round(arr.wind.qnh_hpa)} hPa`),
         minima.category && mcduLine("CAT", minima.category),
         minima.mode === "RADIO" && minima.dh_ft &&
-          mcduLine("RADIO", `${minima.dh_ft} ft`, "DH carte"),
+          mcduLine("RADIO", `${minima.dh_ft} ft`, t("mcdu_chart_dh")),
         minima.mode === "BARO" && minima.altitude_ft &&
-          mcduLine("BARO", `${minima.altitude_ft} ft`, "DA/MDA carte"),
+          mcduLine("BARO", `${minima.altitude_ft} ft`, t("mcdu_chart_da")),
         minima.rvr_m && mcduLine("RVR", `${minima.rvr_m} m`),
         arr.missed_approach_altitude_ft &&
           mcduLine("GA ALT", `${arr.missed_approach_altitude_ft} ft`),
@@ -4546,19 +5233,19 @@ function renderMcdu(plan) {
   const toConfirm = [];
   const check = (label, choice) => { if (needsCheck(choice)) toConfirm.push(label); };
   if (dep) {
-    check("piste départ", dep.runway);
+    check(t("mcdu_departure_runway"), dep.runway);
     check("SID", dep.sid);
-    check("TRANS départ", dep.sid_transition);
+    check(t("mcdu_departure_transition"), dep.sid_transition);
   }
   if (arr) {
-    check("piste arrivée", arr.runway);
+    check(t("mcdu_arrival_runway"), arr.runway);
     check("APPR", arr.approach);
     check("VIA", arr.approach_transition);
     check("STAR", arr.star);
-    check("TRANS arrivée", arr.star_transition);
+    check(t("mcdu_arrival_transition"), arr.star_transition);
   }
   if (toConfirm.length) {
-    screen.append(el("div", "mcdu-warn", `À confirmer à l'ATIS : ${toConfirm.join(", ")}`));
+    screen.append(el("div", "mcdu-warn", tf("mcdu_confirm", { items: toConfirm.join(", ") })));
   }
 
   panel.append(screen);
@@ -4865,13 +5552,17 @@ function updateGroundHud() {
   heading.append(document.createTextNode(
     `${currentTaxiPlan.direction === "arrival" ? t("ground_to") : t("ground_from")} `
   ));
-  heading.append(el("b", null, currentTaxiPlan.parking?.label || "—"));
+  heading.append(el("b", null, groundLabel(currentTaxiPlan.parking?.label) || "—"));
   heading.append(document.createTextNode(
     currentTaxiPlan.direction === "arrival" ? "" : ` · ${t("runway")} ${currentTaxiPlan.runway}`
   ));
   hud.append(heading);
 
-  hud.append(el("div", "ground-steps", currentTaxiPlan.summary.join(" › ")));
+  hud.append(el(
+    "div",
+    "ground-steps",
+    currentTaxiPlan.summary.map(groundLabel).join(" › ")
+  ));
   // Une fois le roulage commencé, c'est la distance restante qui compte.
   hud.append(el("div", null, guidance
     ? tf("metres_remaining", { distance: Math.round(guidance.remaining_m) })
@@ -5008,6 +5699,7 @@ async function pollLive() {
   const params = new URLSearchParams({
     demo: $("demo-toggle").checked ? "1" : "0",
     icao: currentIcao || "",
+    aircraft: currentPlan?.aircraft_name || currentPlan?.aircraft || "",
   });
   if (currentChart.highlight_runway) params.set("runway", currentChart.highlight_runway);
 
@@ -5474,11 +6166,12 @@ function setModuleMenuOpen(open, restoreFocus = false) {
   }
 }
 
-function selectTab(name) {
+function selectTab(name, scrollToModule = false) {
   const restoreMenuFocus = $("module-menu-toggle").getAttribute("aria-expanded") === "true";
   for (const button of document.querySelectorAll(".tabs button")) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
+  show($("terminal"), name === "terminal");
   for (const key of ["map", "ground", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
     show($(`panel-${key}`), key === name);
   }
@@ -5486,6 +6179,17 @@ function selectTab(name) {
   if (name === "map") window.requestAnimationFrame(() => MAP.resize());
   if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());
   setModuleMenuOpen(false, restoreMenuFocus);
+  if (scrollToModule) {
+    window.requestAnimationFrame(() => {
+      const target = name === "terminal" ? $("terminal") : $(`panel-${name}`);
+      target?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    });
+  }
 }
 
 function openActiveAlerts() {
@@ -5507,7 +6211,7 @@ function openActiveAlerts() {
 
 document.querySelector(".tabs").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-tab]");
-  if (button) selectTab(button.dataset.tab);
+  if (button) selectTab(button.dataset.tab, true);
 });
 
 $("module-menu-toggle").addEventListener("click", () => {
@@ -5533,11 +6237,11 @@ document.addEventListener("keydown", (event) => {
 });
 MOBILE_MODULE_MENU.addEventListener("change", () => setModuleMenuOpen(false));
 
-$("refresh").addEventListener("click", buildPlan);
+$("refresh").addEventListener("click", refreshPlanOrDemo);
 $("simbrief-create").addEventListener("click", openSimBriefPlanner);
 $("support-open").addEventListener("click", openSupportPage);
 $("support-open-toolbar").addEventListener("click", openSupportPage);
-$("demo-toggle").addEventListener("change", buildPlan);
+$("demo-toggle").addEventListener("change", toggleDemoMode);
 
 $("map-fit").addEventListener("click", () => MAP.fit());
 $("map-zoom-in").addEventListener("click", () => MAP.zoomIn());
@@ -5571,6 +6275,11 @@ $("settings-form").addEventListener("submit", saveSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
 });
+// La langue ne vit que dans le navigateur : un client distant peut la changer
+// sans toucher aux réglages du PC, qui lui restent fermés.
+$("mobile-language").addEventListener("change", (event) => {
+  window.I18N.setLanguage(event.target.value);
+});
 $("settings-trail-color").addEventListener("input", (event) => {
   setTrailColorField(event.target.value);
 });
@@ -5595,19 +6304,10 @@ $("settings-lan-copy").addEventListener("click", async () => {
 });
 $("shutdown").addEventListener("click", shutdownApplication);
 $("sim-status").addEventListener("click", pollSimulatorStatus);
-$("terminal-toggle").addEventListener("click", toggleTerminal);
 $("global-flight-alert").addEventListener("click", openActiveAlerts);
-
-const storedTerminalState = localStorage.getItem(TERMINAL_COLLAPSED_KEY);
-setTerminalCollapsed(
-  storedTerminalState === null
-    ? window.matchMedia("(max-width: 760px)").matches
-    : storedTerminalState === "true"
-);
 window.I18N.apply();
 
 window.addEventListener("navixav:languagechange", () => {
-  setTerminalCollapsed(localStorage.getItem(TERMINAL_COLLAPSED_KEY) === "true");
   if (currentPlan) renderPlan(currentPlan);
   else {
     updateHud(latestAircraft);

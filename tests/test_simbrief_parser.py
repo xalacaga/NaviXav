@@ -20,6 +20,18 @@ def test_planned_runways(ofp: OfpSummary):
     assert ofp.destination_planned_runway is None
 
 
+def test_airport_coordinates_are_available_as_route_fallbacks():
+    summary = parse_ofp(
+        {
+            "origin": {"icao_code": "LCPH", "pos_lat": "34.7180", "pos_long": "32.4857"},
+            "destination": {"icao_code": "EHAM", "pos_lat": "52.3086", "pos_long": "4.7639"},
+        }
+    )
+
+    assert (summary.origin_lat, summary.origin_lon) == (34.718, 32.4857)
+    assert (summary.destination_lat, summary.destination_lon) == (52.3086, 4.7639)
+
+
 def test_procedure_names_from_navlog(ofp: OfpSummary):
     assert ofp.simbrief_sid == "EPIK8M"
     assert ofp.simbrief_star == "AFRI8N"
@@ -43,6 +55,54 @@ def test_enroute_route_keeps_via_to_pairs(ofp: OfpSummary):
         {"via": "DCT", "to": "LIRKO", "stage": "CRZ"},
         {"via": "DCT", "to": "MOKIP", "stage": "CRZ"},
         {"via": "DCT", "to": "GERVA", "stage": "CRZ"},
+    ]
+
+
+def test_enroute_route_keeps_simbrief_coordinates():
+    summary = parse_ofp(
+        {
+            "navlog": {
+                "fix": [
+                    {
+                        "ident": "LIRKO",
+                        "type": "wpt",
+                        "via_airway": "DCT",
+                        "stage": "crz",
+                        "pos_lat": "48.1234",
+                        "pos_long": "5.6789",
+                    }
+                ]
+            }
+        }
+    )
+
+    assert summary.enroute_route == [
+        {
+            "via": "DCT",
+            "to": "LIRKO",
+            "stage": "CRZ",
+            "lat": 48.1234,
+            "lon": 5.6789,
+        }
+    ]
+
+
+def test_invalid_navlog_coordinates_are_ignored():
+    summary = parse_ofp(
+        {
+            "navlog": [
+                {
+                    "ident": "LIRKO",
+                    "type": "wpt",
+                    "pos_lat": "nan",
+                    "pos_long": "500",
+                }
+            ]
+        }
+    )
+
+    assert summary.enroute_route == [
+        {"via": "DCT", "to": "LIRKO", "stage": ""}
     ]
 
 

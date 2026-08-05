@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from navixav.geo import distance_nm
 from navixav.models import Confidence
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
@@ -69,6 +71,41 @@ def test_atc_route_is_rebuilt(provider, settings, ofp):
     assert plan.enroute.route_path[-1]["ident"] == "LFBO"
 
 
+class _RecordingProvider:
+    def __init__(self, inner) -> None:
+        self._inner = inner
+        self.enroute_lookups: list[str] = []
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def fix_position(self, ident, icao=None, near=None):
+        if near is not None:
+            self.enroute_lookups.append(ident)
+        return self._inner.fix_position(ident, icao, near)
+
+
+def test_simbrief_coordinates_skip_enroute_simconnect_lookups(provider, settings, ofp):
+    positioned = deepcopy(ofp)
+    expected = {
+        "LIRKO": (48.0, 6.0),
+        "MOKIP": (46.5, 4.0),
+        "GERVA": (44.5, 2.5),
+    }
+    for fix in positioned.navlog:
+        if fix.ident in expected:
+            fix.lat, fix.lon = expected[fix.ident]
+
+    recording = _RecordingProvider(provider)
+    plan = _plan(recording, settings, positioned)
+
+    assert recording.enroute_lookups == []
+    assert [
+        (leg["lat"], leg["lon"])
+        for leg in plan.enroute.route_legs
+    ] == list(expected.values())
+
+
 def test_route_path_starts_and_ends_on_the_selected_runways(provider, settings, ofp):
     """Le tracé part du seuil de la 05 à LFST et finit sur celui de la 32R."""
     plan = _plan(provider, settings, ofp)
@@ -110,6 +147,34 @@ def test_overrides_take_precedence(provider, settings, ofp):
     assert plan.arrival.runway.choice.value == "14L"
     assert plan.arrival.approach.value == "ILS Z RWY 14L"
     assert plan.arrival.runway.choice.source == "utilisateur"
+
+
+def test_plan_exposes_only_published_alternatives_for_manual_recalculation(
+    provider, settings, ofp
+):
+    plan = _plan(provider, settings, ofp)
+
+    assert {item["value"] for item in plan.arrival.runway.choice.alternatives} == {
+        "14L", "14R", "32L"
+    }
+    assert "AFRIC" not in {
+        item["value"] for item in plan.arrival.star_transition.alternatives
+    }
+    assert all(item["value"] for item in plan.departure.sid.alternatives)
+
+
+def test_manual_choice_keeps_alternatives_for_a_second_correction(
+    provider, settings, ofp
+):
+    plan = _plan(
+        provider,
+        settings,
+        ofp,
+        PlannerOverrides(arrival_runway="14L", approach="ILS Z RWY 14L"),
+    )
+
+    assert plan.arrival.runway.choice.alternatives
+    assert plan.arrival.approach.alternatives
 
 
 def test_reversed_wind_flips_the_arrival_runway(provider, settings, ofp):

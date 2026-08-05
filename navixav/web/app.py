@@ -61,7 +61,7 @@ from navixav.updater import GitHubUpdater, UpdateError
 from navixav.weather.briefing import build_briefing
 
 STATIC_DIR = resource_path("navixav", "web", "static")
-DEMO_OFP = resource_path("tests", "data", "ofp_lfst_lfbo.json")
+DEMO_OFP = resource_path("tests", "data", "ofp_lcph_eham.json")
 FAA_ICAO_PREFIXES = {
     "PA", "PF", "PG", "PH", "PJ", "PM", "PO", "PW",
     "NS", "TI", "TJ",
@@ -184,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "/api/simbrief/new",
                 "/api/support/open",
                 "/api/update/install",
+                "/api/demo/restart",
                 "/api/shutdown",
             } or (
                 request.url.path == "/api/plan" and request.method == "POST"
@@ -807,14 +808,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         demo: bool = False,
         icao: str | None = None,
         runway: str | None = None,
+        aircraft: str | None = None,
     ) -> dict[str, Any]:
         if demo:
             _ensure_demo_source(icao, runway)
+        tracker.set_aircraft_hint(aircraft)
         try:
             state = tracker.read(allow_demo=demo)
         except PositionUnavailable as exc:
             return {"connected": False, "reason": str(exc)}
         return {"connected": True, "aircraft": state.to_dict()}
+
+    @app.post("/api/demo/restart")
+    def restart_demo() -> dict[str, object]:
+        """Relance la simulation au départ du plan actuellement chargé."""
+        payload = current_plan_state.get("payload") or {}
+        if len(_demo_flight_path(payload)) < 2:
+            raise HTTPException(
+                409,
+                "Le plan actuellement chargé ne contient pas de route exploitable.",
+            )
+        demo_state.pop("key", None)
+        _ensure_demo_source(None, None)
+        departure = (payload.get("departure") or {}).get("icao")
+        arrival = (payload.get("arrival") or {}).get("icao")
+        return {
+            "started": True,
+            "departure": departure,
+            "arrival": arrival,
+        }
 
     @app.get("/api/simulator")
     def simulator_status() -> dict[str, object]:

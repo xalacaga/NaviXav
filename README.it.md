@@ -80,10 +80,21 @@ visualizzare:
 - il Top of Descent e un rateo di discesa indicativo su una pendenza di 3°;
 - lo scostamento rispetto al profilo verticale previsto.
 
-Il giornale locale non conserva una traccia dettagliata. Dopo l'atterraggio
-salva soltanto un riepilogo con durata, distanza e altitudine massima. Tutti i
+Dopo l'atterraggio, il giornale locale conserva un riepilogo conciso e una
+cronologia limitata degli eventi: fasi di volo, pista di decollo e atterraggio
+con il vento osservato, e cambiamenti stabili di carrello, flap, spoiler, freno
+di parcheggio, luci e modalità dell'autopilota. Gli eventi sono memorizzati come
+dati e vengono riprodotti nella lingua selezionata al momento. Tutti i
 riepiloghi possono essere eliminati dall'interfaccia e nessun dato di volo
 viene inviato a servizi esterni.
+
+Per flap, spoiler e freno di parcheggio, NaviXav confronta le SimVar ufficiali
+di leva, posizione effettiva, superficie e indicatore cockpit. Configurazione
+dell’aereo ed eventi di volo continuano così ad aggiornarsi quando un velivolo
+di terze parti lascia bloccato un valore standard MSFS.
+Un adattatore dedicato ai Fenix A319/A320/A321 legge direttamente i tre comandi
+del cockpit, così le modifiche a flap, aerofreni e freno di parcheggio vengono
+segnalate anche con motori e impianti idraulici spenti.
 
 ### Scheda MCDU
 
@@ -115,6 +126,13 @@ NaviXav utilizza SimConnect per:
 Il simulatore deve essere avviato con un volo caricato per recuperare nuovi
 dati. Le informazioni già memorizzate nella cache restano disponibili offline.
 
+Quando il navlog dettagliato di SimBrief contiene coordinate convalidate,
+NaviXav le usa subito per tracciare la rotta e interroga MSFS Facilities solo
+per le posizioni mancanti. Anche i collegamenti pubblicati delle procedure
+evitano ricerche di posizione superflue. Il primo caricamento del piano risulta
+più rapido, mantenendo i controlli del corridoio e la cache MSFS locale come
+ripiego.
+
 ### Mappa
 
 La mappa comprende:
@@ -137,8 +155,10 @@ volo e costruito esclusivamente con le strutture native di MSFS:
 - uno sfondo aeronautico scuro con griglia metrica e freccia nord fornisce scala
   e orientamento senza il rumore di una carta stradale;
 - piste, vie principali, piazzole e aeromobile hanno priorità visiva;
-- vie secondarie e accessi alle piazzole sono nascosti per impostazione
-  predefinita e il pulsante **Secondarie** li mostra su richiesta;
+- le vie di rullaggio con nome restano visibili anche quando MSFS le classifica
+  come segmenti generici `path`; solo i collegamenti secondari senza nome e gli
+  accessi alle piazzole sono nascosti per impostazione predefinita, e il
+  pulsante **Secondarie** li mostra su richiesta;
 - alla partenza, se l'aeromobile è a terra entro 180 m da una piazzola, NaviXav
   propone automaticamente il percorso verso la pista selezionata;
 - un clic su un'altra piazzola sostituisce subito la proposta; all'arrivo la
@@ -382,8 +402,23 @@ reale, mappa, vincoli, dati MCDU, dati dell’aereo e carte ufficiali.
 Impostazioni, arresto e aggiornamenti restano riservati al PC. Se Windows lo
 richiede, autorizzare NaviXav solo sulle reti private.
 
+Sugli schermi remoti inferiori a 760 px, lo stato della connessione MSFS viene
+ridotto al punto colorato, così `MSFS connected` non fuoriesce dalla barra degli
+strumenti. L’etichetta tradotta resta disponibile per le tecnologie assistive.
+La barra mobile offre inoltre un proprio selettore della lingua senza esporre
+le impostazioni riservate al PC.
+
 NaviXav adatta automaticamente la sua interfaccia al ridimensionamento:
 
+- oltre 1100 px, la navigazione tra i moduli passa a una barra flottante
+  compatta in alto a sinistra, con un indicatore attivo chiaro; la voce breve
+  **Piano di volo** apre Partenza, Rotta e Arrivo come un normale modulo
+  esclusivo, senza comando di riduzione, è selezionata per impostazione predefinita e ogni scelta porta direttamente al
+  contenuto. L’area principale usa tutta la larghezza restante e un PDF
+  ufficiale aperto occupa l’intera griglia. Le finestre più strette mantengono
+  il selettore orizzontale e i dispositivi mobili il pannello accessibile. Quando
+  un avviso di volo globale aggiunge una seconda riga all’intestazione, la barra
+  desktop scende automaticamente e risale dopo la scomparsa dell’avviso;
 - oltre 1100 px, le schede Partenza, Rotta e Arrivo possono essere affiancate;
 - sotto 1100 px, queste schede passano su una sola colonna;
 - sotto 980 px, la barra degli strumenti e i comandi della mappa occupano tutta

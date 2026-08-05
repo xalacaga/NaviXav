@@ -87,6 +87,14 @@ together with the altimeter setting, the autopilot modes, the selected
 altitude, the fuel on board and the actual wind. Units are requested from the
 simulator and never recomputed locally.
 
+For flaps, spoilers and the parking brake, NaviXav cross-checks the official
+handle, effective-position, surface-position and cockpit-indicator SimVars.
+This keeps both Aircraft configuration and Flight events live when a third-party
+aircraft leaves one of the standard MSFS values frozen.
+A dedicated Fenix A319/A320/A321 adapter reads the three cockpit levers
+directly, so flap, speedbrake and parking-brake changes are reported even with
+the engines and hydraulic systems off.
+
 #### Visual alerts
 
 NaviXav monitors that configuration and flags anything left out: gear not down
@@ -110,9 +118,12 @@ click can still acknowledge it immediately. A
 whole system can be switched off from the panel. Blinking, reserved for
 critical alerts, is dropped when the system asks for reduced motion.
 
-The local journal keeps no detailed track: after landing, it stores only a
-flight summary (duration, distance and maximum altitude). All summaries can be
-purged from the interface, and no flight data is sent to any external service.
+After landing, the local logbook stores a concise flight summary and a bounded
+event timeline: flight phases, take-off and landing runway with the observed
+wind, and stable changes to gear, flaps, spoilers, parking brake, lights and
+autopilot modes. Events are stored as data and replay in the currently selected
+language. All summaries can be purged from the interface, and no flight data is
+sent to any external service.
 
 ### MCDU card
 
@@ -143,6 +154,12 @@ NaviXav uses SimConnect to:
 The simulator must be running with a flight loaded in order to retrieve new
 data. Information already cached remains available offline.
 
+When the detailed SimBrief navlog provides validated coordinates, NaviXav uses
+them immediately for the en-route plot and queries MSFS Facilities only for
+missing positions. Published procedure links also avoid unnecessary positional
+lookups. This shortens the first plan load while preserving route-corridor
+checks and the local MSFS cache as a fallback.
+
 ### Map
 
 The map includes:
@@ -170,8 +187,9 @@ flight map and built only from native MSFS facilities:
 - a dark aviation background with a metric grid and north arrow provides scale
   and orientation without the noise of a road map;
 - runways, primary taxiways, stands and the aircraft are visually prioritised;
-- secondary taxiways and stand access paths are hidden by default; the
-  **Secondary** button reveals them on demand;
+- named taxiways remain visible even when MSFS classifies them as generic
+  `path` segments; only unnamed secondary links and stand access paths are
+  hidden by default, and the **Secondary** button reveals them on demand;
 - on departure, when the aircraft is on the ground within 180 m of a stand,
   NaviXav automatically proposes a route from that stand to the selected runway;
 - clicking another stand immediately replaces the proposal; on arrival, the
@@ -419,8 +437,23 @@ constraints, MCDU data, aircraft data and official charts. Settings, shutdown
 and updates remain restricted to the PC. If Windows asks, allow NaviXav on
 private networks only.
 
+On remote screens below 760 px, the MSFS connection state is reduced to its
+coloured status dot so that `MSFS connected` cannot overflow the toolbar. The
+translated status label remains available to assistive technologies. The
+mobile toolbar also provides its own language selector without exposing the
+PC-only settings.
+
 NaviXav adapts its interface automatically when resized:
 
+- above 1100 px, module switching moves into a compact floating rail on the
+  upper left, with a clear active marker; the concise **Flight plan** entry opens the
+  Departure, Route and Arrival cards as a regular exclusive module, without a
+  collapse control, is selected by default, and every choice scrolls directly to its content. The main
+  area uses all remaining window width, and an opened official PDF expands
+  across the chart grid. Narrower desktop windows retain the horizontal
+  selector and mobile screens retain their accessible drawer. When a global
+  flight alert adds a second header row, the desktop rail automatically moves
+  below it and returns to its higher position after the alert clears;
 - above 1100 px, the Departure, Route and Arrival cards can be shown side by
   side;
 - below 1100 px, these cards move to a single column;

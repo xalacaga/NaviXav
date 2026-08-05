@@ -1,0 +1,243 @@
+About NaviXav
+
+NaviXav is a downloadable, standalone Windows desktop application for Microsoft Flight Simulator 2024. It is installed and executed locally on the user's computer.
+
+NaviXav is not a hosted website, a browser-delivered add-on or a cloud application. All primary features are provided by the installed Windows executable and displayed inside its dedicated desktop window. Microsoft Edge WebView2 is used only as the embedded rendering component for that window.
+
+NaviXav combines your latest generated SimBrief Operational Flight Plan with navigation data and live aircraft information obtained directly from Microsoft Flight Simulator through SimConnect.
+
+NaviXav is intended for flight simulation only. Always verify important information against current official publications and applicable ATC instructions.
+
+What's New
+
+Modern desktop navigation. On wide desktop windows, modules now sit in a compact floating rail at the upper left with a clear active marker and a subtle glass treatment. A concise Flight plan entry replaces the long collapsible Departure, Route and Arrival section, behaves like every other module and is selected by default. Every choice scrolls directly to its content, the main area fills all remaining width, and an opened official PDF expands across the chart grid. A visible global flight alert automatically moves the rail below the enlarged header instead of covering its first entry. Compact desktop windows retain the horizontal selector, while mobile navigation keeps its accessible side drawer.
+
+Weather briefing. A new Weather tab brings together departure, cruise, arrival and alternate briefings. Each airport shows decoded essentials — wind, visibility, ceiling, temperature and dew point, QNH, significant phenomena and flight category (VFR, MVFR, IFR or LIFR) — together with the age of the observation. The TAF summary keeps only the meaningful changes, and the raw METAR and TAF remain one click away. The cruise briefing carries the OFP average wind, wind component, ISA deviation, outside air temperature and tropopause. Stale observations, mist or fog risk, gusts, low temperatures and low IFR conditions are all flagged. In live METAR mode, observations refresh on load and every five minutes without recalculating the route or changing the selected procedures.
+
+Dispatch monitoring. A new Dispatch tab compares the OFP forecast with live simulator values: loaded and remaining fuel, actual burn, take-off and landing weights, time and distance, refreshed every two seconds. Projected arrival fuel warns when it drops below final reserve plus alternate fuel, and projected landing weight warns above maximum landing weight. Hourly burn uses a five-minute rolling average and stays accurate at increased simulation rate. Tracking now survives closing the application mid-flight: block fuel and take-off time are restored when NaviXav reopens.
+
+Flight timeline and replay. Flight tracking now presents a proportional ribbon for every phase flown and groups stable events beneath the phase in which they occurred: take-off and landing runway with the observed wind, gear, flaps, spoilers, parking brake, lights and autopilot modes. The timeline is kept with the completed-flight summary in the local logbook and replays in whichever interface language is selected later.
+
+Faster first plan preparation. When SimBrief supplies validated coordinates in its detailed navlog, NaviXav draws the en-route section immediately and asks MSFS Facilities only for missing positions. Published procedure links also avoid unnecessary positional lookups, while route-corridor validation and the local MSFS cache remain available as safeguards.
+
+Cleaner mobile connection status. On phones and tablets narrower than 760 px, the MSFS connection state uses a compact coloured dot instead of the MSFS connected label, keeping the toolbar inside the screen. The translated label remains accessible to assistive technologies, and the mobile toolbar now offers its own display-language selector.
+
+More accurate aircraft indications. Airbus five-position flap handles now show the correct detents, unknown aircraft show both handle position and measured flap angle, and flight levels use pressure altitude in the standard atmosphere instead of true altitude. Constraints, official charts, MCDU chart guidance, taxi labels, connection messages and error banners now all follow the selected interface language.
+
+Reliable live control indications. Aircraft configuration and Flight events keep following flaps, spoilers and the parking brake when a third-party aircraft freezes one standard MSFS value. NaviXav cross-checks official handle, effective-position, surface-position and cockpit-indicator SimVars, so flaps no longer remain stuck on FULL and control changes are no longer silently missed. A dedicated Fenix A319/A320/A321 adapter reads all three cockpit controls directly, including with engines and hydraulic systems off.
+
+Clearer airport ground charts. Named taxiways remain visible even when MSFS classifies them as generic path segments. At airports such as LCPH, main taxiways including A, B and K are no longer hidden with anonymous secondary links and stand access paths.
+
+More reliable route drawing. Approach lines no longer jump to a same-named waypoint hundreds of miles away — the Orly final approach could previously lead to Corsica. Runway-related names such as CF02, FI21L and DER07 are now recognised at any airport, en-route waypoints with several database matches are resolved near the route, and routes crossing the antimeridian are drawn continuously.
+
+Fewer false runway warnings. The misleading "SimBrief planned runway X, but wind would favour Y" message is gone. In light, calm or variable wind it attributed to the wind a ranking that actually came from airport preference and ILS availability.
+
+Cleaner install. The application and its installer now carry full publisher information and are shipped uncompressed, which removes the antivirus heuristic warnings some users reported on earlier builds.
+
+Main Features
+
+Retrieves your latest generated SimBrief OFP from a Pilot ID or username, with the complete route, dispatch data, weights, fuel, alternate and estimated flight time.
+
+Suggests departure and arrival runways from weather and aircraft configuration, then SIDs, STARs, transitions, approaches and VIA selections from MSFS navigation data.
+
+Displays altitude and speed constraints, transition altitude or level, ILS frequency, intercept altitude and missed-approach altitude.
+
+Provides a full weather briefing for departure, cruise, arrival and alternate, with decoded METAR, summarised TAF and operational warnings.
+
+Compares the OFP dispatch figures with live fuel, weight, time and distance values read from the simulator.
+
+Computes ground taxi routes between a parking stand and the runway, drawn on a dedicated aerodrome chart with holding points and turn-by-turn callouts.
+
+Tracks the aircraft in real time through SimConnect: flight phase, speeds, altitude, next waypoint, lateral deviation, route progress, Top of Descent and vertical-profile guidance.
+
+Monitors aircraft configuration — gear, flaps, speedbrakes, parking brake, lights, altimeter setting, autopilot modes, selected altitude, fuel and wind — and clears configuration alerts automatically once the correction becomes stable.
+
+Provides an aircraft-adaptive reference card: Airbus MCDU, Boeing CDU or a generic FMS presentation.
+
+Includes a moving map with the planned route, terminal procedures, aircraft position, flown track, ground taxi route and several selectable styles.
+
+Gives access to supported official national AIS charts.
+
+Stores only a local summary of completed flights, which can be purged at any time.
+
+Includes a demonstration mode and automatic update checking with SHA-256 verification and explicit user confirmation.
+
+Available in English, French, German, Spanish, Italian, Portuguese, Dutch and Polish.
+
+How NaviXav Is Developed
+
+NaviXav is a one-person project, and it is written with heavy use of AI coding assistants — what is often called "vibe coding". This is stated openly, because you are installing an executable on your own machine and you are entitled to know how it was produced.
+
+What that means in practice: I specify every feature, review the result, fly it in the simulator and decide what ships. The assistant writes a large share of the code; it does not decide what gets released. An automated suite of more than four hundred tests must pass before any build is produced, and a failing test blocks the release. The complete source is published under the Apache License 2.0, so anyone can read exactly what runs on their machine — and that scrutiny is welcome.
+
+The honest caveat: AI-assisted code can contain mistakes that look entirely plausible on the page. That is precisely why the test suite, the open source and the "always verify" warning above matter. If something looks wrong, please report it. Bug reports are the most valuable contribution to this project.
+
+SimBrief Integration
+
+NaviXav retrieves the latest OFP that has already been generated on SimBrief. The Create a SimBrief plan button opens the official SimBrief flight-plan editor; after generating the OFP, return to NaviXav and select Import flight plan.
+
+A generated SimBrief OFP is required before NaviXav can retrieve it. NaviXav does not modify or upload flight plans to SimBrief.
+
+Live Flight Tracking
+
+NaviXav reads live aircraft information directly from MSFS through SimConnect and displays the current flight phase, position and flown track, speeds, altitude and vertical speed, remaining distance and route progress, next waypoint, lateral deviation, Top of Descent estimation, vertical-profile guidance, fuel information, aircraft configuration and active alerts.
+
+Configuration alerts disappear automatically once the required correction becomes stable, and can activate again if the same unsafe condition returns later.
+
+Weather Briefing
+
+The Weather tab covers departure, cruise, arrival and alternate. Each airport shows wind, visibility, ceiling, temperature and dew point, QNH, significant phenomena and flight category, together with the observation age. A graphical summary presents conditions, wind direction, visibility and ceiling at a glance.
+
+The cruise briefing is built from the OFP's own average wind, wind component, ISA deviation and tropopause, so it triggers no additional network request. Weather source and refresh behaviour are selected in Settings.
+
+Dispatch Monitoring
+
+The Dispatch tab places the SimBrief dispatch figures next to what the simulator is actually reporting: loaded and remaining fuel, actual burn, take-off and landing weights, elapsed and remaining time, distance flown and distance to go.
+
+Projected arrival fuel is compared with final reserve plus alternate fuel, and projected landing weight with maximum landing weight, so a developing problem is visible long before it becomes one. Values refresh every two seconds and hourly burn uses a five-minute rolling average, which keeps it meaningful at increased simulation rate.
+
+Ground Taxi Guidance
+
+Using the taxiway network published by Microsoft Flight Simulator, NaviXav builds a taxi route between a parking stand and the runway. It follows the taxiways, avoids closed segments and service roads, only uses a runway as a last resort, and tells you which holding point to stop at.
+
+Selecting a stand draws the route on the map — green behind the aircraft, blue ahead — with holding bars and remaining distance. While taxiing, the next manoeuvre is announced ("Turn left on Q", "Hold short of runway 05") together with the distance to go. At arrival, the runway exit closest to your stand is chosen automatically.
+
+The dedicated Ground tab shows the same information on a full-size aerodrome chart with a metric grid and north indication, secondary taxiways hidden by default.
+
+Aircraft Configuration
+
+NaviXav adapts its configuration display to the aircraft currently loaded in MSFS. Monitored items can include landing gear, flap position and aircraft-specific detents, speedbrakes, parking brake, exterior lights, altimeter setting, selected altitude, autopilot modes, engine anti-ice, fuel quantity, wind information and overspeed or stall warnings.
+
+Available data depends on the values exposed by the aircraft through SimConnect.
+
+Aircraft-Adaptive Flight Management Card
+
+The flight-management reference card adapts its terminology to the detected aircraft family: MCDU for Airbus, CDU for Boeing, and a generic FMS presentation for other compatible aircraft. It provides a structured reference for entering route, departure, arrival and approach information manually into the aircraft.
+
+NaviXav does not attempt to automate unsupported aircraft performance calculations.
+
+Moving Map
+
+The integrated moving map can display the SimBrief route, SID, en-route, STAR and approach segments, the current aircraft position and flown track, departure and arrival airports, selected runway information, the ground taxi route, several selectable styles, and route-fitting or aircraft-follow modes. All map data is displayed inside the installed NaviXav desktop application.
+
+Official Chart Coverage
+
+NaviXav connects directly to the following official national sources:
+
+France: SIA eAIP
+
+Spain and the Canary Islands: ENAIRE AIP
+
+Netherlands: LVNL eAIP
+
+United States and covered territories: FAA d-TPP
+
+Charts are downloaded only when requested and cached locally. Automatic minima extraction is currently limited to recognised French SIA ILS CAT I chart formats, and extracted values must always be reviewed and validated by the user.
+
+Requirements
+
+Windows 10 or Windows 11, 64-bit
+
+Microsoft Flight Simulator 2024
+
+A SimBrief account and a previously generated SimBrief OFP
+
+Internet access for SimBrief data, map tiles, weather, official charts and update checks
+
+Microsoft Edge WebView2 Runtime
+
+Python and a separate system-wide SimConnect installation are not required. NaviXav includes its own application-private SimConnect client components and communicates with the SimConnect service provided by Microsoft Flight Simulator.
+
+Installation
+
+Extract the downloaded Flightsim.to ZIP archive.
+
+Run NaviXav-Setup-1.4.7.exe.
+
+Follow the installation wizard.
+
+Start NaviXav from the Windows Start menu or the optional desktop shortcut.
+
+Open Settings and enter your SimBrief Pilot ID or username.
+
+Start Microsoft Flight Simulator 2024.
+
+Load a flight and wait for the MSFS connection indicator to turn green.
+
+NaviXav is an external Windows desktop application. Do not install it in the MSFS Community folder. The recommended installer checks whether Microsoft Edge WebView2 Runtime is available and can install the official Microsoft component when required.
+
+Antivirus and False Positives
+
+NaviXav is a Python application packaged into a standalone Windows executable. Unsigned executables built this way are sometimes flagged by generic machine-learning heuristics — typically as Wacatac or a similar generic label — without any actual malicious code being present.
+
+This build ships uncompressed and carries full publisher metadata, which removes the usual cause of those warnings. The application is not code-signed, so Windows SmartScreen may still warn on first run. The SHA-256 checksum of every published file is provided so that you can verify your download.
+
+If your antivirus reports NaviXav, please report it here with the version number rather than assuming the worst — vendor false-positive submissions are what get these resolved for everyone.
+
+First Use
+
+Create and generate a flight plan on SimBrief.
+
+Start Microsoft Flight Simulator and load your flight.
+
+Start NaviXav and open Settings.
+
+Enter your SimBrief Pilot ID or username.
+
+Import your latest generated SimBrief plan.
+
+Review the suggested runways and terminal procedures.
+
+Validate all important information before entering it into the aircraft.
+
+A demonstration mode is also available for discovering the interface without an active MSFS or SimBrief connection. It replays an entire flight from your plan — taxi, take-off, climb, cruise, descent, approach, landing and arrival stand.
+
+Local Flight Summaries
+
+NaviXav keeps only a concise local summary of completed flights. It does not store a detailed replay or a permanent position history. Summaries can be deleted at any time using the purge function and never leave the user's computer.
+
+Privacy
+
+NaviXav has no advertising telemetry and does not identify or profile its users. User settings, the MSFS navigation cache, map preferences, completed-flight summaries and rotating diagnostic logs all remain stored locally. Diagnostic logs never contain the SimBrief Pilot ID, SimBrief username or complete flight route.
+
+The installed desktop application accesses the internet only to retrieve selected aviation data — SimBrief flight plans, map tiles, official charts, weather information and update availability. These are outbound requests made by the installed Windows application; NaviXav is not delivered or operated as an online web application.
+
+Freeware
+
+NaviXav is completely free. No feature, update or content is locked behind a payment. Any financial support offered by users is entirely voluntary and provides no exclusive functionality or priority access.
+
+Known Limitations
+
+Microsoft Flight Simulator 2020 compatibility is not currently claimed.
+
+A flight must be fully loaded in MSFS before live SimConnect data becomes available.
+
+A SimBrief OFP must already have been generated before NaviXav can retrieve it.
+
+Procedure suggestions may differ from current ATIS information or ATC clearances.
+
+Ground taxi guidance depends on the taxiway data published by the simulator for each airport, and is advisory only — it is not an ATC clearance.
+
+Official chart availability is limited to the supported national sources listed above, and automatic minima extraction is not available for every chart format.
+
+Some third-party aircraft may expose incomplete or aircraft-specific SimConnect values.
+
+Internet-dependent features remain unavailable while offline, although previously cached local navigation information may remain available.
+
+The application is not code-signed, so Windows SmartScreen may warn on first run.
+
+Support
+
+NaviXav is developed by Xavier BEGUE (xalacaga).
+
+When reporting an issue, please include the NaviXav version, your Windows version, your Microsoft Flight Simulator version, the aircraft type and a clear description of the problem.
+
+Never publish your SimBrief Pilot ID, username or other personal information in a public comment.
+
+License and Credits
+
+NaviXav is distributed under the Apache License 2.0. Copyright 2026 Xavier BEGUE.
+
+Microsoft Flight Simulator, MSFS, SimConnect, Microsoft Edge and WebView2 are trademarks of the Microsoft group of companies. Map data and tiles are provided by OpenStreetMap contributors. Runtime aeronautical information and official charts remain subject to the terms and conditions of their respective providers.
+
+NaviXav is an independent project and is not affiliated with or endorsed by Microsoft, Navigraph, SimBrief, national AIS authorities or the FAA.

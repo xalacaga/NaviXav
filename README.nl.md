@@ -80,10 +80,21 @@ tonen:
 - het Top of Descent en een indicatieve daalsnelheid op een helling van 3°;
 - de afwijking ten opzichte van het geplande verticale profiel.
 
-Het lokale journaal bewaart geen gedetailleerd vluchtspoor. Na de landing wordt
-alleen een samenvatting met duur, afstand en maximale hoogte opgeslagen. Alle
-samenvattingen kunnen via de interface worden gewist en er worden geen
-vluchtgegevens naar externe diensten verzonden.
+Na de landing bewaart het lokale logboek een beknopte vluchtsamenvatting en een
+begrensde tijdlijn: vluchtfasen, start- en landingsbaan met de waargenomen wind,
+en stabiele wijzigingen aan landingsgestel, flaps, spoilers, parkeerrem,
+verlichting en stuurautomaatmodi. Gebeurtenissen worden als gegevens opgeslagen
+en afgespeeld in de taal die dan is geselecteerd. Alle samenvattingen kunnen
+via de interface worden gewist en er worden geen vluchtgegevens naar externe
+diensten verzonden.
+
+Voor flaps, spoilers en parkeerrem vergelijkt NaviXav de officiële SimVars voor
+hendel, effectieve stand, klepstand en cockpitindicator. Vliegtuigconfiguratie
+en vluchtgebeurtenissen blijven daardoor bijwerken als een toestel van derden
+één standaardwaarde van MSFS laat vaststaan.
+Een speciale adapter voor de Fenix A319/A320/A321 leest de drie cockpitbedieningen
+rechtstreeks uit. Wijzigingen aan flaps, speedbrakes en parkeerrem worden daardoor
+ook gemeld wanneer de motoren en hydraulische systemen uitgeschakeld zijn.
 
 ### MCDU-kaart
 
@@ -116,6 +127,13 @@ NaviXav gebruikt SimConnect om:
 De simulator moet draaien met een geladen vlucht om nieuwe gegevens op te
 halen. Reeds gecachete informatie blijft offline beschikbaar.
 
+Wanneer het gedetailleerde SimBrief-navlog gevalideerde coördinaten bevat,
+gebruikt NaviXav die meteen voor de routeweergave en vraagt het alleen
+ontbrekende posities op via MSFS Facilities. Gepubliceerde procedurekoppelingen
+voorkomen eveneens onnodige positieaanvragen. Daardoor wordt het eerste plan
+sneller geladen, terwijl corridorcontroles en de lokale MSFS-cache als
+terugvaloptie behouden blijven.
+
 ### Kaart
 
 De kaart omvat:
@@ -138,8 +156,10 @@ vluchtkaart en uitsluitend opgebouwd uit native MSFS-faciliteiten:
 - een donkere luchtvaartachtergrond met metrisch raster en noordpijl geeft
   schaal en oriëntatie zonder de drukte van een wegenkaart;
 - banen, primaire taxibanen, opstelplaatsen en het vliegtuig krijgen visuele prioriteit;
-- secundaire taxibanen en toegangen tot opstelplaatsen zijn standaard verborgen
-  en worden met **Secundair** op verzoek getoond;
+- benoemde taxibanen blijven zichtbaar, ook wanneer MSFS ze als algemene
+  `path`-segmenten classificeert; alleen naamloze secundaire verbindingen en
+  toegangen tot opstelplaatsen zijn standaard verborgen en worden met
+  **Secundair** op verzoek getoond;
 - bij vertrek stelt NaviXav, wanneer het vliegtuig binnen 180 m van een stand
   aan de grond staat, automatisch een route naar de gekozen baan voor;
 - een klik op een andere stand vervangt het voorstel onmiddellijk; bij aankomst
@@ -385,8 +405,23 @@ vluchtvolging, kaart, beperkingen, MCDU-, vliegtuig- en officiële kaartgegevens
 Instellingen, afsluiten en updates blijven voorbehouden aan de pc. Sta NaviXav,
 als Windows dit vraagt, alleen toe op privénetwerken.
 
+Op externe schermen smaller dan 760 px wordt de MSFS-verbindingsstatus beperkt
+tot de gekleurde statusstip, zodat `MSFS connected` niet buiten de werkbalk
+valt. Het vertaalde label blijft beschikbaar voor ondersteunende technologieën.
+De mobiele werkbalk biedt ook een eigen taalkeuze zonder de instellingen die
+alleen op de pc beschikbaar zijn vrij te geven.
+
 NaviXav past de interface automatisch aan bij het schalen:
 
+- boven 1100 px verhuist de modulenavigatie naar een compacte zwevende balk
+  linksboven met een duidelijke actieve markering; de korte keuze **Vluchtplan**
+  opent Vertrek, Route en Aankomst als een gewone exclusieve module zonder
+  inklapfunctie, is standaard geselecteerd en elke keuze schuift rechtstreeks naar de inhoud. Het
+  hoofdgebied gebruikt alle resterende breedte en een geopende officiële PDF
+  vult het volledige raster. Smallere vensters houden de horizontale keuze en
+  mobiele schermen hun toegankelijke zijpaneel. Wanneer een globale vluchtmelding
+  een tweede kopregel toevoegt, schuift de desktopbalk automatisch omlaag en na
+  het verdwijnen van de melding weer omhoog;
 - boven 1100 px kunnen de kaarten Vertrek, Route en Aankomst naast elkaar
   worden getoond;
 - onder 1100 px gaan deze kaarten naar één kolom;

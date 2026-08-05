@@ -90,6 +90,14 @@ Höhenmessereinstellung, die Autopilotmodi, die gewählte Höhe, den Kraftstoff 
 Bord und den tatsächlichen Wind. Die Einheiten werden beim Simulator angefragt
 und nie nachträglich umgerechnet.
 
+Für Klappen, Bremsklappen und Parkbremse vergleicht NaviXav die offiziellen
+SimVars für Hebel, effektive Position, Flächenposition und Cockpitanzeige.
+Flugzeugkonfiguration und Flugereignisse bleiben dadurch aktiv, wenn ein
+Drittanbieterflugzeug einen MSFS-Standardwert einfriert.
+Ein eigener Adapter für die Fenix A319/A320/A321 liest alle drei Cockpithebel
+direkt aus. Änderungen an Klappen, Bremsklappen und Parkbremse werden daher auch
+bei abgeschalteten Triebwerken und Hydrauliksystemen gemeldet.
+
 #### Visuelle Warnungen
 
 NaviXav überwacht diese Konfiguration und meldet Versäumnisse: Fahrwerk im
@@ -116,10 +124,13 @@ Lage zusammen, und das gesamte System lässt sich im Panel abschalten. Das
 Blinken, das kritischen Warnungen vorbehalten ist, entfällt, wenn das System
 reduzierte Bewegung anfordert.
 
-Das lokale Journal speichert keine detaillierte Flugspur. Nach der Landung
-bleibt nur eine Zusammenfassung mit Dauer, Entfernung und maximaler Höhe
-erhalten. Alle Zusammenfassungen können in der Oberfläche gelöscht werden;
-Flugdaten werden nicht an externe Dienste gesendet.
+Nach der Landung speichert das lokale Logbuch eine kurze Flugzusammenfassung
+und eine begrenzte Ereigniszeitleiste: Flugphasen, Start- und Landebahn mit dem
+beobachteten Wind sowie stabile Änderungen an Fahrwerk, Klappen, Spoilern,
+Parkbremse, Beleuchtung und Autopilotmodi. Die Ereignisse werden als Daten
+gespeichert und in der aktuell gewählten Sprache wiedergegeben. Alle
+Zusammenfassungen können in der Oberfläche gelöscht werden; Flugdaten werden
+nicht an externe Dienste gesendet.
 
 ### MCDU-Blatt
 
@@ -152,6 +163,13 @@ NaviXav nutzt SimConnect, um:
 Der Simulator muss mit geladenem Flug laufen, um neue Daten abzurufen. Bereits
 zwischengespeicherte Informationen bleiben offline verfügbar.
 
+Wenn das ausführliche SimBrief-Navlog validierte Koordinaten enthält, verwendet
+NaviXav sie sofort für die Streckendarstellung und fragt MSFS Facilities nur
+für fehlende Positionen ab. Veröffentlichte Verfahrensverknüpfungen vermeiden
+ebenfalls unnötige Positionsabfragen. Dadurch wird der erste Plan schneller
+geladen; Korridorprüfungen und der lokale MSFS-Cache bleiben als Absicherung
+erhalten.
+
 ### Karte
 
 Die Karte umfasst:
@@ -179,8 +197,10 @@ der Flugkarte und ausschließlich aus nativen MSFS-Einrichtungen aufgebaut:
 - ein dunkler Luftfahrthintergrund mit metrischem Raster und Nordpfeil liefert
   Maßstab und Orientierung ohne den Ballast einer Straßenkarte;
 - Bahnen, Hauptrollwege, Standplätze und Flugzeug werden visuell priorisiert;
-- Nebenrollwege und Standplatzzufahrten sind standardmäßig verborgen und
-  werden mit **Nebenwege** bei Bedarf eingeblendet;
+- benannte Rollwege bleiben auch dann sichtbar, wenn MSFS sie als allgemeine
+  `path`-Segmente einstuft; nur unbenannte Nebenverbindungen und
+  Standplatzzufahrten sind standardmäßig verborgen und werden mit
+  **Nebenwege** bei Bedarf eingeblendet;
 - beim Abflug schlägt NaviXav innerhalb von 180 m um einen Standplatz automatisch
   eine Route von dort zur gewählten Bahn vor;
 - ein Klick auf einen anderen Standplatz ersetzt den Vorschlag sofort; bei der
@@ -431,8 +451,23 @@ Live-Verfolgung, Karte, Einschränkungen, MCDU-, Flugzeug- und amtliche
 Kartendaten. Einstellungen, Beenden und Updates bleiben dem PC vorbehalten.
 Wenn Windows fragt, NaviXav nur für private Netzwerke zulassen.
 
+Auf entfernten Bildschirmen unter 760 px wird der MSFS-Verbindungsstatus auf
+den farbigen Statuspunkt reduziert, damit `MSFS connected` nicht aus der
+Werkzeugleiste herausragt. Die übersetzte Bezeichnung bleibt für assistive
+Technologien verfügbar. Die mobile Werkzeugleiste bietet außerdem eine eigene
+Sprachauswahl, ohne die PC-exklusiven Einstellungen freizugeben.
+
 NaviXav passt seine Oberfläche beim Skalieren automatisch an:
 
+- über 1100 px wechselt die Modulnavigation in eine kompakte schwebende Leiste
+  oben links mit einer klaren Aktivmarkierung; der kurze Eintrag **Flugplan** öffnet
+  Abflug, Route und Ankunft als normales exklusives Modul ohne Einklappen, ist standardmäßig ausgewählt und
+  jede Auswahl springt direkt zum Inhalt. Der Hauptbereich nutzt die gesamte
+  Restbreite und ein geöffnetes offizielles PDF spannt die ganze Kartengruppe
+  auf. Schmalere Desktopfenster behalten die horizontale Auswahl und
+  Mobilgeräte ihren barrierearmen Drawer. Fügt ein globaler Flugalarm dem Header
+  eine zweite Zeile hinzu, weicht die Desktopleiste automatisch nach unten aus
+  und kehrt nach Ende des Alarms nach oben zurück;
 - über 1100 px können die Karten Abflug, Route und Ankunft nebeneinander
   stehen;
 - unter 1100 px wechseln diese Karten in eine einzige Spalte;

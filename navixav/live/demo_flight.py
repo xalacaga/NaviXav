@@ -358,12 +358,17 @@ class DemoFlightSource:
             gear_extended_pct=100.0 if gear_down else 0.0,
             flaps_handle_index=flaps_index,
             flaps_extended_pct=flaps_pct,
+            # Aile de démonstration braquée à 40° pleins volets.
+            flaps_angle_deg=round(flaps_pct * 0.4, 1),
             spoilers_handle_pct=spoilers_pct,
             spoilers_armed=spoilers_armed,
             parking_brake=stopped or holding,
             lights=lights,
             altimeter_hpa=1013.0 if altitude > 6000 else 1017.0,
             indicated_altitude_ft=round(altitude, 1),
+            # Le vol de démonstration se déroule en atmosphère standard : le
+            # niveau de vol y coïncide avec l'altitude simulée.
+            pressure_altitude_ft=round(altitude, 1),
             autopilot_master=autopilot,
             autopilot_nav_lock=autopilot,
             autopilot_approach_hold=bool(in_final and autopilot),

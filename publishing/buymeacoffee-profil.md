@@ -22,6 +22,12 @@ altitudes de transition, cartes officielles, suivi en temps réel.
 Tout tourne en local sur votre machine, sans compte, sans télémétrie, sans pub.
 C'est gratuit et ça le restera.
 
+Je le dis franchement : j'écris NaviXav avec l'aide d'assistants de code IA.
+Je conçois les fonctions, je relis, je teste en vol et je décide de ce qui
+sort ; plus de quatre cents tests automatisés doivent passer avant qu'une
+version soit publiée, et tout le code source est ouvert sous licence Apache
+2.0. Vous savez donc exactement ce que vous installez.
+
 Derrière, il y a beaucoup de soirées passées à lire des specs de navigation, à
 traquer des bugs SimConnect et à traduire l'interface en huit langues. Un café,
 c'est votre façon de me dire que ça vous sert — et ça m'aide à continuer

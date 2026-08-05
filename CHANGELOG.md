@@ -2,16 +2,66 @@
 
 ## [1.4.7] - 2026-08-05
 
-## Fixed
+### Added
 
+- Flight tracking now records a bounded, debounced event timeline with a
+  proportional phase ribbon and grouped events for runways, observed wind,
+  flight phases, gear, flaps, spoilers, parking brake, lights and autopilot
+  modes.
+- Completed-flight summaries retain that timeline in the local logbook. Events
+  are stored as language-neutral data and replay in the currently selected
+  interface language.
+
+### Fixed
+
+- Aircraft configuration and Flight events now follow flaps, spoilers and the
+  parking brake even when a third-party aircraft freezes one standard SimVar.
+  NaviXav cross-checks the official handle, effective-position,
+  surface-position and cockpit-indicator values, and a previous 100% flap
+  extension can no longer pin the display to `FULL` after the lever moves.
+  A dedicated Fenix A319/A320/A321 adapter reads the flap, speedbrake and
+  parking-brake cockpit variables directly, including with engines and
+  hydraulic systems off.
+- Named taxiways now remain visible on the ground chart when MSFS classifies
+  them as generic `path` segments, as at LCPH. Only unnamed secondary links and
+  stand access paths stay hidden behind the **Secondary** control.
+- On remote mobile screens narrower than 760 px, the MSFS connection status is
+  now shown as an accessible coloured dot instead of the overflowing
+  `MSFS connected` label.
+- Airbus aircraft exposing five physical flap-handle positions now display the
+  correct `0`, `1`, `2`, `3`, `FULL` detents instead of shifting every position
+  above `1` down by one.
+- Aircraft without a known flap profile now display the handle position and
+  measured flap angle instead of an ambiguous travel percentage; non-Airbus
+  final detents retain their angle instead of becoming `FULL`.
+- Flight level and cruise-phase detection now use pressure altitude in the
+  standard atmosphere instead of true altitude, preventing warm-air errors
+  such as displaying FL342 for an aircraft level at FL330.
+- Constraints, official charts, chart minima, MCDU chart guidance, simulator
+  taxi labels, connection tooltips and error banners now follow the selected
+  interface language.
 - The Windows installer and the application are no longer flagged as a threat by antivirus heuristics : the executable is shipped uncompressed and now carries full publisher information.
 - The installer and the application now consistently show Xalacaga as the publisher.
 
-## Changed
+### Changed
 
-- Correction bug.
-- Modif build exe.
-- Make English the default documentation language.
+- Wide desktop windows now use a compact glass-effect module rail at the upper left
+  with a clearer active state. Its concise **Flight plan** entry behaves like
+  every other exclusive module and replaces the old collapsible Departure,
+  Route and Arrival section. It is selected by default, and every choice scrolls directly to its content.
+  The main area now fills all space beside the rail, and an opened official PDF
+  expands across the complete chart grid. When a global flight alert adds a
+  second header row, the rail automatically moves below it instead of
+  overlapping the first module. Compact desktop windows retain the
+  horizontal selector and mobile navigation keeps its accessible side drawer.
+- First plan preparation now reuses validated coordinates from the detailed
+  SimBrief navlog and published procedure links before querying MSFS Facilities.
+  Missing positions still use the MSFS cache and SimConnect fallback, with the
+  existing route-corridor safeguards.
+- Phones and tablets can select their display language directly from the mobile
+  toolbar while PC-only settings remain unavailable remotely.
+- English is now the source language for the documentation; localized README
+  files are synchronized from it after user-facing changes.
 
 The installer is verified against its SHA-256 checksum before any automatic update.
 

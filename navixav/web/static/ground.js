@@ -225,10 +225,14 @@ const GROUND = (() => {
       // Les routes de service ne concernent pas l'avion ; les tracer avec les
       // voies doublait la densité du plan pour rien.
       if (taxiway.kind === "vehicle") continue;
-      // At airport scale, stand lead-ins and unnamed links create most of the
-      // visual noise. The selected route is still drawn above the network;
-      // secondary details come back when the pilot zooms in.
-      const secondary = taxiway.kind === "parking" || taxiway.kind === "path";
+      // MSFS uses `path` both for anonymous secondary links and for real,
+      // published taxiways at some airports (LCPH exposes A, B, K, etc. this
+      // way). A name therefore takes precedence over the generic kind: named
+      // taxiways remain visible, while stand lead-ins and anonymous paths stay
+      // behind the Secondary control.
+      const secondary = taxiway.kind === "parking" || (
+        taxiway.kind === "path" && !String(taxiway.name || "").trim()
+      );
       if (secondary && !showSecondaryTaxiways) continue;
       const [x1, y1] = toScreen(taxiway.start.x, taxiway.start.y);
       const [x2, y2] = toScreen(taxiway.end.x, taxiway.end.y);
@@ -352,7 +356,9 @@ const GROUND = (() => {
         context.font = active
           ? "700 11px 'Inter', system-ui, sans-serif"
           : "600 10px 'Inter', system-ui, sans-serif";
-        context.fillText(parking.label, x, y + radius + 9);
+        // Le libellé du service est français : seul l'affichage est traduit,
+        // la sélection continue de se faire sur l'étiquette d'origine.
+        context.fillText(window.I18N.groundLabel(parking.label), x, y + radius + 9);
       }
     }
     context.restore();

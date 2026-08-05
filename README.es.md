@@ -81,10 +81,21 @@ para mostrar:
 - el Top of Descent y un régimen de descenso indicativo con pendiente de 3°;
 - la desviación respecto al perfil vertical previsto.
 
-El diario local no conserva ninguna traza detallada. Después del aterrizaje,
-solo guarda un resumen con la duración, la distancia y la altitud máxima. Todos
-los resúmenes pueden purgarse desde la interfaz y no se envían datos de vuelo a
+Tras el aterrizaje, el diario local guarda un resumen conciso y una cronología
+limitada de eventos: fases del vuelo, pista de despegue y aterrizaje con el
+viento observado, y cambios estables del tren, flaps, spoilers, freno de
+estacionamiento, luces y modos del piloto automático. Los eventos se almacenan
+como datos y se reproducen en el idioma seleccionado en ese momento. Todos los
+resúmenes pueden purgarse desde la interfaz y no se envían datos de vuelo a
 servicios externos.
+
+Para flaps, spoilers y freno de estacionamiento, NaviXav compara las SimVars
+oficiales de palanca, posición efectiva, superficie e indicador de cabina. La
+configuración del avión y los eventos de vuelo siguen actualizándose aunque un
+avión de terceros deje congelado uno de los valores estándar de MSFS.
+Un adaptador específico para los Fenix A319/A320/A321 lee directamente los tres
+mandos de cabina, de modo que los cambios de flaps, aerofrenos y freno de
+estacionamiento se notifican incluso con motores y sistemas hidráulicos apagados.
 
 ### Ficha MCDU
 
@@ -117,6 +128,13 @@ NaviXav utiliza SimConnect para:
 El simulador debe estar iniciado con un vuelo cargado para obtener nuevos
 datos. La información ya almacenada en caché permanece disponible sin conexión.
 
+Cuando el registro de navegación detallado de SimBrief incluye coordenadas
+validadas, NaviXav las usa de inmediato para dibujar la ruta y solo consulta
+MSFS Facilities para las posiciones que faltan. Los enlaces de procedimientos
+publicados también evitan consultas de posición innecesarias. Así se acelera la
+primera carga del plan sin perder las comprobaciones del corredor ni la caché
+local de MSFS como alternativa.
+
 ### Mapa
 
 El mapa incluye:
@@ -139,8 +157,10 @@ vuelo y construido únicamente con las instalaciones nativas de MSFS:
 - un fondo aeronáutico oscuro con cuadrícula métrica y flecha norte aporta
   escala y orientación sin el ruido de un mapa de carreteras;
 - pistas, calles principales, puestos y avión tienen prioridad visual;
-- las calles secundarias y los accesos a puestos están ocultos por defecto y
-  el botón **Secundarias** los muestra bajo demanda;
+- las calles de rodaje con nombre permanecen visibles aunque MSFS las
+  clasifique como segmentos genéricos `path`; solo los enlaces secundarios sin
+  nombre y los accesos a puestos se ocultan por defecto, y el botón
+  **Secundarias** los muestra bajo demanda;
 - en salida, si el avión está en tierra a menos de 180 m de un puesto, NaviXav
   propone automáticamente la ruta hasta la pista seleccionada;
 - al pulsar otro puesto se sustituye inmediatamente la propuesta; en llegada,
@@ -384,8 +404,23 @@ mapa, restricciones, datos del MCDU, del avión y cartas oficiales. Los ajustes,
 el cierre y las actualizaciones quedan reservados al PC. Si Windows lo solicita,
 autoriza NaviXav solo en redes privadas.
 
+En pantallas remotas de menos de 760 px, el estado de conexión con MSFS se
+reduce a su punto de color para que `MSFS connected` no desborde la barra de
+herramientas. La etiqueta traducida sigue disponible para las tecnologías de
+asistencia. La barra móvil también ofrece su propio selector de idioma sin
+exponer los ajustes reservados al PC.
+
 NaviXav adapta automáticamente su interfaz al redimensionar:
 
+- por encima de 1100 px, la navegación entre módulos pasa a una barra flotante
+  compacta en la parte superior izquierda, con un indicador activo claro; la entrada breve
+  **Plan de vuelo** abre Salida, Ruta y Llegada como un módulo exclusivo normal,
+  sin control para contraer, está seleccionada por defecto y cada opción lleva directamente a su contenido.
+  El área principal usa todo el ancho restante y un PDF oficial abierto ocupa
+  toda la cuadrícula. Las ventanas más estrechas conservan el selector
+  horizontal y los móviles su panel lateral accesible. Cuando una alerta global
+  añade una segunda fila al encabezado, la barra de escritorio baja
+  automáticamente y vuelve a subir al desaparecer la alerta;
 - por encima de 1100 px, las tarjetas Salida, Ruta y Llegada pueden mostrarse
   una junto a otra;
 - por debajo de 1100 px, estas tarjetas pasan a una sola columna;

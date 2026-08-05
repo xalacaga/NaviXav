@@ -63,6 +63,52 @@ function Set-VersionInFile(
     )
 }
 
+# Les textes de publication (Flightsim.to, Buy Me a Coffee, notice de
+# l'installateur) annoncent un numéro de version et un nom de fichier
+# d'installation. Laissés à la main, ils dérivent silencieusement et la page
+# publique finit par décrire une version que plus personne ne télécharge.
+function Update-PublishingVersions([string]$Current, [string]$Next) {
+    $Root = Join-Path $ProjectRoot "publishing"
+    if (-not (Test-Path -LiteralPath $Root)) { return }
+
+    $Pattern = [regex]::Escape($Current)
+    $Touched = @()
+    foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
+        $Content = [System.IO.File]::ReadAllText($File.FullName)
+        $Updated = [regex]::Replace($Content, $Pattern, $Next)
+        if ($Updated -ne $Content) {
+            [System.IO.File]::WriteAllText(
+                $File.FullName,
+                $Updated,
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $Touched += $File.Name
+        }
+    }
+
+    # Garde-fou : toute version résiduelle signale une publication oubliée.
+    $Stale = @()
+    foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
+        $Content = [System.IO.File]::ReadAllText($File.FullName)
+        foreach ($Match in [regex]::Matches($Content, '\d+\.\d+\.\d+')) {
+            if ($Match.Value -ne $Next) {
+                $Stale += "$($File.Name) : $($Match.Value)"
+            }
+        }
+    }
+    if ($Stale.Count -gt 0) {
+        throw @"
+Publications non alignées sur la version $Next :
+$($Stale | Sort-Object -Unique | ForEach-Object { "  - $_" } | Out-String)
+Corrige ces fichiers dans publishing\ puis relance la préparation.
+"@
+    }
+
+    if ($Touched.Count -gt 0) {
+        Write-Host "Publications alignées : $($Touched -join ', ')" -ForegroundColor Green
+    }
+}
+
 # Espace insécable exigée par la typographie française devant les ponctuations
 # doubles et à l'intérieur des guillemets.
 $NoBreakSpace = [char]0x00A0
@@ -215,6 +261,7 @@ To publish without a visible change, run again with -AllowGenericNotes.
 
 Set-VersionInFile "navixav\__init__.py" '__version__\s*=\s*"\d+\.\d+\.\d+"' "__version__ = `"$Next`""
 Set-VersionInFile "pyproject.toml" '(?m)^version\s*=\s*"\d+\.\d+\.\d+"' "version = `"$Next`""
+Update-PublishingVersions $Current $Next
 
 $Features = @($Commits | Where-Object { $_ -match '^feat(\([^)]+\))?!?:' })
 $Fixes = @($Commits | Where-Object { $_ -match '^fix(\([^)]+\))?:' })

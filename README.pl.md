@@ -82,10 +82,20 @@ wyświetlić:
 - Top of Descent oraz orientacyjną prędkość zniżania na ścieżce 3°;
 - odchylenie od zaplanowanego profilu pionowego.
 
-Lokalny dziennik nie przechowuje szczegółowego śladu lotu. Po lądowaniu
-zapisywane jest tylko podsumowanie z czasem trwania, odległością i maksymalną
-wysokością. Wszystkie podsumowania można usunąć z interfejsu, a dane lotu nie
-są wysyłane do usług zewnętrznych.
+Po lądowaniu lokalny dziennik zapisuje zwięzłe podsumowanie lotu i ograniczoną
+oś zdarzeń: fazy lotu, drogę startową startu i lądowania z zaobserwowanym
+wiatrem oraz stabilne zmiany podwozia, klap, spoilerów, hamulca postojowego,
+świateł i trybów autopilota. Zdarzenia są zapisywane jako dane i odtwarzane w
+aktualnie wybranym języku. Wszystkie podsumowania można usunąć z interfejsu,
+a dane lotu nie są wysyłane do usług zewnętrznych.
+
+Dla klap, spoilerów i hamulca postojowego NaviXav porównuje oficjalne SimVars
+dźwigni, pozycji efektywnej, powierzchni i wskaźnika kokpitu. Konfiguracja
+samolotu i zdarzenia lotu są dzięki temu aktualizowane nawet wtedy, gdy samolot
+zewnętrzny pozostawia jedną standardową wartość MSFS bez zmian.
+Dedykowany adapter Fenix A319/A320/A321 odczytuje bezpośrednio trzy dźwignie w
+kokpicie, dlatego zmiany klap, spoilerów i hamulca postojowego są rejestrowane
+również przy wyłączonych silnikach i układach hydraulicznych.
 
 ### Karta MCDU
 
@@ -118,6 +128,13 @@ NaviXav wykorzystuje SimConnect, aby:
 Symulator musi być uruchomiony z wczytanym lotem, aby pobrać nowe dane.
 Informacje już zapisane w pamięci podręcznej pozostają dostępne offline.
 
+Gdy szczegółowy dziennik nawigacyjny SimBrief zawiera zweryfikowane
+współrzędne, NaviXav od razu wykorzystuje je do rysowania trasy i odpytuje
+MSFS Facilities tylko o brakujące pozycje. Opublikowane powiązania procedur
+również eliminują zbędne wyszukiwanie pozycji. Pierwsze wczytanie planu jest
+dzięki temu szybsze, przy zachowaniu kontroli korytarza i lokalnej pamięci
+podręcznej MSFS jako rozwiązania awaryjnego.
+
 ### Mapa
 
 Mapa obejmuje:
@@ -140,8 +157,10 @@ i zbudowany wyłącznie z natywnych obiektów MSFS:
 - ciemne tło lotnicze z siatką metryczną i strzałką północy daje skalę oraz
   orientację bez bałaganu mapy drogowej;
 - drogi startowe, główne drogi kołowania, stanowiska i samolot mają priorytet wizualny;
-- drugorzędne drogi i dojazdy do stanowisk są domyślnie ukryte, a przycisk
-  **Drugorzędne** pokazuje je na żądanie;
+- nazwane drogi kołowania pozostają widoczne nawet wtedy, gdy MSFS klasyfikuje
+  je jako ogólne segmenty `path`; domyślnie ukryte są tylko nienazwane
+  połączenia drugorzędne i dojazdy do stanowisk, a przycisk **Drugorzędne**
+  pokazuje je na żądanie;
 - przy odlocie NaviXav automatycznie proponuje trasę do wybranej drogi startowej,
   gdy samolot stoi na ziemi w odległości do 180 m od stanowiska;
 - kliknięcie innego stanowiska natychmiast zastępuje propozycję; po przylocie
@@ -385,8 +404,23 @@ podłączonym do tej samej sieci Wi-Fi. Interfejs mobilny udostępnia śledzenie
 zamykanie i aktualizacje pozostają dostępne tylko na komputerze. Jeśli Windows
 zapyta, zezwól NaviXav wyłącznie w sieciach prywatnych.
 
+Na ekranach zdalnych węższych niż 760 px stan połączenia MSFS jest pokazywany
+wyłącznie jako kolorowa kropka, dzięki czemu `MSFS connected` nie wychodzi poza
+pasek narzędzi. Przetłumaczona etykieta pozostaje dostępna dla technologii
+wspomagających.
+Mobilny pasek narzędzi zawiera również własny wybór języka bez udostępniania
+ustawień przeznaczonych wyłącznie dla komputera.
+
 NaviXav automatycznie dostosowuje interfejs przy zmianie rozmiaru:
 
+- powyżej 1100 px nawigacja między modułami przechodzi do kompaktowego,
+  pływającego panelu u góry po lewej z wyraźnym oznaczeniem aktywnej pozycji; krótka
+  pozycja **Plan lotu** otwiera Odlot, Trasę i Przylot jako zwykły, wyłączny
+  moduł bez zwijania, jest domyślnie wybrana, a każdy wybór przewija bezpośrednio do treści. Główna
+  część wykorzystuje całą pozostałą szerokość, a otwarty oficjalny PDF zajmuje
+  całą siatkę. Węższe okna zachowują wybór poziomy, a ekrany mobilne dostępny
+  panel boczny. Gdy globalny alert lotu dodaje drugi wiersz nagłówka, panel
+  pulpitu automatycznie przesuwa się niżej i wraca wyżej po zniknięciu alertu;
 - powyżej 1100 px karty Odlot, Trasa i Przylot mogą być wyświetlane obok
   siebie;
 - poniżej 1100 px karty te przechodzą do jednej kolumny;

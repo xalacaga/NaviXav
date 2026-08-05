@@ -49,10 +49,17 @@ _CONFIGURATION_VARIABLES = (
     ("GEAR LEFT POSITION", "Percent"),
     ("GEAR RIGHT POSITION", "Percent"),
     ("FLAPS HANDLE INDEX", "Number"),
+    ("FLAPS EFFECTIVE HANDLE INDEX", "Number"),
+    ("TRAILING EDGE FLAPS LEFT INDEX", "Number"),
+    ("FLAPS HANDLE PERCENT", "Percent"),
     ("TRAILING EDGE FLAPS LEFT PERCENT", "Percent"),
+    ("TRAILING EDGE FLAPS LEFT ANGLE", "Degrees"),
     ("SPOILERS HANDLE POSITION", "Percent"),
+    ("SPOILERS LEFT POSITION", "Percent"),
+    ("SPOILERS RIGHT POSITION", "Percent"),
     ("SPOILERS ARMED", "Bool"),
     ("BRAKE PARKING POSITION", "Bool"),
+    ("BRAKE PARKING INDICATOR", "Bool"),
     ("LIGHT LANDING", "Bool"),
     ("LIGHT TAXI", "Bool"),
     ("LIGHT STROBE", "Bool"),
@@ -62,6 +69,7 @@ _CONFIGURATION_VARIABLES = (
     ("LIGHT WING", "Bool"),
     ("KOHLSMAN SETTING MB", "Millibars"),
     ("INDICATED ALTITUDE", "Feet"),
+    ("PRESSURE ALTITUDE", "Feet"),
     ("AUTOPILOT MASTER", "Bool"),
     ("AUTOPILOT NAV1 LOCK", "Bool"),
     ("AUTOPILOT APPROACH HOLD", "Bool"),
@@ -96,6 +104,16 @@ _CAPABILITY_VARIABLES = (
     ("FLAPS NUM HANDLE POSITIONS", "Number"),
 )
 
+# Le cockpit commun FNX_32X des A319/A320/A321 pilote ses leviers avec ces
+# LVars. Elles sont lues dans un bloc séparé et seulement lorsque le plan chargé
+# identifie un Fenix, afin de ne jamais créer/interpréter ces variables sur un
+# autre appareil.
+_FENIX_CONTROL_VARIABLES = (
+    ("L:S_FC_FLAPS", "Number"),
+    ("L:A_FC_SPEEDBRAKE", "Number"),
+    ("L:S_MIP_PARKING_BRAKE", "Number"),
+)
+
 # Une connexion qui vient d'échouer n'est pas retentée immédiatement.
 _RETRY_DELAY_S = 5.0
 
@@ -118,6 +136,13 @@ class SimConnectSource:
         self._configuration_disabled_until = 0.0
         self._capabilities: AircraftCapabilities | None = None
         self._capabilities_disabled_until = 0.0
+        self._parking_brake_raw: tuple[bool, bool] | None = None
+        self._parking_brake_state: bool | None = None
+        self._flaps_raw: tuple[int, int, int] | None = None
+        self._flaps_index: int | None = None
+        self._spoilers_raw: tuple[float, float, float] | None = None
+        self._spoilers_pct: float | None = None
+        self._aircraft_hint = ""
 
     @property
     def name(self) -> str:
@@ -128,6 +153,14 @@ class SimConnectSource:
         from navixav.msfs.client import DLL_CANDIDATES
 
         return any(path.is_file() for path in DLL_CANDIDATES)
+
+    def set_aircraft_hint(self, hint: str | None) -> None:
+        self._aircraft_hint = str(hint or "").strip().upper()
+
+    def _is_fenix_family(self) -> bool:
+        return "FENIX" in self._aircraft_hint and any(
+            model in self._aircraft_hint for model in ("A319", "A320", "A321")
+        )
 
     # ------------------------------------------------------------------ #
 
@@ -206,15 +239,52 @@ class SimConnectSource:
             values["GEAR LEFT POSITION"],
             values["GEAR RIGHT POSITION"],
         )
+        flaps_index = self._resolve_flaps_index(
+            values["FLAPS HANDLE INDEX"],
+            values["FLAPS EFFECTIVE HANDLE INDEX"],
+            values["TRAILING EDGE FLAPS LEFT INDEX"],
+        )
+        spoilers_pct = self._resolve_spoilers_pct(
+            values["SPOILERS HANDLE POSITION"],
+            values["SPOILERS LEFT POSITION"],
+            values["SPOILERS RIGHT POSITION"],
+        )
+        spoilers_armed = bool(values["SPOILERS ARMED"])
+        parking_brake = self._resolve_parking_brake(
+            values["BRAKE PARKING POSITION"],
+            values["BRAKE PARKING INDICATOR"],
+        )
+
+        if self._is_fenix_family():
+            try:
+                fenix = client.read_simvars(
+                    _FENIX_CONTROL_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+                )
+            except SimConnectError as exc:
+                logger.info("Commandes Fenix indisponibles (%s)", exc)
+            else:
+                flaps_index = max(0, min(4, int(round(fenix["L:S_FC_FLAPS"]))))
+                speedbrake = max(0.0, min(3.0, fenix["L:A_FC_SPEEDBRAKE"]))
+                spoilers_armed = speedbrake < 0.5
+                spoilers_pct = max(0.0, (speedbrake - 1.0) * 50.0)
+                parking_brake = bool(fenix["L:S_MIP_PARKING_BRAKE"])
 
         return AircraftConfiguration(
             gear_handle_down=bool(values["GEAR HANDLE POSITION"]),
             gear_extended_pct=min(gear_positions),
-            flaps_handle_index=int(round(values["FLAPS HANDLE INDEX"])),
+            flaps_handle_index=flaps_index,
+            flaps_effective_index=int(round(values["FLAPS EFFECTIVE HANDLE INDEX"])),
+            flaps_surface_index=int(round(values["TRAILING EDGE FLAPS LEFT INDEX"])),
+            flaps_handle_pct=values["FLAPS HANDLE PERCENT"],
             flaps_extended_pct=values["TRAILING EDGE FLAPS LEFT PERCENT"],
-            spoilers_handle_pct=values["SPOILERS HANDLE POSITION"],
-            spoilers_armed=bool(values["SPOILERS ARMED"]),
-            parking_brake=bool(values["BRAKE PARKING POSITION"]),
+            flaps_angle_deg=values["TRAILING EDGE FLAPS LEFT ANGLE"],
+            spoilers_handle_pct=spoilers_pct,
+            spoilers_surface_pct=max(
+                values["SPOILERS LEFT POSITION"],
+                values["SPOILERS RIGHT POSITION"],
+            ),
+            spoilers_armed=spoilers_armed,
+            parking_brake=parking_brake,
             lights={
                 "landing": bool(values["LIGHT LANDING"]),
                 "taxi": bool(values["LIGHT TAXI"]),
@@ -226,6 +296,7 @@ class SimConnectSource:
             },
             altimeter_hpa=values["KOHLSMAN SETTING MB"],
             indicated_altitude_ft=values["INDICATED ALTITUDE"],
+            pressure_altitude_ft=values["PRESSURE ALTITUDE"],
             autopilot_master=bool(values["AUTOPILOT MASTER"]),
             autopilot_nav_lock=bool(values["AUTOPILOT NAV1 LOCK"]),
             autopilot_approach_hold=bool(values["AUTOPILOT APPROACH HOLD"]),
@@ -252,6 +323,77 @@ class SimConnectSource:
             simulation_rate=values["SIMULATION RATE"],
             capabilities=self._read_capabilities(client),
         )
+
+    def _resolve_parking_brake(self, position: float, indicator: float) -> bool:
+        """Suit celle des deux SimVars de frein qui change réellement.
+
+        Des avions tiers figent parfois POSITION et animent seulement
+        INDICATOR. D'autres font l'inverse. Après le premier échantillon, la
+        variable qui vient de bouger devient donc la référence.
+        """
+        raw = (bool(position), bool(indicator))
+        previous = self._parking_brake_raw
+        if previous is None:
+            state = raw[0] if raw[0] != raw[1] else raw[1]
+        elif raw[0] != previous[0] and raw[1] == previous[1]:
+            state = raw[0]
+        elif raw[1] != previous[1] and raw[0] == previous[0]:
+            state = raw[1]
+        elif raw[0] == raw[1]:
+            state = raw[0]
+        else:
+            state = self._parking_brake_state if self._parking_brake_state is not None else raw[0]
+        self._parking_brake_raw = raw
+        self._parking_brake_state = state
+        return state
+
+    def _resolve_flaps_index(
+        self, handle: float, effective: float, surface: float
+    ) -> int:
+        """Suit l'index de volets qui évolue sur l'appareil chargé."""
+        raw = tuple(int(round(value)) for value in (handle, effective, surface))
+        previous = self._flaps_raw
+        if previous is None:
+            index = raw[0]
+        else:
+            changed = [value for value, old in zip(raw, previous) if value != old]
+            if not changed:
+                index = self._flaps_index if self._flaps_index is not None else raw[0]
+            elif len(set(changed)) == 1:
+                index = changed[0]
+            elif raw[0] != previous[0]:
+                index = raw[0]
+            elif raw[1] != previous[1]:
+                index = raw[1]
+            else:
+                index = raw[2]
+        self._flaps_raw = raw
+        self._flaps_index = index
+        return index
+
+    def _resolve_spoilers_pct(
+        self, handle: float, left_surface: float, right_surface: float
+    ) -> float:
+        """Suit la poignée ou les surfaces, selon ce que l'avion actualise."""
+        raw = (float(handle), float(left_surface), float(right_surface))
+        previous = self._spoilers_raw
+        if previous is None:
+            value = raw[0]
+        else:
+            handle_changed = abs(raw[0] - previous[0]) >= 0.5
+            surfaces_changed = any(
+                abs(value - old) >= 0.5
+                for value, old in zip(raw[1:], previous[1:])
+            )
+            if handle_changed:
+                value = raw[0]
+            elif surfaces_changed:
+                value = max(raw[1:])
+            else:
+                value = self._spoilers_pct if self._spoilers_pct is not None else raw[0]
+        self._spoilers_raw = raw
+        self._spoilers_pct = value
+        return value
 
     def _read_capabilities(self, client: SimConnectClient) -> AircraftCapabilities | None:
         """Capacités de la cellule, relues seulement après un échec."""
@@ -291,6 +433,12 @@ class SimConnectSource:
         self._capabilities = None
         self._capabilities_disabled_until = 0.0
         self._configuration_disabled_until = 0.0
+        self._parking_brake_raw = None
+        self._parking_brake_state = None
+        self._flaps_raw = None
+        self._flaps_index = None
+        self._spoilers_raw = None
+        self._spoilers_pct = None
 
     def close(self) -> None:
         with self._lock:

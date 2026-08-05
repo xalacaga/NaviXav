@@ -76,6 +76,10 @@ def test_non_rnp_aircraft_falls_back_to_the_other_variant(rnp_provider, settings
     assert plan.arrival.approach.value == "ILS Y RWY 32R"
     assert plan.arrival.approach_transition.value == "VECTORS"
     assert any("RNP" in w for w in plan.warnings)
+    alternatives = {
+        item["value"]: item for item in plan.arrival.approach.alternatives
+    }
+    assert alternatives["ILS Z RWY 32R"]["disqualified"] is True
 
 
 def test_rnp_requirement_is_published_on_the_z_variant(rnp_provider):

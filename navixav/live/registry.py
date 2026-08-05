@@ -29,6 +29,14 @@ class LiveTracker:
         with self._lock:
             self._demo = source
 
+    def set_aircraft_hint(self, hint: str | None) -> None:
+        """Indique le modèle planifié aux adaptateurs qui en ont besoin."""
+        with self._lock:
+            for source in self._sources:
+                setter = getattr(source, "set_aircraft_hint", None)
+                if callable(setter):
+                    setter(hint)
+
     def read(self, allow_demo: bool = False) -> AircraftState:
         with self._lock:
             if allow_demo and self._demo is not None:

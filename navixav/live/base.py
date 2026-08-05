@@ -43,15 +43,30 @@ class AircraftConfiguration:
     gear_handle_down: bool | None = None
     gear_extended_pct: float | None = None
     flaps_handle_index: int | None = None
+    flaps_effective_index: int | None = None
+    flaps_surface_index: int | None = None
+    flaps_handle_pct: float | None = None
     flaps_extended_pct: float | None = None
+    # Braquage réel du volet gauche. SimConnect ne publie pas le marquage
+    # inscrit sur le levier ; hors Airbus, ce marquage est justement cet angle.
+    flaps_angle_deg: float | None = None
     spoilers_handle_pct: float | None = None
+    spoilers_surface_pct: float | None = None
     spoilers_armed: bool | None = None
     parking_brake: bool | None = None
     lights: dict[str, bool] = field(default_factory=dict)
 
     # Altimétrie
+    #
+    # Trois altitudes coexistent et ne sont pas interchangeables :
+    # `AircraftState.altitude_ft` est l'altitude vraie, `indicated_altitude_ft`
+    # ce que l'altimètre affiche avec le calage courant, et
+    # `pressure_altitude_ft` la hauteur dans l'atmosphère standard à 1013,25
+    # hPa. Seule cette dernière donne le niveau de vol : en air chaud,
+    # l'altitude vraie la dépasse de plus de mille pieds en croisière.
     altimeter_hpa: float | None = None
     indicated_altitude_ft: float | None = None
+    pressure_altitude_ft: float | None = None
 
     # Automatismes
     autopilot_master: bool | None = None

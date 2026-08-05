@@ -1,0 +1,119 @@
+{
+  "fetch": { "status": "Success" },
+  "params": {
+    "time_generated": "1785000000",
+    "airac": "2604",
+    "units": "KGS"
+  },
+  "general": {
+    "icao_airline": "TRA",
+    "flight_number": "6421",
+    "route": "DCT RDS DCT KEA DCT KOR DCT BEO DCT VIE DCT LASGA DCT DINKU DCT NORKU DCT PAM",
+    "initial_altitude": "36000",
+    "costindex": "28",
+    "cruise_profile": "CI",
+    "climb_profile": "250/300/78",
+    "descent_profile": "78/300/250",
+    "avg_wind_comp": "-018",
+    "avg_wind_dir": "275",
+    "avg_wind_spd": "45",
+    "avg_temp_dev": "2",
+    "avg_tropopause": "37200",
+    "route_distance": "1815",
+    "air_distance": "1870",
+    "gc_distance": "1668"
+  },
+  "fuel": {
+    "taxi": "230",
+    "enroute_burn": "10900",
+    "contingency": "545",
+    "alternate_burn": "1250",
+    "reserve": "1180",
+    "extra": "300",
+    "min_takeoff": "14175",
+    "plan_takeoff": "14475",
+    "plan_ramp": "14705",
+    "plan_landing": "3575",
+    "avg_fuel_flow": "2420",
+    "max_tanks": "18730"
+  },
+  "weights": {
+    "oew": "44300",
+    "pax_count": "168",
+    "pax_count_actual": "168",
+    "bag_count": "154",
+    "cargo": "1450",
+    "payload": "17050",
+    "est_zfw": "61350",
+    "max_zfw": "64300",
+    "est_tow": "75825",
+    "max_tow": "79000",
+    "est_ldw": "64925",
+    "max_ldw": "67400"
+  },
+  "times": {
+    "est_out": "1785002400",
+    "est_off": "1785003300",
+    "est_on": "1785016800",
+    "est_in": "1785017700",
+    "est_time_enroute": "13500",
+    "est_block": "15300"
+  },
+  "origin": {
+    "icao_code": "LCPH",
+    "iata_code": "PFO",
+    "name": "Paphos International",
+    "plan_rwy": "",
+    "elevation": "41",
+    "pos_lat": "34.7180",
+    "pos_long": "32.4857"
+  },
+  "destination": {
+    "icao_code": "EHAM",
+    "iata_code": "AMS",
+    "name": "Amsterdam Schiphol",
+    "plan_rwy": "",
+    "elevation": "-11",
+    "pos_lat": "52.3086",
+    "pos_long": "4.7639"
+  },
+  "alternate": {
+    "icao_code": "EHRD",
+    "name": "Rotterdam The Hague",
+    "route": "DCT",
+    "distance": "32",
+    "ete": "900",
+    "burn": "1250",
+    "cruise_altitude": "10000"
+  },
+  "aircraft": {
+    "icaocode": "A20N",
+    "name": "Airbus A320neo",
+    "reg": "PH-XAV",
+    "equip": "SDE2E3FGHIRWXYZ/LB1",
+    "selcal": "AB-CD"
+  },
+  "atc": {
+    "callsign": "TRA6421",
+    "flightplan_text": "(FPL-TRA6421-IS -A20N/M-SDE2E3FGHIRWXYZ/LB1 -LCPH0730 -N0445F360 DCT RDS DCT KEA DCT KOR DCT BEO DCT VIE DCT LASGA DCT DINKU DCT NORKU DCT PAM -EHAM0345 EHRD -PBN/A1B1C1D1O1S2 REG/PHXAV)"
+  },
+  "weather": {
+    "orig_metar": "LCPH 260730Z 29008KT CAVOK 25/16 Q1012 NOSIG",
+    "dest_metar": "EHAM 260725Z 24012KT 9999 SCT025 18/13 Q1016 NOSIG",
+    "altn_metar": "EHRD 260725Z 24010KT 9999 SCT025 18/13 Q1016 NOSIG"
+  },
+  "navlog": {
+    "fix": [
+      { "ident": "RDS", "name": "RODOS", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "CLB", "pos_lat": "36.4040", "pos_long": "28.0860" },
+      { "ident": "KEA", "name": "KEA", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "37.7000", "pos_long": "24.3000" },
+      { "ident": "KOR", "name": "KORINTHOS", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "37.9300", "pos_long": "22.9400" },
+      { "ident": "BEO", "name": "BELGRADE", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "44.8190", "pos_long": "20.3060" },
+      { "ident": "VIE", "name": "VIENNA", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "48.1100", "pos_long": "16.5700" },
+      { "ident": "LASGA", "name": "LASGA", "type": "wpt", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "49.3400", "pos_long": "13.4500" },
+      { "ident": "DINKU", "name": "DINKU", "type": "wpt", "via_airway": "DCT", "is_sid_star": "0", "stage": "CRZ", "pos_lat": "50.1700", "pos_long": "10.4800" },
+      { "ident": "NORKU", "name": "NORKU", "type": "wpt", "via_airway": "DCT", "is_sid_star": "0", "stage": "DSC", "pos_lat": "51.0200", "pos_long": "7.5500" },
+      { "ident": "PAM", "name": "PAMPUS", "type": "vor", "via_airway": "DCT", "is_sid_star": "0", "stage": "DSC", "pos_lat": "52.3340", "pos_long": "5.0920" },
+      { "ident": "EHAM", "name": "AMSTERDAM SCHIPHOL", "type": "apt", "via_airway": "DCT", "is_sid_star": "0", "stage": "DSC", "pos_lat": "52.3086", "pos_long": "4.7639" }
+    ]
+  }
+}

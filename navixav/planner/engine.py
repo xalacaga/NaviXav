@@ -135,13 +135,32 @@ class CompletionEngine:
             route_path.append({
                 "ident": origin.ident, "lat": origin.lat, "lon": origin.lon, "via": "",
             })
+        elif ofp.origin_lat is not None and ofp.origin_lon is not None:
+            route_path.append({
+                "ident": ofp.origin_icao,
+                "lat": ofp.origin_lat,
+                "lon": ofp.origin_lon,
+                "via": "",
+            })
         # Les repères se résolvent de proche en proche : le précédent sert
         # d'ancrage au suivant, et la route directe arbitre les cas restants.
         # Sans cela, un homonyme d'un autre continent suffit à faire faire un
         # aller-retour au tracé.
-        previous = (origin.lat, origin.lon) if origin is not None else None
+        previous = (
+            (origin.lat, origin.lon)
+            if origin is not None
+            else (
+                (ofp.origin_lat, ofp.origin_lon)
+                if ofp.origin_lat is not None and ofp.origin_lon is not None
+                else None
+            )
+        )
         for leg in route_legs:
-            position = self._enroute_position(leg["to"], previous)
+            position = (
+                (float(leg["lat"]), float(leg["lon"]))
+                if _positioned(leg)
+                else self._enroute_position(leg["to"], previous)
+            )
             if position is None:
                 continue
             if not self._on_direct_corridor(position, origin, destination):
@@ -163,6 +182,13 @@ class CompletionEngine:
                 "ident": destination.ident,
                 "lat": destination.lat,
                 "lon": destination.lon,
+                "via": "",
+            })
+        elif ofp.destination_lat is not None and ofp.destination_lon is not None:
+            route_path.append({
+                "ident": ofp.destination_icao,
+                "lat": ofp.destination_lat,
+                "lon": ofp.destination_lon,
                 "via": "",
             })
 
@@ -397,18 +423,22 @@ class CompletionEngine:
                     Choice(forced_name, Confidence.LOW, "utilisateur", "forcée, non vérifiée"),
                     Choice(forced_transition, Confidence.LOW, "utilisateur"),
                 )
-            return self._departure_choice_from(
+            choice, transition = self._departure_choice_from(
                 picked, target_fix, forced_transition, "utilisateur",
                 Confidence.HIGH, "SID imposée",
             )
+            choice.alternatives = _procedure_alternatives(compatible, picked)
+            return choice, transition
 
         if simbrief_name:
             picked = _find_by_ident(compatible, simbrief_name)
             if picked is not None:
-                return self._departure_choice_from(
+                choice, transition = self._departure_choice_from(
                     picked, target_fix, forced_transition, "simbrief",
                     Confidence.HIGH, "SID donnée par SimBrief et validée en base",
                 )
+                choice.alternatives = _procedure_alternatives(compatible, picked)
+                return choice, transition
             if _find_by_ident(sids, simbrief_name) is not None:
                 self._warn(
                     f"La SID SimBrief « {simbrief_name} » n'est pas publiée "
@@ -420,10 +450,12 @@ class CompletionEngine:
         )
         if not candidates:
             best = compatible[0]
-            return self._departure_choice_from(
+            choice, transition = self._departure_choice_from(
                 best, target_fix, forced_transition, "moteur",
                 Confidence.LOW, "aucun lien avec le premier point en route",
             )
+            choice.alternatives = _procedure_alternatives(compatible, best)
+            return choice, transition
 
         best = candidates[0]
         alternatives = _alternatives(candidates[1:4])
@@ -447,7 +479,8 @@ class CompletionEngine:
 
         if forced_transition:
             return sid_choice, Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée"
+                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
+                _transition_alternatives(procedure, forced_transition),
             )
 
         # Cas 1 : la SID publie des transitions explicites.
@@ -457,15 +490,18 @@ class CompletionEngine:
                 return sid_choice, Choice(
                     target_fix, Confidence.HIGH, "moteur",
                     "transition rejoignant le premier point en route",
+                    _transition_alternatives(procedure, target_fix),
                 )
             picked = self._nearest_transition(procedure, target_fix)
             if picked:
                 return sid_choice, Choice(
                     picked, Confidence.MEDIUM, "moteur",
                     "transition la plus proche du premier point en route",
+                    _transition_alternatives(procedure, picked),
                 )
             return sid_choice, Choice(
-                idents[0], Confidence.LOW, "moteur", "première transition publiée"
+                idents[0], Confidence.LOW, "moteur", "première transition publiée",
+                _transition_alternatives(procedure, idents[0]),
             )
 
         # Cas 2 : SID sans transition publiée (usage européen courant).
@@ -712,6 +748,8 @@ class CompletionEngine:
                 reason = best.reason
                 alternatives = _alternatives(candidates[1:4])
 
+        if not alternatives:
+            alternatives = _procedure_alternatives(compatible, picked)
         star_choice = Choice(picked.ident, confidence, source, reason, alternatives)
         transition_choice = self._star_transition(picked, target_fix, forced_transition)
         return star_choice, transition_choice, picked.exit_fix
@@ -724,7 +762,8 @@ class CompletionEngine:
     ) -> Choice:
         if forced_transition:
             return Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée"
+                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
+                _transition_alternatives(procedure, forced_transition),
             )
 
         if procedure.transitions:
@@ -733,14 +772,19 @@ class CompletionEngine:
                 return Choice(
                     target_fix, Confidence.HIGH, "moteur",
                     "transition partant du dernier point en route",
+                    _transition_alternatives(procedure, target_fix),
                 )
             picked = self._nearest_transition(procedure, target_fix)
             if picked:
                 return Choice(
                     picked, Confidence.MEDIUM, "moteur",
                     "transition la plus proche du dernier point en route",
+                    _transition_alternatives(procedure, picked),
                 )
-            return Choice(idents[0], Confidence.LOW, "moteur", "première transition publiée")
+            return Choice(
+                idents[0], Confidence.LOW, "moteur", "première transition publiée",
+                _transition_alternatives(procedure, idents[0]),
+            )
 
         entry_fix = procedure.entry_fix
         if entry_fix:
@@ -781,7 +825,17 @@ class CompletionEngine:
                     Choice(forced_transition, Confidence.LOW, "utilisateur"),
                 )
             return (
-                Choice(picked.display_name, Confidence.HIGH, "utilisateur", "approche imposée"),
+                Choice(
+                    picked.display_name,
+                    Confidence.HIGH,
+                    "utilisateur",
+                    "approche imposée",
+                    [
+                        _approach_alternative(p, star_exit_fix, rnp_capable)
+                        for p in compatible
+                        if p is not picked
+                    ][:3],
+                ),
                 self._approach_transition(picked, star_exit_fix, forced_transition),
             )
 
@@ -865,7 +919,10 @@ class CompletionEngine:
             confidence,
             "moteur",
             " ; ".join(reasons),
-            alternatives=[_approach_alternative(p, star_exit_fix) for p in ordered[1:4]],
+            alternatives=[
+                _approach_alternative(p, star_exit_fix, rnp_capable)
+                for p in ordered[1:4]
+            ],
         )
         return approach_choice, self._approach_transition(
             best, star_exit_fix, forced_transition
@@ -879,7 +936,8 @@ class CompletionEngine:
     ) -> Choice:
         if forced_transition:
             return Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée"
+                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
+                _transition_alternatives(procedure, forced_transition),
             )
 
         idents = procedure.transition_idents()
@@ -893,6 +951,7 @@ class CompletionEngine:
             return Choice(
                 star_exit_fix, Confidence.HIGH, "moteur",
                 "transition partant du point de sortie de la STAR",
+                _transition_alternatives(procedure, star_exit_fix),
             )
 
         picked = self._nearest_transition(procedure, star_exit_fix)
@@ -900,10 +959,12 @@ class CompletionEngine:
             return Choice(
                 picked, Confidence.MEDIUM, "moteur",
                 "transition la plus proche de la fin de la STAR",
+                _transition_alternatives(procedure, picked),
             )
         return Choice(
             idents[0], Confidence.LOW, "moteur",
             "première transition publiée, aucun lien avec la STAR",
+            _transition_alternatives(procedure, idents[0]),
         )
 
     # ------------------------------------------------------------------ #
@@ -934,6 +995,18 @@ class CompletionEngine:
         )
         by_name = {s.runway.name: s for s in scores}
 
+        def alternatives_for(selected_name: str) -> list[dict]:
+            return [
+                {
+                    "value": score.runway.name,
+                    "headwind_kt": round(score.headwind_kt, 1),
+                    "crosswind_kt": round(score.crosswind_kt, 1),
+                    "disqualified": score.disqualified,
+                }
+                for score in scores
+                if score.runway.name != selected_name
+            ][:3]
+
         def build(entry: RunwayScore, choice: Choice) -> RunwayChoice:
             return RunwayChoice(
                 choice=choice,
@@ -951,7 +1024,16 @@ class CompletionEngine:
                 return RunwayChoice(
                     choice=Choice(name, Confidence.LOW, "utilisateur", "forcée, non vérifiée")
                 )
-            return build(entry, Choice(name, Confidence.HIGH, "utilisateur", "piste imposée"))
+            return build(
+                entry,
+                Choice(
+                    name,
+                    Confidence.HIGH,
+                    "utilisateur",
+                    "piste imposée",
+                    alternatives_for(name),
+                ),
+            )
 
         if simbrief_runway:
             name = normalise_runway(simbrief_runway)
@@ -975,6 +1057,7 @@ class CompletionEngine:
                         name, confidence, "simbrief",
                         "piste planifiée par SimBrief"
                         + (" et confirmée par le vent" if agrees else ""),
+                        alternatives_for(name),
                     ),
                 )
             self._warn(f"Piste SimBrief « {simbrief_runway} » inconnue à {icao}.")
@@ -1000,15 +1083,7 @@ class CompletionEngine:
 
         choice = Choice(
             best.runway.name, confidence, "moteur", reason,
-            alternatives=[
-                {
-                    "value": s.runway.name,
-                    "headwind_kt": round(s.headwind_kt, 1),
-                    "crosswind_kt": round(s.crosswind_kt, 1),
-                    "disqualified": s.disqualified,
-                }
-                for s in scores[1:4]
-            ],
+            alternatives=alternatives_for(best.runway.name),
         )
         return build(best, choice)
 
@@ -1026,7 +1101,6 @@ class CompletionEngine:
         if not target_fix:
             return []
 
-        target_position = self.provider.fix_position(target_fix)
         candidates: list[_Candidate] = []
 
         for procedure in procedures:
@@ -1052,6 +1126,16 @@ class CompletionEngine:
                 )
                 continue
 
+        # Le raccord nominal est le cas courant. Une position n'est utile que
+        # pour le repli géométrique ; la demander avant peut déclencher plusieurs
+        # tentatives SimConnect pour un repère absent du cache.
+        if candidates:
+            candidates.sort(key=lambda c: (c.score, c.procedure.ident))
+            return candidates
+
+        target_position = self.provider.fix_position(target_fix)
+        for procedure in procedures:
+            link = procedure.exit_fix if use_exit_fix else procedure.entry_fix
             if target_position and link:
                 position = self.provider.fix_position(link)
                 if position:
@@ -1213,7 +1297,7 @@ def _find_approach_by_name(
 
 
 def _approach_alternative(
-    procedure: Procedure, star_exit_fix: str | None
+    procedure: Procedure, star_exit_fix: str | None, rnp_capable: bool = True
 ) -> dict:
     """Décrit une approche écartée, et pourquoi elle existe."""
     if procedure.is_vectors_entry:
@@ -1227,10 +1311,36 @@ def _approach_alternative(
         "role": role,
         "transitions": list(procedure.transition_idents()),
         "requires_rnp": procedure.requires_rnp,
+        "disqualified": procedure.requires_rnp and not rnp_capable,
         "connects_to_star": bool(
             star_exit_fix and star_exit_fix in procedure.transition_idents()
         ),
     }
+
+
+def _procedure_alternatives(
+    procedures: Sequence[Procedure], selected: Procedure
+) -> list[dict]:
+    """Expose uniquement d'autres procédures publiées pour la piste retenue."""
+    return [
+        {
+            "value": procedure.ident,
+            "runways": list(procedure.runways),
+            "reason": "procédure publiée compatible avec la piste",
+        }
+        for procedure in procedures
+        if procedure is not selected
+    ][:3]
+
+
+def _transition_alternatives(
+    procedure: Procedure, selected: str | None
+) -> list[dict]:
+    return [
+        {"value": ident, "reason": "transition publiée"}
+        for ident in procedure.transition_idents()
+        if ident != selected
+    ][:3]
 
 
 def _alternatives(candidates: Sequence[_Candidate]) -> list[dict]:
