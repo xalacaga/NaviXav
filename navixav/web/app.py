@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from navixav import __version__
+from navixav.changelog import load_changelog
 from navixav.chart import EARTH_RADIUS_M, build_chart
 from navixav.ground import (
     DEPARTURE,
@@ -877,13 +878,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "arrival": arrival,
         }
 
+    @app.get("/api/changelog")
+    def changelog() -> dict[str, object]:
+        """Journal complet des versions, livré avec l'application."""
+        return {"version": __version__, "releases": load_changelog()}
+
     @app.get("/api/simulator")
     def simulator_status() -> dict[str, object]:
         try:
             state = tracker.read()
         except PositionUnavailable as exc:
             return {"connected": False, "reason": str(exc)}
-        return {"connected": True, "source": state.source}
+        return {
+            "connected": True,
+            "paused": state.paused,
+            "source": state.source,
+        }
 
     @app.post("/api/shutdown")
     async def shutdown() -> dict[str, bool]:

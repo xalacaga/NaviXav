@@ -242,7 +242,12 @@ select {
 }
 select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.switch { display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; }
+/* La case masquée est en absolu : sans ce repère, son bloc conteneur devient
+   la boîte de dialogue et elle en déborde sur toute sa largeur. */
+.switch {
+  position: relative;
+  display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none;
+}
 .switch input { position: absolute; opacity: 0; pointer-events: none; }
 .switch-track {
   width: 40px; height: 22px;
@@ -463,8 +468,59 @@ main {
   font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint);
 }
 .row-value { font-size: 1.02rem; font-weight: 650; letter-spacing: 0.02em; }
-.row-value.empty { color: var(--text-faint); font-weight: 400; }
+.row-value.empty {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  line-height: 1.45;
+}
+/* Une absence de procédure tient sur une ligne : ni valeur cadrée, ni seconde
+   ligne d'explication, ni la respiration qu'appelle une vraie valeur. */
+.row-empty { padding-top: 5px; padding-bottom: 5px; }
 .row-reason { grid-column: 2 / -1; font-size: 0.74rem; color: var(--text-faint); line-height: 1.45; }
+.row-actions { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Crayon de correction : en retrait tant que la ligne n'est pas survolée, mais
+   toujours visible au clavier, une fois ouvert, ou sur un choix imposé. */
+.choice-edit {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease,
+    opacity 0.14s ease;
+}
+.choice-edit svg { width: 13px; height: 13px; }
+.row:hover .choice-edit,
+.choice-edit:focus-visible,
+.choice-edit.active,
+.choice-edit.overridden { opacity: 1; }
+.choice-edit:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+.choice-edit.overridden { color: var(--accent); }
+.choice-edit.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.choice-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Sans survol, le crayon ne se découvrirait jamais. */
+@media (hover: none) {
+  .choice-edit { opacity: 1; }
+}
+
 .choice-select {
   grid-column: 2 / -1;
   width: min(100%, 420px);
@@ -804,6 +860,13 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   background: var(--high);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--high) 18%, transparent);
 }
+.sim-status.paused {
+  color: var(--text); border-color: color-mix(in srgb, var(--medium) 62%, var(--border));
+}
+.sim-status.paused .sim-status-dot {
+  background: var(--medium);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--medium) 18%, transparent);
+}
 .shutdown-btn:hover { color: var(--low); border-color: var(--low); }
 .update-btn.available {
   color: #d8fff2;
@@ -843,8 +906,12 @@ body.remote-client .mobile-language {
   font-size: 0.82rem;
 }
 
+/* Douze réglages sur deux colonnes tenaient sur six rangées : la boîte
+   dépassait la fenêtre et se dotait d'un ascenseur pour des champs qui
+   auraient pu être côte à côte. Elle s'élargit et laisse la grille compter
+   elle-même ses colonnes. */
 .settings-dialog {
-  width: min(720px, calc(100vw - 28px));
+  width: min(960px, calc(100vw - 28px));
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -853,19 +920,21 @@ body.remote-client .mobile-language {
   box-shadow: 0 24px 80px #0008;
 }
 .settings-dialog::backdrop { background: #020617b8; backdrop-filter: blur(3px); }
-.settings-dialog form { padding: 22px; }
+.settings-dialog form { padding: 20px; }
 .settings-head, .settings-actions {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
 }
 .settings-head h2 { margin: 0 0 4px; }
 .settings-head p { margin: 0; color: var(--text-dim); font-size: 0.82rem; }
+/* Autant de colonnes que la largeur en autorise : trois dans la fenêtre
+   native, deux dès qu'elle se resserre, une sur téléphone. */
 .settings-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px; margin: 22px 0 10px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 13px 16px; margin: 16px 0 8px;
 }
 .settings-grid .field { min-width: 0; }
 .settings-grid input, .settings-grid select {
-  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 11px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised); color: var(--text); font: inherit;
 }
@@ -893,15 +962,15 @@ body.remote-client .mobile-language {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin: 18px 0 4px;
-  padding: 14px;
+  margin: 14px 0 2px;
+  padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-raised));
 }
 .support-card h3 {
-  margin: 0 0 5px;
-  font-size: 0.88rem;
+  margin: 0 0 3px;
+  font-size: 0.86rem;
 }
 .support-card p {
   max-width: 48rem;
@@ -916,9 +985,76 @@ body.remote-client .mobile-language {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
-.settings-message { min-height: 20px; color: var(--high); font-size: 0.8rem; }
+.settings-head-actions { display: flex; align-items: center; gap: 8px; }
+.changelog-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 7px;
+  color: var(--text-dim);
+}
+.changelog-btn svg { width: 17px; height: 17px; fill: currentColor; }
+.changelog-btn:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+}
+
+/* Journal des versions : trente et une entrées, donc la seule surface de
+   l'application qui a de bonnes raisons de défiler. Le cadre reste fixe et
+   seule la liste bouge. */
+.changelog-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: min(760px, calc(100vh - 64px));
+  padding: 20px;
+}
+.changelog-body {
+  overflow-y: auto;
+  margin-top: 14px;
+  padding-right: 6px;
+}
+.changelog-note { margin: 0; color: var(--text-dim); font-size: 0.82rem; }
+.changelog-release { padding: 13px 0; border-top: 1px solid var(--border); }
+.changelog-release:first-child { border-top: 0; padding-top: 2px; }
+.changelog-release-head {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 6px;
+}
+.changelog-version {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+}
+.changelog-date { font-size: 0.74rem; color: var(--text-faint); }
+.changelog-current { color: var(--accent); border-color: var(--accent); }
+.changelog-kind {
+  margin: 9px 0 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.changelog-kind.kind-added { color: var(--high); }
+.changelog-kind.kind-fixed { color: var(--accent); }
+.changelog-items {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.changelog-items li {
+  color: var(--text-dim);
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+.settings-message { min-height: 18px; color: var(--high); font-size: 0.8rem; }
 .settings-message.error { color: var(--low); }
-.settings-actions { justify-content: flex-end; margin-top: 10px; }
+.settings-actions { justify-content: flex-end; margin-top: 8px; }
 @media (max-width: 620px) {
   .settings-grid { grid-template-columns: 1fr; }
   .support-card { align-items: stretch; flex-direction: column; }
@@ -1023,6 +1159,14 @@ body.remote-client .mobile-language {
   background: var(--high);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--high) 70%, transparent);
   animation: pulse 2s infinite;
+}
+.live-pill.paused {
+  border-color: color-mix(in srgb, var(--medium) 62%, transparent);
+  color: var(--text);
+}
+.live-pill.paused .live-dot {
+  background: var(--medium);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--medium) 18%, transparent);
 }
 @keyframes pulse {
   70% { box-shadow: 0 0 0 7px transparent; }
@@ -2261,6 +2405,8 @@ pre {
   .aircraft-mark { width: 58px; height: 58px; border-radius: 14px; }
   table { display: block; overflow-x: auto; white-space: nowrap; }
   button, .icon-btn, .btn-primary, select, input { min-height: 44px; }
+  /* Cible tactile pleine, mais toujours un simple crayon sans cadre. */
+  .choice-edit { width: 44px; opacity: 1; }
   .settings-dialog {
     width: 100vw;
     max-width: none;

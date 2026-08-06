@@ -11,6 +11,7 @@ from navixav.live.simconnect import (
     _CAPABILITY_VARIABLES,
     _CONFIGURATION_VARIABLES,
     _FENIX_CONTROL_VARIABLES,
+    _PAUSE_VARIABLES,
     _VARIABLES,
     SimConnectSource,
 )
@@ -138,6 +139,10 @@ class FakeClient:
                 "SIMULATION RATE": 1.0,
             })
             return values
+        if variables == _PAUSE_VARIABLES:
+            if "pause" in self.failing:
+                raise SimConnectError("état de pause indisponible")
+            return {"MOTION SIMULATION": 1.0}
         if variables == _CAPABILITY_VARIABLES:
             if "capabilities" in self.failing:
                 raise SimConnectError("capacités indisponibles")
@@ -171,7 +176,34 @@ def test_simconnect_source_maps_direct_values(monkeypatch):
     assert state.indicated_airspeed_kt == 172.0
     assert state.vertical_speed_fpm == -700.0
     assert not state.on_ground
+    assert state.paused is False
     assert state.source == "SimConnect"
+
+
+def test_simconnect_source_reports_normal_and_active_pause(monkeypatch):
+    source = SimConnectSource()
+    fake = FakeClient()
+    original = fake.read_simvars
+
+    def read_paused(variables, timeout_s=3.0):
+        if variables == _PAUSE_VARIABLES:
+            return {"MOTION SIMULATION": 0.0}
+        return original(variables, timeout_s)
+
+    fake.read_simvars = read_paused
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    assert source.read().paused is True
+
+
+def test_pause_state_is_optional(monkeypatch):
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: FakeClient(("pause",)))
+
+    state = source.read()
+
+    assert state.paused is None
+    assert state.latitude == 48.723
 
 
 # --------------------------------------------------------------------------- #
@@ -547,8 +579,11 @@ def test_tracker_ignores_demo_when_not_requested():
 
 
 def test_state_serialises():
-    state = AircraftState(latitude=48.72, longitude=2.36, source="Test")
+    state = AircraftState(
+        latitude=48.72, longitude=2.36, paused=True, source="Test"
+    )
     payload = state.to_dict()
     assert payload["latitude"] == 48.72
     assert payload["source"] == "Test"
     assert "on_ground" in payload
+    assert payload["paused"] is True

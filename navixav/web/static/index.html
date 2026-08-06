@@ -236,7 +236,15 @@
         <h2>Paramètres</h2>
         <p>Enregistrés localement sur cet ordinateur.</p>
       </div>
-      <button type="button" id="settings-close" class="icon-btn" aria-label="Fermer">×</button>
+      <div class="settings-head-actions">
+        <button type="button" id="changelog-open" class="icon-btn changelog-btn"
+                title="Journal des versions" aria-label="Journal des versions">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z"/>
+          </svg>
+        </button>
+        <button type="button" id="settings-close" class="icon-btn" aria-label="Fermer">×</button>
+      </div>
     </div>
     <div class="settings-grid">
       <label class="field" for="settings-language">
@@ -333,6 +341,17 @@
       <button type="submit" class="btn-primary">Enregistrer</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="changelog-dialog" class="settings-dialog changelog-dialog">
+  <div class="settings-head">
+    <div>
+      <h2 id="changelog-title">Journal des versions</h2>
+      <p id="changelog-intro">Tous les changements importants depuis le début du suivi des versions.</p>
+    </div>
+    <button type="button" id="changelog-close" class="icon-btn" aria-label="Fermer">×</button>
+  </div>
+  <div id="changelog-body" class="changelog-body"></div>
 </dialog>
 
 <dialog id="welcome-dialog" class="settings-dialog welcome-dialog">

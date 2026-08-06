@@ -406,12 +406,6 @@ class CompletionEngine:
         forced_transition: str | None,
     ) -> tuple[Choice, Choice]:
         compatible = [p for p in sids if p.serves_runway(runway_name)]
-        if not compatible:
-            self._warn(
-                f"Aucune SID compatible avec la piste {runway_name} ; "
-                "recherche élargie à toutes les pistes."
-            )
-            compatible = sids
 
         if forced_name:
             picked = _find_by_ident(compatible, forced_name) or _find_by_ident(
@@ -423,12 +417,38 @@ class CompletionEngine:
                     Choice(forced_name, Confidence.LOW, "utilisateur", "forcée, non vérifiée"),
                     Choice(forced_transition, Confidence.LOW, "utilisateur"),
                 )
+            if picked not in compatible:
+                self._warn(
+                    f"La SID « {picked.ident} » n'est pas publiée pour la piste "
+                    f"{runway_name} : elle part d'un autre seuil."
+                )
             choice, transition = self._departure_choice_from(
                 picked, target_fix, forced_transition, "utilisateur",
                 Confidence.HIGH, "SID imposée",
             )
             choice.alternatives = _procedure_alternatives(compatible, picked)
             return choice, transition
+
+        # Symétrique de la STAR : une SID publiée pour une autre piste part d'un
+        # autre seuil, avec ses propres caps et ses propres altitudes minimales.
+        # Elle n'est pas un départ dégradé, elle est involable. Sans SID pour la
+        # piste retenue, le départ réel est un cap piste puis un guidage radar
+        # vers la route : c'est cela qu'il faut annoncer.
+        if not compatible:
+            self._warn(
+                f"Aucune SID n'est publiée pour la piste {runway_name} ; "
+                "départ en guidage radar."
+            )
+            return (
+                Choice(
+                    None,
+                    Confidence.NONE,
+                    "moteur",
+                    f"aucune SID publiée pour la piste {runway_name}",
+                    alternatives=_other_runway_alternatives(sids),
+                ),
+                Choice(None, Confidence.NONE, "moteur", "aucune SID retenue"),
+            )
 
         if simbrief_name:
             picked = _find_by_ident(compatible, simbrief_name)
@@ -458,12 +478,13 @@ class CompletionEngine:
             return choice, transition
 
         best = candidates[0]
-        alternatives = _alternatives(candidates[1:4])
         choice, transition = self._departure_choice_from(
             best.procedure, target_fix, forced_transition, "moteur",
             best.confidence, best.reason,
         )
-        choice.alternatives = alternatives
+        choice.alternatives = _procedure_alternatives(
+            compatible, best.procedure, candidates[1:]
+        )
         return choice, transition
 
     def _departure_choice_from(
@@ -590,10 +611,17 @@ class CompletionEngine:
             block.star = Choice(None, Confidence.NONE, reason="aucune STAR en base")
 
         if approaches:
+            # Le maillon que l'approche doit reprendre : la sortie de la STAR
+            # quand il y en a une, sinon le dernier point de la route. C'est de
+            # là que vient l'avion dans les deux cas, et beaucoup de terrains
+            # sans STAR pour la piste retenue publient justement une transition
+            # d'approche sur ce point-là.
+            link_fix = star_exit_fix or ofp.last_enroute_fix
             block.approach, block.approach_transition = self._choose_approach(
                 approaches=approaches,
                 runway_name=runway_name,
-                star_exit_fix=star_exit_fix,
+                link_fix=link_fix,
+                via_star=star_exit_fix is not None,
                 forced_name=overrides.approach,
                 forced_transition=overrides.approach_transition,
                 prefer_ils=overrides.prefer_ils,
@@ -625,11 +653,40 @@ class CompletionEngine:
                     selected_approach.missed_approach_altitude_ft
                 )
                 self._fill_final_approach_guidance(block, selected_approach)
+            self._check_arrival_chain(block, selected_approach, star_exit_fix)
         else:
             self._warn(f"Aucune procédure d'approche publiée pour {icao}.")
             block.approach = Choice(None, Confidence.NONE, reason="aucune approche en base")
 
         return block
+
+    def _check_arrival_chain(
+        self,
+        block: ArrivalBlock,
+        approach: Procedure | None,
+        star_exit_fix: str | None,
+    ) -> None:
+        """Vérifie la chaîne d'arrivée une fois tous les maillons posés.
+
+        Chaque maillon est choisi pour lui-même ; rien ne garantit que la
+        succession tienne. Une STAR peut très bien être publiée pour la piste
+        retenue et se terminer sur un repère qu'aucune approche de cette piste
+        ne reprend : le pilote sera alors vectoré, ce qu'il vaut mieux annoncer
+        que laisser deviner d'un point d'interrogation en fin de STAR.
+        """
+        if approach is None or not star_exit_fix:
+            return
+        transition = block.approach_transition.value if block.approach_transition else None
+        if transition in {star_exit_fix, VECTORS}:
+            return
+        if approach.is_vectors_entry:
+            # Variante prévue pour le guidage radar : la rupture est normale.
+            return
+        self._warn(
+            f"La STAR {block.star.value} se termine sur {star_exit_fix}, "
+            f"qui n'ouvre aucune approche de la piste "
+            f"{block.runway.choice.value} : prévoir un guidage radar vers l'axe."
+        )
 
     def _fill_final_approach_guidance(
         self, block: ArrivalBlock, approach: Procedure
@@ -696,12 +753,6 @@ class CompletionEngine:
         forced_transition: str | None,
     ) -> tuple[Choice, Choice, str | None]:
         compatible = [p for p in stars if p.serves_runway(runway_name)]
-        if not compatible:
-            self._warn(
-                f"Aucune STAR compatible avec la piste {runway_name} ; "
-                "recherche élargie à toutes les pistes."
-            )
-            compatible = stars
 
         picked: Procedure | None = None
         confidence = Confidence.MEDIUM
@@ -720,7 +771,34 @@ class CompletionEngine:
                     Choice(forced_transition, Confidence.LOW, "utilisateur"),
                     None,
                 )
+            if picked not in compatible:
+                self._warn(
+                    f"La STAR « {picked.ident} » n'est pas publiée pour la piste "
+                    f"{runway_name} : elle mène à l'IAF d'une autre piste."
+                )
             confidence, source, reason = Confidence.HIGH, "utilisateur", "STAR imposée"
+
+        # Une STAR publiée pour une autre piste n'est pas une arrivée dégradée,
+        # elle est involable : elle dépose l'avion sur l'IAF du côté opposé du
+        # terrain, et aucune approche de la piste retenue n'en reprend le point
+        # de sortie. Annoncer une arrivée directe — que le pilote sait voler —
+        # vaut mieux que produire une chaîne que personne ne peut enchaîner.
+        if picked is None and not compatible:
+            self._warn(
+                f"Aucune STAR n'est publiée pour la piste {runway_name} ; "
+                "arrivée directe vers l'approche."
+            )
+            return (
+                Choice(
+                    None,
+                    Confidence.NONE,
+                    "moteur",
+                    f"aucune STAR publiée pour la piste {runway_name}",
+                    alternatives=_other_runway_alternatives(stars),
+                ),
+                Choice(None, Confidence.NONE, "moteur", "aucune STAR retenue"),
+                None,
+            )
 
         if picked is None and simbrief_name:
             match = _find_by_ident(compatible, simbrief_name)
@@ -746,7 +824,9 @@ class CompletionEngine:
                 picked = best.procedure
                 confidence = best.confidence
                 reason = best.reason
-                alternatives = _alternatives(candidates[1:4])
+                alternatives = _procedure_alternatives(
+                    compatible, picked, candidates[1:]
+                )
 
         if not alternatives:
             alternatives = _procedure_alternatives(compatible, picked)
@@ -802,7 +882,8 @@ class CompletionEngine:
         self,
         approaches: list[Procedure],
         runway_name: str,
-        star_exit_fix: str | None,
+        link_fix: str | None,
+        via_star: bool,
         forced_name: str | None,
         forced_transition: str | None,
         prefer_ils: bool,
@@ -831,12 +912,14 @@ class CompletionEngine:
                     "utilisateur",
                     "approche imposée",
                     [
-                        _approach_alternative(p, star_exit_fix, rnp_capable)
+                        _approach_alternative(p, link_fix, rnp_capable)
                         for p in compatible
                         if p is not picked
                     ][:3],
                 ),
-                self._approach_transition(picked, star_exit_fix, forced_transition),
+                self._approach_transition(
+                    picked, link_fix, via_star, forced_transition
+                ),
             )
 
         preference = self.settings.approach_preference
@@ -864,16 +947,20 @@ class CompletionEngine:
             #    par un avion non qualifié. Critère éliminatoire.
             equipment = 0 if (rnp_capable or not procedure.requires_rnp) else 1
 
-            # 2. Raccord direct depuis la fin de la STAR.
+            # 2. Raccord direct depuis le point d'où l'avion arrive : fin de la
+            #    STAR, ou dernier point de la route quand aucune STAR ne dessert
+            #    la piste.
             connects = (
-                0
-                if star_exit_fix and star_exit_fix in procedure.transition_idents()
-                else 1
+                0 if link_fix and link_fix in procedure.transition_idents() else 1
             )
 
-            # 3. Cohérence du mode d'arrivée : avec une STAR on veut une entrée
-            #    publiée ; sans STAR on sera vectoré vers l'axe.
-            if star_exit_fix:
+            # 3. Cohérence du mode d'arrivée. Un raccord publié tranche à lui
+            #    seul : il n'y a rien de mieux qu'une transition qui part
+            #    exactement d'où l'on vient. Sinon, avec une STAR on veut une
+            #    entrée publiée ; sans STAR on sera vectoré vers l'axe.
+            if connects == 0:
+                entry = 0
+            elif via_star:
                 entry = 0 if procedure.has_published_transitions else 1
             else:
                 entry = 0 if procedure.is_vectors_entry else 1
@@ -889,14 +976,14 @@ class CompletionEngine:
 
         ordered = sorted(compatible, key=rank)
         best = ordered[0]
-        connects = bool(star_exit_fix and star_exit_fix in best.transition_idents())
+        connects = bool(link_fix and link_fix in best.transition_idents())
         blocked_by_rnp = [
             p for p in compatible if p.requires_rnp and not rnp_capable
         ]
 
         reasons: list[str] = [f"type {best.proc_type} selon la préférence"]
         if connects:
-            reasons.insert(0, f"transition publiée depuis {star_exit_fix}")
+            reasons.insert(0, f"transition publiée depuis {link_fix}")
         elif best.is_vectors_entry:
             reasons.insert(0, "variante guidage radar (entrée sur repère d'interception)")
         if best.requires_rnp:
@@ -910,7 +997,7 @@ class CompletionEngine:
             )
 
         confidence = Confidence.HIGH if connects else Confidence.MEDIUM
-        if not star_exit_fix and best.is_vectors_entry:
+        if not via_star and best.is_vectors_entry:
             # Aucune STAR à raccorder, mais la structure choisie est la bonne.
             confidence = Confidence.HIGH
 
@@ -920,18 +1007,19 @@ class CompletionEngine:
             "moteur",
             " ; ".join(reasons),
             alternatives=[
-                _approach_alternative(p, star_exit_fix, rnp_capable)
-                for p in ordered[1:4]
+                _approach_alternative(p, link_fix, rnp_capable)
+                for p in ordered[1:]
             ],
         )
         return approach_choice, self._approach_transition(
-            best, star_exit_fix, forced_transition
+            best, link_fix, via_star, forced_transition
         )
 
     def _approach_transition(
         self,
         procedure: Procedure,
-        star_exit_fix: str | None,
+        link_fix: str | None,
+        via_star: bool,
         forced_transition: str | None,
     ) -> Choice:
         if forced_transition:
@@ -947,23 +1035,29 @@ class CompletionEngine:
                 "aucune transition publiée : guidage radar attendu",
             )
 
-        if star_exit_fix and star_exit_fix in idents:
+        if link_fix and link_fix in idents:
             return Choice(
-                star_exit_fix, Confidence.HIGH, "moteur",
-                "transition partant du point de sortie de la STAR",
-                _transition_alternatives(procedure, star_exit_fix),
+                link_fix, Confidence.HIGH, "moteur",
+                "transition partant du point de sortie de la STAR"
+                if via_star
+                else "transition partant du dernier point en route",
+                _transition_alternatives(procedure, link_fix),
             )
 
-        picked = self._nearest_transition(procedure, star_exit_fix)
+        picked = self._nearest_transition(procedure, link_fix)
         if picked:
             return Choice(
                 picked, Confidence.MEDIUM, "moteur",
-                "transition la plus proche de la fin de la STAR",
+                "transition la plus proche de la fin de la STAR"
+                if via_star
+                else "transition la plus proche du dernier point en route",
                 _transition_alternatives(procedure, picked),
             )
         return Choice(
             idents[0], Confidence.LOW, "moteur",
-            "première transition publiée, aucun lien avec la STAR",
+            "première transition publiée, aucun lien avec la STAR"
+            if via_star
+            else "première transition publiée, aucun lien avec la route",
             _transition_alternatives(procedure, idents[0]),
         )
 
@@ -1296,8 +1390,24 @@ def _find_approach_by_name(
     return None
 
 
+def _other_runway_alternatives(procedures: Sequence[Procedure]) -> list[dict]:
+    """Procédures écartées parce qu'elles desservent une autre piste.
+
+    Elles restent proposées : le moteur ne les enchaîne pas de lui-même, mais
+    un pilote qui sait pourquoi il les veut doit pouvoir les imposer.
+    """
+    return [
+        {
+            "value": procedure.ident,
+            "runways": list(procedure.runways),
+            "reason": "publiée pour une autre piste",
+        }
+        for procedure in procedures
+    ]
+
+
 def _approach_alternative(
-    procedure: Procedure, star_exit_fix: str | None, rnp_capable: bool = True
+    procedure: Procedure, link_fix: str | None, rnp_capable: bool = True
 ) -> dict:
     """Décrit une approche écartée, et pourquoi elle existe."""
     if procedure.is_vectors_entry:
@@ -1313,24 +1423,48 @@ def _approach_alternative(
         "requires_rnp": procedure.requires_rnp,
         "disqualified": procedure.requires_rnp and not rnp_capable,
         "connects_to_star": bool(
-            star_exit_fix and star_exit_fix in procedure.transition_idents()
+            link_fix and link_fix in procedure.transition_idents()
         ),
     }
 
 
 def _procedure_alternatives(
-    procedures: Sequence[Procedure], selected: Procedure
+    procedures: Sequence[Procedure],
+    selected: Procedure,
+    ranked: Sequence[_Candidate] = (),
 ) -> list[dict]:
-    """Expose uniquement d'autres procédures publiées pour la piste retenue."""
-    return [
-        {
-            "value": procedure.ident,
-            "runways": list(procedure.runways),
-            "reason": "procédure publiée compatible avec la piste",
-        }
-        for procedure in procedures
-        if procedure is not selected
-    ][:3]
+    """Toutes les autres procédures publiées pour la piste retenue.
+
+    Celles que le moteur a su classer viennent en tête avec leur justification ;
+    les suivantes restent proposées telles quelles. Le pilote doit voir tout ce
+    qui est volable depuis la piste, pas seulement ce que le moteur a préféré.
+    """
+    seen = {selected.ident}
+    items: list[dict] = []
+    for candidate in ranked:
+        if candidate.procedure.ident in seen:
+            continue
+        seen.add(candidate.procedure.ident)
+        items.append(
+            {
+                "value": candidate.procedure.ident,
+                "runways": list(candidate.procedure.runways),
+                "reason": candidate.reason,
+                "confidence": candidate.confidence.value,
+            }
+        )
+    for procedure in procedures:
+        if procedure.ident in seen:
+            continue
+        seen.add(procedure.ident)
+        items.append(
+            {
+                "value": procedure.ident,
+                "runways": list(procedure.runways),
+                "reason": "procédure publiée compatible avec la piste",
+            }
+        )
+    return items
 
 
 def _transition_alternatives(
@@ -1340,16 +1474,4 @@ def _transition_alternatives(
         {"value": ident, "reason": "transition publiée"}
         for ident in procedure.transition_idents()
         if ident != selected
-    ][:3]
-
-
-def _alternatives(candidates: Sequence[_Candidate]) -> list[dict]:
-    return [
-        {
-            "value": c.procedure.ident,
-            "runways": list(c.procedure.runways),
-            "reason": c.reason,
-            "confidence": c.confidence.value,
-        }
-        for c in candidates
     ]

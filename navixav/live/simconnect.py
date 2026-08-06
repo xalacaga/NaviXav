@@ -41,6 +41,10 @@ _VARIABLES = (
     ("SIM ON GROUND", "Bool"),
 )
 
+# État de session facultatif. Il reste séparé du bloc vital afin qu'un ancien
+# simulateur qui ne connaît pas cette SimVar ne fasse jamais tomber le suivi.
+_PAUSE_VARIABLES = (("MOTION SIMULATION", "Bool"),)
+
 # Bloc de configuration : confort et alarmes. Son échec est toléré.
 _CONFIGURATION_VARIABLES = (
     ("GEAR HANDLE POSITION", "Bool"),
@@ -134,6 +138,7 @@ class SimConnectSource:
         self._last_failure = 0.0
         self._failure_reason = ""
         self._configuration_disabled_until = 0.0
+        self._pause_disabled_until = 0.0
         self._capabilities: AircraftCapabilities | None = None
         self._capabilities_disabled_until = 0.0
         self._parking_brake_raw: tuple[bool, bool] | None = None
@@ -205,9 +210,31 @@ class SimConnectSource:
                 indicated_airspeed_kt=values["AIRSPEED INDICATED"],
                 vertical_speed_fpm=values["VERTICAL SPEED"],
                 on_ground=bool(values["SIM ON GROUND"]),
+                paused=self._read_paused(client),
                 source=self.name,
                 configuration=self._read_configuration(client),
             )
+
+    # ------------------------------------------------------------------ #
+
+    def _read_paused(self, client: SimConnectClient) -> bool | None:
+        """Indique la pause normale ou active, si MSFS expose cet état."""
+        now = time.monotonic()
+        if now < self._pause_disabled_until:
+            return None
+        try:
+            values = client.read_simvars(
+                _PAUSE_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+            )
+        except SimConnectError as exc:
+            self._pause_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info(
+                "État de pause indisponible, nouvelle tentative dans %.0f s (%s)",
+                _OPTIONAL_RETRY_DELAY_S,
+                exc,
+            )
+            return None
+        return not bool(values["MOTION SIMULATION"])
 
     # ------------------------------------------------------------------ #
 
@@ -433,6 +460,7 @@ class SimConnectSource:
         self._capabilities = None
         self._capabilities_disabled_until = 0.0
         self._configuration_disabled_until = 0.0
+        self._pause_disabled_until = 0.0
         self._parking_brake_raw = None
         self._parking_brake_state = None
         self._flaps_raw = None

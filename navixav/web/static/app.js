@@ -37,6 +37,10 @@ function plannerText(value) {
     ["transition partant du point de sortie de la STAR", "transition starting at the STAR exit point"],
     ["aucune transition publiée : guidage radar attendu", "no published transition: radar vectors expected"],
     ["première transition publiée, aucun lien avec la STAR", "first published transition, no connection with the STAR"],
+    ["première transition publiée, aucun lien avec la route", "first published transition, no connection with the route"],
+    ["aucune STAR retenue", "no STAR selected"],
+    ["aucune SID retenue", "no SID selected"],
+    ["publiée pour une autre piste", "published for another runway"],
     ["transition rejoignant le premier point en route", "transition connecting to the first en-route waypoint"],
     ["transition la plus proche du premier point en route", "transition nearest to the first en-route waypoint"],
     ["transition partant du dernier point en route", "transition starting at the last en-route waypoint"],
@@ -59,6 +63,8 @@ function plannerText(value) {
     if (match) return tf("reason_fix_distance", { fix: match[1], distance: match[2], target: match[3] });
     match = part.match(/^(sortie|entrée) sur (.+)$/);
     if (match) return `${match[1] === "sortie" ? "exit" : "entry"} at ${match[2]}`;
+    match = part.match(/^aucune (SID|STAR) publiée pour la piste (.+)$/);
+    if (match) return `no ${match[1]} published for runway ${match[2]}`;
     match = part.match(/^transition publiée (vers|depuis) (.+)$/);
     if (match) return `published transition ${match[1] === "vers" ? "to" : "from"} ${match[2]}`;
     match = part.match(/^choix serré entre (.+) et (.+)$/);
@@ -85,7 +91,11 @@ function warningText(value) {
     [/^Aucune SID publiée pour (.+) dans la base\.$/, "No SID is published for $1 in the database."],
     [/^Aucune STAR publiée pour (.+) dans la base\.$/, "No STAR is published for $1 in the database."],
     [/^Aucune procédure d'approche publiée pour (.+)\.$/, "No approach procedure is published for $1."],
-    [/^Aucune (SID|STAR) compatible avec la piste (.+) ; recherche élargie à toutes les pistes\.$/, "No $1 is compatible with runway $2; searching all runways."],
+    [/^Aucune STAR n'est publiée pour la piste (.+) ; arrivée directe vers l'approche\.$/, "No STAR is published for runway $1; direct arrival to the approach."],
+    [/^Aucune SID n'est publiée pour la piste (.+) ; départ en guidage radar\.$/, "No SID is published for runway $1; radar-vectored departure."],
+    [/^La STAR « (.+) » n'est pas publiée pour la piste (.+) : elle mène à l'IAF d'une autre piste\.$/, "STAR “$1” is not published for runway $2: it leads to another runway’s IAF."],
+    [/^La SID « (.+) » n'est pas publiée pour la piste (.+) : elle part d'un autre seuil\.$/, "SID “$1” is not published for runway $2: it starts from another threshold."],
+    [/^La STAR (.+) se termine sur (.+), qui n'ouvre aucune approche de la piste (.+) : prévoir un guidage radar vers l'axe\.$/, "STAR $1 ends at $2, which starts no approach for runway $3: expect radar vectors to the final course."],
     [/^(SID|STAR) forcée « (.+) » introuvable en base\.$/, "User-selected $1 “$2” was not found in the database."],
     [/^La (SID|STAR) SimBrief « (.+) » n'est pas publiée pour la piste (.+)\.$/, "SimBrief $1 “$2” is not published for runway $3."],
     [/^Aucune approche publiée pour la piste (.+)\.$/, "No approach is published for runway $1."],
@@ -321,18 +331,90 @@ async function installAvailableUpdate() {
   }
 }
 
+/* ------------------------------------------------------ journal des versions */
+
+/** Journal complet, livré avec l'application et lu sans réseau.
+ *
+ * Le texte des puces reste celui du dépôt, en anglais : il décrit trente et une
+ * versions déjà publiées, qu'aucune traduction ne réécrira. Seuls le cadre et
+ * les intitulés de rubrique suivent la langue de l'interface.
+ */
+function changelogKindLabel(section) {
+  const key = `changelog_kind_${section.kind}`;
+  const label = t(key);
+  return label === key ? (section.title || "") : label;
+}
+
+function changelogDate(value) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(displayLocale(), {
+    year: "numeric", month: "long", day: "numeric",
+  });
+}
+
+function renderChangelog(data) {
+  const body = $("changelog-body");
+  body.innerHTML = "";
+  const releases = data?.releases || [];
+  if (!releases.length) {
+    body.append(el("p", "changelog-note", t("changelog_empty")));
+    return;
+  }
+  for (const release of releases) {
+    const block = el("section", "changelog-release");
+    const head = el("div", "changelog-release-head");
+    head.append(el("span", "changelog-version", release.version));
+    if (release.date) head.append(el("span", "changelog-date", changelogDate(release.date)));
+    // Repérer la version installée évite de chercher où l'on en est.
+    if (release.version === data.version) {
+      head.append(el("span", "badge changelog-current", t("changelog_installed")));
+    }
+    block.append(head);
+    for (const section of release.sections || []) {
+      const label = changelogKindLabel(section);
+      if (label) block.append(el("div", `changelog-kind kind-${section.kind}`, label));
+      const list = el("ul", "changelog-items");
+      for (const item of section.items || []) list.append(el("li", null, item));
+      block.append(list);
+    }
+    body.append(block);
+  }
+}
+
+async function openChangelog() {
+  const dialog = $("changelog-dialog");
+  const body = $("changelog-body");
+  body.innerHTML = "";
+  body.append(el("p", "changelog-note", t("changelog_loading")));
+  dialog.showModal();
+  try {
+    const data = await fetch("/api/changelog", { cache: "no-store" }).then((r) => r.json());
+    renderChangelog(data);
+  } catch (error) {
+    body.innerHTML = "";
+    body.append(el("p", "changelog-note", `${t("changelog_failed")} — ${error}`));
+  }
+}
+
 async function pollSimulatorStatus() {
   const indicator = $("sim-status");
   try {
     const status = await fetch("/api/simulator", { cache: "no-store" }).then((r) => r.json());
-    indicator.classList.toggle("online", Boolean(status.connected));
+    const paused = Boolean(status.connected && status.paused);
+    indicator.classList.toggle("online", Boolean(status.connected) && !paused);
+    indicator.classList.toggle("paused", paused);
     indicator.classList.toggle("offline", !status.connected);
-    $("sim-status-text").textContent = status.connected ? t("sim_connected") : t("sim_offline");
+    $("sim-status-text").textContent = paused
+      ? t("sim_paused")
+      : (status.connected ? t("sim_connected") : t("sim_offline"));
     indicator.title = status.connected
-      ? tf("sim_connected_title", { source: status.source || "SimConnect" })
+      ? (paused
+        ? tf("sim_paused_title", { source: status.source || "SimConnect" })
+        : tf("sim_connected_title", { source: status.source || "SimConnect" }))
       : (status.reason || t("sim_no_answer"));
   } catch (_error) {
-    indicator.classList.remove("online");
+    indicator.classList.remove("online", "paused");
     indicator.classList.add("offline");
     $("sim-status-text").textContent = t("server_stopped");
   }
@@ -3770,9 +3852,40 @@ const PLANNER_OVERRIDE_DEPENDENCIES = {
   approach: ["approach_transition"],
 };
 
+// Sentinelle du choix « automatique » : elle ne peut pas être vide, sinon le
+// menu la confondrait avec son intitulé d'invite, ni ressembler à un identifiant
+// de procédure. Elle repasse la main au moteur en effaçant la surcharge.
+const PLANNER_OVERRIDE_AUTO = "__auto__";
+
+// Le bouton doit désigner sa liste par `aria-controls` : chaque ligne a donc
+// besoin d'un identifiant qui lui est propre, y compris après un nouveau rendu.
+let choiceSelectSequence = 0;
+
+/** Crayon discret : un choix se corrige, il ne se réclame pas. */
+function pencilMark() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute(
+    "d",
+    "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 "
+    + "0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+  );
+  path.setAttribute("fill", "currentColor");
+  svg.append(path);
+  return svg;
+}
+
 async function applyPlannerOverride(field, value) {
   for (const dependent of PLANNER_OVERRIDE_DEPENDENCIES[field] || []) {
     delete plannerOverrides[dependent];
+  }
+  if (value === null) {
+    delete plannerOverrides[field];
+    await buildPlan({ ...plannerOverrides });
+    return;
   }
   await buildPlan({ [field]: value });
 }
@@ -3790,12 +3903,6 @@ function alternativeLabel(alternative) {
 }
 
 function choiceRow(label, choice, note, overrideField = null) {
-  const row = el("div", "row");
-  row.append(el("span", "row-label", label));
-
-  const value = el("span", `row-value${choice.value ? "" : " empty"}`, choice.value || "—");
-  row.append(value);
-
   const sourceKey = SOURCE_LABEL[choice.source];
   const source = sourceKey && sourceKey !== "SimBrief" ? t(sourceKey) : (sourceKey || choice.source);
   const reason = [source, plannerText(choice.reason)]
@@ -3804,23 +3911,41 @@ function choiceRow(label, choice, note, overrideField = null) {
   const parts = [note, reason].filter(Boolean).join(" — ");
   const confidence = t(`confidence_${confidenceClass(choice)}`);
   const confidenceDescription = [confidence, parts].filter(Boolean).join(" — ");
+
+  // Un choix vide n'a pas de valeur à cadrer : un tiret sur une ligne et son
+  // explication sur la suivante occupent la hauteur d'une procédure réelle pour
+  // dire qu'il n'y en a pas. L'explication tient donc lieu de valeur, sur une
+  // seule ligne resserrée.
+  const empty = !choice.value;
+  const row = el("div", `row${empty ? " row-empty" : ""}`);
+  row.append(el("span", "row-label", label));
+  row.append(el(
+    "span",
+    `row-value${empty ? " empty" : ""}`,
+    empty ? (parts || "—") : choice.value
+  ));
+
   const dot = el("span", `dot ${confidenceClass(choice)}`);
   dot.setAttribute("role", "img");
   dot.setAttribute("aria-label", confidenceDescription);
   dot.title = confidenceDescription;
-  row.append(dot);
-  if (parts) row.append(el("span", "row-reason", parts));
+  const actions = el("span", "row-actions");
+  actions.append(dot);
+  row.append(actions);
+  if (parts && !empty) row.append(el("span", "row-reason", parts));
 
   const alternatives = (choice.alternatives || []).filter(
     (alternative) => alternative?.value && !alternative.disqualified
   );
-  if (
-    overrideField
-    && confidenceClass(choice) === "low"
-    && alternatives.length
-    && !latestStatus?.remote_client
-  ) {
-    const select = el("select", "choice-select");
+  // Le sélecteur n'est pas réservé aux rattrapages : le moteur propose, le
+  // pilote dispose. Il s'ouvre dès qu'une autre procédure publiée existe, y
+  // compris sur un choix sûr, et aussi quand le moteur n'a rien retenu — une
+  // STAR publiée pour une autre piste n'est plus enchaînée d'office, mais elle
+  // reste imposable par qui sait pourquoi il la veut.
+  if (overrideField && alternatives.length && !latestStatus?.remote_client) {
+    const overridden = Boolean(plannerOverrides[overrideField]);
+    const select = el("select", "choice-select hidden");
+    select.id = `choice-select-${++choiceSelectSequence}`;
     select.setAttribute("aria-label", tf("change_choice", { label }));
     select.title = tf("change_choice", { label });
     const prompt = el("option", null, t("change_choice_action"));
@@ -3832,15 +3957,43 @@ function choiceRow(label, choice, note, overrideField = null) {
       option.value = alternative.value;
       select.append(option);
     }
+    // Une surcharge doit rester réversible : sans cette entrée, un choix imposé
+    // ne peut plus être rendu au moteur sans refaire le plan complet.
+    if (overridden) {
+      const auto = el("option", null, t("reset_choice_action"));
+      auto.value = PLANNER_OVERRIDE_AUTO;
+      select.append(auto);
+    }
     select.addEventListener("change", async () => {
       if (!select.value) return;
+      const next = select.value === PLANNER_OVERRIDE_AUTO ? null : select.value;
       select.disabled = true;
       try {
-        await applyPlannerOverride(overrideField, select.value);
+        await applyPlannerOverride(overrideField, next);
       } finally {
         select.disabled = false;
       }
     });
+
+    // Un panneau de vol se lit d'abord, il ne se règle qu'ensuite : le crayon
+    // reste en retrait tant qu'on ne survole pas la ligne, et n'ouvre la liste
+    // que si on le demande. Un choix déjà imposé le garde allumé, sinon rien
+    // ne distinguerait une valeur calculée d'une valeur forcée.
+    const toggle = el("button", `choice-edit${overridden ? " overridden" : ""}`);
+    toggle.type = "button";
+    toggle.setAttribute("aria-controls", select.id);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", tf("change_choice", { label }));
+    toggle.title = tf("change_choice", { label });
+    toggle.append(pencilMark());
+    toggle.addEventListener("click", () => {
+      const opened = select.classList.contains("hidden");
+      show(select, opened);
+      toggle.setAttribute("aria-expanded", String(opened));
+      toggle.classList.toggle("active", opened);
+      if (opened) select.focus();
+    });
+    actions.append(toggle);
     row.append(select);
   }
   return row;
@@ -3910,6 +4063,17 @@ function runwayNote(runway) {
   return bits.join(" · ");
 }
 
+/** Ligne de transition, tue si la procédure dont elle dépend n'existe pas.
+ *
+ * Sans SID il n'y a pas de sortie de SID, sans STAR il n'y a pas d'entrée de
+ * STAR : la ligne ne dirait rien de plus que celle du dessus, sur un panneau où
+ * la place se compte.
+ */
+function transitionRows(procedure, transition, label, note, overrideField) {
+  if (!procedure.value) return [];
+  return [[label, transition, note, overrideField]];
+}
+
 function renderTerminal(plan) {
   const departure = $("card-departure");
   departure.innerHTML = "";
@@ -3917,7 +4081,10 @@ function renderTerminal(plan) {
     departure.append(
       terminalCard(plan.departure, t("departure_title"), "departure_runway", [
         ["SID", plan.departure.sid, "", "sid"],
-        [t("transition"), plan.departure.sid_transition, t("sid_exit_note"), "sid_transition"],
+        ...transitionRows(
+          plan.departure.sid, plan.departure.sid_transition,
+          t("transition"), t("sid_exit_note"), "sid_transition",
+        ),
       ])
     );
     if (plan.departure.transition_altitude_ft) {
@@ -3949,9 +4116,16 @@ function renderTerminal(plan) {
     arrival.append(
       terminalCard(plan.arrival, t("arrival_title"), "arrival_runway", [
         ["STAR", plan.arrival.star, "", "star"],
-        [t("transition"), plan.arrival.star_transition, t("star_entry_note"), "star_transition"],
+        ...transitionRows(
+          plan.arrival.star, plan.arrival.star_transition,
+          t("transition"), t("star_entry_note"), "star_transition",
+        ),
         [t("approach"), plan.arrival.approach, "", "approach"],
-        [t("approach_transition_short"), plan.arrival.approach_transition, t("approach_transition_note"), "approach_transition"],
+        ...transitionRows(
+          plan.arrival.approach, plan.arrival.approach_transition,
+          t("approach_transition_short"), t("approach_transition_note"),
+          "approach_transition",
+        ),
       ])
     );
     const badges = el("div", "route-meta");
@@ -5608,7 +5782,7 @@ async function loadMapPreferences(status = latestStatus) {
   applyMapPreferences(await response.json());
 }
 
-function setLiveState(online, text) {
+function setLiveState(online, text, paused = false) {
   // Les deux vues portent le même état : passer de l'une à l'autre ne doit pas
   // laisser croire que le simulateur a été perdu.
   for (const [pill, label] of [
@@ -5616,7 +5790,8 @@ function setLiveState(online, text) {
     [$("ground-live-pill"), $("ground-live-text")],
   ]) {
     if (!pill) continue;
-    pill.classList.toggle("online", online);
+    pill.classList.toggle("online", online && !paused);
+    pill.classList.toggle("paused", online && paused);
     if (label) label.textContent = text;
   }
 }
@@ -5719,7 +5894,11 @@ async function pollLive() {
     }
     const aircraft = data.aircraft;
     const source = aircraft.source === "Démonstration" ? t("demo") : aircraft.source;
-    setLiveState(true, `${source} · ${t("live")}`);
+    setLiveState(
+      true,
+      aircraft.paused ? t("sim_paused") : `${source} · ${t("live")}`,
+      Boolean(aircraft.paused),
+    );
     applyAircraftState(aircraft);
     pollTaxiGuidance(aircraft);
   } catch (error) {
@@ -6269,6 +6448,8 @@ $("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
 $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
 $("update-install").addEventListener("click", handleUpdateButton);
+$("changelog-open").addEventListener("click", openChangelog);
+$("changelog-close").addEventListener("click", () => $("changelog-dialog").close());
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);

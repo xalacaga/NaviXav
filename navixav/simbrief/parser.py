@@ -7,6 +7,7 @@ extrait le strict nécessaire pour le moteur de complétion.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from math import isfinite
@@ -14,6 +15,17 @@ from typing import Any, Iterable
 
 # Points calculés par SimBrief, absents de la navdata réelle.
 _PSEUDO_FIXES = {"TOC", "TOD", "T/C", "T/D", "ETP", "EEP", "EXP"}
+
+# Repères synthétiques d'une procédure terminale : seuil de piste (« RW29 »),
+# repère d'interception d'axe (« CF29 »), FAF (« FF29 »), point d'approche
+# interrompue (« MA29 »), repère de distance (« 19DME »).
+#
+# ARINC 424 les nomme d'après la piste ou la distance ; aucun point publié de
+# la route ne porte un nom de cette forme. SimBrief les laisse pourtant dans le
+# navlog sans les marquer `is_sid_star`, si bien qu'ils se retrouvaient comptés
+# comme points en route — et que le dernier d'entre eux servait de repère de
+# raccord à la STAR, qui ne pouvait alors rien raccorder.
+_PROCEDURE_FIX_RE = re.compile(r"^(?:RW|CF|FF|MA)\d{1,2}[LRCB]?$|^\d{1,3}DME$")
 
 
 @dataclass
@@ -30,6 +42,11 @@ class NavlogFix:
     @property
     def is_real_fix(self) -> bool:
         return bool(self.ident) and self.ident.upper() not in _PSEUDO_FIXES
+
+    @property
+    def is_procedure_fix(self) -> bool:
+        """Repère appartenant à une procédure, même non marqué par SimBrief."""
+        return bool(_PROCEDURE_FIX_RE.match(self.ident.upper()))
 
 
 @dataclass
@@ -159,7 +176,7 @@ class OfpSummary:
         """Points en route, hors SID/STAR, hors points pseudo et aéroports."""
         fixes: list[str] = []
         for fix in self.navlog:
-            if fix.is_sid_star or not fix.is_real_fix:
+            if fix.is_sid_star or not fix.is_real_fix or fix.is_procedure_fix:
                 continue
             if fix.fix_type.lower() in {"apt", "airport"}:
                 continue
@@ -173,7 +190,7 @@ class OfpSummary:
         """Séquence VIA/TO du navlog, hors procédures et points calculés."""
         route: list[dict[str, Any]] = []
         for fix in self.navlog:
-            if fix.is_sid_star or not fix.is_real_fix:
+            if fix.is_sid_star or not fix.is_real_fix or fix.is_procedure_fix:
                 continue
             if fix.fix_type.lower() in {"apt", "airport"}:
                 continue

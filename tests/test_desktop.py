@@ -630,6 +630,32 @@ def test_terminal_choices_and_planner_warnings_are_localized():
     assert translations.count("reason_star_simbrief_validated:") == 8
 
 
+def test_an_absent_procedure_never_costs_more_room_than_a_real_one():
+    """Dire qu'il n'y a pas de STAR ne doit pas prendre la place d'une STAR.
+
+    Un tiret cadré, une seconde ligne d'explication, puis une ligne de
+    transition qui répète l'absence : quatre lignes pour un vide.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    # L'explication tient lieu de valeur, sur une seule ligne.
+    assert "const empty = !choice.value;" in javascript
+    assert 'empty ? (parts || "—") : choice.value' in javascript
+    assert 'if (parts && !empty) row.append(el("span", "row-reason", parts));' in javascript
+    assert ".row-empty" in css
+
+    # Sans SID pas de sortie de SID, sans STAR pas d'entrée de STAR.
+    assert "function transitionRows(" in javascript
+    assert "if (!procedure.value) return [];" in javascript
+    terminal = javascript[javascript.index("function renderTerminal(plan)"):]
+    terminal = terminal[: terminal.index("/* ------------")]
+    assert "plan.departure.sid, plan.departure.sid_transition," in terminal
+    assert "plan.arrival.star, plan.arrival.star_transition," in terminal
+    assert "plan.arrival.approach, plan.arrival.approach_transition," in terminal
+
+
 def test_terminal_choices_can_be_recalculated_from_safe_published_alternatives():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
@@ -638,8 +664,30 @@ def test_terminal_choices_can_be_recalculated_from_safe_published_alternatives()
 
     assert '...plannerOverrides' in javascript
     assert 'alternative?.value && !alternative.disqualified' in javascript
-    assert 'confidenceClass(choice) === "low"' in javascript
-    assert 'await applyPlannerOverride(overrideField, select.value)' in javascript
+    # Le sélecteur ne dépend plus de la confiance : une SID sûre reste
+    # remplaçable, et les choix que le moteur laisse vides — une STAR publiée
+    # pour une autre piste — restent imposables depuis les alternatives.
+    assert (
+        'if (overrideField && alternatives.length && !latestStatus?.remote_client)'
+        in javascript
+    )
+    assert 'confidenceClass(choice)' in javascript
+    assert 'await applyPlannerOverride(overrideField, next)' in javascript
+    # Une surcharge doit pouvoir être rendue au moteur.
+    assert 'auto.value = PLANNER_OVERRIDE_AUTO' in javascript
+    assert 'delete plannerOverrides[field]' in javascript
+    # La liste reste repliée derrière un crayon discret : un panneau de vol se
+    # lit d'abord. Le bouton doit rester atteignable au clavier et annoncer
+    # l'état de la liste qu'il commande.
+    assert 'const toggle = el("button", `choice-edit' in javascript
+    assert 'toggle.append(pencilMark())' in javascript
+    assert 'toggle.setAttribute("aria-controls", select.id)' in javascript
+    assert 'toggle.setAttribute("aria-expanded", String(opened))' in javascript
+    assert 'toggle.setAttribute("aria-label", tf("change_choice", { label }))' in javascript
+    assert 'el("select", "choice-select hidden")' in javascript
+    assert ".choice-edit" in css
+    assert ".row:hover .choice-edit" in css
+    assert ".choice-edit:focus-visible" in css
     assert 'departure_runway: ["sid", "sid_transition"]' in javascript
     assert (
         'arrival_runway: ["star", "star_transition", "approach", "approach_transition"]'
@@ -651,8 +699,10 @@ def test_terminal_choices_can_be_recalculated_from_safe_published_alternatives()
     for key in (
         "confidence_high", "confidence_medium", "confidence_low",
         "confidence_none", "change_choice", "change_choice_action",
+        "reset_choice_action",
     ):
         assert f"{key}:" in translations
+    assert translations.count("reset_choice_action:") == 8
 
 
 def test_current_flight_trace_is_memory_only_and_still_drawn_on_the_map():
@@ -768,6 +818,20 @@ def test_the_map_stays_free_of_the_ground_layout():
         "drawTaxiRoute", "drawHoldShortMarks", "setTaxiPlan", "parkingAt",
     ):
         assert absent not in map_javascript, f"{absent} n'a rien à faire sur la carte"
+
+
+def test_the_simulator_indicator_distinguishes_pause_from_disconnect():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    styles = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'indicator.classList.toggle("paused", paused)' in javascript
+    assert 'aircraft.paused ? t("sim_paused")' in javascript
+    assert ".sim-status.paused" in styles
+    assert ".live-pill.paused" in styles
+    assert translations.count("sim_paused:") == 8
+    assert translations.count("sim_paused_title:") == 8
 
 
 def test_the_ground_view_owns_the_airport_layout():

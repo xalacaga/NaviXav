@@ -122,6 +122,7 @@ class AircraftState:
     indicated_airspeed_kt: float | None = None
     vertical_speed_fpm: float | None = None
     on_ground: bool = False
+    paused: bool | None = None
     title: str = ""
     source: str = ""
     configuration: AircraftConfiguration | None = None

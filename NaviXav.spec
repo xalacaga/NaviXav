@@ -64,6 +64,9 @@ app_binaries += webview_binaries
 
 datas = [
     (str(project_root / "navixav" / "web" / "static"), "navixav/web/static"),
+    # Le journal des versions est lu par les Paramètres : sans lui, la fenêtre
+    # s'ouvrirait vide dans l'application installée.
+    (str(project_root / "CHANGELOG.md"), "."),
     (str(project_root / "assets" / "navixav.ico"), "assets"),
     (str(project_root / "tests" / "data" / "ofp_lcph_eham.json"), "tests/data"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),

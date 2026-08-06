@@ -98,7 +98,8 @@ def test_without_a_star_the_vectors_variant_wins(provider, settings):
     approach, transition = engine._choose_approach(
         approaches=provider.procedures("LFBO", ProcedureKind.APPROACH),
         runway_name="32R",
-        star_exit_fix=None,
+        link_fix=None,
+        via_star=False,
         forced_name=None,
         forced_transition=None,
         prefer_ils=True,

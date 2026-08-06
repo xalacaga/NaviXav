@@ -113,6 +113,45 @@ Corrige ces fichiers dans publishing\ puis relance la préparation.
 # doubles et à l'intérieur des guillemets.
 $NoBreakSpace = [char]0x00A0
 
+# Langues de l'interface, dans l'ordre où elles apparaissent dans i18n.js.
+# Une note de version est un texte que l'utilisateur lit : elle suit donc la
+# même règle que le reste de l'interface et existe dans toutes les langues que
+# NaviXav parle. « en » reste la langue de la release GitHub et le repli.
+$Locales = @("en", "fr", "de", "es", "it", "pt", "nl", "pl")
+
+$SectionTitles = @{
+    en = @{ Added = "Added";      Fixed = "Fixed";       Changed = "Changed" }
+    fr = @{ Added = "Nouveautés"; Fixed = "Corrections"; Changed = "Modifications" }
+    de = @{ Added = "Neu";        Fixed = "Behoben";     Changed = "Geändert" }
+    es = @{ Added = "Novedades";  Fixed = "Correcciones";Changed = "Cambios" }
+    it = @{ Added = "Novità";     Fixed = "Correzioni";  Changed = "Modifiche" }
+    pt = @{ Added = "Novidades";  Fixed = "Correções";   Changed = "Alterações" }
+    nl = @{ Added = "Nieuw";      Fixed = "Opgelost";    Changed = "Gewijzigd" }
+    pl = @{ Added = "Nowości";    Fixed = "Poprawki";    Changed = "Zmiany" }
+}
+
+$ReleasedOn = @{
+    en = "Released on {0}."
+    fr = "Publié le {0}."
+    de = "Veröffentlicht am {0}."
+    es = "Publicado el {0}."
+    it = "Pubblicato il {0}."
+    pt = "Publicado em {0}."
+    nl = "Uitgebracht op {0}."
+    pl = "Opublikowano {0}."
+}
+
+$InstallerFooter = @{
+    en = "The installer is verified against its SHA-256 checksum before any automatic update."
+    fr = "L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique."
+    de = "Das Installationsprogramm wird vor jeder automatischen Aktualisierung anhand seiner SHA-256-Prüfsumme verifiziert."
+    es = "El instalador se verifica con su suma de comprobación SHA-256 antes de cualquier actualización automática."
+    it = "Il programma di installazione è verificato tramite il suo checksum SHA-256 prima di ogni aggiornamento automatico."
+    pt = "O instalador é verificado através da sua soma de verificação SHA-256 antes de qualquer atualização automática."
+    nl = "Het installatieprogramma wordt vóór elke automatische update geverifieerd aan de hand van zijn SHA-256-controlesom."
+    pl = "Instalator jest weryfikowany za pomocą sumy kontrolnej SHA-256 przed każdą automatyczną aktualizacją."
+}
+
 # Phrase de note de version : majuscule initiale, point final et espaces
 # insécables. L'espace n'est ajoutée devant « : » que si l'auteur en a déjà
 # mis une, sinon les URL et les heures seraient déformées.
@@ -140,12 +179,36 @@ function Format-FrenchSentence([string]$Text) {
     return $Value
 }
 
+# Typographie neutre, pour toutes les langues sauf le français : majuscule
+# initiale et point final, sans toucher à la ponctuation. Les espaces
+# insécables de Format-FrenchSentence sont une règle française ; les appliquer
+# à l'anglais ou au néerlandais y introduirait des espaces parasites.
+function Format-PlainSentence([string]$Text) {
+    $Value = ([string]$Text).Trim()
+    if (-not $Value) { return "" }
+    $Value = [regex]::Replace(
+        $Value,
+        '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([^)]+\))?!?:\s*',
+        ''
+    )
+    if (-not $Value) { return "" }
+    $Value = $Value.Substring(0, 1).ToUpperInvariant() + $Value.Substring(1)
+    if ($Value -notmatch '[.!?»”]$') { $Value += "." }
+    return $Value
+}
+
+function Format-Sentence([string]$Text, [string]$Locale) {
+    if ($Locale -eq "fr") { return Format-FrenchSentence $Text }
+    return Format-PlainSentence $Text
+}
+
 function Add-Category(
     [System.Collections.Generic.List[string]]$Lines,
     [string]$Title,
-    [object[]]$Items
+    [object[]]$Items,
+    [string]$Locale
 ) {
-    $Sentences = @($Items | ForEach-Object { Format-FrenchSentence $_ } | Where-Object { $_ })
+    $Sentences = @($Items | ForEach-Object { Format-Sentence $_ $Locale } | Where-Object { $_ })
     if ($Sentences.Count -eq 0) { return }
     $Lines.Add("## $Title")
     $Lines.Add("")
@@ -155,78 +218,117 @@ function Add-Category(
     $Lines.Add("")
 }
 
+# Texte d'une entrée dans une langue donnée, avec repli sur l'anglais.
+function Get-EntryText($Entry, [string]$Locale) {
+    if ($Entry.ContainsKey($Locale)) { return $Entry[$Locale] }
+    return $Entry["en"]
+}
+
+function Select-EntryTexts([object[]]$Entries, [string]$Locale) {
+    return @($Entries | ForEach-Object { Get-EntryText $_ $Locale })
+}
+
 # Nouveautés et corrections rédigées à la main pour cette version.
 #
 # Les sujets de commit décrivent le dépôt, pas le produit : ils donnent des
-# notes de version illisibles pour l'utilisateur. RELEASE_HIGHLIGHTS.md prend
+# notes de version illisibles pour l'utilisateur. RELEASE_HIGHLIGHTS.json prend
 # donc le pas sur eux, section par section, dès qu'il contient au moins une
-# puce. Le fichier est réinitialisé après la publication.
+# entrée. Le fichier est réinitialisé après la publication.
 #
-# Les puces vont aux nouveautés jusqu'au titre « ## Corrections », qui bascule
-# les suivantes vers la section des correctifs.
+# Chaque entrée porte son texte dans les langues de l'interface. Le format est
+# structuré plutôt que rédigé en Markdown : huit traductions par changement ne
+# tiennent pas dans une liste à puces sans qu'on finisse par mélanger les
+# changements entre eux.
+function Read-HighlightEntries($Entries) {
+    $Result = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($Entry in @($Entries)) {
+        if ($null -eq $Entry) { continue }
+        $Texts = @{}
+        foreach ($Locale in $Locales) {
+            $Value = ([string]$Entry.$Locale).Trim()
+            if ($Value) { $Texts[$Locale] = $Value }
+        }
+        if ($Texts.Count -eq 0) { continue }
+        foreach ($Required in @("en", "fr")) {
+            if (-not $Texts.ContainsKey($Required)) {
+                throw @"
+RELEASE_HIGHLIGHTS.json : une entrée n'a pas de texte « $Required ».
+
+Chaque entrée doit au moins porter « fr » et « en ». Les autres langues
+retombent sur « en » lorsqu'elles manquent.
+
+Entrée fautive : $(($Texts.Values | Select-Object -First 1))
+"@
+            }
+        }
+        $Result.Add($Texts)
+    }
+    return $Result.ToArray()
+}
+
 function Get-Highlights([string]$Path) {
     $Empty = [pscustomobject]@{ Features = @(); Fixes = @() }
     if (-not (Test-Path -LiteralPath $Path)) { return $Empty }
     $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-    $Features = [System.Collections.Generic.List[string]]::new()
-    $Fixes = [System.Collections.Generic.List[string]]::new()
-    $Items = $Features
-    $Current = ""
-    $InComment = $false
-    foreach ($Line in ($Content -split "`r?`n")) {
-        # Les exemples du gabarit vivent dans un commentaire HTML : ils ne
-        # doivent jamais se retrouver dans les notes de version.
-        if ($InComment) {
-            if ($Line -match '-->') { $InComment = $false }
-            continue
-        }
-        if ($Line -match '<!--') {
-            if ($Line -notmatch '-->') { $InComment = $true }
-            continue
-        }
-        if ($Line -match '^\s*#{1,6}\s*(?<title>.+?)\s*$') {
-            if ($Current) { $Items.Add($Current) }
-            $Current = ""
-            $Title = $Matches.title
-            if ($Title -match '^(Fix|Fixed|Corrections?|Correctifs?)') { $Items = $Fixes }
-            elseif ($Title -match '^(Added|Features?|Nouveaut|Nouvelles)') { $Items = $Features }
-            continue
-        }
-        if ($Line -match '^\s*[-*]\s+(?<text>.+?)\s*$') {
-            if ($Current) { $Items.Add($Current) }
-            $Current = $Matches.text
-        } elseif ($Current -and $Line -match '^\s+\S') {
-            # Puce sur plusieurs lignes : la continuation est indentée.
-            $Current = "$Current " + $Line.Trim()
-        } elseif (-not $Line.Trim()) {
-            if ($Current) { $Items.Add($Current) }
-            $Current = ""
-        }
+    if (-not $Content.Trim()) { return $Empty }
+    try {
+        $Data = $Content | ConvertFrom-Json
+    } catch {
+        throw "RELEASE_HIGHLIGHTS.json est illisible : $($_.Exception.Message)"
     }
-    if ($Current) { $Items.Add($Current) }
     return [pscustomobject]@{
-        Features = $Features.ToArray()
-        Fixes = $Fixes.ToArray()
+        Features = @(Read-HighlightEntries $Data.added)
+        Fixes = @(Read-HighlightEntries $Data.fixed)
     }
 }
 
+# Notes de version d'une langue, prêtes à être écrites sur disque.
+function New-ReleaseNotes(
+    [string]$Locale,
+    [string]$Version,
+    [string]$Date,
+    [object[]]$AddedEntries,
+    [object[]]$FixedEntries,
+    [object[]]$ChangedItems
+) {
+    $Titles = $SectionTitles[$Locale]
+    $Lines = [System.Collections.Generic.List[string]]::new()
+    $Lines.Add("# NaviXav $Version")
+    $Lines.Add("")
+    $Lines.Add(($ReleasedOn[$Locale] -f $Date))
+    $Lines.Add("")
+    Add-Category $Lines $Titles.Added (Select-EntryTexts $AddedEntries $Locale) $Locale
+    Add-Category $Lines $Titles.Fixed (Select-EntryTexts $FixedEntries $Locale) $Locale
+    # Les sujets de commit n'existent que dans la langue où ils ont été écrits :
+    # seul leur titre de section est traduit. C'est un repli, pas une note.
+    Add-Category $Lines $Titles.Changed $ChangedItems $Locale
+    if ($Lines[$Lines.Count - 1] -ne "") { $Lines.Add("") }
+    $Lines.Add($InstallerFooter[$Locale])
+    $Lines.Add("")
+    return $Lines
+}
+
 $HighlightsTemplate = @"
-# Highlights for the next release
-
-Update this file for **every code change**, not only immediately before a
-release. Add one bullet per change, in English and from the user's perspective.
-This file is used instead of commit subjects in the release notes and is then
-reset by ``scripts\prepare_release.ps1``.
-
-<!-- Example, remove before use:
-- Flight tracking displays the estimated time remaining before arrival.
--->
-
-## Fixes
-
-<!-- Example, remove before use:
-- The basemap no longer shows seams between map tiles.
--->
+{
+  "_comment": [
+    "Highlights for the next release. Update this file for EVERY code change,",
+    "not only immediately before a release.",
+    "",
+    "One entry per change, written from the user's point of view, in the eight",
+    "interface languages. The rule is the same as for i18n.js: a text the user",
+    "reads exists in every language NaviXav speaks.",
+    "",
+    "'fr' and 'en' are required; a missing language falls back to 'en'.",
+    "Aviation identifiers and METAR/MCDU notation stay unchanged in every",
+    "language.",
+    "",
+    "prepare_release.ps1 turns these entries into RELEASE_NOTES.md and its",
+    "localised siblings, and prepends a version section to CHANGELOG.md, the",
+    "history the application reads, then resets this file."
+  ],
+  "added": [],
+  "fixed": []
+}
 "@
 
 $Current = Get-CurrentVersion
@@ -238,7 +340,7 @@ if ($Commits.Count -eq 0) {
 $EffectiveBump = if ($Bump -eq "auto") { Get-AutomaticBump $Commits } else { $Bump }
 $Next = Get-NextVersion $Current $EffectiveBump
 $Date = Get-Date -Format "yyyy-MM-dd"
-$HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.md"
+$HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.json"
 $Highlights = Get-Highlights $HighlightsPath
 
 # Contrôle avant toute modification : rien n'est publié avec des notes qui ne
@@ -250,10 +352,10 @@ if (
     -not $AllowGenericNotes
 ) {
     throw @"
-RELEASE_HIGHLIGHTS.md does not describe this release.
+RELEASE_HIGHLIGHTS.json does not describe this release.
 
-Add one bullet per change, in English and from the user's perspective, under
-"# Highlights" or "## Fixes", then run the command again.
+Add one entry per change to "added" or "fixed", written from the user's point
+of view, with at least its "fr" and "en" texts, then run the command again.
 
 To publish without a visible change, run again with -AllowGenericNotes.
 "@
@@ -272,29 +374,52 @@ $Other = @(
         $_ -notmatch '^chore\(release\):'
     }
 )
-$Notes = [System.Collections.Generic.List[string]]::new()
-$Notes.Add("# NaviXav $Next")
-$Notes.Add("")
-$Notes.Add("Released on $Date.")
-$Notes.Add("")
 # Les textes rédigés à la main l'emportent, section par section : ils parlent
-# du produit, là où le sujet de commit ne décrit que le dépôt.
-$FeatureItems = if ($Highlights.Features.Count -gt 0) { $Highlights.Features } else { $Features }
-$FixItems = if ($Highlights.Fixes.Count -gt 0) { $Highlights.Fixes } else { $Fixes }
-Add-Category $Notes "Added" $FeatureItems
-Add-Category $Notes "Fixed" $FixItems
-Add-Category $Notes "Changed" $Other
-if ($Notes[$Notes.Count - 1] -ne "") { $Notes.Add("") }
-$Notes.Add("The installer is verified against its SHA-256 checksum before any automatic update.")
-$Notes.Add("")
-$ReleaseText = $Notes -join "`n"
-[System.IO.File]::WriteAllText(
-    (Join-Path $ProjectRoot "RELEASE_NOTES.md"),
-    $ReleaseText,
-    [System.Text.UTF8Encoding]::new($false)
-)
+# du produit, là où le sujet de commit ne décrit que le dépôt. Un sujet de
+# commit repris faute de mieux n'existe que dans sa langue d'origine : il est
+# rangé sous « en », d'où toutes les autres langues le reprendront.
+$FeatureItems = if ($Highlights.Features.Count -gt 0) {
+    $Highlights.Features
+} else {
+    @($Features | ForEach-Object { @{ en = $_ } })
+}
+$FixItems = if ($Highlights.Fixes.Count -gt 0) {
+    $Highlights.Fixes
+} else {
+    @($Fixes | ForEach-Object { @{ en = $_ } })
+}
 
-$ChangelogEntry = "## [$Next] - $Date`n`n" + (($Notes | Select-Object -Skip 4) -join "`n")
+# Une note par langue de l'interface. « RELEASE_NOTES.md » reste l'anglais :
+# c'est le corps de la release GitHub, lu par tout le monde.
+$NotesByLocale = @{}
+foreach ($Locale in $Locales) {
+    $NotesByLocale[$Locale] = New-ReleaseNotes $Locale $Next $Date $FeatureItems $FixItems $Other
+}
+$Notes = $NotesByLocale["en"]
+
+foreach ($Locale in $Locales) {
+    $Text = ($NotesByLocale[$Locale] -join "`n")
+    $Targets = @("RELEASE_NOTES.$Locale.md")
+    if ($Locale -eq "en") { $Targets += "RELEASE_NOTES.md" }
+    foreach ($Target in $Targets) {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $ProjectRoot $Target),
+            $Text,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
+}
+
+# Le journal reste en anglais : c'est un historique de dépôt, que les Paramètres
+# se contentent de relire.
+# Dans le journal, la version porte le titre de section : ses rubriques passent
+# donc un niveau plus bas, sinon « Added » a le même rang que « [1.4.9] ».
+$ChangelogBody = @(
+    $Notes | Select-Object -Skip 4 | ForEach-Object {
+        if ($_ -like "## *") { "#" + $_ } else { $_ }
+    }
+) -join "`n"
+$ChangelogEntry = "## [$Next] - $Date`n`n" + $ChangelogBody
 if (Test-Path -LiteralPath "CHANGELOG.md") {
     $Existing = Get-Content -LiteralPath "CHANGELOG.md" -Raw -Encoding UTF8
     $Header = "# Changelog`n`n"
@@ -321,5 +446,5 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
 )
 
 Write-Host "Version prepared: $Current -> $Next ($EffectiveBump)" -ForegroundColor Green
-Write-Host "Notes: $ProjectRoot\RELEASE_NOTES.md"
+Write-Host "Notes: $ProjectRoot\RELEASE_NOTES.md ($($Locales -join ', '))"
 Write-Output $Next

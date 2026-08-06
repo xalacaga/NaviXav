@@ -17,9 +17,19 @@ $ReleaseFiles = @(
     "pyproject.toml",
     "CHANGELOG.md",
     "RELEASE_NOTES.md",
+    # Une note par langue de l'interface, produites par prepare_release.ps1 et
+    # jointes à la Release GitHub.
+    "RELEASE_NOTES.en.md",
+    "RELEASE_NOTES.fr.md",
+    "RELEASE_NOTES.de.md",
+    "RELEASE_NOTES.es.md",
+    "RELEASE_NOTES.it.md",
+    "RELEASE_NOTES.pt.md",
+    "RELEASE_NOTES.nl.md",
+    "RELEASE_NOTES.pl.md",
     # Vidé par prepare_release.ps1 une fois les nouveautés reprises dans les
     # notes : la remise à zéro appartient donc au commit de Release.
-    "RELEASE_HIGHLIGHTS.md",
+    "RELEASE_HIGHLIGHTS.json",
     # prepare_release.ps1 aligne également les textes et noms d'archives
     # publiés sur Flightsim.to. Ils font partie du même commit de Release.
     "publishing/flightsim-to-description.txt",
@@ -189,17 +199,30 @@ if ($LASTEXITCODE -eq 0) {
 
 $Installer = "release\NaviXav-Setup-$Version.exe"
 $Portable = "release\NaviXav-$Version-windows-x64-portable.zip"
-$Assets = @($Installer, "$Installer.sha256", $Portable, "$Portable.sha256")
-if ($Assets | Where-Object { -not (Test-Path -LiteralPath $_) }) {
+$Packages = @($Installer, "$Installer.sha256", $Portable, "$Portable.sha256")
+if ($Packages | Where-Object { -not (Test-Path -LiteralPath $_) }) {
     Write-Host "Les paquets sont absents : reconstruction de v$Version." -ForegroundColor Yellow
     & (Join-Path $PSScriptRoot "build_windows.ps1")
     if ($LASTEXITCODE -ne 0) { throw "La reconstruction de la Release a échoué." }
 }
-foreach ($Asset in $Assets) {
+foreach ($Asset in $Packages) {
     if (-not (Test-Path -LiteralPath $Asset)) {
         throw "Fichier de Release manquant : $Asset"
     }
 }
+
+# Les notes traduites accompagnent la Release. Le corps GitHub reste en anglais
+# — c'est la page que tout le monde ouvre — mais chaque langue de l'interface a
+# son fichier téléchargeable, comme les README.
+$LocalisedNotes = @(
+    "en", "fr", "de", "es", "it", "pt", "nl", "pl"
+) | ForEach-Object { "RELEASE_NOTES.$_.md" }
+foreach ($Note in $LocalisedNotes) {
+    if (-not (Test-Path -LiteralPath $Note)) {
+        throw "Note de version manquante : $Note. Lance scripts\prepare_release.ps1."
+    }
+}
+$Assets = $Packages + $LocalisedNotes
 
 Invoke-Checked "git" @("push", "origin", "main") "L'envoi de la branche main a échoué"
 Invoke-Checked "git" @("push", "origin", $Tag) "L'envoi du tag $Tag a échoué"
