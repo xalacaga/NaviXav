@@ -39,6 +39,7 @@ RECV_ID_FACILITY_DATA_END = 29
 _PAYLOAD_OFFSET = (3 + 7) * 4
 
 DATATYPE_FLOAT64 = 4
+DATATYPE_STRING256 = 9
 PERIOD_ONCE = 1
 OBJECT_ID_USER = 0
 SIMCONNECT_UNUSED = 0xFFFFFFFF
@@ -191,6 +192,7 @@ class SimConnectClient:
         # Une définition de données est réutilisable : la déclarer à chaque
         # lecture les accumulerait côté simulateur pour toute la connexion.
         self._simvar_definitions: dict[tuple[tuple[str, str], ...], int] = {}
+        self._string_simvar_definitions: dict[str, int] = {}
         if self._dll.SimConnect_Open(
             ct.byref(self._handle), b"NaviXav", None, 0, None, 0
         ) != 0:
@@ -368,6 +370,68 @@ class SimConnectClient:
             )
         raise SimConnectError("Aucune donnée de vol reçue du simulateur.")
 
+    def read_string_simvar(self, name: str, timeout_s: float = 3.0) -> str:
+        """Lit une SimVar texte fixe de l'avion du joueur.
+
+        Les blocs numériques de NaviXav restent exclusivement en FLOAT64. Le
+        titre de l'appareil chargé utilise donc sa propre définition STRING256,
+        afin de ne pas décaler la structure binaire des relevés de vol.
+        """
+        definition_id = self._string_definition_for(name)
+        self._next_id += 1
+        request_id = self._next_id
+
+        result = self._dll.SimConnect_RequestDataOnSimObject(
+            self._handle, request_id, definition_id, OBJECT_ID_USER,
+            PERIOD_ONCE, 0, 0, 0, 0,
+        )
+        if result != 0:
+            self._forget_string_definition(name)
+            raise SimConnectError(f"Impossible de demander la variable {name}.")
+
+        pointer = ct.POINTER(_RECV)()
+        size = wintypes.DWORD()
+        deadline = time.monotonic() + timeout_s
+        exceptions: list[int] = []
+
+        while time.monotonic() < deadline:
+            if self._dll.SimConnect_GetNextDispatch(
+                self._handle, ct.byref(pointer), ct.byref(size)
+            ) != 0:
+                time.sleep(0.002)
+                continue
+
+            recv = pointer.contents
+            if recv.dwID == RECV_ID_SIMOBJECT_DATA:
+                data = ct.cast(pointer, ct.POINTER(_RECV_SIMOBJECT_DATA)).contents
+                if data.dwRequestID != request_id:
+                    continue
+                payload = ct.string_at(pointer, recv.dwSize)[_PAYLOAD_OFFSET:]
+                if len(payload) < 256:
+                    raise SimConnectError(
+                        f"Réponse de {len(payload)} octets pour 256 attendus."
+                    )
+                return payload[:256].split(b"\0", 1)[0].decode(
+                    "utf-8", errors="replace"
+                )
+            if recv.dwID == RECV_ID_EXCEPTION:
+                exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
+                if exception.dwException not in exceptions:
+                    exceptions.append(exception.dwException)
+                deadline = min(deadline, time.monotonic() + EXCEPTION_GRACE_S)
+            elif recv.dwID == RECV_ID_QUIT:
+                raise SimConnectError("Le simulateur s'est fermé.")
+
+        if exceptions:
+            self._forget_string_definition(name)
+            names = ", ".join(
+                EXCEPTION_NAMES.get(code, str(code)) for code in exceptions
+            )
+            raise SimConnectRefused(
+                f"SimConnect a refusé la demande ({names}).", exceptions
+            )
+        raise SimConnectError(f"Aucune valeur reçue pour {name}.")
+
     def _definition_for(self, variables: Sequence[tuple[str, str]]) -> int:
         """Renvoie l'identifiant de définition de ce jeu de variables."""
         key = tuple(variables)
@@ -395,11 +459,34 @@ class SimConnectClient:
         if definition_id is not None:
             self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
 
+    def _string_definition_for(self, name: str) -> int:
+        existing = self._string_simvar_definitions.get(name)
+        if existing is not None:
+            return existing
+
+        self._next_id += 1
+        definition_id = self._next_id
+        result = self._dll.SimConnect_AddToDataDefinition(
+            self._handle, definition_id, name.encode(), b"NULL",
+            DATATYPE_STRING256, 0.0, SIMCONNECT_UNUSED,
+        )
+        if result != 0:
+            self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+            raise SimConnectError(f"Impossible de déclarer la variable texte {name}.")
+        self._string_simvar_definitions[name] = definition_id
+        return definition_id
+
+    def _forget_string_definition(self, name: str) -> None:
+        definition_id = self._string_simvar_definitions.pop(name, None)
+        if definition_id is not None:
+            self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+
     def close(self) -> None:
         if self._handle:
             self._dll.SimConnect_Close(self._handle)
             self._handle = ct.c_void_p()
         self._simvar_definitions.clear()
+        self._string_simvar_definitions.clear()
 
     def __enter__(self) -> "SimConnectClient":
         return self

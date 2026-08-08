@@ -1809,7 +1809,7 @@ function nextFlightConstraint(plan, projection, aircraft) {
         stage,
         pathIndex: index,
         distanceNm: distanceFromProjectionToIndex(projection, index),
-        altitudeFt: constraintAltitudeFt(row.altitude, Number(aircraft.altitude_ft || 0)),
+        altitudeFt: constraintAltitudeFt(row.altitude, finiteOr(publishedAltitude(aircraft), 0)),
       });
     }
   }
@@ -1849,27 +1849,125 @@ function detectFlightPhase(aircraft, projection) {
   return t(detectFlightPhaseKey(aircraft, projection));
 }
 
+/*
+ * Plafonds publiés de la STAR et de l'approche, rapportés à leur distance de
+ * la destination.
+ *
+ * Seules les contraintes qui poussent vers le bas comptent pour une descente :
+ * « ≤ 8 000 ft », « 4 000 ft », ou la borne haute d'un « entre ». Un plancher
+ * « ≥ 3 000 ft » ne fait jamais descendre plus tôt et serait un contresens ici.
+ */
+function descentCeilings(plan) {
+  if (flightGeometry.length < 2) return [];
+  const suffix = new Array(flightGeometry.length).fill(0);
+  for (let index = flightGeometry.length - 2; index >= 0; index -= 1) {
+    suffix[index] = suffix[index + 1]
+      + haversineNm(flightGeometry[index], flightGeometry[index + 1]);
+  }
+
+  const ceilings = [];
+  for (const [stage, rows] of [
+    ["star", plan.arrival?.star_constraints || []],
+    ["approach", plan.arrival?.approach_constraints || []],
+  ]) {
+    let cursor = 0;
+    for (const row of rows) {
+      if (!row.is_fix || !row.altitude) continue;
+      const index = flightGeometry.findIndex(
+        (point, pointIndex) => (
+          pointIndex >= cursor && point.stage === stage && point.ident === row.label
+        )
+      );
+      if (index < 0) continue;
+      cursor = index + 1;
+      if (String(row.altitude).trim().startsWith("≥")) continue;
+      // Le plafond se lit depuis la croisière : pour un « entre »,
+      // `constraintAltitudeFt` renvoie alors la borne haute, la seule à tenir.
+      const altitudeFt = constraintAltitudeFt(row.altitude, Infinity);
+      if (!Number.isFinite(altitudeFt)) continue;
+      ceilings.push({ altitudeFt, distanceNm: suffix[index] });
+    }
+  }
+  return ceilings;
+}
+
+/*
+ * Le TOD est un point de la route, pas un écart recalculé à chaque image.
+ *
+ * L'ancienne formule retranchait de la distance restante la descente qui reste
+ * à faire, déduite de l'altitude courante. Les deux termes décroissant
+ * ensemble, un profil suivi à 3° figeait l'affichage ; pire, une descente
+ * entamée trop tôt le faisait grandir, puisqu'un avion déjà bas n'a plus rien
+ * à perdre. À 4 000 ft encore à 82 NM du terrain, le panneau annonçait « TOD
+ * dans 71 NM » — soit la distance restante rhabillée — alors que le point
+ * était dépassé depuis une trentaine de milles.
+ *
+ * Le repère est donc ancré sur le niveau de croisière du plan, seule altitude
+ * qui ne dépende pas de la trajectoire réellement suivie. Il devient fixe : la
+ * valeur décroît, passe par zéro, puis se dit « dépassé » quand elle l'est.
+ */
 function descentGuidance(plan, aircraft, projection) {
   if (!aircraft || !projection) return null;
-  const currentAltitude = Number(aircraft.altitude_ft || 0);
+  // Le niveau de vol se lit dans l'atmosphère standard. L'altitude vraie
+  // dépasse la pression de plus de mille pieds par air chaud, soit trois
+  // milles de TOD ; `standardAltitude` ne retombe sur elle qu'à défaut.
+  const currentAltitude = finiteOr(standardAltitude(aircraft), 0);
   const interceptText = plan.arrival?.glide_intercept_altitude;
   const targetAltitude = constraintAltitudeFt(interceptText, currentAltitude) || 3000;
   const finalDistance = Number(plan.arrival?.final_approach_distance_nm || 8);
   const distanceToIntercept = Math.max(0, projection.remainingNm - finalDistance);
-  const altitudeToLose = Math.max(0, currentAltitude - targetAltitude);
-  const descentDistance = altitudeToLose / 318;
-  const todInNm = distanceToIntercept - descentDistance;
-  const groundSpeed = Math.max(120, Number(aircraft.ground_speed_kt || 0));
-  const requiredVsFpm = -Math.round((groundSpeed * 318) / 60 / 50) * 50;
-  const expectedAltitude = Math.min(
-    Number(plan.enroute?.cruise_altitude_ft || Infinity),
+  const cruiseAltitude = finiteOr(plan.enroute?.cruise_altitude_ft);
+
+  // Sans niveau de croisière au plan le repère ne peut pas être ancré :
+  // l'altitude courante reste alors la seule origine disponible.
+  const anchorAltitude = cruiseAltitude === null ? currentAltitude : cruiseAltitude;
+
+  /*
+   * Le MCDU descend plus tôt que la seule géométrie du glide ne l'impose,
+   * parce qu'il doit aussi tenir les plafonds de la STAR et de l'approche.
+   * Chacun ouvre son propre profil à 3° ; le TOD est le plus amont d'entre
+   * eux, et l'altitude attendue au point courant le plus bas.
+   */
+  let anchorFromDestination = finalDistance
+    + Math.max(0, anchorAltitude - targetAltitude) / 318;
+  let expectedAltitude = Math.min(
+    cruiseAltitude === null ? Infinity : cruiseAltitude,
     targetAltitude + distanceToIntercept * 318
   );
+  for (const ceiling of descentCeilings(plan)) {
+    anchorFromDestination = Math.max(
+      anchorFromDestination,
+      ceiling.distanceNm + Math.max(0, anchorAltitude - ceiling.altitudeFt) / 318
+    );
+    if (projection.remainingNm > ceiling.distanceNm) {
+      expectedAltitude = Math.min(
+        expectedAltitude,
+        ceiling.altitudeFt + (projection.remainingNm - ceiling.distanceNm) * 318
+      );
+    }
+  }
+  const todInNm = projection.remainingNm - anchorFromDestination;
+
+  const groundSpeed = Math.max(120, Number(aircraft.ground_speed_kt || 0));
+  const requiredVsFpm = -Math.round((groundSpeed * 318) / 60 / 50) * 50;
+
+  // Quitter la croisière ne se déduit pas de la seule altitude : en montée
+  // aussi l'avion est sous son niveau. Le TOD franchi ou une perte d'altitude
+  // depuis le plafond du vol distinguent les deux, et le panneau s'en sert
+  // pour juger le profil même pendant un palier.
+  const reachedAltitude = finiteOr(activeFlightSummary?.max_altitude_ft, currentAltitude);
+  const leftCruise = (
+    cruiseAltitude !== null
+    && currentAltitude < cruiseAltitude - 1000
+    && (todInNm <= 2 || currentAltitude < reachedAltitude - 1500)
+  );
+
   return {
     targetAltitude,
     todInNm,
     requiredVsFpm,
     expectedAltitude,
+    leftCruise,
     profileDeltaFt: Math.round(currentAltitude - expectedAltitude),
   };
 }
@@ -4034,6 +4132,19 @@ function standardAltitude(aircraft) {
   );
 }
 
+/*
+ * L'altitude indiquée est la seule comparable aux contraintes publiées : une
+ * contrainte à 4 000 ft se tient au calage courant, pas à l'altitude vraie que
+ * publie SimConnect. Même repli que `standardAltitude` si le simulateur ne
+ * donne pas le bloc de configuration.
+ */
+function publishedAltitude(aircraft) {
+  return finiteOr(
+    aircraft?.configuration?.indicated_altitude_ft,
+    finiteOr(aircraft?.altitude_ft)
+  );
+}
+
 function progressAltitudeLabel(aircraft, ratio) {
   const altitude = standardAltitude(aircraft);
   if (altitude === null) return "—";
@@ -4168,7 +4279,7 @@ function updateFlightPanel(aircraft) {
   if (constraint?.altitudeFt && constraint.distanceNm > 0.2 && aircraft) {
     const minutes = constraint.distanceNm / Math.max(60, Number(aircraft.ground_speed_kt || 0)) * 60;
     requiredVs = Math.round(
-      (constraint.altitudeFt - Number(aircraft.altitude_ft || 0)) / minutes / 50
+      (constraint.altitudeFt - finiteOr(publishedAltitude(aircraft), 0)) / minutes / 50
     ) * 50;
   }
   liveValue(
@@ -4182,11 +4293,22 @@ function updateFlightPanel(aircraft) {
       : descent.todInNm >= -2
         ? t("tod_now")
         : tf("tod_passed", { distance: Math.abs(descent.todInNm).toFixed(0) });
-    liveValue("flight-tod", todText, descent.todInNm < -2 ? "warning" : "good");
+    // Franchir le TOD n'a rien d'anormal une fois la descente entamée : c'est
+    // rester en croisière au-delà du point qui doit alerter.
+    liveValue(
+      "flight-tod",
+      todText,
+      descent.todInNm > 2 || descent.leftCruise ? "good" : "warning"
+    );
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
+    // `leftCruise` d'abord : sans lui, stabiliser à 4 000 ft bien avant le
+    // terrain suffisait à faire taire l'écart au profil, la vitesse verticale
+    // étant nulle et la phase encore « en route ». L'alerte disparaissait
+    // exactement quand elle devenait utile.
     const profileActive = (
-      phase === t("phase_descent")
+      descent.leftCruise
+      || phase === t("phase_descent")
       || phase === t("phase_approach")
       || verticalSpeed < -300
       || descent.todInNm <= 2

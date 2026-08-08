@@ -16,5 +16,56 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": []
+  "fixed": [
+    {
+      "en": "Fenix A319/A320/A321 speedbrakes now show ARMED reliably even when the SimBrief aircraft name is generic.",
+      "fr": "Les aérofreins des Fenix A319/A320/A321 affichent désormais correctement ARMÉS même lorsque le nom d’avion SimBrief est générique.",
+      "de": "Die Speedbrakes der Fenix A319/A320/A321 zeigen jetzt zuverlässig ARMED an, auch wenn der Flugzeugname in SimBrief generisch ist.",
+      "es": "Los aerofrenos de los Fenix A319/A320/A321 ahora muestran ARMED correctamente aunque el nombre del avión en SimBrief sea genérico.",
+      "it": "Gli speedbrake dei Fenix A319/A320/A321 ora mostrano correttamente ARMED anche quando il nome dell’aeromobile in SimBrief è generico.",
+      "pt": "Os speedbrakes dos Fenix A319/A320/A321 agora apresentam ARMED corretamente mesmo quando o nome da aeronave no SimBrief é genérico.",
+      "nl": "De speedbrakes van de Fenix A319/A320/A321 tonen nu betrouwbaar ARMED, ook wanneer de vliegtuigbenaming in SimBrief algemeen is.",
+      "pl": "Hamulce aerodynamiczne Fenix A319/A320/A321 pokazują teraz poprawnie ARMED, nawet gdy nazwa samolotu w SimBrief jest ogólna."
+    },
+    {
+      "en": "Top of Descent is now a fixed point on the route, computed from the cruise level: it counts down to zero and then reads as passed. It could previously freeze during a 3° descent, or even grow when the descent was started too early.",
+      "fr": "Le Top of Descent est désormais un point fixe de la route, calculé depuis le niveau de croisière : il décroît jusqu’à zéro puis s’affiche comme dépassé. Il pouvait auparavant se figer pendant une descente à 3°, voire grandir lorsque la descente était entamée trop tôt.",
+      "de": "Der Top of Descent ist jetzt ein fester Punkt auf der Route, berechnet aus der Reiseflughöhe: Der Wert zählt bis null herunter und wird danach als überschritten angezeigt. Zuvor konnte er während eines Sinkflugs mit 3° einfrieren oder sogar ansteigen, wenn der Sinkflug zu früh begonnen wurde.",
+      "es": "El Top of Descent es ahora un punto fijo de la ruta, calculado a partir del nivel de crucero: disminuye hasta cero y después se indica como superado. Antes podía quedarse congelado durante un descenso a 3° o incluso aumentar cuando el descenso se iniciaba demasiado pronto.",
+      "it": "Il Top of Descent è ora un punto fisso della rotta, calcolato dal livello di crociera: diminuisce fino a zero e poi viene indicato come superato. In precedenza poteva bloccarsi durante una discesa a 3° o addirittura aumentare quando la discesa veniva iniziata troppo presto.",
+      "pt": "O Top of Descent é agora um ponto fixo da rota, calculado a partir do nível de cruzeiro: diminui até zero e depois é indicado como ultrapassado. Antes podia ficar parado durante uma descida a 3° ou até aumentar quando a descida era iniciada demasiado cedo.",
+      "nl": "Het Top of Descent is nu een vast punt op de route, berekend vanaf het kruisniveau: de waarde telt af tot nul en wordt daarna als gepasseerd weergegeven. Voorheen kon die tijdens een daling van 3° blijven staan of zelfs oplopen wanneer de daling te vroeg werd ingezet.",
+      "pl": "Top of Descent jest teraz stałym punktem trasy, wyznaczanym na podstawie poziomu przelotowego: wartość maleje do zera, a następnie pokazuje przekroczenie. Wcześniej mogła zatrzymać się podczas zniżania 3° lub nawet rosnąć, gdy zniżanie rozpoczęto zbyt wcześnie."
+    },
+    {
+      "en": "The deviation from the descent profile keeps being reported during a level-off below the cruise level. It used to disappear as soon as the vertical speed returned to zero, exactly when the aircraft was far below profile.",
+      "fr": "L’écart au profil de descente reste annoncé pendant un palier sous le niveau de croisière. Il disparaissait jusqu’ici dès que la vitesse verticale revenait à zéro, c’est-à-dire au moment précis où l’avion était très bas sur le profil.",
+      "de": "Die Abweichung vom Sinkflugprofil wird jetzt auch während eines Zwischenniveaus unterhalb der Reiseflughöhe angezeigt. Bisher verschwand sie, sobald die Vertikalgeschwindigkeit auf null zurückging, also genau dann, wenn das Flugzeug weit unter dem Profil lag.",
+      "es": "La desviación respecto al perfil de descenso se sigue indicando durante un nivel intermedio por debajo del nivel de crucero. Antes desaparecía en cuanto la velocidad vertical volvía a cero, justo cuando el avión estaba muy por debajo del perfil.",
+      "it": "Lo scostamento dal profilo di discesa continua a essere segnalato durante un livellamento al di sotto del livello di crociera. Prima spariva non appena la velocità verticale tornava a zero, proprio quando l’aeromobile era molto sotto il profilo.",
+      "pt": "O desvio em relação ao perfil de descida continua a ser indicado durante um nivelamento abaixo do nível de cruzeiro. Antes desaparecia assim que a velocidade vertical voltava a zero, precisamente quando a aeronave estava muito abaixo do perfil.",
+      "nl": "De afwijking ten opzichte van het daalprofiel blijft zichtbaar tijdens een niveauvlucht onder het kruisniveau. Voorheen verdween die zodra de verticale snelheid weer nul werd, juist wanneer het toestel ver onder het profiel zat.",
+      "pl": "Odchylenie od profilu zniżania pozostaje widoczne podczas lotu poziomego poniżej poziomu przelotowego. Wcześniej znikało, gdy tylko prędkość pionowa wracała do zera, czyli dokładnie wtedy, gdy samolot był głęboko pod profilem."
+    },
+    {
+      "en": "Top of Descent now honours the published altitude ceilings of the STAR and the approach, and reads altitude in the standard atmosphere like a flight level.",
+      "fr": "Le Top of Descent tient désormais compte des plafonds d’altitude publiés de la STAR et de l’approche, et lit l’altitude dans l’atmosphère standard comme un niveau de vol.",
+      "de": "Der Top of Descent berücksichtigt jetzt die veröffentlichten Höhenobergrenzen der STAR und des Anflugs und liest die Höhe wie eine Flugfläche in der Standardatmosphäre.",
+      "es": "El Top of Descent tiene ahora en cuenta los techos de altitud publicados de la STAR y de la aproximación, y lee la altitud en la atmósfera estándar como un nivel de vuelo.",
+      "it": "Il Top of Descent tiene ora conto dei tetti di altitudine pubblicati della STAR e dell’avvicinamento e legge l’altitudine nell’atmosfera standard come un livello di volo.",
+      "pt": "O Top of Descent passa a ter em conta os tetos de altitude publicados da STAR e da aproximação e lê a altitude na atmosfera padrão como um nível de voo.",
+      "nl": "Het Top of Descent houdt nu rekening met de gepubliceerde hoogteplafonds van de STAR en de nadering, en leest de hoogte in de standaardatmosfeer zoals een vliegniveau.",
+      "pl": "Top of Descent uwzględnia teraz opublikowane pułapy wysokości procedury STAR i podejścia oraz odczytuje wysokość w atmosferze wzorcowej, tak jak poziom lotu."
+    },
+    {
+      "en": "The vertical speed required for the next constraint is now compared with the indicated altitude, the only one comparable with a published constraint.",
+      "fr": "La vitesse verticale requise pour la prochaine contrainte se compare désormais à l’altitude indiquée, la seule comparable à une contrainte publiée.",
+      "de": "Die für die nächste Beschränkung erforderliche Vertikalgeschwindigkeit wird jetzt mit der angezeigten Höhe verglichen, der einzigen, die mit einer veröffentlichten Beschränkung vergleichbar ist.",
+      "es": "La velocidad vertical necesaria para la siguiente restricción se compara ahora con la altitud indicada, la única comparable con una restricción publicada.",
+      "it": "La velocità verticale richiesta per il vincolo successivo viene ora confrontata con l’altitudine indicata, l’unica comparabile con un vincolo pubblicato.",
+      "pt": "A velocidade vertical necessária para a restrição seguinte passa a ser comparada com a altitude indicada, a única comparável com uma restrição publicada.",
+      "nl": "De verticale snelheid die nodig is voor de volgende beperking wordt nu vergeleken met de aangegeven hoogte, de enige die vergelijkbaar is met een gepubliceerde beperking.",
+      "pl": "Prędkość pionowa wymagana do spełnienia następnego ograniczenia jest teraz porównywana z wysokością wskazywaną, jedyną porównywalną z ograniczeniem opublikowanym."
+    }
+  ]
 }

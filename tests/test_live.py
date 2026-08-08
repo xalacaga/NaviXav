@@ -326,7 +326,12 @@ def test_fenix_speedbrake_zero_means_armed(monkeypatch):
                     "L:A_FC_SPEEDBRAKE": 0.0,
                     "L:S_MIP_PARKING_BRAKE": 0.0,
                 }
-            return super().read_simvars(variables, timeout_s)
+            values = super().read_simvars(variables, timeout_s)
+            if variables == _CONFIGURATION_VARIABLES:
+                # La SimVar standard figée dit explicitement DISARMED : seul
+                # l'adaptateur sélectionné par TITLE peut corriger le résultat.
+                values["SPOILERS ARMED"] = 0.0
+            return values
 
     source = SimConnectSource()
     source.set_aircraft_hint("Fenix A320")
@@ -339,6 +344,34 @@ def test_fenix_speedbrake_zero_means_armed(monkeypatch):
     assert configuration.spoilers_handle_pct == 0.0
     assert configuration.spoilers_armed is True
     assert configuration.parking_brake is False
+
+
+def test_loaded_msfs_title_selects_fenix_when_simbrief_name_is_generic(monkeypatch):
+    """L'OFP décrit souvent un Airbus générique, pas l'addon réellement chargé."""
+
+    class LoadedFenixClient(FakeClient):
+        def read_string_simvar(self, name: str, timeout_s: float = 3.0):
+            assert name == "TITLE"
+            return "Fenix A320 CFM Air France"
+
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                return {
+                    "L:S_FC_FLAPS": 0.0,
+                    "L:A_FC_SPEEDBRAKE": 0.0,
+                    "L:S_MIP_PARKING_BRAKE": 0.0,
+                }
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint("Airbus A320neo")
+    monkeypatch.setattr(source, "_connect", lambda: LoadedFenixClient())
+
+    state = source.read()
+
+    assert state.title == "Fenix A320 CFM Air France"
+    assert state.configuration is not None
+    assert state.configuration.spoilers_armed is True
 
 
 def test_the_three_altitudes_stay_distinct(monkeypatch):
@@ -488,6 +521,7 @@ def _client_with_fake_dll() -> tuple[SimConnectClient, FakeDll]:
     client._handle = None
     client._next_id = 1
     client._simvar_definitions = {}
+    client._string_simvar_definitions = {}
     return client, dll
 
 
@@ -508,6 +542,16 @@ def test_distinct_blocks_get_distinct_definitions():
     configuration = client._definition_for(_CONFIGURATION_VARIABLES)
 
     assert position != configuration
+
+
+def test_aircraft_title_uses_a_reused_string_definition():
+    client, dll = _client_with_fake_dll()
+
+    first = client._string_definition_for("TITLE")
+    second = client._string_definition_for("TITLE")
+
+    assert first == second
+    assert [name for _definition, name in dll.added] == [b"TITLE"]
 
 
 def test_forgetting_a_definition_releases_it():

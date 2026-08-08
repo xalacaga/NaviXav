@@ -635,6 +635,65 @@ def test_vertical_profile_waits_for_descent_before_reporting_too_low():
     assert "Math.abs(delta) <= 500" in javascript
 
 
+def _descent_guidance_source() -> str:
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    body = javascript[javascript.index("function descentGuidance(") :]
+    return body[: body.index("\n}\n")]
+
+
+def test_the_top_of_descent_is_anchored_on_the_cruise_level():
+    """Le TOD est un point de la route, pas un écart recalculé à chaque image.
+
+    Recalculé depuis l'altitude courante, il se figeait sur un profil suivi à
+    3° et grandissait quand la descente était entamée trop tôt : à 4 000 ft
+    encore à 82 NM, il annonçait « dans 71 NM » au lieu de « dépassé ».
+    """
+    guidance = _descent_guidance_source()
+
+    assert "cruiseAltitude === null ? currentAltitude : cruiseAltitude" in guidance
+    assert "const todInNm = projection.remainingNm - anchorFromDestination;" in guidance
+    # L'ancienne origine ne doit jamais revenir.
+    assert "altitudeToLose" not in guidance
+    assert "Number(aircraft.altitude_ft" not in guidance
+
+
+def test_the_descent_profile_reads_the_standard_atmosphere():
+    """Le niveau de vol se lit en pression : l'altitude vraie vaut mille pieds
+    de plus par air chaud, soit trois milles de TOD."""
+    guidance = _descent_guidance_source()
+    assert "finiteOr(standardAltitude(aircraft), 0)" in guidance
+
+
+def test_the_top_of_descent_honours_the_published_ceilings():
+    """Le MCDU descend tôt pour tenir la STAR ; le TOD retient le profil le
+    plus amont, et un plancher « ≥ » ne doit jamais avancer la descente."""
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    assert "descentCeilings(plan)" in _descent_guidance_source()
+
+    ceilings = javascript[javascript.index("function descentCeilings(") :]
+    ceilings = ceilings[: ceilings.index("\n}\n")]
+    assert 'String(row.altitude).trim().startsWith("≥")' in ceilings
+    assert "star_constraints" in ceilings
+    assert "approach_constraints" in ceilings
+
+
+def test_a_level_off_below_cruise_still_reports_the_vertical_profile():
+    """Stabiliser à 4 000 ft loin du terrain suffisait à faire taire l'écart au
+    profil : vitesse verticale nulle et phase encore « en route »."""
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "leftCruise" in _descent_guidance_source()
+    active = javascript[javascript.index("const profileActive = (") :]
+    active = active[: active.index(");")]
+    assert "descent.leftCruise" in active
+
+
 def test_global_alarm_opens_its_details_and_armed_spoilers_take_priority():
     static = Path(desktop.__file__).parent / "web" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")

@@ -128,6 +128,10 @@ _OPTIONAL_RETRY_DELAY_S = 30.0
 # Les blocs secondaires ne doivent jamais retarder la position bien longtemps.
 _OPTIONAL_TIMEOUT_S = 1.5
 
+# Le titre est relu assez souvent pour détecter un changement d'appareil sans
+# ajouter une requête SimConnect à chaque rafraîchissement de l'interface.
+_AIRCRAFT_TITLE_REFRESH_S = 5.0
+
 
 class SimConnectSource:
     """Lecture directe dans le simulateur, sans application intermédiaire."""
@@ -148,6 +152,9 @@ class SimConnectSource:
         self._spoilers_raw: tuple[float, float, float] | None = None
         self._spoilers_pct: float | None = None
         self._aircraft_hint = ""
+        self._aircraft_title = ""
+        self._aircraft_title_checked_at = 0.0
+        self._aircraft_title_disabled_until = 0.0
 
     @property
     def name(self) -> str:
@@ -163,8 +170,9 @@ class SimConnectSource:
         self._aircraft_hint = str(hint or "").strip().upper()
 
     def _is_fenix_family(self) -> bool:
-        return "FENIX" in self._aircraft_hint and any(
-            model in self._aircraft_hint for model in ("A319", "A320", "A321")
+        identity = f"{self._aircraft_title} {self._aircraft_hint}".upper()
+        return "FENIX" in identity and any(
+            model in identity for model in ("A319", "A320", "A321")
         )
 
     # ------------------------------------------------------------------ #
@@ -199,6 +207,7 @@ class SimConnectSource:
                 )
 
             self._failure_reason = ""
+            title = self._read_aircraft_title(client)
             return AircraftState(
                 latitude=values["PLANE LATITUDE"],
                 longitude=values["PLANE LONGITUDE"],
@@ -211,11 +220,52 @@ class SimConnectSource:
                 vertical_speed_fpm=values["VERTICAL SPEED"],
                 on_ground=bool(values["SIM ON GROUND"]),
                 paused=self._read_paused(client),
+                title=title,
                 source=self.name,
                 configuration=self._read_configuration(client),
             )
 
     # ------------------------------------------------------------------ #
+
+    def _read_aircraft_title(self, client: SimConnectClient) -> str:
+        """Lit le titre MSFS sans rendre le suivi dépendant de cette SimVar."""
+        now = time.monotonic()
+        if now < self._aircraft_title_disabled_until:
+            return self._aircraft_title
+        if (
+            self._aircraft_title_checked_at
+            and now - self._aircraft_title_checked_at < _AIRCRAFT_TITLE_REFRESH_S
+        ):
+            return self._aircraft_title
+
+        reader = getattr(client, "read_string_simvar", None)
+        if not callable(reader):
+            return self._aircraft_title
+        try:
+            title = str(reader("TITLE", timeout_s=_OPTIONAL_TIMEOUT_S)).strip()
+        except SimConnectError as exc:
+            self._aircraft_title_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info(
+                "Titre avion indisponible, nouvelle tentative dans %.0f s (%s)",
+                _OPTIONAL_RETRY_DELAY_S,
+                exc,
+            )
+        else:
+            self._aircraft_title_checked_at = now
+            if title:
+                if self._aircraft_title and title != self._aircraft_title:
+                    # Les valeurs mémorisées décrivent l'ancienne cellule.
+                    self._capabilities = None
+                    self._capabilities_disabled_until = 0.0
+                    self._configuration_disabled_until = 0.0
+                    self._parking_brake_raw = None
+                    self._parking_brake_state = None
+                    self._flaps_raw = None
+                    self._flaps_index = None
+                    self._spoilers_raw = None
+                    self._spoilers_pct = None
+                self._aircraft_title = title
+        return self._aircraft_title
 
     def _read_paused(self, client: SimConnectClient) -> bool | None:
         """Indique la pause normale ou active, si MSFS expose cet état."""
@@ -467,6 +517,9 @@ class SimConnectSource:
         self._flaps_index = None
         self._spoilers_raw = None
         self._spoilers_pct = None
+        self._aircraft_title = ""
+        self._aircraft_title_checked_at = 0.0
+        self._aircraft_title_disabled_until = 0.0
 
     def close(self) -> None:
         with self._lock:
