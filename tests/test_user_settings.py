@@ -1,13 +1,18 @@
+from types import SimpleNamespace
+
 import pytest
 from pydantic import ValidationError
 
 from navixav.config import (
+    DEFAULT_TAXI_SPEED_LIMIT_KT,
+    DEFAULT_TAXI_TURN_SPEED_LIMIT_KT,
     MAP_BASEMAPS,
     Settings,
     load_user_settings,
     save_user_settings,
 )
-from navixav.web.app import SettingsRequest
+from navixav.web import app as web_app
+from navixav.web.app import SettingsRequest, create_app
 
 
 def test_user_settings_round_trip(tmp_path):
@@ -80,3 +85,94 @@ def test_settings_request_rejects_invalid_limits():
         SettingsRequest(map_basemap="proprietary")
     with pytest.raises(ValidationError):
         SettingsRequest(map_trail_color="red")
+    with pytest.raises(ValidationError):
+        SettingsRequest(taxi_speed_limit_kt=0)
+    with pytest.raises(ValidationError):
+        SettingsRequest(taxi_turn_speed_limit_kt=200)
+
+
+def test_taxi_speed_limits_survive_both_validation_paths(tmp_path):
+    path = tmp_path / "settings.json"
+    request = SettingsRequest(
+        taxi_speed_limit_kt=30,
+        taxi_turn_speed_limit_kt=12,
+        taxi_speed_alarm_sound=False,
+    )
+
+    save_user_settings(Settings().with_user_values(request.model_dump()), path)
+    restored = load_user_settings(Settings(), path)
+
+    assert restored.taxi_speed_limit_kt == 30
+    assert restored.taxi_turn_speed_limit_kt == 12
+    assert restored.taxi_speed_alarm_sound is False
+
+
+def test_default_taxi_speed_limits_match_common_practice():
+    """Ni règlement ni limite publiée : des valeurs par défaut ajustables."""
+    settings = Settings()
+
+    assert settings.taxi_speed_limit_kt == DEFAULT_TAXI_SPEED_LIMIT_KT == 25
+    assert settings.taxi_turn_speed_limit_kt == DEFAULT_TAXI_TURN_SPEED_LIMIT_KT == 10
+    assert settings.taxi_speed_alarm_sound is True
+
+
+def test_a_turn_limit_never_exceeds_the_straight_limit():
+    """Au-dessus de la limite en ligne droite, elle ne se déclencherait jamais."""
+    configured = Settings().with_user_values(
+        {"taxi_speed_limit_kt": 15, "taxi_turn_speed_limit_kt": 40}
+    )
+
+    assert configured.taxi_speed_limit_kt == 15
+    assert configured.taxi_turn_speed_limit_kt == 15
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [(0, 25), (-5, 25), (999, 60), ("", 25), (None, 25), ("18", 18)],
+)
+def test_an_unusable_taxi_speed_falls_back_or_clamps(raw, expected):
+    """Une limite nulle éteindrait l'alarme sans le dire."""
+    assert Settings().with_user_values(
+        {"taxi_speed_limit_kt": raw}
+    ).taxi_speed_limit_kt == expected
+
+
+def test_taxi_speed_limits_reach_a_remote_client_through_the_status(monkeypatch):
+    """Un téléphone ne lit pas /api/settings : sans cela il alerterait à 25 kt
+    alors que l'hôte a réglé 18."""
+    monkeypatch.setattr(
+        web_app,
+        "MsfsProvider",
+        lambda store, allow_fetch=True: SimpleNamespace(
+            source_name="test",
+            airac_cycle="2401",
+            supports_rnp_flag=True,
+            has_ground_geometry=True,
+            stats=lambda: {},
+            reference_counts=lambda: {},
+            close=lambda: None,
+        ),
+    )
+    settings = Settings().with_user_values(
+        {
+            "taxi_speed_limit_kt": 18,
+            "taxi_turn_speed_limit_kt": 8,
+            "taxi_speed_alarm_sound": False,
+        }
+    )
+    app = create_app(settings)
+    endpoint = next(
+        route.endpoint for route in app.routes if route.path == "/api/status"
+    )
+
+    payload = endpoint(
+        SimpleNamespace(
+            client=SimpleNamespace(host="192.168.1.42"),
+            url=SimpleNamespace(port=8765),
+        )
+    )
+
+    assert payload["remote_client"] is True
+    assert payload["taxi_speed_limit_kt"] == 18
+    assert payload["taxi_turn_speed_limit_kt"] == 8
+    assert payload["taxi_speed_alarm_sound"] is False

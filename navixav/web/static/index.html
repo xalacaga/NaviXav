@@ -224,6 +224,8 @@
         <button id="ground-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
         <button id="ground-secondary" class="icon-btn" type="button"
                 aria-pressed="false" title="Afficher les voies secondaires et les accès aux postes">Secondaires</button>
+        <button id="ground-alarm" class="icon-btn active" type="button"
+                aria-pressed="true" title="Alarme sonore de vitesse de roulage">Alarme</button>
         <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
         <button id="ground-zoom-out" class="icon-btn" title="Dézoomer">−</button>
         <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button>
@@ -232,6 +234,12 @@
     <div class="map-stage ground-stage">
       <canvas id="ground-canvas"></canvas>
       <div class="ground-hud" id="ground-hud"></div>
+      <!--
+        La vitesse sol vit hors du bandeau de guidage : celui-ci est reconstruit
+        à chaque position, ce qui relancerait sans fin le clignotement du
+        dépassement.
+      -->
+      <div class="ground-speed hidden" id="ground-speed"></div>
     </div>
   </section>
 
@@ -347,6 +355,19 @@
           <i class="trail-preview" aria-hidden="true"></i>
           <output id="settings-trail-value" class="color-value" for="settings-trail-color">#22D3EE</output>
         </span>
+      </label>
+      <label class="field" for="settings-taxi-speed">
+        <span>Vitesse de roulage maximale (kt)</span>
+        <input id="settings-taxi-speed" type="number" min="1" max="60" />
+      </label>
+      <label class="field" for="settings-taxi-turn-speed">
+        <span>Vitesse maximale en virage (kt)</span>
+        <input id="settings-taxi-turn-speed" type="number" min="1" max="60" />
+      </label>
+      <label class="switch settings-switch">
+        <input type="checkbox" id="settings-taxi-alarm" />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label" id="settings-taxi-alarm-label">Alarme sonore de vitesse au roulage</span>
       </label>
       <label class="switch settings-switch">
         <input type="checkbox" id="settings-rnp" />

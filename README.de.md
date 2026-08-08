@@ -206,7 +206,11 @@ der Flugkarte und ausschließlich aus nativen MSFS-Einrichtungen aufgebaut:
 - ein Klick auf einen anderen Standplatz ersetzt den Vorschlag sofort; bei der
   Ankunft bleibt der Zielstandplatz eine manuelle Auswahl;
 - Route, Haltepunkte, nächste Anweisung und Reststrecke werden klar dargestellt;
-- nach einer Abweichung wird ab der tatsächlichen Flugzeugposition neu geplant.
+- nach einer Abweichung wird ab der tatsächlichen Flugzeugposition neu geplant;
+- die Geschwindigkeit über Grund erscheint in Echtzeit im Plan, mit einer
+  Warnung vor Erreichen der maximalen Rollgeschwindigkeit und einem blinkenden
+  Alarm mit Signalton darüber; die Grenze verschärft sich in Kurven, vor
+  Haltebalken und am Standplatz und gilt auf einer Bahn nie.
 
 SimConnect-Parkwege dienen nur zur Zuordnung eines Standplatzes zum Rollnetz.
 Sie können nicht als künstliche Abkürzung quer über Bahnen verwendet werden.
@@ -402,6 +406,8 @@ In der Oberfläche lassen sich außerdem einstellen:
 - die Mindestbahnlänge;
 - das Erscheinungsbild der Oberfläche: automatisch, hell oder dunkel;
 - den MSFS-Community-Ordner für die Bestandsaufnahme der Flugzeugverfahren;
+- die maximale Rollgeschwindigkeit, die niedrigere Grenze für Kurven und den
+  akustischen Rollgeschwindigkeitsalarm;
 - die RNP-Fähigkeit des Luftfahrzeugs.
 
 In der installierten Fassung werden die Werte in
@@ -734,25 +740,29 @@ verlassen den Computer.
 
 ## Lizenz
 
-NaviXav ist freie Software und wird unter der Lizenz
-[Apache 2.0](LICENSE) verbreitet.
+Der aktuelle NaviXav-Quellcode wird unter der
+[PolyForm Noncommercial License 1.0.0](LICENSE) angeboten. Dies ist eine
+**Source-available-Lizenz** und keine Open-Source-Lizenz.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-Du darfst NaviXav frei verwenden, ändern, weitergeben und einbinden, auch in
-einem kommerziellen Projekt. Im Gegenzug verlangt die Lizenz, den **Autor zu
-nennen**:
+Die Lizenz erlaubt Nutzung, Änderung und Weitergabe für die darin definierten
+nichtkommerziellen Zwecke. Jede kommerzielle Nutzung erfordert eine separate
+schriftliche Lizenz des Rechteinhabers. Dazu gehören die Einbindung des
+aktuellen Codes oder von Teilen davon in eine kostenpflichtige oder
+umsatzbringende Anwendung, der Verkauf einer geänderten Version und die
+kommerzielle Weitergabe.
 
-- den Copyright-Hinweis und eine Kopie der Lizenz bei jeder Weitergabe
-  beibehalten;
-- die Datei [NOTICE](NOTICE) und ihren Attributionsinhalt beibehalten;
-- **jede von dir geänderte Datei deutlich kennzeichnen**, gemäß Abschnitt 4(b)
-  der Lizenz.
+Umfang und Kontaktangaben stehen unter
+[Kommerzielle Lizenzierung](COMMERCIAL_LICENSE.md). Codebeiträge erfordern
+eine vorherige Vereinbarung, da NaviXav nichtkommerzielle und kommerzielle
+Lizenzen kombiniert; siehe [Mitwirken](CONTRIBUTING.md).
 
-Die Lizenz gewährt außerdem eine Patentlizenz und schließt jede Gewährleistung
-aus. Navigationsdaten, amtliche Karten und der Kartenhintergrund fallen nicht
-unter diese Lizenz: Für sie gelten weiterhin die Bedingungen ihrer jeweiligen
-Anbieter, die in der Datei NOTICE aufgeführt sind.
+Git-Versionen mit Tag v1.4.12 und frühere wurden separat unter Apache 2.0
+veröffentlicht; bereits gewährte Rechte bleiben bestehen. Komponenten Dritter,
+Navigationsdaten, amtliche Karten und Kartenhintergründe behalten ihre eigenen
+Bedingungen, beschrieben in [NOTICE](NOTICE) und
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ## Tests
 

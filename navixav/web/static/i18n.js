@@ -1776,6 +1776,65 @@
     theme: "Wygląd", theme_auto: "Automatyczny (Windows)", theme_light: "Jasny", theme_dark: "Ciemny",
   });
 
+  // Vitesse de roulage. « max » et « kt » restent tels quels : ce sont des
+  // notations, pas des mots de la langue.
+  Object.assign(TRANSLATIONS.fr, {
+    ground_alarm: "Alarme", ground_alarm_title: "Alarme sonore de vitesse de roulage",
+    taxi_speed_limit: "max {limit} kt", taxi_speed_over: "trop vite · max {limit} kt",
+    taxi_speed_runway: "piste", taxi_speed_setting: "Vitesse de roulage maximale (kt)",
+    taxi_turn_speed_setting: "Vitesse maximale en virage (kt)",
+    taxi_speed_alarm_setting: "Alarme sonore de vitesse au roulage",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    ground_alarm: "Alarm", ground_alarm_title: "Audible taxi speed alarm",
+    taxi_speed_limit: "max {limit} kt", taxi_speed_over: "too fast · max {limit} kt",
+    taxi_speed_runway: "runway", taxi_speed_setting: "Maximum taxi speed (kt)",
+    taxi_turn_speed_setting: "Maximum speed in turns (kt)",
+    taxi_speed_alarm_setting: "Audible taxi speed alarm",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    ground_alarm: "Alarm", ground_alarm_title: "Akustischer Alarm für die Rollgeschwindigkeit",
+    taxi_speed_limit: "max {limit} kt", taxi_speed_over: "zu schnell · max {limit} kt",
+    taxi_speed_runway: "Piste", taxi_speed_setting: "Maximale Rollgeschwindigkeit (kt)",
+    taxi_turn_speed_setting: "Maximale Geschwindigkeit in Kurven (kt)",
+    taxi_speed_alarm_setting: "Akustischer Alarm für die Rollgeschwindigkeit",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    ground_alarm: "Alarma", ground_alarm_title: "Alarma sonora de velocidad de rodaje",
+    taxi_speed_limit: "máx {limit} kt", taxi_speed_over: "demasiado rápido · máx {limit} kt",
+    taxi_speed_runway: "pista", taxi_speed_setting: "Velocidad máxima de rodaje (kt)",
+    taxi_turn_speed_setting: "Velocidad máxima en giros (kt)",
+    taxi_speed_alarm_setting: "Alarma sonora de velocidad de rodaje",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    ground_alarm: "Allarme", ground_alarm_title: "Allarme sonoro della velocità di rullaggio",
+    taxi_speed_limit: "max {limit} kt", taxi_speed_over: "troppo veloce · max {limit} kt",
+    taxi_speed_runway: "pista", taxi_speed_setting: "Velocità massima di rullaggio (kt)",
+    taxi_turn_speed_setting: "Velocità massima in curva (kt)",
+    taxi_speed_alarm_setting: "Allarme sonoro della velocità di rullaggio",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    ground_alarm: "Alarme", ground_alarm_title: "Alarme sonoro de velocidade de rolagem",
+    taxi_speed_limit: "máx {limit} kt", taxi_speed_over: "demasiado rápido · máx {limit} kt",
+    taxi_speed_runway: "pista", taxi_speed_setting: "Velocidade máxima de rolagem (kt)",
+    taxi_turn_speed_setting: "Velocidade máxima em curva (kt)",
+    taxi_speed_alarm_setting: "Alarme sonoro de velocidade de rolagem",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    ground_alarm: "Alarm", ground_alarm_title: "Geluidsalarm voor taxisnelheid",
+    taxi_speed_limit: "max {limit} kt", taxi_speed_over: "te snel · max {limit} kt",
+    taxi_speed_runway: "baan", taxi_speed_setting: "Maximale taxisnelheid (kt)",
+    taxi_turn_speed_setting: "Maximale snelheid in bochten (kt)",
+    taxi_speed_alarm_setting: "Geluidsalarm voor taxisnelheid",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    ground_alarm: "Alarm", ground_alarm_title: "Alarm dźwiękowy prędkości kołowania",
+    taxi_speed_limit: "maks {limit} kt", taxi_speed_over: "za szybko · maks {limit} kt",
+    taxi_speed_runway: "pas", taxi_speed_setting: "Maksymalna prędkość kołowania (kt)",
+    taxi_turn_speed_setting: "Maksymalna prędkość na zakrętach (kt)",
+    taxi_speed_alarm_setting: "Alarm dźwiękowy prędkości kołowania",
+  });
+
   const ELEMENTS = {
     ".brand-sub": "subtitle",
     ".switch-label": "demo",
@@ -1799,6 +1858,7 @@
     "#module-menu-toggle span": "module_menu",
     "#live-text": "searching_sim",
     "#ground-live-text": "searching_sim",
+    "#ground-alarm": "ground_alarm",
     "#ground-plan": "ground_plan",
     "#ground-clear": "ground_clear",
     "#ground-follow": "follow",
@@ -1851,6 +1911,9 @@
     '#settings-basemap option[value="carto_light"]': "basemap_carto_light",
     '#settings-basemap option[value="carto_dark"]': "basemap_carto_dark",
     'label[for="settings-trail-color"] span': "map_trail_color",
+    'label[for="settings-taxi-speed"] span': "taxi_speed_setting",
+    'label[for="settings-taxi-turn-speed"] span': "taxi_turn_speed_setting",
+    "#settings-taxi-alarm-label": "taxi_speed_alarm_setting",
     "#aircraft-settings-title": "aircraft_settings_title",
     "#aircraft-settings-help": "aircraft_settings_help",
     "#aircraft-folder-label": "aircraft_folder",
@@ -1899,6 +1962,7 @@
     "#ground-clear": "ground_clear_title",
     "#ground-follow": "follow_title",
     "#ground-secondary": "ground_secondary_title",
+    "#ground-alarm": "ground_alarm_title",
     "#ground-fit": "fit_title",
     "#ground-zoom-out": "zoom_out",
     "#ground-zoom-in": "zoom_in",

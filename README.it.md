@@ -165,7 +165,11 @@ volo e costruito esclusivamente con le strutture native di MSFS:
   piazzola di destinazione resta una scelta manuale;
 - percorso effettuato e restante, nomi utili, punti di attesa, prossima manovra
   e distanza residua sono presentati con chiarezza;
-- dopo una deviazione il percorso viene ricalcolato dalla posizione reale.
+- dopo una deviazione il percorso viene ricalcolato dalla posizione reale;
+- la velocità al suolo compare in tempo reale sulla planimetria, con un avviso
+  all’avvicinarsi della velocità massima di rullaggio e un allarme lampeggiante
+  con segnale acustico oltre di essa; il limite si restringe in curva, prima di
+  una barra d’arresto e alla piazzola, e non si applica mai su una pista.
 
 I percorsi di parcheggio SimConnect servono solo a collegare le piazzole alla
 rete e non possono creare scorciatoie artificiali attraverso le piste.
@@ -355,6 +359,8 @@ L'interfaccia consente inoltre di configurare:
 - la lunghezza minima di pista;
 - l'aspetto dell'interfaccia: automatico, chiaro o scuro;
 - la cartella Community di MSFS usata per censire le procedure per aeromobile;
+- la velocità massima di rullaggio, il limite più basso applicato in curva e
+  l’allarme sonoro della velocità di rullaggio;
 - la capacità RNP dell'aeromobile.
 
 Nella versione installata, i valori sono conservati in
@@ -674,25 +680,28 @@ OpenStreetMap, la meteorologia e le pubblicazioni AIS ufficiali.
 
 ## Licenza
 
-NaviXav è software libero distribuito con licenza
-[Apache 2.0](LICENSE).
+Il codice sorgente attuale di NaviXav è disponibile con la
+[licenza PolyForm Noncommercial 1.0.0](LICENSE). È una licenza
+**source available**, non una licenza open source.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-Puoi usare, modificare, ridistribuire e integrare NaviXav liberamente, anche in
-un progetto commerciale. In cambio, la licenza impone di **accreditare
-l'autore**:
+La licenza consente l'uso, la modifica e la ridistribuzione per gli scopi non
+commerciali da essa definiti. Ogni uso commerciale richiede una licenza
+scritta separata dal titolare dei diritti. Ciò include l'integrazione di tutto
+o parte del codice attuale in un'applicazione a pagamento o che genera ricavi,
+la vendita di una versione modificata o la ridistribuzione commerciale.
 
-- conservare la menzione di copyright e una copia della licenza in ogni
-  ridistribuzione;
-- conservare il file [NOTICE](NOTICE) e il suo contenuto di attribuzione;
-- **segnalare in modo visibile ogni file che hai modificato**, come richiesto
-  dalla sezione 4(b) della licenza.
+Consulta [Licenze commerciali](COMMERCIAL_LICENSE.md) per l'ambito e i dati di
+contatto. I contributi di codice richiedono un accordo preventivo perché
+NaviXav combina licenze non commerciali e commerciali; consulta
+[Contribuire](CONTRIBUTING.md).
 
-La licenza concede inoltre una licenza sui brevetti ed esclude ogni garanzia.
-I dati di navigazione, le carte ufficiali e lo sfondo cartografico non sono
-coperti da questa licenza: restano soggetti alle condizioni dei rispettivi
-fornitori, dettagliate nel file NOTICE.
+Le versioni Git con tag v1.4.12 e precedenti sono state pubblicate separatamente
+con Apache 2.0; i diritti già concessi restano validi. I componenti di terze
+parti, i dati di navigazione, le carte ufficiali e gli sfondi cartografici
+mantengono le proprie condizioni, descritte in [NOTICE](NOTICE) e
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ## Test
 

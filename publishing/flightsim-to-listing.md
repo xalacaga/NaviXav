@@ -211,13 +211,14 @@ What that means in practice:
 - The project carries an automated test suite of more than four hundred tests
   that must pass before any build is produced. A failing test blocks the
   release.
-- The complete source is published under the Apache License 2.0. Anyone can
-  read exactly what runs on their machine, and I welcome that scrutiny.
+- The complete source is published under the PolyForm Noncommercial License
+  1.0.0. Anyone can inspect exactly what runs on their machine. Noncommercial
+  use is permitted; commercial use requires a separate written licence.
 - NaviXav is advisory software for a flight simulator. It never controls your
   aircraft, and it never replaces official publications or ATC instructions.
 
 The honest caveat: AI-assisted code can contain mistakes that look entirely
-plausible on the page. That is precisely why the test suite, the open source
+plausible on the page. That is precisely why the test suite, source transparency
 and the "always verify" warning above matter. If something looks wrong, please
 report it — bug reports are the most valuable contribution to this project.
 
@@ -440,8 +441,10 @@ a public comment.
 
 ### License and Credits
 
-NaviXav is distributed under the Apache License 2.0. Copyright 2026 Xavier
-BEGUE.
+The current NaviXav source is available under the PolyForm Noncommercial
+License 1.0.0. Commercial use requires a separate written licence. Git releases
+tagged v1.4.12 and earlier remain available under Apache 2.0. Copyright 2026
+Xavier BEGUE.
 
 Microsoft Flight Simulator, MSFS, SimConnect, Microsoft Edge and WebView2 are
 trademarks of the Microsoft group of companies. Map data and tiles are provided
@@ -569,8 +572,9 @@ files as separate download options.
       submit it to the vendor rather than blocking the release.
 - [ ] Confirm that each ZIP extracts and launches correctly on a clean Windows
       user account.
-- [ ] Confirm that `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES` and the bundled
-      third-party licence texts are present.
+- [ ] Confirm that `LICENSE`, `COMMERCIAL_LICENSE.md`, `NOTICE`,
+      `THIRD_PARTY_NOTICES` and the bundled third-party licence texts are
+      present.
 - [ ] Do not add an external download link to the Flightsim.to description.
 - [ ] Do not create a new listing for future versions; update this listing
       through its Versioning tab.

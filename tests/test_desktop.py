@@ -1181,6 +1181,120 @@ def test_dragging_the_ground_view_does_not_select_a_parking():
     assert "Math.max(11, (parking.radius_m || 15) * view.scale)" in ground
 
 
+def test_the_ground_view_shows_the_live_ground_speed():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    assert 'id="ground-speed"' in html
+    # Le bandeau de guidage est réécrit à chaque position : y loger la vitesse
+    # relancerait le clignotement du dépassement à chaque seconde.
+    assert html.index('id="ground-speed"') > html.index('id="ground-hud"')
+    assert "renderTaxiSpeed(aircraft);" in javascript
+    assert "renderTaxiSpeed(null);" in javascript
+    assert ".ground-speed {" in css
+    # Sans chasse fixe, le bandeau tressaute à chaque kt.
+    assert "font-variant-numeric: tabular-nums;" in css
+
+
+def test_the_taxi_speed_alarm_warns_before_it_shouts():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    state = javascript[javascript.index("function taxiSpeedState"):]
+    state = state[: state.index("\n}\n")]
+    assert 'level = "over"' in state
+    assert 'level = "caution"' in state
+    assert "TAXI_CAUTION_RATIO" in state
+    assert "const TAXI_CAUTION_RATIO = 0.9;" in javascript
+
+    assert ".ground-speed.is-caution" in css
+    assert ".ground-speed.is-over" in css
+    # Le clignotement n'est qu'un renfort : la couleur et le chiffre suffisent.
+    assert "@media (prefers-reduced-motion: reduce)" in css
+
+
+def test_the_taxi_limit_tightens_for_turns_holds_and_the_stand():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    limit = javascript[javascript.index("function taxiSpeedLimitKt"):]
+    limit = limit[: limit.index("\n}\n")]
+    assert "guidance.arrived" in limit
+    assert "guidance.hold_short" in limit
+    assert 'guidance.next_turn === "left"' in limit
+    assert "TAXI_TURN_ZONE_M" in limit
+    # Une limite de virage plus haute que la ligne droite ne se déclencherait
+    # jamais.
+    assert "Math.min(taxiSpeedLimits.turn, straight)" in limit
+
+
+def test_the_taxi_speed_alarm_stays_silent_on_the_runway():
+    """Le décollage se fait à des vitesses qui n'ont rien à voir avec le roulage.
+
+    La déduire de la vitesse ferait taire l'alarme précisément quand elle se
+    justifie le plus : c'est la géométrie du terrain qui tranche.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+
+    assert "GROUND.onRunway(aircraft)" in javascript
+    assert 'level: "runway"' in javascript
+    assert "onRunway(state = aircraft)" in ground
+    assert "distanceToSegment" in ground
+    assert "runway.width_m || 45) / 2 + 10" in ground
+
+
+def test_the_taxi_alarm_beep_is_synthesised_and_can_be_muted():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="ground-alarm"' in html
+    assert '$("ground-alarm").addEventListener' in javascript
+    assert "window.AudioContext || window.webkitAudioContext" in javascript
+    assert "if (!taxiSpeedLimits.sound) return;" in javascript
+    # Un dépassement doit tenir avant le premier bip : une bosse de piste ne
+    # déclenche pas l'alarme.
+    assert "const TAXI_ALARM_HOLD_MS = 1000;" in javascript
+    assert "now - taxiAlarmSince < TAXI_ALARM_HOLD_MS" in javascript
+
+    mute = javascript[javascript.index("async function toggleTaxiAlarmSound"):]
+    mute = mute[: mute.index("\n}\n")]
+    assert "latestStatus?.remote_client" in mute
+    assert "taxi_speed_alarm_sound: taxiSpeedLimits.sound" in mute
+
+
+def test_taxi_speed_limits_are_a_setting_in_every_language():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="settings-taxi-speed"' in html
+    assert 'id="settings-taxi-turn-speed"' in html
+    assert 'id="settings-taxi-alarm"' in html
+    assert "taxi_speed_limit_kt: Number(" in javascript
+    assert "applyTaxiSpeedPreferences(" in javascript
+    # Un client distant ne lit pas /api/settings : le statut lui porte les
+    # limites de l'hôte.
+    assert "applyTaxiSpeedPreferences(status);" in javascript
+
+    for key in (
+        "ground_alarm",
+        "taxi_speed_limit",
+        "taxi_speed_over",
+        "taxi_speed_runway",
+        "taxi_speed_setting",
+        "taxi_turn_speed_setting",
+        "taxi_speed_alarm_setting",
+    ):
+        assert translations.count(f"{key}:") == 8
+
+
 def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")

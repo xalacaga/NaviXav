@@ -196,7 +196,11 @@ flight map and built only from native MSFS facilities:
   destination stand remains a manual choice;
 - the route separates travelled and remaining portions and shows only useful
   names, hold-short points, the next manoeuvre and remaining distance;
-- after a deviation, the route is recalculated from the aircraft’s real position.
+- after a deviation, the route is recalculated from the aircraft’s real position;
+- the live ground speed is shown on the diagram, with a warning as it nears
+  the maximum taxi speed and a flashing alarm with an audible beep beyond it;
+  the limit tightens for turns, hold-short bars and the arrival stand, and
+  never applies on a runway.
 
 SimConnect parking paths are used only to attach stands to the taxi network.
 They can never become shortcuts between taxiways, preventing artificial lines
@@ -387,6 +391,8 @@ The interface also lets you configure:
 - the minimum runway length;
 - the interface appearance: automatic, light or dark;
 - the MSFS Community folder used to inventory aircraft procedure coverage;
+- the maximum taxi speed, the lower limit applied in turns and the audible
+  taxi speed alarm;
 - the aircraft's RNP capability.
 
 In the installed version, the values are kept in
@@ -720,24 +726,27 @@ contributors can inspect the result, report defects and propose improvements.
 
 ## Licence
 
-NaviXav is free software distributed under the
-[Apache 2.0](LICENSE) licence.
+The current NaviXav source is available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). This is a **source-available**
+licence, not an open-source licence.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-You may freely use, modify, redistribute and integrate NaviXav, including in a
-commercial project. In return, the licence requires that you **credit the
-author**:
+The licence permits use, modification and redistribution for its defined
+noncommercial purposes. Commercial use requires a separate written licence
+from the copyright holder. This includes incorporating all or part of the
+current code into a paid or revenue-generating application, selling a modified
+version, or commercially redistributing it.
 
-- retain the copyright notice and a copy of the licence in any redistribution;
-- retain the [NOTICE](NOTICE) file and its attribution content;
-- **state prominently which files you have modified**, as required by
-  section 4(b) of the licence.
+See [Commercial licensing](COMMERCIAL_LICENSE.md) for the scope and contact
+details. Code contributions require prior agreement because NaviXav uses both
+noncommercial and commercial licensing; see [Contributing](CONTRIBUTING.md).
 
-The licence also grants a patent licence and excludes any warranty. Navigation
-data, official charts and the map background are not covered by this licence:
-they remain subject to their respective providers' terms, detailed in the
-NOTICE file.
+Git releases tagged v1.4.12 and earlier were separately published under Apache
+2.0. Existing rights to those releases remain valid. Third-party
+components, navigation data, official charts and map backgrounds are not
+relicensed: their own terms are detailed in [NOTICE](NOTICE) and
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ## Tests
 

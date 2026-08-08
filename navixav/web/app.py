@@ -122,6 +122,9 @@ class SettingsRequest(BaseModel):
         default="osm", pattern="^(osm|opentopo|carto_light|carto_dark)$"
     )
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
+    taxi_speed_limit_kt: int = Field(default=25, ge=1, le=60)
+    taxi_turn_speed_limit_kt: int = Field(default=10, ge=1, le=60)
+    taxi_speed_alarm_sound: bool = True
     aircraft_community_path: str = Field(default="", max_length=1000)
     lan_enabled: bool = False
 
@@ -327,6 +330,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "lan_url": f"http://{address}:{port}/" if address else "",
             "map_basemap": settings.map_basemap,
             "map_trail_color": settings.map_trail_color,
+            # Un client distant ne lit pas /api/settings : sans ces valeurs son
+            # plan de roulage alerterait sur des limites qui ne sont pas les
+            # tiennes.
+            "taxi_speed_limit_kt": settings.taxi_speed_limit_kt,
+            "taxi_turn_speed_limit_kt": settings.taxi_turn_speed_limit_kt,
+            "taxi_speed_alarm_sound": settings.taxi_speed_alarm_sound,
             "navdata": navdata,
         }
 

@@ -2,15 +2,23 @@ NaviXav
 Copyright 2026 Xavier BEGUE (xalacaga)
 https://github.com/xalacaga/NaviXav
 
-NaviXav is licensed under the Apache License, Version 2.0.
-This NOTICE file is informational and does not add restrictions to that
-license. When redistribution triggers section 4 of the Apache License 2.0,
-retain the notices required by that section.
+The current NaviXav source is offered under the PolyForm Noncommercial
+License 1.0.0. Commercial use requires a separate written licence from the
+copyright holder; see COMMERCIAL_LICENSE.md. This is a source-available
+licence, not an open-source licence.
 
-NaviXav est distribué sous licence Apache, version 2.0.
-Ce fichier NOTICE est informatif et n’ajoute aucune restriction à cette
-licence. Lorsqu’une redistribution relève de la section 4 de la licence
-Apache 2.0, conservez les mentions exigées par cette section.
+Git releases tagged v1.4.12 and earlier were separately published under the
+Apache License 2.0. Rights already granted for those releases remain in force
+and are not revoked by the current licensing change.
+
+Le code source actuel de NaviXav est proposé sous licence PolyForm
+Noncommercial 1.0.0. Une utilisation commerciale nécessite une licence écrite
+distincte du titulaire des droits ; consultez COMMERCIAL_LICENSE.md. Il s’agit
+d’une licence « source available », et non d’une licence open source.
+
+Les versions Git étiquetées v1.4.12 et antérieures ont été publiées séparément
+sous licence Apache 2.0. Les droits déjà accordés sur ces versions restent
+valables et ne sont pas révoqués par le changement de licence actuel.
 
 Third-party software / Logiciels tiers
 --------------------------------------
@@ -29,7 +37,7 @@ Microsoft components
 The distribution includes an unmodified Microsoft SimConnect.dll obtained
 from the Microsoft Flight Simulator SDK and may include the official Microsoft
 Edge WebView2 bootstrapper. These components are not licensed under the
-NaviXav Apache License and remain subject to the applicable Microsoft terms.
+NaviXav PolyForm licence and remain subject to the applicable Microsoft terms.
 Microsoft, Microsoft Flight Simulator, MSFS, Edge and WebView2 are trademarks
 of the Microsoft group of companies.
 

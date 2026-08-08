@@ -61,8 +61,8 @@ HOW NAVIXAV IS DEVELOPED
 NaviXav is a one-person project written with heavy use of AI coding assistants.
 Every feature is specified, reviewed and flight-tested by the author, an
 automated suite of more than four hundred tests must pass before any build is
-produced, and the complete source is published under the Apache License 2.0 so
-that anyone can read exactly what runs on their machine.
+produced, and the complete source is published under the PolyForm Noncommercial
+License 1.0.0 so anyone can inspect exactly what runs on their machine.
 
 PRIVACY
 
@@ -76,5 +76,7 @@ https://github.com/xalacaga/NaviXav
 
 LICENSE
 
-NaviXav is licensed under the Apache License 2.0.
+The current NaviXav source is licensed under PolyForm Noncommercial 1.0.0.
+Commercial use requires a separate written licence. Git releases tagged
+v1.4.12 and earlier remain available under Apache 2.0.
 Copyright 2026 Xavier BEGUE (xalacaga).

@@ -633,6 +633,9 @@ async function openSettings() {
     $("settings-rnp").checked = Boolean(values.aircraft_rnp_capable);
     $("settings-basemap").value = values.map_basemap || "osm";
     setTrailColorField(values.map_trail_color);
+    $("settings-taxi-speed").value = values.taxi_speed_limit_kt;
+    $("settings-taxi-turn-speed").value = values.taxi_turn_speed_limit_kt;
+    $("settings-taxi-alarm").checked = values.taxi_speed_alarm_sound !== false;
     $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
     $("settings-aircraft-community").value = values.aircraft_community_path || "";
     show($("settings-lan-access"), Boolean(values.lan_enabled));
@@ -665,6 +668,9 @@ async function saveSettings(event) {
     aircraft_rnp_capable: $("settings-rnp").checked,
     map_basemap: $("settings-basemap").value,
     map_trail_color: $("settings-trail-color").value,
+    taxi_speed_limit_kt: Number($("settings-taxi-speed").value),
+    taxi_turn_speed_limit_kt: Number($("settings-taxi-turn-speed").value),
+    taxi_speed_alarm_sound: $("settings-taxi-alarm").checked,
     aircraft_community_path: $("settings-aircraft-community").value.trim(),
     lan_enabled: $("settings-lan-enabled").checked,
   };
@@ -677,6 +683,7 @@ async function saveSettings(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || t("err_save_refused"));
     applyMapPreferences(result);
+    applyTaxiSpeedPreferences(result);
     message.textContent = result.lan_restart_required
       ? t("lan_restart_required")
       : t("saved");
@@ -779,6 +786,7 @@ async function submitWelcome(event) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || t("err_save_refused"));
     applyMapPreferences(result);
+    applyTaxiSpeedPreferences(result);
     closeWelcome();
     await initialiseApplication();
   } catch (error) {
@@ -6239,6 +6247,197 @@ function updateGroundHud() {
     : `${Math.round(currentTaxiPlan.distance_m)} m`));
 }
 
+/* ------------------------------------------------ vitesse au roulage */
+
+/*
+ * La vitesse sol du plan de roulage, et l'alarme qui va avec.
+ *
+ * Aucun règlement ne fixe une vitesse de roulage universelle : les consignes
+ * d'exploitation tournent autour de 25 kt en ligne droite et de 10 kt dès
+ * qu'il faut tourner, s'arrêter avant une piste ou approcher un poste. Les
+ * deux valeurs sont donc des réglages, pas une limite publiée, et le bandeau
+ * affiche toujours celle qu'il applique — une alarme dont on ignore le seuil
+ * n'apprend rien.
+ *
+ * Deux garde-fous évitent de crier pour rien. La piste d'abord : le décollage
+ * et l'atterrissage s'y font à des vitesses qui n'ont aucun rapport avec le
+ * roulage, et c'est la géométrie du terrain qui le dit, jamais la vitesse
+ * elle-même — la déduire de la vitesse ferait taire l'alarme exactement quand
+ * elle se justifie le plus. Le maintien ensuite : le dépassement doit tenir une
+ * seconde avant le premier bip, sans quoi une bosse de piste le déclencherait.
+ */
+
+// Sous la limite, la bande où l'on prévient avant d'alarmer.
+const TAXI_CAUTION_RATIO = 0.9;
+// Distance à partir de laquelle la limite de virage s'applique déjà.
+const TAXI_TURN_ZONE_M = 150;
+// En deçà, l'avion manœuvre au pas : rien à signaler.
+const TAXI_SPEED_FLOOR_KT = 2;
+const TAXI_ALARM_HOLD_MS = 1000;
+const TAXI_ALARM_REPEAT_MS = { caution: 3000, over: 1000 };
+
+const taxiSpeedLimits = { straight: 25, turn: 10, sound: true };
+let taxiAlarmContext = null;
+let taxiAlarmLevel = null;
+let taxiAlarmSince = 0;
+let taxiAlarmLastBeep = 0;
+
+function applyTaxiSpeedPreferences(values) {
+  taxiSpeedLimits.straight = finiteOr(values?.taxi_speed_limit_kt, 25);
+  taxiSpeedLimits.turn = Math.min(
+    taxiSpeedLimits.straight,
+    finiteOr(values?.taxi_turn_speed_limit_kt, 10)
+  );
+  taxiSpeedLimits.sound = values?.taxi_speed_alarm_sound !== false;
+  syncTaxiAlarmButton();
+}
+
+/** Limite applicable ici : celle des virages dès qu'il faut ralentir. */
+function taxiSpeedLimitKt(guidance) {
+  const straight = taxiSpeedLimits.straight;
+  const turn = Math.min(taxiSpeedLimits.turn, straight);
+  if (!guidance) return straight;
+  if (guidance.arrived) return turn;
+  const toHold = finiteOr(guidance.distance_to_hold_m);
+  if (guidance.hold_short && toHold !== null && toHold <= TAXI_TURN_ZONE_M) return turn;
+  const toNext = finiteOr(guidance.distance_to_next_m);
+  const turning = guidance.next_turn === "left" || guidance.next_turn === "right";
+  if (turning && toNext !== null && toNext <= TAXI_TURN_ZONE_M) return turn;
+  return straight;
+}
+
+/**
+ * État de la vitesse au sol, ou null s'il n'y a rien à afficher.
+ *
+ * Le niveau « runway » affiche la vitesse sans limite ni alarme : sur la
+ * piste, la vitesse de roulage ne s'applique plus.
+ */
+function taxiSpeedState(aircraft, guidance) {
+  if (!aircraft?.on_ground || aircraft.paused) return null;
+  const speed = finiteOr(aircraft.ground_speed_kt);
+  if (speed === null) return null;
+  if (GROUND.onRunway(aircraft)) return { speed, limit: null, level: "runway" };
+
+  const limit = taxiSpeedLimitKt(guidance);
+  let level = "ok";
+  if (speed >= TAXI_SPEED_FLOOR_KT) {
+    if (speed > limit) level = "over";
+    else if (speed >= limit * TAXI_CAUTION_RATIO) level = "caution";
+  }
+  return { speed, limit, level };
+}
+
+/**
+ * Bip d'alarme, synthétisé plutôt que chargé.
+ *
+ * Un fichier son ajouterait un actif au paquet, une latence au premier
+ * déclenchement et un chemin à corriger dans l'installateur, pour deux notes.
+ */
+function taxiAlarmBeep(level) {
+  if (!taxiSpeedLimits.sound) return;
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    taxiAlarmContext = taxiAlarmContext || new Audio();
+    if (taxiAlarmContext.state === "suspended") taxiAlarmContext.resume();
+    const start = taxiAlarmContext.currentTime;
+    const oscillator = taxiAlarmContext.createOscillator();
+    const gain = taxiAlarmContext.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.value = level === "over" ? 880 : 587;
+    // Attaque et extinction douces : un créneau brut claque dans le casque.
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    oscillator.connect(gain).connect(taxiAlarmContext.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.2);
+  } catch (_error) {
+    // Sans sortie audio utilisable, l'alarme reste visuelle.
+  }
+}
+
+function driveTaxiSpeedAlarm(level, now = Date.now()) {
+  if (level !== taxiAlarmLevel) {
+    taxiAlarmLevel = level;
+    taxiAlarmSince = level === "caution" || level === "over" ? now : 0;
+    taxiAlarmLastBeep = 0;
+  }
+  if (!taxiAlarmSince || now - taxiAlarmSince < TAXI_ALARM_HOLD_MS) return;
+  if (taxiAlarmLastBeep && now - taxiAlarmLastBeep < TAXI_ALARM_REPEAT_MS[level]) return;
+  taxiAlarmLastBeep = now;
+  taxiAlarmBeep(level);
+}
+
+/**
+ * Bandeau de vitesse du plan de roulage.
+ *
+ * Il vit hors du bandeau de guidage, réécrit à chaque position : reconstruire
+ * ses nœuds une fois par seconde relancerait le clignotement du dépassement à
+ * chaque fois, et il ne clignoterait jamais.
+ */
+function renderTaxiSpeed(aircraft) {
+  const node = $("ground-speed");
+  if (!node) return;
+  const state = taxiSpeedState(aircraft, currentTaxiGuidance);
+  if (!state) {
+    show(node, false);
+    driveTaxiSpeedAlarm("ok");
+    return;
+  }
+  if (!node.childElementCount) {
+    const readout = el("div", "ground-speed-readout");
+    readout.append(
+      el("span", "ground-speed-label", t("ground_short")),
+      el("b", "ground-speed-value"),
+      el("span", "ground-speed-unit", "kt")
+    );
+    node.append(readout, el("div", "ground-speed-limit"));
+  }
+  node.querySelector(".ground-speed-label").textContent = t("ground_short");
+  node.querySelector(".ground-speed-value").textContent = String(Math.round(state.speed));
+  // Le dépassement est dit en toutes lettres : une couleur seule laisserait un
+  // pilote daltonien devant un chiffre qui n'a l'air de rien.
+  const key = state.level === "over" ? "taxi_speed_over" : "taxi_speed_limit";
+  node.querySelector(".ground-speed-limit").textContent = state.limit === null
+    ? t("taxi_speed_runway")
+    : tf(key, { limit: state.limit });
+  node.className = `ground-speed is-${state.level}`;
+  show(node, true);
+  driveTaxiSpeedAlarm(state.level);
+}
+
+function syncTaxiAlarmButton() {
+  const button = $("ground-alarm");
+  if (!button) return;
+  button.classList.toggle("active", taxiSpeedLimits.sound);
+  button.setAttribute("aria-pressed", String(taxiSpeedLimits.sound));
+}
+
+/**
+ * Coupe ou rétablit le bip depuis la barre du plan de roulage.
+ *
+ * Le réglage est le même que celui des paramètres : deux interrupteurs pour
+ * une seule alarme laisseraient croire qu'on peut la couper à moitié.
+ */
+async function toggleTaxiAlarmSound() {
+  taxiSpeedLimits.sound = !taxiSpeedLimits.sound;
+  syncTaxiAlarmButton();
+  if (latestStatus?.remote_client) return;
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) return;
+    const values = await response.json();
+    await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, taxi_speed_alarm_sound: taxiSpeedLimits.sound }),
+    });
+  } catch (error) {
+    // Le choix reste appliqué à l'écran même si l'enregistrement échoue.
+  }
+}
+
 function applyMapPreferences(values) {
   MAP.configure({
     basemap: values?.map_basemap || "osm",
@@ -6271,11 +6470,14 @@ async function persistBasemap(key) {
 async function loadMapPreferences(status = latestStatus) {
   if (status?.remote_client) {
     applyMapPreferences(status);
+    applyTaxiSpeedPreferences(status);
     return;
   }
   const response = await fetch("/api/settings");
   if (!response.ok) return;
-  applyMapPreferences(await response.json());
+  const values = await response.json();
+  applyMapPreferences(values);
+  applyTaxiSpeedPreferences(values);
 }
 
 function setLiveState(online, text, paused = false) {
@@ -6357,6 +6559,8 @@ function applyAircraftState(aircraft) {
     maybeRequestAutomaticTaxiRoute(aircraft);
   }
   updateHud(aircraft);
+  // La vitesse au sol suit chaque position, avec ou sans itinéraire chargé.
+  renderTaxiSpeed(aircraft);
   updateRouteStripProgress(aircraft);
   updateFlightPanel(aircraft);
   updateDispatchLive(aircraft);
@@ -6381,6 +6585,7 @@ async function pollLive() {
       MAP.clearAircraft();
       GROUND.clearAircraft();
       updateHud(null);
+      renderTaxiSpeed(null);
       updateGroundHud();
       updateRouteStripProgress(null);
       latestAircraft = null;
@@ -6943,6 +7148,7 @@ $("ground-plan").addEventListener("click", () => GROUND.fitPlan());
 $("ground-clear").addEventListener("click", () => clearTaxiPlan());
 $("ground-follow").addEventListener("click", () => GROUND.toggleFollow());
 $("ground-secondary").addEventListener("click", () => GROUND.toggleSecondaryTaxiways());
+$("ground-alarm").addEventListener("click", () => toggleTaxiAlarmSound());
 $("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
 $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);

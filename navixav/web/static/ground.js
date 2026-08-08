@@ -58,6 +58,16 @@ const GROUND = (() => {
     };
   }
 
+  /** Distance d'un point au segment [a, b], en mètres locaux. */
+  function distanceToSegment(x, y, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const squared = dx * dx + dy * dy;
+    if (squared <= 0) return Math.hypot(x - a.x, y - a.y);
+    const ratio = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / squared));
+    return Math.hypot(x - (a.x + dx * ratio), y - (a.y + dy * ratio));
+  }
+
   function toScreen(x, y) {
     return [
       canvas.clientWidth / 2 + (x - view.centerX) * view.scale,
@@ -732,6 +742,24 @@ const GROUND = (() => {
     clearAircraft() {
       aircraft = null;
       draw();
+    },
+    /**
+     * L'avion est-il sur une piste plutôt que sur une voie de circulation ?
+     *
+     * C'est la seule question qui compte pour une limite de roulage : la
+     * déduire de la vitesse ferait taire l'alarme précisément quand elle est
+     * la plus justifiée, un roulage à 50 kt étant alors pris pour un décollage.
+     * La bande est élargie de quelques mètres, un avion aligné n'ayant aucune
+     * raison d'avoir son point de référence exactement sur l'axe.
+     */
+    onRunway(state = aircraft) {
+      const position = state?.latitude != null
+        ? toLocal(state.latitude, state.longitude)
+        : null;
+      if (!position || !chart?.runways?.length) return false;
+      return chart.runways.some((runway) => distanceToSegment(
+        position.x, position.y, runway.start, runway.end
+      ) <= (runway.width_m || 45) / 2 + 10);
     },
     onParkingSelect(callback) {
       parkingListener = typeof callback === "function" ? callback : null;

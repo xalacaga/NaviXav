@@ -204,7 +204,12 @@ de vol et construit uniquement avec les installations natives de MSFS :
 - l’itinéraire distingue la partie parcourue de la partie restante, affiche
   uniquement les noms utiles, les points d’attente, la prochaine manœuvre et
   la distance restante ;
-- en cas d’écart, le trajet est recalculé depuis la position réelle de l’avion.
+- en cas d’écart, le trajet est recalculé depuis la position réelle de l’avion ;
+- la vitesse sol s’affiche en direct sur le plan, avec un avertissement à
+  l’approche de la vitesse de roulage maximale et une alarme clignotante
+  accompagnée d’un bip au-delà ; la limite se resserre dans les virages, avant
+  une barre d’arrêt et à l’approche du poste, et ne s’applique jamais sur une
+  piste.
 
 Les chemins SimConnect de type parking servent uniquement à rattacher un poste
 au réseau. Ils ne sont jamais utilisés comme raccourcis entre deux taxiways, ce
@@ -398,6 +403,8 @@ L’interface permet également de configurer :
 - la longueur minimale de piste ;
 - l’apparence de l’interface : automatique, claire ou sombre ;
 - le dossier Community de MSFS utilisé pour inventorier les procédures par appareil ;
+- la vitesse de roulage maximale, la limite plus basse appliquée en virage et
+  l’alarme sonore de vitesse au roulage ;
 - la capacité RNP de l’appareil.
 
 Dans la version installée, les valeurs sont conservées dans
@@ -743,25 +750,29 @@ examiner le résultat, signaler les défauts et proposer des améliorations.
 
 ## Licence
 
-NaviXav est un logiciel libre distribué sous licence
-[Apache 2.0](LICENSE).
+Le code source actuel de NaviXav est proposé sous
+[licence PolyForm Noncommercial 1.0.0](LICENSE). Il s'agit d'une licence
+**source available**, et non d'une licence open source.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-Tu peux librement utiliser, modifier, redistribuer et intégrer NaviXav, y
-compris dans un projet commercial. En contrepartie, la licence impose de
-**créditer l'auteur** :
+La licence autorise l'utilisation, la modification et la redistribution pour
+les usages non commerciaux qu'elle définit. Toute utilisation commerciale
+nécessite une licence écrite distincte du titulaire des droits. Cela comprend
+l'intégration de tout ou partie du code actuel dans une application payante ou
+génératrice de revenus, la vente d'une version modifiée ou sa redistribution
+commerciale.
 
-- conserver la mention de copyright et une copie de la licence dans toute
-  redistribution ;
-- conserver le fichier [NOTICE](NOTICE) et son contenu d'attribution ;
-- **signaler de manière visible tout fichier que tu as modifié**, conformément
-  à la section 4(b) de la licence.
+Consulte [la licence commerciale](COMMERCIAL_LICENSE.md) pour connaître le
+périmètre et le contact. Les contributions de code nécessitent un accord
+préalable, car NaviXav combine licences non commerciales et commerciales ;
+consulte [Contribuer](CONTRIBUTING.md).
 
-La licence accorde également une concession de brevets et exclut toute
-garantie. Les données de navigation, les cartes officielles et le fond
-cartographique ne sont pas couverts par cette licence : ils restent soumis aux
-conditions de leurs fournisseurs respectifs, détaillées dans le fichier NOTICE.
+Les versions Git étiquetées v1.4.12 et antérieures ont été publiées séparément
+sous licence Apache 2.0. Les droits déjà accordés restent valables.
+Les composants tiers, données de navigation, cartes officielles et fonds
+cartographiques ne changent pas de licence : leurs conditions sont détaillées
+dans [NOTICE](NOTICE) et [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ## Tests
 

@@ -10,6 +10,7 @@ $ThirdPartyDir = Join-Path $Destination "third-party"
 
 New-Item -ItemType Directory -Path $ThirdPartyDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "LICENSE") -Destination $Destination -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "COMMERCIAL_LICENSE.md") -Destination $Destination -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "NOTICE") -Destination $Destination -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES") -Destination $Destination -Force
 

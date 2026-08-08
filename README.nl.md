@@ -166,7 +166,11 @@ vluchtkaart en uitsluitend opgebouwd uit native MSFS-faciliteiten:
   blijft de bestemmingsstand een handmatige keuze;
 - afgelegd en resterend traject, nuttige namen, wachtpunten, volgende manoeuvre
   en resterende afstand worden duidelijk weergegeven;
-- na een afwijking wordt de route vanaf de werkelijke vliegtuigpositie herberekend.
+- na een afwijking wordt de route vanaf de werkelijke vliegtuigpositie herberekend;
+- de grondsnelheid verschijnt live op de kaart, met een waarschuwing bij het
+  naderen van de maximale taxisnelheid en een knipperend alarm met pieptoon
+  daarboven; de limiet wordt strenger in bochten, voor een stopbalk en bij de
+  stand, en geldt nooit op een baan.
 
 SimConnect-parkeerpaden koppelen alleen opstelplaatsen aan het taxinetwerk en
 kunnen nooit kunstmatige snelkoppelingen dwars over banen vormen.
@@ -358,6 +362,8 @@ De interface laat ook toe om in te stellen:
 - de minimale baanlengte;
 - de weergave van de interface: automatisch, licht of donker;
 - de MSFS Community-map waarmee de dekking van toestelprocedures wordt geïnventariseerd;
+- de maximale taxisnelheid, de lagere limiet voor bochten en het geluidsalarm
+  voor de taxisnelheid;
 - de RNP-capaciteit van het toestel.
 
 In de geïnstalleerde versie worden de waarden bewaard in
@@ -683,25 +689,29 @@ officiële AIS-publicaties verlaten de computer.
 
 ## Licentie
 
-NaviXav is vrije software, verspreid onder de licentie
-[Apache 2.0](LICENSE).
+De huidige broncode van NaviXav wordt aangeboden onder de
+[PolyForm Noncommercial License 1.0.0](LICENSE). Dit is een
+**source-availablelicentie**, geen opensourcelicentie.
 
 Copyright 2026 Xavier BEGUE (xalacaga)
 
-Je mag NaviXav vrij gebruiken, wijzigen, verspreiden en integreren, ook in een
-commercieel project. In ruil daarvoor verplicht de licentie je om de **auteur
-te vermelden**:
+De licentie staat gebruik, wijziging en verspreiding toe voor de daarin
+omschreven niet-commerciële doeleinden. Elk commercieel gebruik vereist een
+afzonderlijke schriftelijke licentie van de rechthebbende. Dit omvat het
+opnemen van alle of een deel van de huidige code in een betaalde of
+inkomstengenererende toepassing, de verkoop van een gewijzigde versie of
+commerciële verspreiding.
 
-- de copyrightvermelding en een kopie van de licentie behouden bij elke
-  verspreiding;
-- het bestand [NOTICE](NOTICE) en de attributie-inhoud ervan behouden;
-- **duidelijk aangeven welke bestanden je hebt gewijzigd**, zoals vereist door
-  sectie 4(b) van de licentie.
+Zie [Commerciële licenties](COMMERCIAL_LICENSE.md) voor de reikwijdte en
+contactgegevens. Codebijdragen vereisen voorafgaande overeenstemming omdat
+NaviXav niet-commerciële en commerciële licenties combineert; zie
+[Bijdragen](CONTRIBUTING.md).
 
-De licentie verleent ook een octrooilicentie en sluit elke garantie uit.
-Navigatiegegevens, officiële kaarten en de kaartachtergrond vallen niet onder
-deze licentie: daarvoor gelden de voorwaarden van de respectieve leveranciers,
-beschreven in het bestand NOTICE.
+Git-releases met tag v1.4.12 en eerdere zijn afzonderlijk onder Apache 2.0
+gepubliceerd; eerder verleende rechten blijven geldig. Componenten van derden,
+navigatiegegevens, officiële kaarten en kaartachtergronden behouden hun eigen
+voorwaarden, beschreven in [NOTICE](NOTICE) en
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ## Tests
 

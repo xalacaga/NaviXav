@@ -1806,6 +1806,62 @@ body.remote-client .mobile-theme {
   line-height: 1.4;
 }
 .ground-hud .ground-hint { color: #8b9bb0; white-space: normal; line-height: 1.4; }
+
+/* La vitesse sol se lit en bas à droite, loin du bandeau de guidage et de
+   l'échelle : c'est un chiffre qu'on cherche du regard, pas qu'on lit. Le plan
+   de roulage restant sombre en thème clair, ses couleurs ne changent pas. */
+.ground-speed {
+  position: absolute; right: 12px; bottom: 12px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(19, 26, 38, 0.86);
+  backdrop-filter: blur(10px);
+  font-family: var(--mono);
+  pointer-events: none;
+}
+.ground-speed-readout { display: flex; align-items: baseline; gap: 6px; }
+.ground-speed-label {
+  font-family: var(--font);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8b9bb0;
+}
+.ground-speed-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  /* Les chiffres gardent la même largeur : sans cela le bandeau tressaute à
+     chaque kt. */
+  font-variant-numeric: tabular-nums;
+  color: #e8eef7;
+}
+.ground-speed-unit { font-size: 0.72rem; color: #8b9bb0; }
+.ground-speed-limit { font-size: 0.68rem; color: #8b9bb0; }
+
+.ground-speed.is-caution { border-color: rgba(251, 191, 36, 0.65); }
+.ground-speed.is-caution .ground-speed-value,
+.ground-speed.is-caution .ground-speed-limit { color: var(--hold-short); }
+
+.ground-speed.is-over {
+  border-color: #fb7185;
+  background: rgba(80, 20, 32, 0.9);
+  animation: ground-speed-alarm 900ms steps(1, end) infinite;
+}
+.ground-speed.is-over .ground-speed-value,
+.ground-speed.is-over .ground-speed-limit { color: #ffe4e6; }
+
+@keyframes ground-speed-alarm {
+  0%, 49% { background: rgba(80, 20, 32, 0.9); }
+  50%, 100% { background: rgba(190, 18, 60, 0.92); }
+}
+
+/* Un clignotement n'est qu'un renfort : la couleur et le chiffre suffisent. */
+@media (prefers-reduced-motion: reduce) {
+  .ground-speed.is-over { animation: none; background: rgba(190, 18, 60, 0.92); }
+}
 .map-hud .hud-title {
   font-family: var(--font);
   font-size: 0.62rem;
@@ -2922,6 +2978,8 @@ pre {
     padding: 6px 8px;
   }
   .map-legend + .map-attribution { bottom: 45px; }
+  .ground-speed { right: 8px; bottom: 8px; padding: 6px 10px; }
+  .ground-speed-value { font-size: 1.3rem; }
   .sia-library-grid { grid-template-columns: minmax(0, 1fr); }
   .sia-chart-preview iframe, .sia-document-frame {
     height: min(68dvh, 620px);

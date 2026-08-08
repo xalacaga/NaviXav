@@ -68,9 +68,9 @@ How NaviXav Is Developed
 
 NaviXav is a one-person project, and it is written with heavy use of AI coding assistants — what is often called "vibe coding". This is stated openly, because you are installing an executable on your own machine and you are entitled to know how it was produced.
 
-What that means in practice: I specify every feature, review the result, fly it in the simulator and decide what ships. The assistant writes a large share of the code; it does not decide what gets released. An automated suite of more than four hundred tests must pass before any build is produced, and a failing test blocks the release. The complete source is published under the Apache License 2.0, so anyone can read exactly what runs on their machine — and that scrutiny is welcome.
+What that means in practice: I specify every feature, review the result, fly it in the simulator and decide what ships. The assistant writes a large share of the code; it does not decide what gets released. An automated suite of more than four hundred tests must pass before any build is produced, and a failing test blocks the release. The complete source is published under the PolyForm Noncommercial License 1.0.0, so anyone can inspect exactly what runs on their machine. Noncommercial use is permitted; commercial use requires a separate written licence.
 
-The honest caveat: AI-assisted code can contain mistakes that look entirely plausible on the page. That is precisely why the test suite, the open source and the "always verify" warning above matter. If something looks wrong, please report it. Bug reports are the most valuable contribution to this project.
+The honest caveat: AI-assisted code can contain mistakes that look entirely plausible on the page. That is precisely why the test suite, source transparency and the "always verify" warning above matter. If something looks wrong, please report it. Bug reports are the most valuable contribution to this project.
 
 SimBrief Integration
 
@@ -236,7 +236,7 @@ Never publish your SimBrief Pilot ID, username or other personal information in 
 
 License and Credits
 
-NaviXav is distributed under the Apache License 2.0. Copyright 2026 Xavier BEGUE.
+The current NaviXav source is available under the PolyForm Noncommercial License 1.0.0. Commercial use requires a separate written licence. Git releases tagged v1.4.12 and earlier remain available under Apache 2.0. Copyright 2026 Xavier BEGUE.
 
 Microsoft Flight Simulator, MSFS, SimConnect, Microsoft Edge and WebView2 are trademarks of the Microsoft group of companies. Map data and tiles are provided by OpenStreetMap contributors. Runtime aeronautical information and official charts remain subject to the terms and conditions of their respective providers.
 

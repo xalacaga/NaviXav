@@ -27,6 +27,14 @@ DEFAULT_MAP_BASEMAP = "osm"
 DEFAULT_MAP_TRAIL_COLOR = "#22d3ee"
 MAP_BASEMAPS = {"osm", "opentopo", "carto_light", "carto_dark"}
 
+# Vitesses de roulage. Aucun règlement n'en fixe une valeur universelle : les
+# consignes d'exploitation tournent autour de 25 kt en ligne droite et de 10 kt
+# dès qu'il faut tourner ou approcher un poste. Ce sont des valeurs par défaut,
+# ajustables depuis l'interface, et non une limite publiée.
+DEFAULT_TAXI_SPEED_LIMIT_KT = 25
+DEFAULT_TAXI_TURN_SPEED_LIMIT_KT = 10
+TAXI_SPEED_LIMIT_RANGE = (1, 60)
+
 USER_SETTINGS_FILE = user_data_path("user_settings.json")
 
 
@@ -53,6 +61,22 @@ def _env_bool(name: str, default: bool) -> bool:
     return default
 
 
+def _taxi_speed(raw: object, default: int) -> int:
+    """Vitesse de roulage ramenée dans une plage utilisable.
+
+    Une valeur nulle ou négative n'est pas une limite basse, c'est une
+    incompréhension : la ramener à 1 kt ferait hurler l'alarme en permanence,
+    et le réglage par défaut est plus honnête. Une valeur trop haute, elle,
+    reste une intention lisible et se contente d'être ramenée au maximum.
+    """
+    low, high = TAXI_SPEED_LIMIT_RANGE
+    try:
+        value = int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return min(high, value) if value >= low else default
+
+
 def default_navdata_store() -> Path:
     """Emplacement de la base NaviXav, alimentée depuis MSFS."""
     return user_data_path("navixav.sqlite")
@@ -75,6 +99,11 @@ class Settings:
     aircraft_rnp_capable: bool = True
     map_basemap: str = DEFAULT_MAP_BASEMAP
     map_trail_color: str = DEFAULT_MAP_TRAIL_COLOR
+    # Vitesse au-delà de laquelle le plan de roulage alerte. La limite de
+    # virage vaut aussi à l'approche d'une barre d'arrêt et du poste d'arrivée.
+    taxi_speed_limit_kt: int = DEFAULT_TAXI_SPEED_LIMIT_KT
+    taxi_turn_speed_limit_kt: int = DEFAULT_TAXI_TURN_SPEED_LIMIT_KT
+    taxi_speed_alarm_sound: bool = True
     # Dossier Community imposé depuis l'interface. None conserve la détection
     # automatique via les UserCfg.opt de MSFS.
     aircraft_community_path: Path | None = None
@@ -113,6 +142,13 @@ class Settings:
             aircraft_rnp_capable=_env_bool("AIRCRAFT_RNP_CAPABLE", True),
             map_basemap=DEFAULT_MAP_BASEMAP,
             map_trail_color=DEFAULT_MAP_TRAIL_COLOR,
+            taxi_speed_limit_kt=_env_int(
+                "TAXI_SPEED_LIMIT_KT", DEFAULT_TAXI_SPEED_LIMIT_KT
+            ),
+            taxi_turn_speed_limit_kt=_env_int(
+                "TAXI_TURN_SPEED_LIMIT_KT", DEFAULT_TAXI_TURN_SPEED_LIMIT_KT
+            ),
+            taxi_speed_alarm_sound=_env_bool("TAXI_SPEED_ALARM_SOUND", True),
             aircraft_community_path=None,
             lan_enabled=False,
         )
@@ -158,6 +194,19 @@ class Settings:
             or any(character not in "0123456789abcdef" for character in raw_trail_color[1:])
         ):
             raw_trail_color = DEFAULT_MAP_TRAIL_COLOR
+        taxi_speed_limit = _taxi_speed(
+            values.get("taxi_speed_limit_kt", self.taxi_speed_limit_kt),
+            self.taxi_speed_limit_kt,
+        )
+        # Une limite de virage supérieure à la limite en ligne droite ne veut
+        # rien dire : elle ne se déclencherait jamais.
+        taxi_turn_speed_limit = min(
+            taxi_speed_limit,
+            _taxi_speed(
+                values.get("taxi_turn_speed_limit_kt", self.taxi_turn_speed_limit_kt),
+                self.taxi_turn_speed_limit_kt,
+            ),
+        )
         lan_enabled = bool(values.get("lan_enabled", self.lan_enabled))
         raw_community = str(
             values.get("aircraft_community_path", self.aircraft_community_path or "")
@@ -182,6 +231,11 @@ class Settings:
             ),
             map_basemap=raw_basemap,
             map_trail_color=raw_trail_color,
+            taxi_speed_limit_kt=taxi_speed_limit,
+            taxi_turn_speed_limit_kt=taxi_turn_speed_limit,
+            taxi_speed_alarm_sound=bool(
+                values.get("taxi_speed_alarm_sound", self.taxi_speed_alarm_sound)
+            ),
             aircraft_community_path=(
                 Path(raw_community).expanduser() if raw_community else None
             ),
@@ -201,6 +255,9 @@ class Settings:
             "aircraft_rnp_capable": self.aircraft_rnp_capable,
             "map_basemap": self.map_basemap,
             "map_trail_color": self.map_trail_color,
+            "taxi_speed_limit_kt": self.taxi_speed_limit_kt,
+            "taxi_turn_speed_limit_kt": self.taxi_turn_speed_limit_kt,
+            "taxi_speed_alarm_sound": self.taxi_speed_alarm_sound,
             "aircraft_community_path": (
                 str(self.aircraft_community_path) if self.aircraft_community_path else ""
             ),
