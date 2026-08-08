@@ -22,7 +22,7 @@ limitation:
 Commercial terms may be agreed as a fixed fee, a recurring licence, a
 royalty, or another written arrangement appropriate to the intended use. No
 commercial licence is granted by this document. To request one, contact
-Xavier BEGUE at `xavier.begue@gmail.com` and describe the code concerned, the
+Xavier BEGUE at `navixav.sim@gmail.com` and describe the code concerned, the
 product or service, its distribution model, and the expected scale of use.
 
 Git releases tagged v1.4.12 and earlier were separately published under the
@@ -55,7 +55,7 @@ Les conditions commerciales peuvent prendre la forme d'un forfait, d'une
 licence récurrente, d'une redevance ou d'un autre accord écrit adapté à
 l'utilisation prévue. Le présent document n'accorde aucune licence
 commerciale. Pour en demander une, contacte Xavier BEGUE à
-`xavier.begue@gmail.com` en précisant le code concerné, le produit ou service,
+`navixav.sim@gmail.com` en précisant le code concerné, le produit ou service,
 son mode de distribution et l'échelle d'utilisation envisagée.
 
 Les versions Git étiquetées v1.4.12 et antérieures ont été publiées séparément

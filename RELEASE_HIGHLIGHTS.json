@@ -16,5 +16,16 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": []
+  "fixed": [
+    {
+      "en": "Commercial licensing and contribution enquiries now use the dedicated NaviXav contact address.",
+      "fr": "Les demandes de licence commerciale et de contribution utilisent désormais l'adresse de contact dédiée à NaviXav.",
+      "de": "Anfragen zu kommerziellen Lizenzen und Beiträgen verwenden jetzt die eigene NaviXav-Kontaktadresse.",
+      "es": "Las consultas sobre licencias comerciales y contribuciones utilizan ahora la dirección de contacto específica de NaviXav.",
+      "it": "Le richieste relative alle licenze commerciali e ai contributi utilizzano ora l'indirizzo di contatto dedicato a NaviXav.",
+      "pt": "Os pedidos sobre licenciamento comercial e contribuições utilizam agora o endereço de contacto dedicado ao NaviXav.",
+      "nl": "Vragen over commerciële licenties en bijdragen gebruiken nu het speciale NaviXav-contactadres.",
+      "pl": "Zapytania dotyczące licencji komercyjnych i współtworzenia korzystają teraz z dedykowanego adresu kontaktowego NaviXav."
+    }
+  ]
 }
