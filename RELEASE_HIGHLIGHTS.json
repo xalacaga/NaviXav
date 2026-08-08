@@ -16,16 +16,5 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": [
-    {
-      "en": "A procedure item already confirmed now stays confirmed for the rest of the flight: a phase no longer loses its ticks when the simulator state moves on, such as the beacon switched off, the flaps retracted or the parking brake released, and an item the simulator no longer reports reads Confirmed earlier instead of Confirmed · SimConnect",
-      "fr": "Un point de procédure déjà confirmé le reste jusqu'à la fin du vol : une phase ne perd plus ses coches quand l'état du simulateur évolue, balise éteinte, volets rentrés ou frein de parking relâché, et un point que le simulateur ne voit plus indique Confirmé plus tôt au lieu de Confirmé · SimConnect",
-      "de": "Ein bereits bestätigter Verfahrenspunkt bleibt für den Rest des Fluges bestätigt: Eine Phase verliert ihre Haken nicht mehr, wenn sich der Simulatorzustand ändert — Blitzlicht aus, Klappen eingefahren oder Feststellbremse gelöst —, und ein Punkt, den der Simulator nicht mehr meldet, zeigt Zuvor bestätigt statt Bestätigt · SimConnect",
-      "es": "Un punto de procedimiento ya confirmado permanece confirmado hasta el final del vuelo: una fase deja de perder sus marcas cuando cambia el estado del simulador, con la baliza apagada, los flaps recogidos o el freno de estacionamiento liberado, y un punto que el simulador ya no detecta indica Confirmado antes en lugar de Confirmado · SimConnect",
-      "it": "Un punto di procedura già confermato resta confermato fino alla fine del volo: una fase non perde più le sue spunte quando lo stato del simulatore cambia, con il beacon spento, i flap retratti o il freno di stazionamento rilasciato, e un punto che il simulatore non rileva più indica Confermato prima invece di Confermato · SimConnect",
-      "pt": "Um ponto de procedimento já confirmado permanece confirmado até ao fim do voo: uma fase deixa de perder as suas marcas quando o estado do simulador muda, com a baliza apagada, os flaps recolhidos ou o travão de estacionamento libertado, e um ponto que o simulador já não deteta indica Confirmado antes em vez de Confirmado · SimConnect",
-      "nl": "Een al bevestigd procedurepunt blijft de rest van de vlucht bevestigd: een fase verliest haar vinkjes niet meer wanneer de simulatorstatus verandert, zoals de beacon uit, de flaps ingetrokken of de parkeerrem los, en een punt dat de simulator niet meer meldt toont Eerder bevestigd in plaats van Bevestigd · SimConnect",
-      "pl": "Potwierdzony już punkt procedury pozostaje potwierdzony do końca lotu: faza nie traci już zaznaczeń, gdy stan symulatora się zmienia — wyłączona lampa błyskowa, schowane klapy czy zwolniony hamulec postojowy — a punkt, którego symulator już nie widzi, pokazuje Potwierdzone wcześniej zamiast Potwierdzone · SimConnect"
-    }
-  ]
+  "fixed": []
 }

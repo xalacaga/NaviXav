@@ -1,19 +1,14 @@
-# NaviXav 1.4.13
+# NaviXav 1.4.14
 
 Publicado em 2026-08-08.
 
-## Novidades
-
-- A planta de rolagem mostra agora a velocidade em relação ao solo em direto e avisa ao aproximar-se da velocidade máxima de rolagem, ativando depois um alarme intermitente e um sinal sonoro assim que é ultrapassada; o limite aperta-se sozinho nas curvas, antes de uma barra de espera e na aproximação ao lugar de chegada, e nunca se aplica numa pista.
-- As definições guardam agora a velocidade máxima de rolagem, o limite mais baixo aplicado nas curvas e um interruptor para o alarme sonoro, que também pode ser silenciado a partir da barra da planta de rolagem.
-- O código-fonte atual do NaviXav permite agora utilizações não comerciais sob PolyForm Noncommercial 1.0.0, com uma licença comercial separada para reutilização paga.
-
 ## Correções
 
-- A preparação das versões distingue agora a versão do NaviXav da versão da licença PolyForm e preserva o limite histórico das versões Apache.
+- Um ponto de procedimento já confirmado permanece confirmado até ao fim do voo: uma fase deixa de perder as suas marcas quando o estado do simulador muda, com a baliza apagada, os flaps recolhidos ou o travão de estacionamento libertado, e um ponto que o simulador já não deteta indica Confirmado antes em vez de Confirmado · SimConnect.
 
 ## Alterações
 
+- Correctif procedure.
 - Mise a jour License et ajout GS pour taxi.
 
 O instalador é verificado através da sua soma de verificação SHA-256 antes de qualquer atualização automática.
