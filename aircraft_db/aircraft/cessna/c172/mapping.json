@@ -1,0 +1,35 @@
+{
+  "comment": [
+    "Où trouver une propriété quand la source par défaut ne convient pas.",
+    "`overrides` vide signifie « variables standard » : c'est le cas de tous les",
+    "C172 de MSFS. Le format d'override est celui décrit dans schema/README.md ;",
+    "il n'est pas encore exécuté par le moteur.",
+    "",
+    "L'ordre compte : la première variante dont `match` réussit est retenue, donc",
+    "les variantes précises se placent avant la variante générique."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "asobo_g1000",
+      "label": "Asobo / Microsoft — G1000 NXi",
+      "match": { "title_contains": ["c172", "skyhawk"], "title_also_contains": ["g1000", "nxi"] },
+      "systems": { "lnav": true, "vnav": true },
+      "overrides": {}
+    },
+    {
+      "id": "asobo_classic",
+      "label": "Asobo / Microsoft — instruments analogiques",
+      "match": { "title_contains": ["c172", "skyhawk"], "title_also_contains": ["classic", "steam", "analog"] },
+      "systems": { "lnav": false, "vnav": false },
+      "overrides": {}
+    },
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": { "title_contains": ["c172"] },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

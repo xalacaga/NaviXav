@@ -112,6 +112,24 @@ def build_parser() -> argparse.ArgumentParser:
     airport.add_argument("--store", metavar="FICHIER", help="base NaviXav à consulter")
     airport.add_argument("--runway", help="ne montrer que les procédures d'une piste")
 
+    aircraft = subparsers.add_parser(
+        "aircraft",
+        parents=[common],
+        help="inventorier les avions installés et amorcer leurs procédures",
+    )
+    aircraft.add_argument(
+        "--community",
+        metavar="DOSSIER",
+        action="append",
+        help="dossier Community, si la détection automatique échoue "
+        "(répétable ; le simulateur peut être installé n'importe où)",
+    )
+    aircraft.add_argument(
+        "--scaffold",
+        action="store_true",
+        help="écrire dans la base utilisateur un canevas pour chaque avion non couvert",
+    )
+
     return parser
 
 
@@ -383,7 +401,63 @@ def _open_provider(store: str | None, allow_fetch: bool = True) -> "MsfsProvider
     return MsfsProvider(store, allow_fetch=allow_fetch)
 
 
-COMMANDS = ("plan", "navdata", "airport", "web", "import")
+COMMANDS = ("plan", "navdata", "airport", "web", "import", "aircraft")
+
+
+def cmd_aircraft(args, settings) -> int:
+    """Inventorie les avions installés, et amorce ceux que la base ignore."""
+    from navixav.aircraft import AircraftMatcher
+    from navixav.aircraft.community import community_folders, survey
+    from navixav.aircraft.scaffold import write_entry
+
+    explicit = [Path(p) for p in (args.community or [])] or None
+    folders = community_folders(explicit)
+    if not folders:
+        print(
+            "Aucun dossier Community trouvé. Indique-le avec « --community CHEMIN » : "
+            "le simulateur peut être installé où l'utilisateur le souhaite.",
+            file=sys.stderr,
+        )
+        return 2
+
+    for folder in folders:
+        print(f"Dossier Community : {folder}")
+    report = survey(AircraftMatcher(), folders)
+    print(f"{report.total} appareil(s) installé(s).")
+    print()
+
+    if report.covered:
+        print(f"Déjà couverts ({len(report.covered)}) :")
+        for aircraft, identifier, maturity in report.covered:
+            marque = "relu" if maturity == "authored" else "canevas"
+            print(f"  {aircraft.label:<38} {identifier} ({marque})")
+        print()
+
+    if not report.missing:
+        print("Aucun appareil non couvert.")
+        return 0
+
+    print(f"Non couverts ({len(report.missing)}) :")
+    for aircraft in report.missing:
+        source = "checklist livrée" if aircraft.checklist else "aucune checklist"
+        print(f"  {aircraft.label:<38} {aircraft.icao:<5} {source}")
+
+    if not args.scaffold:
+        print()
+        print("« navixav aircraft --scaffold » écrit un canevas pour chacun.")
+        return 0
+
+    print()
+    for aircraft in report.missing:
+        try:
+            directory = write_entry(aircraft)
+        except (FileExistsError, ValueError, OSError) as exc:
+            print(f"  ignoré : {aircraft.label} — {exc}")
+            continue
+        print(f"  écrit : {directory}")
+    print()
+    print("Relis les canevas, puis valide-les avant de t'y fier en vol.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -404,6 +478,7 @@ def main(argv: list[str] | None = None) -> int:
         "airport": cmd_airport,
         "web": cmd_web,
         "import": cmd_import,
+        "aircraft": cmd_aircraft,
     }
     handler = handlers.get(args.command or "plan")
     if handler is None:  # pragma: no cover - argparse couvre déjà ce cas

@@ -355,10 +355,20 @@ Interfejs pozwala również skonfigurować:
 - maksymalną składową wiatru tylnego;
 - maksymalną składową wiatru bocznego;
 - minimalną długość drogi startowej;
+- wygląd interfejsu: automatyczny, jasny lub ciemny;
+- folder Community MSFS używany do inwentaryzacji procedur dla samolotów;
 - zdolność RNP statku powietrznego.
 
 W wersji zainstalowanej wartości są przechowywane w pliku
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Procedury dla samolotu
+
+Moduł **Procedury** dopasowuje samolot załadowany w MSFS do lokalnej bazy
+NaviXav. Pokazuje normalne procedury według faz lotu, ich postęp oraz punkty
+potwierdzane automatycznie przez SimConnect. Informacja o źródle używa wybranego
+języka. Pokrycie można sprawdzić w domyślnie zwiniętej sekcji
+**Procedury dla samolotu** w ustawieniach.
 
 ## Pierwsze użycie
 

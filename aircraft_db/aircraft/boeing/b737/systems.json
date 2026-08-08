@@ -1,0 +1,28 @@
+{
+  "comment": [
+    "Comme l'A320, cet appareil déclare bien plus que le vocabulaire",
+    "n'observe : APU, IRS, électrique et pneumatique existent, mais",
+    "aucune propriété ne les expose. Leurs étapes restent `manual`."
+  ],
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": true,
+    "autopilot": true,
+    "autothrottle": true,
+    "anti_ice": true,
+    "pressurisation": true,
+    "apu": true,
+    "irs": true,
+    "fadec": true,
+    "tcas": true,
+    "weather_radar": true,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": true,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": true,
+    "fuel": true
+  }
+}

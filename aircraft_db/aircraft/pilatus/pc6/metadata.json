@@ -1,0 +1,22 @@
+{
+  "id": "pilatus/pc6",
+  "manufacturer": "Pilatus",
+  "family": "PC-6 Porter",
+  "model": "PC-6/B2-H4",
+  "icao_type": "PC6T",
+  "category": "single_turboprop",
+  "engine_count": 1,
+  "propulsion": "turboprop",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "pc-6",
+      "pc6",
+      "porter"
+    ],
+    "priority": 10
+  }
+}

@@ -25,6 +25,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from navixav import __version__
+from navixav.aircraft import AircraftMatcher
+from navixav.aircraft.community import community_folders, survey
+from navixav.aircraft.scaffold import write_entry
+from navixav.aircraft.procedures import procedure_payload
 from navixav.changelog import load_changelog
 from navixav.chart import EARTH_RADIUS_M, build_chart
 from navixav.ground import (
@@ -118,7 +122,14 @@ class SettingsRequest(BaseModel):
         default="osm", pattern="^(osm|opentopo|carto_light|carto_dark)$"
     )
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
+    aircraft_community_path: str = Field(default="", max_length=1000)
     lan_enabled: bool = False
+
+
+class AircraftScaffoldRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=300)
+    package: str = Field(min_length=1, max_length=300)
+    community_path: str = Field(default="", max_length=1000)
 
 
 def _is_loopback(host: str | None) -> bool:
@@ -164,6 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     demo_state: dict[str, Any] = {}
     current_plan_state: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
+    aircraft_matcher = AircraftMatcher()
     resources_closed = False
 
     def close_resources() -> None:
@@ -214,6 +226,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             if request.url.path in {
                 "/api/settings",
+                "/api/aircraft/survey",
+                "/api/aircraft/select-folder",
+                "/api/aircraft/scaffold",
                 "/api/simbrief/new",
                 "/api/support/open",
                 "/api/update/install",
@@ -319,6 +334,77 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_settings() -> dict[str, object]:
         values = settings.user_values()
         return values
+
+    def aircraft_folders(explicit_path: str = "") -> list[Path]:
+        raw = explicit_path.strip()
+        if not raw and settings.aircraft_community_path is not None:
+            raw = str(settings.aircraft_community_path)
+        return community_folders([Path(raw)]) if raw else community_folders()
+
+    def aircraft_inventory(explicit_path: str = "") -> dict[str, object]:
+        return survey(aircraft_matcher, aircraft_folders(explicit_path)).to_dict()
+
+    @app.get("/api/aircraft/survey")
+    def get_aircraft_survey(community: str = "") -> dict[str, object]:
+        return aircraft_inventory(community)
+
+    @app.post("/api/aircraft/select-folder")
+    def select_aircraft_folder(request: Request) -> dict[str, object]:
+        if request.headers.get("X-NaviXav-Aircraft") != "browse":
+            raise HTTPException(403, "Confirmation de sélection absente.")
+        callback = getattr(app.state, "request_aircraft_folder", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "Le sélecteur de dossier est disponible dans l’application Windows.",
+            )
+        detected = aircraft_folders()
+        current = str(
+            settings.aircraft_community_path or (detected[0] if detected else "")
+        )
+        selected = callback(current)
+        if not selected:
+            return {"cancelled": True}
+        folders = community_folders([Path(selected)])
+        if not folders:
+            raise HTTPException(400, "Ce dossier ne contient aucun dossier Community.")
+        payload = survey(aircraft_matcher, folders).to_dict()
+        payload["selected_path"] = str(selected)
+        return payload
+
+    @app.post("/api/aircraft/scaffold")
+    def scaffold_aircraft(
+        payload: AircraftScaffoldRequest, request: Request
+    ) -> dict[str, object]:
+        nonlocal aircraft_matcher
+        if request.headers.get("X-NaviXav-Aircraft") != "scaffold":
+            raise HTTPException(403, "Confirmation de création absente.")
+        folders = aircraft_folders(payload.community_path)
+        report = survey(aircraft_matcher, folders)
+        aircraft = next(
+            (
+                item for item in report.missing
+                if item.label == payload.label and item.package == payload.package
+            ),
+            None,
+        )
+        if aircraft is None:
+            raise HTTPException(404, "Cet appareil non couvert n’est plus présent.")
+        try:
+            directory = write_entry(aircraft)
+        except FileExistsError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except (OSError, ValueError) as exc:
+            LOGGER.warning("Création du canevas d’appareil refusée : %s", exc)
+            raise HTTPException(400, str(exc)) from exc
+        aircraft_matcher = AircraftMatcher()
+        refreshed = survey(aircraft_matcher, folders).to_dict()
+        refreshed["created"] = {"label": aircraft.label, "directory": str(directory)}
+        return refreshed
+
+    @app.get("/api/aircraft/procedures")
+    def aircraft_procedures(title: str = "") -> dict[str, object]:
+        return procedure_payload(aircraft_matcher.match(title))
 
     @app.get("/api/update/check")
     def check_update() -> dict[str, object]:
@@ -857,7 +943,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             state = tracker.read(allow_demo=demo)
         except PositionUnavailable as exc:
             return {"connected": False, "reason": str(exc)}
-        return {"connected": True, "aircraft": state.to_dict()}
+        match = aircraft_matcher.match(state.title)
+        if match is None and aircraft:
+            match = aircraft_matcher.match(aircraft)
+        return {
+            "connected": True,
+            "aircraft": state.to_dict(),
+            "procedures": procedure_payload(match, state),
+        }
 
     @app.post("/api/demo/restart")
     def restart_demo() -> dict[str, object]:

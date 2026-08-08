@@ -400,10 +400,20 @@ In der Oberfläche lassen sich außerdem einstellen:
 - die maximale Rückenwindkomponente;
 - die maximale Seitenwindkomponente;
 - die Mindestbahnlänge;
+- das Erscheinungsbild der Oberfläche: automatisch, hell oder dunkel;
+- den MSFS-Community-Ordner für die Bestandsaufnahme der Flugzeugverfahren;
 - die RNP-Fähigkeit des Luftfahrzeugs.
 
 In der installierten Fassung werden die Werte in
 `%LOCALAPPDATA%\NaviXav\user_settings.json` gespeichert.
+
+### Flugzeugverfahren
+
+Das Modul **Verfahren** ordnet das in MSFS geladene Flugzeug der lokalen
+Verfahrensdatenbank von NaviXav zu. Es zeigt Normalverfahren nach Flugphase,
+ihren Fortschritt und die über SimConnect automatisch bestätigten Punkte. Der
+Quellenhinweis folgt der gewählten Sprache. Die Abdeckung steht im standardmäßig
+eingeklappten Bereich **Flugzeugverfahren** der Einstellungen.
 
 ## Erste Verwendung
 

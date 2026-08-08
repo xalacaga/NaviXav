@@ -1,0 +1,103 @@
+{
+  "source": "Limitations publiées du 737-800, CFM56-7B.",
+  "note": "Les masses varient selon la variante et la certification de chaque exemplaire. Chiffres non relus : à recouper avant tout affichage comme limite certifiée.",
+  "speeds": {
+    "vmo": {
+      "value": 340,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum operating"
+    },
+    "mmo": {
+      "value": 0.82,
+      "unit": "mach",
+      "label": "Maximum operating Mach"
+    },
+    "vle": {
+      "value": 320,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum gear extended"
+    },
+    "vlo": {
+      "value": 270,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum gear operating, extension",
+      "schedule": [
+        {
+          "position": "EXTENSION",
+          "value": 270
+        },
+        {
+          "position": "RETRACTION",
+          "value": 235
+        }
+      ]
+    },
+    "vfe": {
+      "value": 250,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum flap extended",
+      "schedule": [
+        {
+          "position": "1",
+          "value": 250
+        },
+        {
+          "position": "5",
+          "value": 250
+        },
+        {
+          "position": "10",
+          "value": 210
+        },
+        {
+          "position": "15",
+          "value": 200
+        },
+        {
+          "position": "25",
+          "value": 190
+        },
+        {
+          "position": "30",
+          "value": 175
+        },
+        {
+          "position": "40",
+          "value": 162
+        }
+      ]
+    }
+  },
+  "weights": {
+    "max_takeoff": {
+      "value": 79010,
+      "unit": "kg"
+    },
+    "max_landing": {
+      "value": 66360,
+      "unit": "kg"
+    },
+    "max_zero_fuel": {
+      "value": 62732,
+      "unit": "kg"
+    }
+  },
+  "altitudes": {
+    "max_operating": {
+      "value": 41000,
+      "unit": "ft"
+    }
+  },
+  "fuel": {
+    "grade": "Jet A-1"
+  },
+  "engine": {
+    "manufacturer": "CFM International",
+    "model": "CFM56-7B",
+    "count": 2
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "source": "King Air 350 AFM, section 2 — limitations.",
+  "note": "Chiffres non encore relus sur le manuel, et variables selon la version de certification. À recouper avant tout affichage comme limite certifiée.",
+
+  "speeds": {
+    "vmo":  { "value": 263, "unit": "kt", "reference": "IAS", "label": "Maximum operating" },
+    "mmo":  { "value": 0.58, "unit": "mach", "label": "Maximum operating Mach" },
+    "vle":  { "value": 184, "unit": "kt", "reference": "IAS", "label": "Maximum gear extended" },
+    "vlo":  { "value": 182, "unit": "kt", "reference": "IAS", "label": "Maximum gear operating" },
+    "vfe":  { "value": 202, "unit": "kt", "reference": "IAS", "label": "Maximum flap extended",
+              "schedule": [
+                { "position": "APPROACH", "value": 202 },
+                { "position": "DOWN", "value": 158 }
+              ] },
+    "vmca": { "value": 94, "unit": "kt", "reference": "IAS", "label": "Minimum control, air" },
+    "vsse": { "value": 110, "unit": "kt", "reference": "IAS", "label": "Safe single engine speed" },
+    "vyse": { "value": 121, "unit": "kt", "reference": "IAS", "label": "Best rate of climb, one engine inoperative" }
+  },
+
+  "weights": {
+    "max_takeoff": { "value": 15000, "unit": "lb" },
+    "max_landing": { "value": 15000, "unit": "lb" }
+  },
+
+  "altitudes": {
+    "max_operating": { "value": 35000, "unit": "ft" }
+  },
+
+  "pressurisation": {
+    "max_differential": { "value": 6.6, "unit": "psi" }
+  },
+
+  "fuel": {
+    "grade": "Jet A-1"
+  },
+
+  "engine": {
+    "manufacturer": "Pratt & Whitney Canada",
+    "model": "PT6A-60A",
+    "count": 2,
+    "power": { "value": 1050, "unit": "shp" }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "comment": [
+    "Le King Air de MSFS publie les variables standard. La variante distingue",
+    "seulement les deux planches de bord, dont les capacités de navigation",
+    "verticale diffèrent."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "asobo_g1000",
+      "label": "Asobo / Microsoft — G1000 NXi",
+      "match": {
+        "title_contains": ["king air", "b350", "be350"],
+        "title_also_contains": ["g1000", "nxi"]
+      },
+      "systems": { "vnav": true },
+      "overrides": {}
+    },
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": { "title_contains": ["king air", "b350", "be350"] },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

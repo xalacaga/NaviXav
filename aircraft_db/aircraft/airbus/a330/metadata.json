@@ -1,0 +1,21 @@
+{
+  "id": "airbus/a330",
+  "manufacturer": "Airbus",
+  "family": "A330",
+  "model": "A330-900neo",
+  "icao_type": "A339",
+  "category": "widebody_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "a330",
+      "a339"
+    ],
+    "priority": 10
+  }
+}

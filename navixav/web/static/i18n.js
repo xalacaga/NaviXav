@@ -210,6 +210,28 @@
       min_runway: "Longueur de piste minimale (ft)",
       map_basemap: "Fond de carte",
       map_trail_color: "Couleur de la trace du vol",
+      aircraft_settings_title: "Procédures par appareil",
+      aircraft_settings_help: "NaviXav compare les appareils installés avec sa base locale de procédures.",
+      aircraft_folder: "Dossier Community",
+      aircraft_folder_placeholder: "Détection automatique depuis MSFS",
+      aircraft_browse: "Parcourir…",
+      aircraft_refresh: "Actualiser",
+      aircraft_covered: "Couverts",
+      aircraft_missing: "Non couverts",
+      aircraft_none: "Aucun appareil",
+      aircraft_scanning: "Inventaire des appareils…",
+      aircraft_found: "{count} appareil(s) installé(s).",
+      aircraft_folder_not_found: "Aucun dossier Community détecté. Choisissez-le manuellement.",
+      aircraft_scan_failed: "Inventaire des appareils impossible",
+      aircraft_browse_failed: "Sélection du dossier impossible",
+      aircraft_checklist: "checklist disponible",
+      aircraft_no_checklist: "sans checklist",
+      aircraft_maturity_authored: "relu",
+      aircraft_maturity_draft: "canevas",
+      aircraft_scaffold: "Créer le canevas",
+      aircraft_scaffolding: "Création…",
+      aircraft_scaffolded: "Canevas créé pour {label}. Relisez-le avant de vous y fier en vol.",
+      aircraft_scaffold_failed: "Création du canevas impossible",
       lan_access: "Accès téléphone et tablette",
       lan_address: "Adresse sur le réseau local",
       lan_help: "Même Wi-Fi requis. Redémarre NaviXav puis autorise le réseau privé si Windows le demande.",
@@ -799,6 +821,28 @@
       min_runway: "Minimum runway length (ft)",
       map_basemap: "Base map",
       map_trail_color: "Flight trail colour",
+      aircraft_settings_title: "Aircraft procedures",
+      aircraft_settings_help: "NaviXav compares installed aircraft with its local procedure database.",
+      aircraft_folder: "Community folder",
+      aircraft_folder_placeholder: "Detect automatically from MSFS",
+      aircraft_browse: "Browse…",
+      aircraft_refresh: "Refresh",
+      aircraft_covered: "Covered",
+      aircraft_missing: "Not covered",
+      aircraft_none: "No aircraft",
+      aircraft_scanning: "Scanning installed aircraft…",
+      aircraft_found: "{count} installed aircraft.",
+      aircraft_folder_not_found: "No Community folder detected. Select it manually.",
+      aircraft_scan_failed: "Could not scan installed aircraft",
+      aircraft_browse_failed: "Could not select the folder",
+      aircraft_checklist: "checklist available",
+      aircraft_no_checklist: "no checklist",
+      aircraft_maturity_authored: "reviewed",
+      aircraft_maturity_draft: "draft",
+      aircraft_scaffold: "Create draft",
+      aircraft_scaffolding: "Creating…",
+      aircraft_scaffolded: "Draft created for {label}. Review it before relying on it in flight.",
+      aircraft_scaffold_failed: "Could not create the draft",
       lan_access: "Phone and tablet access",
       lan_address: "Local network address",
       lan_help: "The same Wi-Fi is required. Restart NaviXav, then allow private-network access if Windows asks.",
@@ -1422,6 +1466,79 @@
   Object.assign(TRANSLATIONS.nl, { module_menu: "Modules", module_menu_close: "Sluiten" });
   Object.assign(TRANSLATIONS.pl, { module_menu: "Moduły", module_menu_close: "Zamknij" });
 
+  Object.assign(TRANSLATIONS.de, {
+    aircraft_settings_title: "Verfahren nach Flugzeug",
+    aircraft_settings_help: "NaviXav vergleicht installierte Flugzeuge mit seiner lokalen Verfahrensdatenbank.",
+    aircraft_folder: "Community-Ordner", aircraft_folder_placeholder: "Automatisch aus MSFS erkennen",
+    aircraft_browse: "Durchsuchen…", aircraft_refresh: "Aktualisieren", aircraft_covered: "Abgedeckt",
+    aircraft_missing: "Nicht abgedeckt", aircraft_none: "Keine Flugzeuge", aircraft_scanning: "Installierte Flugzeuge werden erfasst…",
+    aircraft_found: "{count} installierte Flugzeuge.", aircraft_folder_not_found: "Kein Community-Ordner erkannt. Bitte manuell auswählen.",
+    aircraft_scan_failed: "Flugzeuge konnten nicht erfasst werden", aircraft_browse_failed: "Ordner konnte nicht ausgewählt werden",
+    aircraft_checklist: "Checkliste verfügbar", aircraft_no_checklist: "ohne Checkliste", aircraft_maturity_authored: "geprüft",
+    aircraft_maturity_draft: "Entwurf", aircraft_scaffold: "Entwurf erstellen", aircraft_scaffolding: "Erstellen…",
+    aircraft_scaffolded: "Entwurf für {label} erstellt. Vor dem Einsatz im Flug prüfen.", aircraft_scaffold_failed: "Entwurf konnte nicht erstellt werden",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    aircraft_settings_title: "Procedimientos por avión",
+    aircraft_settings_help: "NaviXav compara los aviones instalados con su base local de procedimientos.",
+    aircraft_folder: "Carpeta Community", aircraft_folder_placeholder: "Detectar automáticamente desde MSFS",
+    aircraft_browse: "Examinar…", aircraft_refresh: "Actualizar", aircraft_covered: "Cubiertos",
+    aircraft_missing: "No cubiertos", aircraft_none: "Ningún avión", aircraft_scanning: "Buscando aviones instalados…",
+    aircraft_found: "{count} aviones instalados.", aircraft_folder_not_found: "No se detectó ninguna carpeta Community. Selecciónala manualmente.",
+    aircraft_scan_failed: "No se pudieron buscar los aviones", aircraft_browse_failed: "No se pudo seleccionar la carpeta",
+    aircraft_checklist: "checklist disponible", aircraft_no_checklist: "sin checklist", aircraft_maturity_authored: "revisado",
+    aircraft_maturity_draft: "borrador", aircraft_scaffold: "Crear borrador", aircraft_scaffolding: "Creando…",
+    aircraft_scaffolded: "Borrador creado para {label}. Revísalo antes de usarlo en vuelo.", aircraft_scaffold_failed: "No se pudo crear el borrador",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    aircraft_settings_title: "Procedure per aeromobile",
+    aircraft_settings_help: "NaviXav confronta gli aeromobili installati con il database locale delle procedure.",
+    aircraft_folder: "Cartella Community", aircraft_folder_placeholder: "Rileva automaticamente da MSFS",
+    aircraft_browse: "Sfoglia…", aircraft_refresh: "Aggiorna", aircraft_covered: "Coperti",
+    aircraft_missing: "Non coperti", aircraft_none: "Nessun aeromobile", aircraft_scanning: "Ricerca degli aeromobili installati…",
+    aircraft_found: "{count} aeromobili installati.", aircraft_folder_not_found: "Nessuna cartella Community rilevata. Selezionala manualmente.",
+    aircraft_scan_failed: "Impossibile cercare gli aeromobili", aircraft_browse_failed: "Impossibile selezionare la cartella",
+    aircraft_checklist: "checklist disponibile", aircraft_no_checklist: "senza checklist", aircraft_maturity_authored: "verificato",
+    aircraft_maturity_draft: "bozza", aircraft_scaffold: "Crea bozza", aircraft_scaffolding: "Creazione…",
+    aircraft_scaffolded: "Bozza creata per {label}. Verificala prima di usarla in volo.", aircraft_scaffold_failed: "Impossibile creare la bozza",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    aircraft_settings_title: "Procedimentos por aeronave",
+    aircraft_settings_help: "O NaviXav compara as aeronaves instaladas com a base local de procedimentos.",
+    aircraft_folder: "Pasta Community", aircraft_folder_placeholder: "Detetar automaticamente a partir do MSFS",
+    aircraft_browse: "Procurar…", aircraft_refresh: "Atualizar", aircraft_covered: "Cobertas",
+    aircraft_missing: "Não cobertas", aircraft_none: "Nenhuma aeronave", aircraft_scanning: "A procurar aeronaves instaladas…",
+    aircraft_found: "{count} aeronaves instaladas.", aircraft_folder_not_found: "Nenhuma pasta Community detetada. Selecione-a manualmente.",
+    aircraft_scan_failed: "Não foi possível procurar aeronaves", aircraft_browse_failed: "Não foi possível selecionar a pasta",
+    aircraft_checklist: "checklist disponível", aircraft_no_checklist: "sem checklist", aircraft_maturity_authored: "revista",
+    aircraft_maturity_draft: "rascunho", aircraft_scaffold: "Criar rascunho", aircraft_scaffolding: "A criar…",
+    aircraft_scaffolded: "Rascunho criado para {label}. Reveja-o antes de o usar em voo.", aircraft_scaffold_failed: "Não foi possível criar o rascunho",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    aircraft_settings_title: "Procedures per vliegtuig",
+    aircraft_settings_help: "NaviXav vergelijkt geïnstalleerde vliegtuigen met de lokale proceduredatabase.",
+    aircraft_folder: "Community-map", aircraft_folder_placeholder: "Automatisch detecteren vanuit MSFS",
+    aircraft_browse: "Bladeren…", aircraft_refresh: "Vernieuwen", aircraft_covered: "Ondersteund",
+    aircraft_missing: "Niet ondersteund", aircraft_none: "Geen vliegtuigen", aircraft_scanning: "Geïnstalleerde vliegtuigen zoeken…",
+    aircraft_found: "{count} geïnstalleerde vliegtuigen.", aircraft_folder_not_found: "Geen Community-map gevonden. Selecteer deze handmatig.",
+    aircraft_scan_failed: "Vliegtuigen konden niet worden gezocht", aircraft_browse_failed: "Map kon niet worden geselecteerd",
+    aircraft_checklist: "checklist beschikbaar", aircraft_no_checklist: "zonder checklist", aircraft_maturity_authored: "nagekeken",
+    aircraft_maturity_draft: "concept", aircraft_scaffold: "Concept maken", aircraft_scaffolding: "Maken…",
+    aircraft_scaffolded: "Concept voor {label} gemaakt. Controleer het voor gebruik tijdens de vlucht.", aircraft_scaffold_failed: "Concept kon niet worden gemaakt",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    aircraft_settings_title: "Procedury według samolotu",
+    aircraft_settings_help: "NaviXav porównuje zainstalowane samoloty z lokalną bazą procedur.",
+    aircraft_folder: "Folder Community", aircraft_folder_placeholder: "Wykryj automatycznie z MSFS",
+    aircraft_browse: "Przeglądaj…", aircraft_refresh: "Odśwież", aircraft_covered: "Obsługiwane",
+    aircraft_missing: "Nieobsługiwane", aircraft_none: "Brak samolotów", aircraft_scanning: "Wyszukiwanie zainstalowanych samolotów…",
+    aircraft_found: "Zainstalowane samoloty: {count}.", aircraft_folder_not_found: "Nie wykryto folderu Community. Wybierz go ręcznie.",
+    aircraft_scan_failed: "Nie udało się wyszukać samolotów", aircraft_browse_failed: "Nie udało się wybrać folderu",
+    aircraft_checklist: "checklista dostępna", aircraft_no_checklist: "bez checklisty", aircraft_maturity_authored: "sprawdzony",
+    aircraft_maturity_draft: "szkic", aircraft_scaffold: "Utwórz szkic", aircraft_scaffolding: "Tworzenie…",
+    aircraft_scaffolded: "Utworzono szkic dla {label}. Sprawdź go przed użyciem w locie.", aircraft_scaffold_failed: "Nie udało się utworzyć szkicu",
+  });
+
   // Operational map and taxi wording. Aviation identifiers and abbreviations
   // (ICAO, SID/STAR, QNH, ILS, MCDU and units) deliberately stay unchanged.
   Object.assign(TRANSLATIONS.de, {
@@ -1533,19 +1650,145 @@
     borrowed_geometry_body: "Wybrana baza nie zawiera geometrii naziemnej; plan pochodzi z „{source}”. Procedury nadal pochodzą z wybranej bazy.",
   });
 
+  Object.assign(TRANSLATIONS.fr, {
+    tab_procedures: "Procédures", procedure_kicker: "Aide à la procédure",
+    procedure_unavailable_title: "Procédure indisponible", procedure_unavailable_body: "La famille est reconnue, mais sa procédure n’est pas lisible.",
+    procedure_aircraft_uncovered: "L’appareil chargé n’est pas encore couvert. Créez son canevas depuis les paramètres, puis relisez-le avant le vol.",
+    procedure_maturity_authored: "Procédure relue", procedure_maturity_draft: "Canevas à relire",
+    procedure_live: "SimConnect actif", procedure_offline: "Mode consultation", procedure_phase_flow: "Séquence des phases de vol",
+    procedure_progress: "{complete}/{total} confirmé(s)", procedure_confirmed_auto: "Confirmé · SimConnect",
+    procedure_confirm_manual: "Donnée inconnue · confirmer", procedure_waiting_sim: "En attente · SimConnect",
+    procedure_mode_manual: "Confirmation pilote", procedure_mode_info: "Information", procedure_reset: "Réinitialiser le vol",
+    procedure_next: "Phase suivante", procedure_source: "Source", procedure_load_failed: "Chargement de la procédure impossible",
+    procedure_source_family: "Procédures normales de la famille {family}, représentation normalisée. Aucune SOP compagnie, aucun extrait de FCOM.",
+    procedure_source_manual: "{manual}, section 4 — procédures normales, représentation normalisée.",
+    procedure_phase_before_start: "Avant mise en route", procedure_phase_start: "Mise en route",
+    procedure_phase_after_start: "Après mise en route", procedure_phase_taxi: "Roulage",
+    procedure_phase_before_takeoff: "Avant décollage", procedure_phase_takeoff: "Décollage",
+    procedure_phase_after_takeoff: "Après décollage", procedure_phase_climb: "Montée",
+    procedure_phase_cruise: "Croisière", procedure_phase_descent: "Descente",
+    procedure_phase_approach: "Approche", procedure_phase_landing: "Atterrissage",
+    procedure_phase_after_landing: "Après atterrissage", procedure_phase_shutdown: "Arrêt",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    tab_procedures: "Procedures", procedure_kicker: "Procedure assistant",
+    procedure_unavailable_title: "Procedure unavailable", procedure_unavailable_body: "The aircraft family is recognised, but its procedure cannot be read.",
+    procedure_aircraft_uncovered: "The loaded aircraft is not covered yet. Create its draft in settings, then review it before flight.",
+    procedure_maturity_authored: "Reviewed procedure", procedure_maturity_draft: "Draft · review required",
+    procedure_live: "SimConnect live", procedure_offline: "Review mode", procedure_phase_flow: "Flight phase sequence",
+    procedure_progress: "{complete}/{total} confirmed", procedure_confirmed_auto: "Confirmed · SimConnect",
+    procedure_confirm_manual: "Unknown data · confirm", procedure_waiting_sim: "Waiting · SimConnect",
+    procedure_mode_manual: "Pilot confirmation", procedure_mode_info: "Information", procedure_reset: "Reset flight",
+    procedure_next: "Next phase", procedure_source: "Source", procedure_load_failed: "Could not load the procedure",
+    procedure_source_family: "Normal procedures for the {family} family, normalised representation. No company SOP or FCOM excerpt.",
+    procedure_source_manual: "{manual}, section 4 — normal procedures, normalised representation.",
+    procedure_phase_before_start: "Before start", procedure_phase_start: "Engine start",
+    procedure_phase_after_start: "After start", procedure_phase_taxi: "Taxi",
+    procedure_phase_before_takeoff: "Before takeoff", procedure_phase_takeoff: "Takeoff",
+    procedure_phase_after_takeoff: "After takeoff", procedure_phase_climb: "Climb",
+    procedure_phase_cruise: "Cruise", procedure_phase_descent: "Descent",
+    procedure_phase_approach: "Approach", procedure_phase_landing: "Landing",
+    procedure_phase_after_landing: "After landing", procedure_phase_shutdown: "Shutdown",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    tab_procedures: "Verfahren", procedure_kicker: "Verfahrensassistent", procedure_unavailable_title: "Verfahren nicht verfügbar",
+    procedure_unavailable_body: "Die Flugzeugfamilie wurde erkannt, das Verfahren ist jedoch nicht lesbar.", procedure_aircraft_uncovered: "Das geladene Flugzeug wird noch nicht unterstützt. Erstellen Sie den Entwurf in den Einstellungen und prüfen Sie ihn vor dem Flug.",
+    procedure_maturity_authored: "Geprüftes Verfahren", procedure_maturity_draft: "Entwurf · Prüfung nötig", procedure_live: "SimConnect aktiv", procedure_offline: "Ansichtsmodus",
+    procedure_phase_flow: "Abfolge der Flugphasen", procedure_progress: "{complete}/{total} bestätigt", procedure_confirmed_auto: "Bestätigt · SimConnect", procedure_confirm_manual: "Daten unbekannt · bestätigen",
+    procedure_waiting_sim: "Warten · SimConnect", procedure_mode_manual: "Pilotenbestätigung", procedure_mode_info: "Information", procedure_reset: "Flug zurücksetzen", procedure_next: "Nächste Phase", procedure_source: "Quelle", procedure_load_failed: "Verfahren konnte nicht geladen werden",
+    procedure_source_family: "Normalverfahren der {family}-Familie, normalisierte Darstellung. Keine unternehmensspezifische SOP und kein FCOM-Auszug.",
+    procedure_source_manual: "{manual}, Abschnitt 4 — Normalverfahren, normalisierte Darstellung.",
+    procedure_phase_before_start: "Vor dem Start", procedure_phase_start: "Triebwerkstart", procedure_phase_after_start: "Nach dem Start", procedure_phase_taxi: "Rollen", procedure_phase_before_takeoff: "Vor dem Startlauf", procedure_phase_takeoff: "Start", procedure_phase_after_takeoff: "Nach dem Start", procedure_phase_climb: "Steigflug", procedure_phase_cruise: "Reiseflug", procedure_phase_descent: "Sinkflug", procedure_phase_approach: "Anflug", procedure_phase_landing: "Landung", procedure_phase_after_landing: "Nach der Landung", procedure_phase_shutdown: "Abstellen",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    tab_procedures: "Procedimientos", procedure_kicker: "Ayuda de procedimiento", procedure_unavailable_title: "Procedimiento no disponible",
+    procedure_unavailable_body: "Se reconoce la familia del avión, pero no se puede leer su procedimiento.", procedure_aircraft_uncovered: "El avión cargado aún no está cubierto. Crea su borrador en los ajustes y revísalo antes del vuelo.",
+    procedure_maturity_authored: "Procedimiento revisado", procedure_maturity_draft: "Borrador · requiere revisión", procedure_live: "SimConnect activo", procedure_offline: "Modo consulta",
+    procedure_phase_flow: "Secuencia de fases de vuelo", procedure_progress: "{complete}/{total} confirmados", procedure_confirmed_auto: "Confirmado · SimConnect", procedure_confirm_manual: "Dato desconocido · confirmar",
+    procedure_waiting_sim: "Esperando · SimConnect", procedure_mode_manual: "Confirmación del piloto", procedure_mode_info: "Información", procedure_reset: "Reiniciar vuelo", procedure_next: "Fase siguiente", procedure_source: "Fuente", procedure_load_failed: "No se pudo cargar el procedimiento",
+    procedure_source_family: "Procedimientos normales de la familia {family}, representación normalizada. Sin SOP de compañía ni extractos del FCOM.",
+    procedure_source_manual: "{manual}, sección 4 — procedimientos normales, representación normalizada.",
+    procedure_phase_before_start: "Antes del arranque", procedure_phase_start: "Arranque", procedure_phase_after_start: "Después del arranque", procedure_phase_taxi: "Rodaje", procedure_phase_before_takeoff: "Antes del despegue", procedure_phase_takeoff: "Despegue", procedure_phase_after_takeoff: "Después del despegue", procedure_phase_climb: "Ascenso", procedure_phase_cruise: "Crucero", procedure_phase_descent: "Descenso", procedure_phase_approach: "Aproximación", procedure_phase_landing: "Aterrizaje", procedure_phase_after_landing: "Después del aterrizaje", procedure_phase_shutdown: "Apagado",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    tab_procedures: "Procedure", procedure_kicker: "Assistente procedure", procedure_unavailable_title: "Procedura non disponibile",
+    procedure_unavailable_body: "La famiglia dell’aeromobile è riconosciuta, ma la procedura non è leggibile.", procedure_aircraft_uncovered: "L’aeromobile caricato non è ancora coperto. Crea la bozza nelle impostazioni e verificala prima del volo.",
+    procedure_maturity_authored: "Procedura verificata", procedure_maturity_draft: "Bozza · verifica richiesta", procedure_live: "SimConnect attivo", procedure_offline: "Modalità consultazione",
+    procedure_phase_flow: "Sequenza delle fasi di volo", procedure_progress: "{complete}/{total} confermati", procedure_confirmed_auto: "Confermato · SimConnect", procedure_confirm_manual: "Dato sconosciuto · confermare",
+    procedure_waiting_sim: "In attesa · SimConnect", procedure_mode_manual: "Conferma del pilota", procedure_mode_info: "Informazione", procedure_reset: "Reimposta volo", procedure_next: "Fase successiva", procedure_source: "Fonte", procedure_load_failed: "Impossibile caricare la procedura",
+    procedure_source_family: "Procedure normali della famiglia {family}, rappresentazione normalizzata. Nessuna SOP di compagnia né estratto del FCOM.",
+    procedure_source_manual: "{manual}, sezione 4 — procedure normali, rappresentazione normalizzata.",
+    procedure_phase_before_start: "Prima dell’avviamento", procedure_phase_start: "Avviamento", procedure_phase_after_start: "Dopo l’avviamento", procedure_phase_taxi: "Rullaggio", procedure_phase_before_takeoff: "Prima del decollo", procedure_phase_takeoff: "Decollo", procedure_phase_after_takeoff: "Dopo il decollo", procedure_phase_climb: "Salita", procedure_phase_cruise: "Crociera", procedure_phase_descent: "Discesa", procedure_phase_approach: "Avvicinamento", procedure_phase_landing: "Atterraggio", procedure_phase_after_landing: "Dopo l’atterraggio", procedure_phase_shutdown: "Arresto",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    tab_procedures: "Procedimentos", procedure_kicker: "Assistente de procedimentos", procedure_unavailable_title: "Procedimento indisponível",
+    procedure_unavailable_body: "A família da aeronave foi reconhecida, mas o procedimento não pode ser lido.", procedure_aircraft_uncovered: "A aeronave carregada ainda não está coberta. Crie o rascunho nas definições e reveja-o antes do voo.",
+    procedure_maturity_authored: "Procedimento revisto", procedure_maturity_draft: "Rascunho · requer revisão", procedure_live: "SimConnect ativo", procedure_offline: "Modo de consulta",
+    procedure_phase_flow: "Sequência das fases de voo", procedure_progress: "{complete}/{total} confirmados", procedure_confirmed_auto: "Confirmado · SimConnect", procedure_confirm_manual: "Dado desconhecido · confirmar",
+    procedure_waiting_sim: "A aguardar · SimConnect", procedure_mode_manual: "Confirmação do piloto", procedure_mode_info: "Informação", procedure_reset: "Repor voo", procedure_next: "Fase seguinte", procedure_source: "Fonte", procedure_load_failed: "Não foi possível carregar o procedimento",
+    procedure_source_family: "Procedimentos normais da família {family}, representação normalizada. Sem SOP de companhia nem excertos do FCOM.",
+    procedure_source_manual: "{manual}, secção 4 — procedimentos normais, representação normalizada.",
+    procedure_phase_before_start: "Antes do arranque", procedure_phase_start: "Arranque", procedure_phase_after_start: "Depois do arranque", procedure_phase_taxi: "Rolagem", procedure_phase_before_takeoff: "Antes da descolagem", procedure_phase_takeoff: "Descolagem", procedure_phase_after_takeoff: "Depois da descolagem", procedure_phase_climb: "Subida", procedure_phase_cruise: "Cruzeiro", procedure_phase_descent: "Descida", procedure_phase_approach: "Aproximação", procedure_phase_landing: "Aterragem", procedure_phase_after_landing: "Depois da aterragem", procedure_phase_shutdown: "Paragem",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    tab_procedures: "Procedures", procedure_kicker: "Procedureassistent", procedure_unavailable_title: "Procedure niet beschikbaar",
+    procedure_unavailable_body: "De vliegtuigfamilie is herkend, maar de procedure kan niet worden gelezen.", procedure_aircraft_uncovered: "Het geladen vliegtuig wordt nog niet ondersteund. Maak het concept in de instellingen en controleer het vóór de vlucht.",
+    procedure_maturity_authored: "Gecontroleerde procedure", procedure_maturity_draft: "Concept · controle vereist", procedure_live: "SimConnect actief", procedure_offline: "Raadpleegmodus",
+    procedure_phase_flow: "Volgorde van vluchtfasen", procedure_progress: "{complete}/{total} bevestigd", procedure_confirmed_auto: "Bevestigd · SimConnect", procedure_confirm_manual: "Gegevens onbekend · bevestigen",
+    procedure_waiting_sim: "Wachten · SimConnect", procedure_mode_manual: "Bevestiging piloot", procedure_mode_info: "Informatie", procedure_reset: "Vlucht resetten", procedure_next: "Volgende fase", procedure_source: "Bron", procedure_load_failed: "Procedure kon niet worden geladen",
+    procedure_source_family: "Normale procedures voor de {family}-familie, genormaliseerde weergave. Geen bedrijfs-SOP of FCOM-fragment.",
+    procedure_source_manual: "{manual}, sectie 4 — normale procedures, genormaliseerde weergave.",
+    procedure_phase_before_start: "Voor de start", procedure_phase_start: "Motorstart", procedure_phase_after_start: "Na de start", procedure_phase_taxi: "Taxi", procedure_phase_before_takeoff: "Voor de startbaan", procedure_phase_takeoff: "Start", procedure_phase_after_takeoff: "Na de start", procedure_phase_climb: "Klim", procedure_phase_cruise: "Kruisvlucht", procedure_phase_descent: "Daling", procedure_phase_approach: "Nadering", procedure_phase_landing: "Landing", procedure_phase_after_landing: "Na de landing", procedure_phase_shutdown: "Uitschakelen",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    tab_procedures: "Procedury", procedure_kicker: "Asystent procedur", procedure_unavailable_title: "Procedura niedostępna",
+    procedure_unavailable_body: "Rodzina samolotu została rozpoznana, ale procedury nie można odczytać.", procedure_aircraft_uncovered: "Załadowany samolot nie jest jeszcze obsługiwany. Utwórz szkic w ustawieniach i sprawdź go przed lotem.",
+    procedure_maturity_authored: "Sprawdzona procedura", procedure_maturity_draft: "Szkic · wymaga sprawdzenia", procedure_live: "SimConnect aktywny", procedure_offline: "Tryb podglądu",
+    procedure_phase_flow: "Kolejność faz lotu", procedure_progress: "Potwierdzono {complete}/{total}", procedure_confirmed_auto: "Potwierdzone · SimConnect", procedure_confirm_manual: "Dane nieznane · potwierdź",
+    procedure_waiting_sim: "Oczekiwanie · SimConnect", procedure_mode_manual: "Potwierdzenie pilota", procedure_mode_info: "Informacja", procedure_reset: "Resetuj lot", procedure_next: "Następna faza", procedure_source: "Źródło", procedure_load_failed: "Nie udało się wczytać procedury",
+    procedure_source_family: "Procedury normalne dla rodziny {family}, znormalizowana prezentacja. Bez firmowych SOP ani fragmentów FCOM.",
+    procedure_source_manual: "{manual}, sekcja 4 — procedury normalne, znormalizowana prezentacja.",
+    procedure_phase_before_start: "Przed uruchomieniem", procedure_phase_start: "Uruchomienie silnika", procedure_phase_after_start: "Po uruchomieniu", procedure_phase_taxi: "Kołowanie", procedure_phase_before_takeoff: "Przed startem", procedure_phase_takeoff: "Start", procedure_phase_after_takeoff: "Po starcie", procedure_phase_climb: "Wznoszenie", procedure_phase_cruise: "Przelot", procedure_phase_descent: "Zniżanie", procedure_phase_approach: "Podejście", procedure_phase_landing: "Lądowanie", procedure_phase_after_landing: "Po lądowaniu", procedure_phase_shutdown: "Wyłączenie",
+  });
+
+  Object.assign(TRANSLATIONS.fr, {
+    theme: "Apparence", theme_auto: "Automatique (Windows)", theme_light: "Clair", theme_dark: "Sombre",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    theme: "Appearance", theme_auto: "Automatic (Windows)", theme_light: "Light", theme_dark: "Dark",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    theme: "Darstellung", theme_auto: "Automatisch (Windows)", theme_light: "Hell", theme_dark: "Dunkel",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    theme: "Apariencia", theme_auto: "Automático (Windows)", theme_light: "Claro", theme_dark: "Oscuro",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    theme: "Aspetto", theme_auto: "Automatico (Windows)", theme_light: "Chiaro", theme_dark: "Scuro",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    theme: "Aspeto", theme_auto: "Automático (Windows)", theme_light: "Claro", theme_dark: "Escuro",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    theme: "Weergave", theme_auto: "Automatisch (Windows)", theme_light: "Licht", theme_dark: "Donker",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    theme: "Wygląd", theme_auto: "Automatyczny (Windows)", theme_light: "Jasny", theme_dark: "Ciemny",
+  });
+
   const ELEMENTS = {
     ".brand-sub": "subtitle",
-    ".nav-source": "source",
     ".switch-label": "demo",
-    "#settings-open": "settings",
-    "#simbrief-create": "simbrief_create",
-    "#update-install": "check_update",
+    "#settings-open .toolbar-label": "settings",
+    "#simbrief-create span": "simbrief_create",
+    "#update-install .toolbar-label": "check_update",
     "#sim-status-text": "sim_offline",
-    "#shutdown": "quit",
+    "#shutdown .toolbar-label": "quit",
     "#refresh span": "complete",
     '[data-tab="terminal"]': "tab_terminal",
     '[data-tab="map"]': "tab_map",
     '[data-tab="ground"]': "tab_ground",
+    '[data-tab="procedures"]': "tab_procedures",
     '[data-tab="flight"]': "tab_flight",
     '[data-tab="constraints"]': "tab_constraints",
     '[data-tab="dispatch"]': "tab_dispatch",
@@ -1581,6 +1824,13 @@
     ".settings-head h2": "settings",
     ".settings-head p": "settings_saved_local",
     'label[for="settings-language"] span': "language",
+    'label[for="settings-theme"] span': "theme",
+    '#settings-theme option[value="auto"]': "theme_auto",
+    '#settings-theme option[value="light"]': "theme_light",
+    '#settings-theme option[value="dark"]': "theme_dark",
+    '#mobile-theme option[value="auto"]': "theme_auto",
+    '#mobile-theme option[value="light"]': "theme_light",
+    '#mobile-theme option[value="dark"]': "theme_dark",
     'label[for="settings-pilot-id"] span': "pilot_id",
     'label[for="settings-username"] span': "pilot_username",
     "#welcome-title": "welcome_title",
@@ -1601,6 +1851,13 @@
     '#settings-basemap option[value="carto_light"]': "basemap_carto_light",
     '#settings-basemap option[value="carto_dark"]': "basemap_carto_dark",
     'label[for="settings-trail-color"] span': "map_trail_color",
+    "#aircraft-settings-title": "aircraft_settings_title",
+    "#aircraft-settings-help": "aircraft_settings_help",
+    "#aircraft-folder-label": "aircraft_folder",
+    "#aircraft-folder-browse": "aircraft_browse",
+    "#aircraft-refresh": "aircraft_refresh",
+    "#aircraft-covered-title": "aircraft_covered",
+    "#aircraft-missing-title": "aircraft_missing",
     "#settings-rnp-label": "rnp_aircraft",
     "#settings-lan-label": "lan_access",
     "#settings-lan-title": "lan_address",
@@ -1616,8 +1873,11 @@
     '#settings-form button[type="submit"]': "save",
   };
 
+  const PLACEHOLDERS = {
+    "#settings-aircraft-community": "aircraft_folder_placeholder",
+  };
+
   const TITLES = {
-    ".nav-source": "source_title",
     ".toolbar .switch": "demo_title",
     "#settings-open": "settings_title",
     "#changelog-open": "changelog_title",
@@ -1762,6 +2022,10 @@
       const node = document.querySelector(selector);
       if (node) setNodeText(node, t(key));
     }
+    for (const [selector, key] of Object.entries(PLACEHOLDERS)) {
+      const node = document.querySelector(selector);
+      if (node) node.placeholder = t(key);
+    }
     for (const [selector, key] of Object.entries(TITLES)) {
       const node = document.querySelector(selector);
       if (node) node.title = t(key);
@@ -1794,6 +2058,12 @@
     if (mobileLanguage) {
       mobileLanguage.setAttribute("aria-label", t("language"));
       mobileLanguage.title = t("language");
+    }
+    const mobileTheme = document.querySelector("#mobile-theme");
+    if (mobileTheme) {
+      mobileTheme.value = window.THEME?.getPreference() || "auto";
+      mobileTheme.setAttribute("aria-label", t("theme"));
+      mobileTheme.title = t("theme");
     }
   }
 

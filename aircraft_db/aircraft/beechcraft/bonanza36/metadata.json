@@ -1,0 +1,20 @@
+{
+  "id": "beechcraft/bonanza36",
+  "manufacturer": "Beechcraft",
+  "family": "Bonanza",
+  "model": "A36 Bonanza",
+  "icao_type": "BE36",
+  "category": "single_piston",
+  "engine_count": 1,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "bonanza"
+    ],
+    "priority": 10
+  }
+}

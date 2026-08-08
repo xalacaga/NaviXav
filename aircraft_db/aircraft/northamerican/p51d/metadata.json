@@ -1,0 +1,22 @@
+{
+  "id": "northamerican/p51d",
+  "manufacturer": "North American",
+  "family": "P-51D",
+  "model": "P-51D Mustang",
+  "icao_type": "P51",
+  "category": "warbird",
+  "engine_count": 1,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "p-51",
+      "p51",
+      "mustang"
+    ],
+    "priority": 10
+  }
+}

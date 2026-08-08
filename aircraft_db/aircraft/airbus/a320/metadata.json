@@ -1,0 +1,26 @@
+{
+  "id": "airbus/a320",
+  "manufacturer": "Airbus",
+  "family": "A320",
+  "model": "A320-200",
+  "icao_type": "A320",
+  "category": "narrowbody_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "CS-25",
+  "source": "Procédures normales de la famille A320, représentation normalisée.",
+  "match": {
+    "title_contains": [
+      "a320",
+      "a319",
+      "a321",
+      "a32nx",
+      "a19n",
+      "a20n",
+      "a21n"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

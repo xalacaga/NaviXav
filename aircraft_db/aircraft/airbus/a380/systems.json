@@ -1,0 +1,23 @@
+{
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": true,
+    "autopilot": true,
+    "autothrottle": true,
+    "anti_ice": true,
+    "pressurisation": true,
+    "apu": true,
+    "irs": true,
+    "fadec": true,
+    "tcas": true,
+    "weather_radar": true,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": true,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": true,
+    "fuel": true
+  }
+}

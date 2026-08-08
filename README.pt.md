@@ -356,10 +356,20 @@ A interface permite igualmente configurar:
 - a componente máxima de vento de cauda;
 - a componente máxima de vento cruzado;
 - o comprimento mínimo de pista;
+- a aparência da interface: automática, clara ou escura;
+- a pasta Community do MSFS utilizada para inventariar os procedimentos por aeronave;
 - a capacidade RNP da aeronave.
 
 Na versão instalada, os valores são conservados em
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Procedimentos por aeronave
+
+O módulo **Procedimentos** associa a aeronave carregada no MSFS à base local do
+NaviXav. Apresenta os procedimentos normais por fase de voo, o seu progresso e
+os itens confirmados automaticamente pelo SimConnect. A indicação da fonte segue
+o idioma escolhido. A cobertura pode ser consultada na secção recolhida
+**Procedimentos por aeronave** das definições.
 
 ## Primeira utilização
 

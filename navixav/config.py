@@ -75,6 +75,9 @@ class Settings:
     aircraft_rnp_capable: bool = True
     map_basemap: str = DEFAULT_MAP_BASEMAP
     map_trail_color: str = DEFAULT_MAP_TRAIL_COLOR
+    # Dossier Community imposé depuis l'interface. None conserve la détection
+    # automatique via les UserCfg.opt de MSFS.
+    aircraft_community_path: Path | None = None
     # Accès depuis un téléphone ou une tablette du même réseau local. Sans
     # jeton : le lien affiché sur le PC suffit. Les commandes sensibles
     # (paramètres, mise à jour, arrêt) restent réservées à la machine hôte.
@@ -110,6 +113,7 @@ class Settings:
             aircraft_rnp_capable=_env_bool("AIRCRAFT_RNP_CAPABLE", True),
             map_basemap=DEFAULT_MAP_BASEMAP,
             map_trail_color=DEFAULT_MAP_TRAIL_COLOR,
+            aircraft_community_path=None,
             lan_enabled=False,
         )
 
@@ -155,6 +159,10 @@ class Settings:
         ):
             raw_trail_color = DEFAULT_MAP_TRAIL_COLOR
         lan_enabled = bool(values.get("lan_enabled", self.lan_enabled))
+        raw_community = str(
+            values.get("aircraft_community_path", self.aircraft_community_path or "")
+            or ""
+        ).strip()
         return Settings(
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
             simbrief_username=str(values.get("simbrief_username", "") or "").strip(),
@@ -174,6 +182,9 @@ class Settings:
             ),
             map_basemap=raw_basemap,
             map_trail_color=raw_trail_color,
+            aircraft_community_path=(
+                Path(raw_community).expanduser() if raw_community else None
+            ),
             lan_enabled=lan_enabled,
         )
 
@@ -190,6 +201,9 @@ class Settings:
             "aircraft_rnp_capable": self.aircraft_rnp_capable,
             "map_basemap": self.map_basemap,
             "map_trail_color": self.map_trail_color,
+            "aircraft_community_path": (
+                str(self.aircraft_community_path) if self.aircraft_community_path else ""
+            ),
             "lan_enabled": self.lan_enabled,
         }
 

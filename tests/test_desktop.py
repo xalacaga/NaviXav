@@ -127,6 +127,52 @@ def test_interface_offers_persistent_european_languages():
     assert "navixav:languagechange" in translations
 
 
+def test_interface_offers_a_persistent_global_theme():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "theme.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="settings-theme"' in html
+    assert 'src="/static/theme.js?v=__NAVIXAV_VERSION__"' in html
+    assert html.index("/static/theme.js") < html.index("/static/app.css")
+    for theme in ("auto", "light", "dark"):
+        assert f'<option value="{theme}">' in html
+    assert ':root[data-theme="light"]' in css
+    assert "color-scheme: light" in css
+    assert '"navixav-theme"' in javascript
+    assert "localStorage.setItem(STORAGE_KEY, selected)" in javascript
+    assert "navixav:themechange" in javascript
+    for key in ("theme_auto", "theme_light", "theme_dark"):
+        assert key in translations
+
+
+def test_settings_prioritise_support_and_collapse_aircraft_procedures():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+
+    assert '<details class="aircraft-settings">' in html
+    assert '<details class="aircraft-settings" open' not in html
+    assert '<summary class="aircraft-settings-summary">' in html
+    assert html.index('class="support-card support-card-top"') < html.index('class="settings-grid"')
+    assert html.index('class="support-card support-card-top"') < html.index('class="aircraft-settings"')
+
+
+def test_procedure_header_status_and_phase_flow_are_compact():
+    css = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.css"
+    ).read_text(encoding="utf-8")
+
+    badge = css[css.index(".procedure-badge {") : css.index(".procedure-badge::before")]
+    phase = css[css.index(".procedure-phase {") : css.index(".procedure-phase:hover")]
+    assert "0.48rem/1.1 var(--font)" in badge
+    assert "padding: 2px 5px" in badge
+    assert "min-height: 44px" in phase
+    assert "flex: 1 0 82px" in phase
+    assert "var(--sans)" not in css
+
+
 def test_flight_tracking_and_local_logbook_follow_the_selected_language():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
@@ -287,7 +333,53 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert 'fetch("/api/update/check"' in javascript
     assert '"X-NaviXav-Update": "install"' in javascript
     assert "checkForUpdates(true)" in javascript
-    assert 'class="icon-btn update-btn"' in html
+    assert 'class="icon-btn update-btn toolbar-icon"' in html
+
+
+def test_topbar_prioritises_flight_actions_and_compacts_utilities():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    header = html[html.index('<header class="topbar">') : html.index("</header>")]
+    assert 'class="nav-source"' not in header
+    assert 'id="theme-toggle"' in header
+    assert 'class="icon-btn toolbar-secondary"' in header
+    for control in ("settings-open", "update-install", "support-open-toolbar", "shutdown"):
+        assert f'id="{control}"' in header
+    assert ".toolbar-icon .toolbar-label" in css
+    assert "min-height: 36px" in css
+    assert '$("theme-toggle").addEventListener("click"' in javascript
+    assert "window.THEME.setPreference" in javascript
+
+
+def test_route_strip_uses_a_compact_connected_rail():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    strip = css[css.index(".strip {") : css.index("/* ----------------------------------------------------------------- cards */")]
+    assert "scrollbar-width: none" in strip
+    assert "border-radius: 7px" in strip
+    assert ".strip-sep" in strip
+    assert 'fragment.append(el("span", "strip-sep"))' in javascript
+
+
+def test_overflowing_route_strip_supports_mouse_touch_and_keyboard_scrolling():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="strip" class="strip hidden" tabindex="0"' in html
+    assert ".strip.can-scroll { cursor: grab; }" in css
+    assert 'strip.addEventListener("wheel"' in javascript
+    assert 'strip.addEventListener("pointerdown"' in javascript
+    assert 'event.key === "ArrowLeft"' in javascript
+    assert 'event.key === "ArrowRight"' in javascript
+    assert "new ResizeObserver(updateStripOverflowState).observe(strip);" in javascript
+    assert "initialiseStripScrolling();" in javascript
 
 
 def test_silent_update_restarts_navixav():
@@ -369,7 +461,8 @@ def test_a_remote_client_can_still_choose_its_display_language():
     for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
         assert f'<option value="{language}">' in html
     # Caché sur le PC, où les paramètres portent déjà le choix de la langue.
-    assert ".mobile-language { display: none; }" in css
+    assert ".mobile-language," in css
+    assert ".mobile-theme { display: none; }" in css
     assert "body.remote-client .mobile-language" in css
     assert 'body.remote-client #settings-open' in css
 
@@ -923,7 +1016,7 @@ def test_the_ground_view_has_its_own_tab_and_panel():
     assert 'id="panel-ground"' in markup
     assert 'id="ground-canvas"' in markup
     assert "/static/ground.js" in markup
-    assert '"ground", "flight"' in javascript
+    assert '"ground", "procedures", "flight"' in javascript
     # Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
     assert 'if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());' in javascript
 

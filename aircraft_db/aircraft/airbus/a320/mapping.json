@@ -1,0 +1,109 @@
+{
+  "comment": [
+    "Le fichier qui justifie tout le format. Les procédures ci-contre sont",
+    "identiques pour Asobo, FlyByWire, Fenix et iniBuilds ; seule la manière de",
+    "lire l'état change, et elle est ici.",
+    "",
+    "Les overrides Fenix reproduisent exactement ce que",
+    "navixav/live/simconnect.py porte aujourd'hui en dur. Les remplacer par ces",
+    "données est l'objet du lot « mapping dynamique » ; en attendant, ce fichier",
+    "est la spécification de ce que le code devra faire."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "fenix",
+      "label": "Fenix Simulations",
+      "match": {
+        "title_contains": [
+          "a319",
+          "a320",
+          "a321"
+        ],
+        "title_also_contains": [
+          "fenix"
+        ]
+      },
+      "systems": {},
+      "overrides": {
+        "configuration.flaps_handle_index": {
+          "lvar": "S_FC_FLAPS",
+          "as": "integer",
+          "clamp": [
+            0,
+            4
+          ]
+        },
+        "configuration.parking_brake": {
+          "lvar": "S_MIP_PARKING_BRAKE",
+          "as": "boolean"
+        },
+        "configuration.spoilers_armed": {
+          "lvar": "A_FC_SPEEDBRAKE",
+          "as": "boolean",
+          "below": 0.5
+        },
+        "configuration.spoilers_handle_pct": {
+          "lvar": "A_FC_SPEEDBRAKE",
+          "as": "number",
+          "offset": -1.0,
+          "scale": 50.0,
+          "clamp": [
+            0,
+            100
+          ]
+        }
+      }
+    },
+    {
+      "id": "flybywire",
+      "label": "FlyByWire A32NX",
+      "match": {
+        "title_contains": [
+          "a320",
+          "a32nx"
+        ],
+        "title_also_contains": [
+          "flybywire",
+          "fbw",
+          "a32nx"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    },
+    {
+      "id": "inibuilds",
+      "label": "iniBuilds",
+      "match": {
+        "title_contains": [
+          "a319",
+          "a320",
+          "a321"
+        ],
+        "title_also_contains": [
+          "inibuilds",
+          "ini "
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    },
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": {
+        "title_contains": [
+          "a320",
+          "a319",
+          "a321",
+          "a19n",
+          "a20n",
+          "a21n"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

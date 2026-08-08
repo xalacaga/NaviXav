@@ -1,0 +1,21 @@
+{
+  "comment": [
+    "Variante unique : l'appareil publie les variables standard, ou ses",
+    "LVar propres n'ont pas été relevées. Aucun override deviné."
+  ],
+  "default_variant": "default",
+  "variants": [
+    {
+      "id": "default",
+      "label": "SimWorks Studios",
+      "match": {
+        "title_contains": [
+          "pc-12",
+          "pc12"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

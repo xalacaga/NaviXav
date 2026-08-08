@@ -1,0 +1,48 @@
+{
+  "source": "Cessna 172S Skyhawk SP POH, section 2 — limitations.",
+  "note": "Valeurs de la 172S à moteur IO-360-L2A. Une autre variante (172N, 172P, 172R) a d'autres chiffres : elle doit avoir son propre dossier, pas une correction de celui-ci.",
+
+  "speeds": {
+    "vne":  { "value": 163, "unit": "kt", "reference": "IAS", "label": "Never exceed" },
+    "vno":  { "value": 129, "unit": "kt", "reference": "IAS", "label": "Maximum structural cruising" },
+    "va":   { "value": 105, "unit": "kt", "reference": "IAS", "label": "Manoeuvring at 2550 lb",
+              "schedule": [
+                { "weight_lb": 2550, "value": 105 },
+                { "weight_lb": 2200, "value": 98 },
+                { "weight_lb": 1900, "value": 90 }
+              ] },
+    "vfe":  { "value": 110, "unit": "kt", "reference": "IAS", "label": "Maximum flap extended",
+              "schedule": [
+                { "flap_deg": 10, "value": 110 },
+                { "flap_deg": 30, "value": 85 }
+              ] },
+    "vs":   { "value": 48, "unit": "kt", "reference": "CAS", "label": "Stall, flaps up" },
+    "vs0":  { "value": 40, "unit": "kt", "reference": "CAS", "label": "Stall, full flap" },
+    "vx":   { "value": 62, "unit": "kt", "reference": "IAS", "label": "Best angle of climb" },
+    "vy":   { "value": 74, "unit": "kt", "reference": "IAS", "label": "Best rate of climb" },
+    "best_glide": { "value": 68, "unit": "kt", "reference": "IAS", "label": "Best glide" },
+    "max_demonstrated_crosswind": { "value": 15, "unit": "kt", "label": "Maximum demonstrated crosswind" }
+  },
+
+  "weights": {
+    "max_ramp":    { "value": 2558, "unit": "lb" },
+    "max_takeoff": { "value": 2550, "unit": "lb" },
+    "max_landing": { "value": 2550, "unit": "lb" },
+    "max_baggage": { "value": 120,  "unit": "lb" }
+  },
+
+  "fuel": {
+    "total":  { "value": 56, "unit": "USgal" },
+    "usable": { "value": 53, "unit": "USgal" },
+    "grade":  "100LL"
+  },
+
+  "engine": {
+    "manufacturer": "Lycoming",
+    "model": "IO-360-L2A",
+    "power": { "value": 180, "unit": "hp", "at_rpm": 2700 },
+    "max_rpm": 2700,
+    "oil_capacity": { "value": 8, "unit": "USqt" },
+    "oil_minimum_for_flight": { "value": 5, "unit": "USqt" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "cessna/citation_cj4",
+  "manufacturer": "Cessna",
+  "family": "Citation CJ4",
+  "model": "Citation CJ4 (525C)",
+  "icao_type": "C25C",
+  "category": "light_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 1,
+  "certification": "FAR 23",
+  "source": "Citation CJ4 AFM, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "cj4",
+      "citation cj4",
+      "525c"
+    ],
+    "priority": 20
+  },
+  "maturity": "authored"
+}

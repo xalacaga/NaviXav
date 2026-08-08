@@ -1,0 +1,17 @@
+{
+  "comment": [
+    "Le DA62 de MSFS publie les variables standard : aucun override n'est",
+    "nécessaire. Le fichier existe quand même, parce que le moteur y lit la",
+    "variante affichée à l'utilisateur."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": { "title_contains": ["da62", "da 62"] },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

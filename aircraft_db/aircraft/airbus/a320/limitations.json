@@ -1,0 +1,41 @@
+{
+  "source": "Limitations publiées de l'A320-200, CFM56-5B.",
+  "note": "Les masses varient selon la variante et la version de certification de chaque exemplaire. Chiffres à recouper avant tout affichage comme limite certifiée.",
+
+  "speeds": {
+    "vmo":  { "value": 350, "unit": "kt", "reference": "IAS", "label": "Maximum operating" },
+    "mmo":  { "value": 0.82, "unit": "mach", "label": "Maximum operating Mach" },
+    "vlo":  { "value": 250, "unit": "kt", "reference": "IAS", "label": "Maximum gear operating" },
+    "vle":  { "value": 280, "unit": "kt", "reference": "IAS", "label": "Maximum gear extended" },
+    "vfe":  { "value": 230, "unit": "kt", "reference": "IAS", "label": "Maximum flap extended",
+              "schedule": [
+                { "position": "CONF 1", "value": 230 },
+                { "position": "CONF 1+F", "value": 215 },
+                { "position": "CONF 2", "value": 200 },
+                { "position": "CONF 3", "value": 185 },
+                { "position": "CONF FULL", "value": 177 }
+              ] },
+    "va":   { "value": 250, "unit": "kt", "reference": "IAS", "label": "Manoeuvring" },
+    "max_demonstrated_crosswind": { "value": 38, "unit": "kt", "label": "Maximum demonstrated crosswind" }
+  },
+
+  "weights": {
+    "max_takeoff": { "value": 78000, "unit": "kg" },
+    "max_landing": { "value": 66000, "unit": "kg" },
+    "max_zero_fuel": { "value": 62500, "unit": "kg" }
+  },
+
+  "altitudes": {
+    "max_operating": { "value": 39100, "unit": "ft" }
+  },
+
+  "fuel": {
+    "grade": "Jet A-1"
+  },
+
+  "engine": {
+    "manufacturer": "CFM International",
+    "model": "CFM56-5B",
+    "count": 2
+  }
+}

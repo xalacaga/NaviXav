@@ -1,0 +1,29 @@
+{
+  "comment": [
+    "Premier appareil pressurisé de la base, et premier à déclarer",
+    "l'antigivrage. `configuration.engine_anti_ice` est la seule propriété du",
+    "vocabulaire qui touche à ces systèmes : la pressurisation, elle, n'est",
+    "observable par aucune, donc ses étapes restent `manual`."
+  ],
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": false,
+    "autopilot": true,
+    "autothrottle": false,
+    "anti_ice": true,
+    "pressurisation": true,
+    "apu": false,
+    "irs": false,
+    "fadec": false,
+    "tcas": true,
+    "weather_radar": true,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": false,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": true,
+    "fuel": true
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "comment": [
+    "Presque tout est déclaré présent, et c'est précisément l'intérêt de cet",
+    "appareil pour la base : il montre l'écart entre ce que l'avion possède et",
+    "ce que le moteur sait observer. `apu`, `irs`, `pneumatic` et `electrical`",
+    "sont bien là, mais aucune propriété du vocabulaire ne les expose encore —",
+    "les étapes correspondantes restent donc `manual`, par la règle de",
+    "l'inconnu et non par oubli."
+  ],
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": true,
+    "autopilot": true,
+    "autothrottle": true,
+    "anti_ice": true,
+    "pressurisation": true,
+    "apu": true,
+    "irs": true,
+    "fadec": true,
+    "tcas": true,
+    "weather_radar": true,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": true,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": true,
+    "fuel": true
+  }
+}

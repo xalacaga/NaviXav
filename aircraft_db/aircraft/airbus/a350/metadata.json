@@ -1,0 +1,21 @@
+{
+  "id": "airbus/a350",
+  "manufacturer": "Airbus",
+  "family": "A350",
+  "model": "A350-900",
+  "icao_type": "A359",
+  "category": "widebody_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "a350",
+      "a359"
+    ],
+    "priority": 10
+  }
+}

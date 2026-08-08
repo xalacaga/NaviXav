@@ -1,0 +1,24 @@
+{
+  "id": "bae/avro_rj",
+  "manufacturer": "BAe Systems",
+  "family": "Avro RJ",
+  "model": "Avro RJ85",
+  "icao_type": "RJ85",
+  "category": "narrowbody_jet",
+  "engine_count": 4,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "avro rj",
+      "bae 146",
+      "rj85",
+      "rj100",
+      "rj70"
+    ],
+    "priority": 10
+  }
+}

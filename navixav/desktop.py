@@ -233,6 +233,17 @@ def _run_desktop_window(url: str, server: object) -> None:
             """Ouvre la page de soutien uniquement après une action explicite."""
             webbrowser.open(SUPPORT_URL, new=2)
 
+        def select_aircraft_folder(current: str = "") -> str | None:
+            """Demande un dossier sans exposer le système de fichiers au WebView."""
+            selected = window.create_file_dialog(
+                webview.FOLDER_DIALOG,
+                directory=current or "",
+                allow_multiple=False,
+            )
+            if not selected:
+                return None
+            return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -245,6 +256,7 @@ def _run_desktop_window(url: str, server: object) -> None:
         server.config.app.state.request_update_install = install_update
         server.config.app.state.request_open_simbrief = open_simbrief
         server.config.app.state.request_open_support = open_support
+        server.config.app.state.request_aircraft_folder = select_aircraft_folder
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

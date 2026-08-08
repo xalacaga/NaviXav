@@ -1,0 +1,24 @@
+{
+  "comment": [
+    "Variante unique : l'appareil publie les variables standard, ou ses",
+    "LVar propres n'ont pas été relevées. Aucun override deviné."
+  ],
+  "default_variant": "default",
+  "variants": [
+    {
+      "id": "default",
+      "label": "Just Flight",
+      "match": {
+        "title_contains": [
+          "avro rj",
+          "bae 146",
+          "rj85",
+          "rj100",
+          "rj70"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

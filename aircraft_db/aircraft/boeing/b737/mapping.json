@@ -1,0 +1,40 @@
+{
+  "comment": [
+    "Le titre PMDG relevé dans le dossier Community de l'utilisateur",
+    "est « PMDG 737-900 PMDG House (N739BW | 2022) » : le motif",
+    "« pmdg » suffit à distinguer la variante, et « 737 » identifie",
+    "la famille.",
+    "",
+    "Aucun override : les LVar PMDG ne sont pas documentées ici et",
+    "aucun addon n'a été ouvert pour les deviner. La variante existe",
+    "pour être nommée à l'utilisateur, pas pour lire son état."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "pmdg",
+      "label": "PMDG",
+      "match": {
+        "title_contains": [
+          "737"
+        ],
+        "title_also_contains": [
+          "pmdg"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    },
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": {
+        "title_contains": [
+          "737"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

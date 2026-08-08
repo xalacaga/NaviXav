@@ -1,0 +1,344 @@
+{
+  "source": "Cessna 172S Skyhawk SP POH, section 4 — procédures normales, représentation normalisée.",
+  "procedures": [
+    {
+      "id": "before_start",
+      "phase": "before_start",
+      "kind": "normal",
+      "title": "BEFORE STARTING ENGINE",
+      "steps": [
+        { "id": "preflight_inspection", "title": "PREFLIGHT INSPECTION", "expected": "COMPLETE", "mode": "manual" },
+        { "id": "passenger_briefing", "title": "PASSENGER BRIEFING", "expected": "COMPLETE", "mode": "manual" },
+        { "id": "seats_belts", "title": "SEATS, BELTS, HARNESSES", "expected": "ADJUST AND LOCK", "mode": "manual" },
+        {
+          "id": "brakes",
+          "title": "BRAKES",
+          "expected": "TEST AND SET",
+          "mode": "auto",
+          "check": { "property": "configuration.parking_brake", "is": true }
+        },
+        { "id": "circuit_breakers", "title": "CIRCUIT BREAKERS", "expected": "CHECK IN", "mode": "manual" },
+        { "id": "electrical_equipment", "title": "ELECTRICAL EQUIPMENT", "expected": "OFF", "mode": "manual" },
+        { "id": "avionics_switch", "title": "AVIONICS SWITCH", "expected": "OFF", "mode": "manual" },
+        { "id": "fuel_selector", "title": "FUEL SELECTOR VALVE", "expected": "BOTH", "mode": "manual" }
+      ]
+    },
+
+    {
+      "id": "start",
+      "phase": "start",
+      "kind": "normal",
+      "title": "STARTING ENGINE",
+      "steps": [
+        { "id": "mixture", "title": "MIXTURE", "expected": "RICH", "mode": "manual" },
+        { "id": "throttle", "title": "THROTTLE", "expected": "OPEN 1/4 INCH", "mode": "manual" },
+        {
+          "id": "beacon",
+          "title": "BEACON LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.beacon", "is": true }
+        },
+        { "id": "master_switch", "title": "MASTER SWITCH", "expected": "ON", "mode": "manual" },
+        { "id": "fuel_pump", "title": "AUXILIARY FUEL PUMP", "expected": "ON", "mode": "manual" },
+        { "id": "ignition", "title": "IGNITION SWITCH", "expected": "START", "mode": "manual" },
+        { "id": "oil_pressure", "title": "OIL PRESSURE", "expected": "CHECK", "mode": "manual" },
+        { "id": "avionics_on", "title": "AVIONICS SWITCH", "expected": "ON", "mode": "manual" }
+      ]
+    },
+
+    {
+      "id": "before_taxi",
+      "phase": "after_start",
+      "kind": "normal",
+      "title": "BEFORE TAXI",
+      "steps": [
+        {
+          "id": "nav_light",
+          "title": "NAVIGATION LIGHTS",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.nav", "is": true }
+        },
+        {
+          "id": "taxi_light",
+          "title": "TAXI LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.taxi", "is": true }
+        },
+        { "id": "radios", "title": "RADIOS AND AVIONICS", "expected": "SET", "mode": "manual" },
+        {
+          "id": "parking_brake_release",
+          "title": "PARKING BRAKE",
+          "expected": "RELEASE",
+          "mode": "auto",
+          "check": { "property": "configuration.parking_brake", "is": false }
+        }
+      ]
+    },
+
+    {
+      "id": "taxi",
+      "phase": "taxi",
+      "kind": "normal",
+      "title": "TAXI",
+      "steps": [
+        { "id": "brakes_check", "title": "BRAKES", "expected": "CHECK", "mode": "manual" },
+        { "id": "flight_instruments", "title": "FLIGHT INSTRUMENTS", "expected": "CHECK", "mode": "manual" },
+        {
+          "id": "flaps_up",
+          "title": "WING FLAPS",
+          "expected": "UP",
+          "mode": "auto",
+          "check": { "property": "configuration.flaps_handle_index", "is": 0 }
+        }
+      ]
+    },
+
+    {
+      "id": "before_takeoff",
+      "phase": "before_takeoff",
+      "kind": "normal",
+      "title": "BEFORE TAKEOFF",
+      "steps": [
+        {
+          "id": "parking_brake_set",
+          "title": "PARKING BRAKE",
+          "expected": "SET",
+          "mode": "auto",
+          "check": { "property": "configuration.parking_brake", "is": true }
+        },
+        { "id": "flight_controls", "group": "runup", "title": "FLIGHT CONTROLS", "expected": "FREE AND CORRECT", "mode": "manual" },
+        { "id": "flight_instruments", "group": "runup", "title": "FLIGHT INSTRUMENTS", "expected": "CHECK AND SET", "mode": "manual" },
+        { "id": "fuel_selector", "group": "runup", "title": "FUEL SELECTOR VALVE", "expected": "BOTH", "mode": "manual" },
+        { "id": "mixture", "group": "runup", "title": "MIXTURE", "expected": "RICH", "mode": "manual" },
+        { "id": "runup", "group": "runup", "title": "THROTTLE 1800 RPM", "expected": "MAGNETOS, ENGINE INSTRUMENTS CHECK", "mode": "manual" },
+        { "id": "trim", "group": "configuration", "title": "ELEVATOR TRIM", "expected": "SET FOR TAKEOFF", "mode": "manual" },
+        { "id": "doors_windows", "group": "configuration", "title": "DOORS AND WINDOWS", "expected": "CLOSED AND LOCKED", "mode": "manual" },
+        {
+          "id": "flaps_up",
+          "group": "configuration",
+          "title": "WING FLAPS",
+          "expected": "UP",
+          "mode": "auto",
+          "check": { "property": "configuration.flaps_handle_index", "is": 0 },
+          "note": {
+            "en": "Normal takeoff uses 0° of flap. A short-field departure uses 10°.",
+            "fr": "Le décollage normal se fait volets rentrés. Le décollage court se fait à 10°."
+          }
+        },
+        {
+          "id": "autopilot_off",
+          "group": "configuration",
+          "title": "AUTOPILOT",
+          "expected": "DISENGAGED",
+          "mode": "auto",
+          "requires_system": "autopilot",
+          "check": { "property": "configuration.autopilot_master", "is": false }
+        },
+        {
+          "id": "landing_light",
+          "group": "line_up",
+          "title": "LANDING LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.landing", "is": true }
+        },
+        {
+          "id": "strobe_lights",
+          "group": "line_up",
+          "title": "STROBE LIGHTS",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.strobe", "is": true }
+        },
+        { "id": "transponder", "group": "line_up", "title": "TRANSPONDER", "expected": "ALT", "mode": "manual" },
+        { "id": "takeoff_briefing", "group": "line_up", "title": "TAKEOFF BRIEFING", "expected": "COMPLETE", "mode": "manual" },
+        {
+          "id": "parking_brake_release",
+          "group": "line_up",
+          "title": "PARKING BRAKE",
+          "expected": "RELEASE",
+          "mode": "auto",
+          "check": { "property": "configuration.parking_brake", "is": false }
+        }
+      ]
+    },
+
+    {
+      "id": "takeoff",
+      "phase": "takeoff",
+      "kind": "normal",
+      "title": "NORMAL TAKEOFF",
+      "steps": [
+        { "id": "throttle_full", "title": "THROTTLE", "expected": "FULL OPEN", "mode": "manual" },
+        { "id": "engine_instruments", "title": "ENGINE INSTRUMENTS", "expected": "CHECK", "mode": "manual" },
+        { "id": "rotate", "title": "ROTATE", "expected": "55 KIAS", "mode": "info" },
+        { "id": "climb_speed", "title": "CLIMB SPEED", "expected": "70-80 KIAS", "mode": "info" }
+      ]
+    },
+
+    {
+      "id": "climb",
+      "phase": "climb",
+      "kind": "normal",
+      "title": "ENROUTE CLIMB",
+      "steps": [
+        { "id": "airspeed", "title": "AIRSPEED", "expected": "75-85 KIAS", "mode": "info" },
+        { "id": "throttle", "title": "THROTTLE", "expected": "FULL OPEN", "mode": "manual" },
+        {
+          "id": "flaps_up",
+          "title": "WING FLAPS",
+          "expected": "UP",
+          "mode": "auto",
+          "check": { "property": "configuration.flaps_handle_index", "is": 0 }
+        },
+        { "id": "fuel_pump_off", "title": "AUXILIARY FUEL PUMP", "expected": "OFF", "mode": "manual" },
+        { "id": "mixture", "title": "MIXTURE", "expected": "LEAN ABOVE 3000 FT", "mode": "manual" }
+      ]
+    },
+
+    {
+      "id": "cruise",
+      "phase": "cruise",
+      "kind": "normal",
+      "title": "CRUISE",
+      "steps": [
+        { "id": "power", "title": "POWER", "expected": "55-75% RPM", "mode": "manual" },
+        { "id": "trim", "title": "ELEVATOR TRIM", "expected": "ADJUST", "mode": "manual" },
+        { "id": "mixture", "title": "MIXTURE", "expected": "LEAN", "mode": "manual" },
+        { "id": "engine_instruments", "title": "ENGINE INSTRUMENTS", "expected": "MONITOR", "mode": "info" }
+      ]
+    },
+
+    {
+      "id": "descent",
+      "phase": "descent",
+      "kind": "normal",
+      "title": "DESCENT",
+      "steps": [
+        { "id": "altimeter", "title": "ALTIMETER", "expected": "SET", "mode": "manual" },
+        { "id": "fuel_selector", "title": "FUEL SELECTOR VALVE", "expected": "BOTH", "mode": "manual" },
+        { "id": "mixture", "title": "MIXTURE", "expected": "ADJUST", "mode": "manual" },
+        {
+          "id": "landing_light",
+          "title": "LANDING LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.landing", "is": true }
+        }
+      ]
+    },
+
+    {
+      "id": "before_landing",
+      "phase": "approach",
+      "kind": "normal",
+      "title": "BEFORE LANDING",
+      "steps": [
+        { "id": "seats_belts", "title": "SEATS, BELTS, HARNESSES", "expected": "SECURE", "mode": "manual" },
+        { "id": "fuel_selector", "title": "FUEL SELECTOR VALVE", "expected": "BOTH", "mode": "manual" },
+        { "id": "mixture", "title": "MIXTURE", "expected": "RICH", "mode": "manual" },
+        {
+          "id": "landing_light",
+          "title": "LANDING LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.landing", "is": true }
+        },
+        {
+          "id": "autopilot_off",
+          "title": "AUTOPILOT",
+          "expected": "DISENGAGED",
+          "mode": "auto",
+          "requires_system": "autopilot",
+          "check": { "property": "configuration.autopilot_master", "is": false }
+        },
+        {
+          "id": "flaps",
+          "title": "WING FLAPS",
+          "expected": "AS REQUIRED (BELOW 110 KIAS)",
+          "mode": "manual",
+          "note": {
+            "en": "0-10 degrees below 110 KIAS, full flap below 85 KIAS. Not verified automatically: the setting depends on the approach flown.",
+            "fr": "0 à 10° sous 110 KIAS, plein volets sous 85 KIAS. Non vérifié automatiquement : le braquage dépend de l'approche exécutée."
+          }
+        },
+        { "id": "approach_speed", "title": "AIRSPEED", "expected": "65-75 KIAS", "mode": "info" }
+      ]
+    },
+
+    {
+      "id": "landing",
+      "phase": "landing",
+      "kind": "normal",
+      "title": "NORMAL LANDING",
+      "steps": [
+        { "id": "touchdown", "title": "TOUCHDOWN", "expected": "MAIN WHEELS FIRST", "mode": "info" },
+        { "id": "landing_roll", "title": "LANDING ROLL", "expected": "LOWER NOSE WHEEL GENTLY", "mode": "info" },
+        { "id": "braking", "title": "BRAKING", "expected": "MINIMUM REQUIRED", "mode": "info" }
+      ]
+    },
+
+    {
+      "id": "after_landing",
+      "phase": "after_landing",
+      "kind": "normal",
+      "title": "AFTER LANDING",
+      "steps": [
+        {
+          "id": "flaps_up",
+          "title": "WING FLAPS",
+          "expected": "UP",
+          "mode": "auto",
+          "check": { "property": "configuration.flaps_handle_index", "is": 0 }
+        },
+        {
+          "id": "strobe_off",
+          "title": "STROBE LIGHTS",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.strobe", "is": false }
+        },
+        {
+          "id": "landing_light_off",
+          "title": "LANDING LIGHT",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.landing", "is": false }
+        },
+        { "id": "fuel_pump_off", "title": "AUXILIARY FUEL PUMP", "expected": "OFF", "mode": "manual" }
+      ]
+    },
+
+    {
+      "id": "shutdown",
+      "phase": "shutdown",
+      "kind": "normal",
+      "title": "SECURING AIRCRAFT",
+      "steps": [
+        {
+          "id": "parking_brake_set",
+          "title": "PARKING BRAKE",
+          "expected": "SET",
+          "mode": "auto",
+          "check": { "property": "configuration.parking_brake", "is": true }
+        },
+        { "id": "avionics_off", "title": "AVIONICS SWITCH", "expected": "OFF", "mode": "manual" },
+        { "id": "electrical_off", "title": "ELECTRICAL EQUIPMENT", "expected": "OFF", "mode": "manual" },
+        { "id": "mixture_cutoff", "title": "MIXTURE", "expected": "IDLE CUTOFF", "mode": "manual" },
+        { "id": "ignition_off", "title": "IGNITION SWITCH", "expected": "OFF", "mode": "manual" },
+        { "id": "master_off", "title": "MASTER SWITCH", "expected": "OFF", "mode": "manual" },
+        {
+          "id": "beacon_off",
+          "title": "BEACON LIGHT",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": { "property": "configuration.lights.beacon", "is": false }
+        },
+        { "id": "control_lock", "title": "CONTROL LOCK", "expected": "INSTALL", "mode": "manual" }
+      ]
+    }
+  ]
+}

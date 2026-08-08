@@ -1,0 +1,22 @@
+{
+  "id": "cirrus/sf50",
+  "manufacturer": "Cirrus",
+  "family": "SF50",
+  "model": "SF50 Vision Jet G2",
+  "icao_type": "SF50",
+  "category": "single_turbofan",
+  "engine_count": 1,
+  "propulsion": "turbofan",
+  "crew": 1,
+  "certification": "FAR 23",
+  "source": "SF50 Vision Jet POH, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "sf50",
+      "vision jet",
+      "cirrus vision"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

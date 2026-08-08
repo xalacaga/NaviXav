@@ -1,0 +1,22 @@
+{
+  "comment": [
+    "Le CJ4 d'Asobo publie les variables standard. `priority` vaut 20",
+    "pour passer devant le C172, dont le motif « c172 » ne peut pas",
+    "collisionner, mais dont la famille partage le constructeur."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft — Working Title",
+      "match": {
+        "title_contains": [
+          "cj4",
+          "525c"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

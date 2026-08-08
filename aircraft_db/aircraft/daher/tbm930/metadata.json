@@ -1,0 +1,23 @@
+{
+  "id": "daher/tbm930",
+  "manufacturer": "Daher",
+  "family": "TBM 930",
+  "model": "TBM 930",
+  "icao_type": "TBM9",
+  "category": "single_turboprop",
+  "engine_count": 1,
+  "propulsion": "turboprop",
+  "crew": 1,
+  "certification": "FAR 23",
+  "source": "TBM 930 AFM, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "tbm 930",
+      "tbm930",
+      "tbm 850",
+      "daher tbm"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

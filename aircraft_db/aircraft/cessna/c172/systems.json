@@ -1,0 +1,28 @@
+{
+  "comment": [
+    "Un système déclaré `false` n'est jamais surveillé, même si le simulateur",
+    "publie la propriété correspondante. Le C172 a un train fixe : aucune alerte",
+    "de train ne doit pouvoir apparaître."
+  ],
+  "systems": {
+    "retractable_gear": false,
+    "flaps": true,
+    "spoilers": false,
+    "autopilot": true,
+    "autothrottle": false,
+    "anti_ice": false,
+    "pressurisation": false,
+    "apu": false,
+    "irs": false,
+    "fadec": false,
+    "tcas": false,
+    "weather_radar": false,
+    "lnav": true,
+    "vnav": false,
+    "autobrake": false,
+    "electrical": true,
+    "hydraulic": false,
+    "pneumatic": false,
+    "fuel": true
+  }
+}

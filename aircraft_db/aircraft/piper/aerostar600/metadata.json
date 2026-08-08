@@ -1,0 +1,20 @@
+{
+  "id": "piper/aerostar600",
+  "manufacturer": "Piper",
+  "family": "Aerostar",
+  "model": "Aerostar 600",
+  "icao_type": "AEST",
+  "category": "twin_piston",
+  "engine_count": 2,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "aerostar"
+    ],
+    "priority": 10
+  }
+}

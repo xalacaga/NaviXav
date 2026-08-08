@@ -1,0 +1,20 @@
+{
+  "id": "beechcraft/baron58",
+  "manufacturer": "Beechcraft",
+  "family": "Baron",
+  "model": "Baron 58",
+  "icao_type": "BE58",
+  "category": "twin_piston",
+  "engine_count": 2,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "baron"
+    ],
+    "priority": 10
+  }
+}

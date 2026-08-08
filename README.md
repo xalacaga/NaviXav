@@ -385,10 +385,20 @@ The interface also lets you configure:
 - the maximum tailwind component;
 - the maximum crosswind component;
 - the minimum runway length;
+- the interface appearance: automatic, light or dark;
+- the MSFS Community folder used to inventory aircraft procedure coverage;
 - the aircraft's RNP capability.
 
 In the installed version, the values are kept in
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Aircraft procedures
+
+The **Procedures** module matches the aircraft loaded in MSFS with NaviXav's
+local procedure database. It presents normal procedures by flight phase, shows
+their progress and identifies items confirmed automatically through SimConnect.
+The source note follows the selected interface language. Procedure coverage can
+be reviewed from the collapsed **Aircraft procedures** section in Settings.
 
 ## First use
 

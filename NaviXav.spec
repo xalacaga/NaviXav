@@ -68,6 +68,11 @@ datas = [
     # s'ouvrirait vide dans l'application installée.
     (str(project_root / "CHANGELOG.md"), "."),
     (str(project_root / "assets" / "navixav.ico"), "assets"),
+    # Base d'avions : procédures, systèmes et mappings, lus par le moteur.
+    # `schema/` et `tools/` restent dehors — ils servent aux contributeurs de la
+    # base, pas à l'application, et la distribution n'a pas à les porter.
+    (str(project_root / "aircraft_db" / "aircraft"), "aircraft_db/aircraft"),
+    (str(project_root / "aircraft_db" / "VERSION.json"), "aircraft_db"),
     (str(project_root / "tests" / "data" / "ofp_lcph_eham.json"), "tests/data"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),
 ]

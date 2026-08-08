@@ -1,0 +1,21 @@
+{
+  "id": "airbus/a340",
+  "manufacturer": "Airbus",
+  "family": "A340",
+  "model": "A340-300",
+  "icao_type": "A343",
+  "category": "widebody_jet",
+  "engine_count": 4,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "a340",
+      "a343"
+    ],
+    "priority": 10
+  }
+}

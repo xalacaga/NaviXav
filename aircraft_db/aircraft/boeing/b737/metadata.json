@@ -1,0 +1,23 @@
+{
+  "id": "boeing/b737",
+  "manufacturer": "Boeing",
+  "family": "737 NG",
+  "model": "737-800",
+  "icao_type": "B738",
+  "category": "narrowbody_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "FAR 25",
+  "source": "Procédures normales de la famille 737 NG, représentation normalisée. Aucune SOP compagnie, aucun extrait de FCOM.",
+  "match": {
+    "title_contains": [
+      "737",
+      "b737",
+      "b738",
+      "b739"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

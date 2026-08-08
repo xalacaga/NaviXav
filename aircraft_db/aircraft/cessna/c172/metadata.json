@@ -1,0 +1,22 @@
+{
+  "id": "cessna/c172",
+  "manufacturer": "Cessna",
+  "family": "C172",
+  "model": "172S Skyhawk SP",
+  "icao_type": "C172",
+  "category": "single_piston",
+  "engine_count": 1,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "FAR 23",
+  "source": "Cessna 172S Skyhawk SP POH, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "c172",
+      "cessna 172",
+      "skyhawk"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

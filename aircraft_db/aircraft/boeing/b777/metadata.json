@@ -1,0 +1,22 @@
+{
+  "id": "boeing/b777",
+  "manufacturer": "Boeing",
+  "family": "777",
+  "model": "777-200ER",
+  "icao_type": "B772",
+  "category": "widebody_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "777",
+      "b772",
+      "b77"
+    ],
+    "priority": 10
+  }
+}

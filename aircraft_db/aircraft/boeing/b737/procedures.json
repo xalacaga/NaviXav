@@ -1,0 +1,830 @@
+{
+  "source": "Procédures normales de la famille 737 NG, représentation normalisée. Aucune SOP compagnie, aucun extrait de FCOM.",
+  "procedures": [
+    {
+      "id": "preflight",
+      "phase": "preflight",
+      "kind": "normal",
+      "title": "PRELIMINARY PREFLIGHT",
+      "steps": [
+        {
+          "id": "parking_brake",
+          "title": "PARKING BRAKE",
+          "expected": "SET",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.parking_brake",
+            "is": true
+          },
+          "group": "safety"
+        },
+        {
+          "id": "battery",
+          "title": "BATTERY",
+          "expected": "ON",
+          "mode": "manual",
+          "group": "safety"
+        },
+        {
+          "id": "standby_power",
+          "title": "STANDBY POWER",
+          "expected": "AUTO",
+          "mode": "manual",
+          "group": "safety"
+        },
+        {
+          "id": "gear_handle",
+          "title": "LANDING GEAR LEVER",
+          "expected": "DOWN",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.gear_handle_down",
+            "is": true
+          },
+          "group": "safety",
+          "requires_system": "retractable_gear"
+        },
+        {
+          "id": "apu",
+          "title": "APU",
+          "expected": "START AS REQUIRED",
+          "mode": "manual",
+          "group": "power",
+          "requires_system": "apu"
+        },
+        {
+          "id": "irs",
+          "title": "IRS",
+          "expected": "NAV",
+          "mode": "manual",
+          "group": "navigation",
+          "requires_system": "irs"
+        },
+        {
+          "id": "fmc",
+          "title": "FMC",
+          "expected": "INITIALISED",
+          "mode": "manual",
+          "group": "navigation"
+        },
+        {
+          "id": "takeoff_data",
+          "title": "TAKEOFF DATA",
+          "expected": "SET",
+          "mode": "manual",
+          "group": "navigation"
+        },
+        {
+          "id": "altimeter",
+          "title": "ALTIMETERS",
+          "expected": "SET",
+          "mode": "manual",
+          "group": "navigation"
+        }
+      ]
+    },
+    {
+      "id": "before_start",
+      "phase": "before_start",
+      "kind": "normal",
+      "title": "BEFORE START",
+      "steps": [
+        {
+          "id": "parking_brake",
+          "title": "PARKING BRAKE",
+          "expected": "SET",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.parking_brake",
+            "is": true
+          }
+        },
+        {
+          "id": "beacon",
+          "title": "ANTI-COLLISION LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.beacon",
+            "is": true
+          }
+        },
+        {
+          "id": "fuel_pumps",
+          "title": "FUEL PUMPS",
+          "expected": "ON",
+          "mode": "manual"
+        },
+        {
+          "id": "doors",
+          "title": "DOORS",
+          "expected": "CLOSED",
+          "mode": "manual"
+        },
+        {
+          "id": "hydraulics",
+          "title": "HYDRAULIC PANEL",
+          "expected": "SET",
+          "mode": "manual",
+          "requires_system": "hydraulic"
+        },
+        {
+          "id": "thrust_levers",
+          "title": "THRUST LEVERS",
+          "expected": "CLOSED",
+          "mode": "manual"
+        },
+        {
+          "id": "clearance",
+          "title": "PUSHBACK AND START CLEARANCE",
+          "expected": "OBTAINED",
+          "mode": "manual"
+        }
+      ]
+    },
+    {
+      "id": "engine_start",
+      "phase": "start",
+      "kind": "normal",
+      "title": "ENGINE START",
+      "steps": [
+        {
+          "id": "packs_off",
+          "title": "PACKS",
+          "expected": "OFF",
+          "mode": "manual",
+          "requires_system": "pneumatic"
+        },
+        {
+          "id": "engine_start_switch",
+          "title": "ENGINE START SWITCH",
+          "expected": "GRD",
+          "mode": "manual"
+        },
+        {
+          "id": "start_lever",
+          "title": "START LEVER",
+          "expected": "IDLE AT 25% N2",
+          "mode": "manual"
+        },
+        {
+          "id": "start_parameters",
+          "title": "N1, N2, EGT AND FUEL FLOW",
+          "expected": "MONITOR",
+          "mode": "info"
+        },
+        {
+          "id": "second_engine",
+          "title": "SECOND ENGINE",
+          "expected": "START",
+          "mode": "manual"
+        },
+        {
+          "id": "generators",
+          "title": "GENERATORS",
+          "expected": "ON",
+          "mode": "manual"
+        },
+        {
+          "id": "packs_on",
+          "title": "PACKS",
+          "expected": "ON",
+          "mode": "manual",
+          "requires_system": "pneumatic"
+        }
+      ]
+    },
+    {
+      "id": "before_taxi",
+      "phase": "after_start",
+      "kind": "normal",
+      "title": "BEFORE TAXI",
+      "steps": [
+        {
+          "id": "apu_off",
+          "title": "APU",
+          "expected": "OFF AS REQUIRED",
+          "mode": "manual",
+          "requires_system": "apu"
+        },
+        {
+          "id": "anti_ice",
+          "title": "ENGINE ANTI-ICE",
+          "expected": "AS REQUIRED",
+          "mode": "manual",
+          "requires_system": "anti_ice"
+        },
+        {
+          "id": "flaps_takeoff",
+          "title": "FLAPS",
+          "expected": "SET FOR TAKEOFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.flaps_handle_index",
+            "one_of": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          "note": {
+            "en": "Flaps 1, 5, 10 or 15 depending on the takeoff performance.",
+            "fr": "Volets 1, 5, 10 ou 15 selon les performances de decollage."
+          }
+        },
+        {
+          "id": "flight_controls",
+          "title": "FLIGHT CONTROLS",
+          "expected": "CHECK",
+          "mode": "manual"
+        },
+        {
+          "id": "trim",
+          "title": "STABILISER TRIM",
+          "expected": "SET FOR TAKEOFF",
+          "mode": "manual"
+        },
+        {
+          "id": "taxi_light",
+          "title": "TAXI LIGHT",
+          "expected": "ON",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.taxi",
+            "is": true
+          }
+        },
+        {
+          "id": "parking_brake_release",
+          "title": "PARKING BRAKE",
+          "expected": "RELEASE",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.parking_brake",
+            "is": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "taxi",
+      "phase": "taxi",
+      "kind": "normal",
+      "title": "TAXI",
+      "steps": [
+        {
+          "id": "brakes_check",
+          "title": "BRAKES",
+          "expected": "CHECK",
+          "mode": "manual"
+        },
+        {
+          "id": "flight_instruments",
+          "title": "FLIGHT INSTRUMENTS",
+          "expected": "CHECK",
+          "mode": "manual"
+        },
+        {
+          "id": "autobrake",
+          "title": "AUTOBRAKE",
+          "expected": "RTO",
+          "mode": "manual",
+          "requires_system": "autobrake"
+        }
+      ]
+    },
+    {
+      "id": "before_takeoff",
+      "phase": "before_takeoff",
+      "kind": "normal",
+      "title": "BEFORE TAKEOFF",
+      "steps": [
+        {
+          "id": "cabin_ready",
+          "title": "CABIN",
+          "expected": "SECURE",
+          "mode": "info",
+          "group": "cabin"
+        },
+        {
+          "id": "briefing",
+          "title": "TAKEOFF BRIEFING",
+          "expected": "CONFIRMED",
+          "mode": "manual",
+          "group": "cabin"
+        },
+        {
+          "id": "flaps",
+          "title": "FLAPS",
+          "expected": "SET FOR TAKEOFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.flaps_handle_index",
+            "one_of": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          "group": "configuration"
+        },
+        {
+          "id": "speedbrakes",
+          "title": "SPEED BRAKE",
+          "expected": "DOWN DETENT",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.spoilers_handle_pct",
+            "at_most": 1
+          },
+          "group": "configuration",
+          "requires_system": "spoilers"
+        },
+        {
+          "id": "gear_down",
+          "title": "LANDING GEAR",
+          "expected": "DOWN",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.gear_handle_down",
+            "is": true
+          },
+          "group": "configuration",
+          "requires_system": "retractable_gear"
+        },
+        {
+          "id": "autopilot_off",
+          "title": "AUTOPILOT",
+          "expected": "DISENGAGED",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.autopilot_master",
+            "is": false
+          },
+          "group": "configuration",
+          "requires_system": "autopilot"
+        },
+        {
+          "id": "transponder",
+          "title": "TRANSPONDER",
+          "expected": "TA/RA",
+          "mode": "manual",
+          "group": "line_up",
+          "requires_system": "tcas"
+        },
+        {
+          "id": "strobe_lights",
+          "title": "STROBE LIGHTS",
+          "expected": "ON",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.strobe",
+            "is": true
+          },
+          "group": "line_up"
+        },
+        {
+          "id": "landing_lights",
+          "title": "LANDING LIGHTS",
+          "expected": "ON",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.landing",
+            "is": true
+          },
+          "group": "line_up"
+        },
+        {
+          "id": "takeoff_config",
+          "title": "TAKEOFF CONFIG",
+          "expected": "NO WARNING",
+          "mode": "manual",
+          "group": "line_up"
+        }
+      ]
+    },
+    {
+      "id": "takeoff",
+      "phase": "takeoff",
+      "kind": "normal",
+      "title": "TAKEOFF",
+      "steps": [
+        {
+          "id": "thrust",
+          "title": "THRUST",
+          "expected": "TAKEOFF THRUST SET",
+          "mode": "manual"
+        },
+        {
+          "id": "autothrottle",
+          "title": "AUTOTHROTTLE",
+          "expected": "N1 ENGAGED",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.autothrottle_active",
+            "is": true
+          },
+          "requires_system": "autothrottle"
+        },
+        {
+          "id": "vone",
+          "title": "V1",
+          "expected": "HANDS OFF THRUST LEVERS",
+          "mode": "info"
+        },
+        {
+          "id": "rotate",
+          "title": "ROTATE",
+          "expected": "VR, 15 DEGREES PITCH",
+          "mode": "info"
+        },
+        {
+          "id": "positive_climb",
+          "title": "POSITIVE CLIMB",
+          "expected": "GEAR UP",
+          "mode": "info"
+        }
+      ]
+    },
+    {
+      "id": "after_takeoff",
+      "phase": "after_takeoff",
+      "kind": "normal",
+      "title": "AFTER TAKEOFF",
+      "steps": [
+        {
+          "id": "gear_up",
+          "title": "LANDING GEAR",
+          "expected": "UP AND OFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.gear_handle_down",
+            "is": false
+          },
+          "requires_system": "retractable_gear"
+        },
+        {
+          "id": "flaps_up",
+          "title": "FLAPS",
+          "expected": "UP ON SCHEDULE",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.flaps_handle_index",
+            "is": 0
+          }
+        },
+        {
+          "id": "engine_bleeds",
+          "title": "ENGINE BLEEDS",
+          "expected": "ON",
+          "mode": "manual",
+          "requires_system": "pneumatic"
+        },
+        {
+          "id": "packs",
+          "title": "PACKS",
+          "expected": "AUTO",
+          "mode": "manual",
+          "requires_system": "pneumatic"
+        },
+        {
+          "id": "altimeter",
+          "title": "ALTIMETERS",
+          "expected": "STD AT TRANSITION ALTITUDE",
+          "mode": "manual"
+        }
+      ]
+    },
+    {
+      "id": "climb",
+      "phase": "climb",
+      "kind": "normal",
+      "title": "CLIMB",
+      "steps": [
+        {
+          "id": "thrust",
+          "title": "THRUST",
+          "expected": "CLIMB SET",
+          "mode": "manual"
+        },
+        {
+          "id": "signs",
+          "title": "SEAT BELTS",
+          "expected": "AS REQUIRED",
+          "mode": "manual"
+        },
+        {
+          "id": "engine_instruments",
+          "title": "ENGINE INSTRUMENTS",
+          "expected": "MONITOR",
+          "mode": "info"
+        }
+      ]
+    },
+    {
+      "id": "cruise",
+      "phase": "cruise",
+      "kind": "normal",
+      "title": "CRUISE",
+      "steps": [
+        {
+          "id": "fuel",
+          "title": "FUEL",
+          "expected": "MONITOR AND BALANCE",
+          "mode": "info"
+        },
+        {
+          "id": "anti_ice",
+          "title": "ENGINE ANTI-ICE",
+          "expected": "AS REQUIRED",
+          "mode": "manual",
+          "requires_system": "anti_ice"
+        },
+        {
+          "id": "weather_radar",
+          "title": "WEATHER RADAR",
+          "expected": "AS REQUIRED",
+          "mode": "manual",
+          "requires_system": "weather_radar"
+        }
+      ]
+    },
+    {
+      "id": "descent",
+      "phase": "descent",
+      "kind": "normal",
+      "title": "DESCENT",
+      "steps": [
+        {
+          "id": "pressurisation",
+          "title": "PRESSURISATION",
+          "expected": "SET FOR LANDING ALTITUDE",
+          "mode": "manual",
+          "requires_system": "pressurisation"
+        },
+        {
+          "id": "landing_data",
+          "title": "LANDING DATA",
+          "expected": "SET",
+          "mode": "manual"
+        },
+        {
+          "id": "approach_briefing",
+          "title": "APPROACH BRIEFING",
+          "expected": "COMPLETE",
+          "mode": "manual"
+        },
+        {
+          "id": "altimeter",
+          "title": "ALTIMETERS",
+          "expected": "SET AT TRANSITION LEVEL",
+          "mode": "manual"
+        },
+        {
+          "id": "signs",
+          "title": "SEAT BELTS",
+          "expected": "ON",
+          "mode": "manual"
+        }
+      ]
+    },
+    {
+      "id": "approach",
+      "phase": "approach",
+      "kind": "normal",
+      "title": "APPROACH",
+      "steps": [
+        {
+          "id": "speedbrakes_armed",
+          "title": "SPEED BRAKE",
+          "expected": "ARMED",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.spoilers_armed",
+            "is": true
+          },
+          "requires_system": "spoilers"
+        },
+        {
+          "id": "autobrake",
+          "title": "AUTOBRAKE",
+          "expected": "SET",
+          "mode": "manual",
+          "requires_system": "autobrake"
+        },
+        {
+          "id": "landing_lights",
+          "title": "LANDING LIGHTS",
+          "expected": "ON",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.landing",
+            "is": true
+          }
+        },
+        {
+          "id": "cabin_ready",
+          "title": "CABIN",
+          "expected": "SECURE",
+          "mode": "info"
+        }
+      ]
+    },
+    {
+      "id": "landing",
+      "phase": "landing",
+      "kind": "normal",
+      "title": "LANDING",
+      "steps": [
+        {
+          "id": "gear_down",
+          "title": "LANDING GEAR",
+          "expected": "DOWN",
+          "mode": "auto",
+          "check": {
+            "all_of": [
+              {
+                "property": "configuration.gear_handle_down",
+                "is": true
+              },
+              {
+                "property": "configuration.gear_extended_pct",
+                "at_least": 99
+              }
+            ]
+          },
+          "group": "configuration",
+          "requires_system": "retractable_gear"
+        },
+        {
+          "id": "flaps_landing",
+          "title": "FLAPS",
+          "expected": "30 OR 40",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.flaps_handle_index",
+            "at_least": 6
+          },
+          "group": "configuration"
+        },
+        {
+          "id": "speedbrakes_armed",
+          "title": "SPEED BRAKE",
+          "expected": "ARMED",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.spoilers_armed",
+            "is": true
+          },
+          "group": "configuration",
+          "requires_system": "spoilers"
+        },
+        {
+          "id": "go_around_altitude",
+          "title": "GO-AROUND ALTITUDE",
+          "expected": "SET",
+          "mode": "manual",
+          "group": "cabin"
+        },
+        {
+          "id": "touchdown",
+          "title": "TOUCHDOWN",
+          "expected": "MAIN WHEELS FIRST",
+          "mode": "info",
+          "group": "cabin"
+        }
+      ]
+    },
+    {
+      "id": "after_landing",
+      "phase": "after_landing",
+      "kind": "normal",
+      "title": "AFTER LANDING",
+      "steps": [
+        {
+          "id": "speedbrakes_down",
+          "title": "SPEED BRAKE",
+          "expected": "DOWN",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.spoilers_handle_pct",
+            "at_most": 1
+          },
+          "requires_system": "spoilers"
+        },
+        {
+          "id": "flaps_up",
+          "title": "FLAPS",
+          "expected": "UP",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.flaps_handle_index",
+            "is": 0
+          }
+        },
+        {
+          "id": "strobe_off",
+          "title": "STROBE LIGHTS",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.strobe",
+            "is": false
+          }
+        },
+        {
+          "id": "landing_lights_off",
+          "title": "LANDING LIGHTS",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.landing",
+            "is": false
+          }
+        },
+        {
+          "id": "autobrake_off",
+          "title": "AUTOBRAKE",
+          "expected": "OFF",
+          "mode": "manual",
+          "requires_system": "autobrake"
+        },
+        {
+          "id": "apu",
+          "title": "APU",
+          "expected": "START AS REQUIRED",
+          "mode": "manual",
+          "requires_system": "apu"
+        },
+        {
+          "id": "transponder",
+          "title": "TRANSPONDER",
+          "expected": "STANDBY",
+          "mode": "manual",
+          "requires_system": "tcas"
+        }
+      ]
+    },
+    {
+      "id": "shutdown",
+      "phase": "shutdown",
+      "kind": "normal",
+      "title": "SHUTDOWN AND SECURING",
+      "steps": [
+        {
+          "id": "parking_brake",
+          "title": "PARKING BRAKE",
+          "expected": "SET",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.parking_brake",
+            "is": true
+          }
+        },
+        {
+          "id": "start_levers",
+          "title": "START LEVERS",
+          "expected": "CUTOFF",
+          "mode": "manual"
+        },
+        {
+          "id": "fuel_pumps",
+          "title": "FUEL PUMPS",
+          "expected": "OFF",
+          "mode": "manual"
+        },
+        {
+          "id": "signs",
+          "title": "SEAT BELTS",
+          "expected": "OFF",
+          "mode": "manual"
+        },
+        {
+          "id": "beacon_off",
+          "title": "ANTI-COLLISION LIGHT",
+          "expected": "OFF",
+          "mode": "auto",
+          "check": {
+            "property": "configuration.lights.beacon",
+            "is": false
+          }
+        },
+        {
+          "id": "irs_off",
+          "title": "IRS",
+          "expected": "OFF",
+          "mode": "manual",
+          "requires_system": "irs"
+        },
+        {
+          "id": "battery",
+          "title": "BATTERY",
+          "expected": "OFF",
+          "mode": "manual"
+        }
+      ]
+    }
+  ]
+}

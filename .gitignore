@@ -35,10 +35,13 @@ installer/assets/MicrosoftEdgeWebView2Setup.exe
 .pytest_*/
 .pytest-*/
 .test-run-*/
+.tmp-pytest-*/
 
 # Données d'exécution locales
 data/navixav.sqlite
 data/cache/
+# Base d'avions de l'utilisateur : ses appareils, sur sa machine.
+data/aircraft_db/
 data/logs/
 data/private_admin/
 data/developer/

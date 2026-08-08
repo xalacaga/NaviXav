@@ -1,0 +1,7 @@
+{
+  "database": "NaviXav Aircraft Database",
+  "version": "2026.08.08",
+  "schema_version": 1,
+  "license": "Apache-2.0",
+  "note": "Représentation normalisée de procédures publiées. La base ne contient aucun extrait de manuel ni document propriétaire."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "diamond/da62",
+  "manufacturer": "Diamond",
+  "family": "DA62",
+  "model": "DA62",
+  "icao_type": "DA62",
+  "category": "twin_piston",
+  "engine_count": 2,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "CS-23",
+  "source": "DA62 AFM, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "da62",
+      "da 62",
+      "diamond da62"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

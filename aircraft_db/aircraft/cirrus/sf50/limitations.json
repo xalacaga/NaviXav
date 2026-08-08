@@ -1,0 +1,73 @@
+{
+  "source": "SF50 Vision Jet POH, section 2 — limitations.",
+  "note": "Chiffres non relus sur le manuel. À recouper avant tout affichage comme limite certifiée.",
+  "speeds": {
+    "vmo": {
+      "value": 250,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum operating"
+    },
+    "mmo": {
+      "value": 0.53,
+      "unit": "mach",
+      "label": "Maximum operating Mach"
+    },
+    "vle": {
+      "value": 210,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum gear extended"
+    },
+    "vlo": {
+      "value": 210,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum gear operating"
+    },
+    "vfe": {
+      "value": 190,
+      "unit": "kt",
+      "reference": "IAS",
+      "label": "Maximum flap extended",
+      "schedule": [
+        {
+          "position": "50%",
+          "value": 190
+        },
+        {
+          "position": "100%",
+          "value": 150
+        }
+      ]
+    }
+  },
+  "weights": {
+    "max_takeoff": {
+      "value": 6000,
+      "unit": "lb"
+    },
+    "max_landing": {
+      "value": 5550,
+      "unit": "lb"
+    }
+  },
+  "altitudes": {
+    "max_operating": {
+      "value": 31000,
+      "unit": "ft"
+    }
+  },
+  "fuel": {
+    "grade": "Jet A-1"
+  },
+  "engine": {
+    "manufacturer": "Williams International",
+    "model": "FJ33-5A",
+    "count": 1,
+    "thrust": {
+      "value": 1846,
+      "unit": "lbf"
+    }
+  }
+}

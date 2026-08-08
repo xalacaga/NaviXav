@@ -24,6 +24,7 @@ def test_user_settings_round_trip(tmp_path):
             "aircraft_rnp_capable": False,
             "map_basemap": "opentopo",
             "map_trail_color": "#ff5500",
+            "aircraft_community_path": str(tmp_path / "Community"),
             "lan_enabled": True,
         }
     )
@@ -37,6 +38,7 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.aircraft_rnp_capable is False
     assert restored.map_basemap == "opentopo"
     assert restored.map_trail_color == "#ff5500"
+    assert restored.aircraft_community_path == tmp_path / "Community"
     assert restored.lan_enabled is True
     # Aucun jeton n'est généré : l'accès mobile repose sur le seul lien local.
     assert not hasattr(restored, "lan_access_token")
@@ -49,12 +51,14 @@ def test_settings_request_accepts_interface_values():
         min_runway_length_ft=4500,
         map_basemap="opentopo",
         map_trail_color="#AABBCC",
+        aircraft_community_path=r"D:\MSFS\Community",
         lan_enabled=True,
     )
 
     assert request.simbrief_pilot_id == "654321"
     assert request.min_runway_length_ft == 4500
     assert request.map_basemap == "opentopo"
+    assert request.aircraft_community_path == r"D:\MSFS\Community"
     assert request.lan_enabled is True
 
 

@@ -356,10 +356,20 @@ De interface laat ook toe om in te stellen:
 - de maximale staartwindcomponent;
 - de maximale zijwindcomponent;
 - de minimale baanlengte;
+- de weergave van de interface: automatisch, licht of donker;
+- de MSFS Community-map waarmee de dekking van toestelprocedures wordt geïnventariseerd;
 - de RNP-capaciteit van het toestel.
 
 In de geïnstalleerde versie worden de waarden bewaard in
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Procedures per toestel
+
+De module **Procedures** koppelt het in MSFS geladen toestel aan de lokale
+proceduredatabase van NaviXav. Ze toont normale procedures per vluchtfase, hun
+voortgang en de punten die SimConnect automatisch bevestigt. De bronvermelding
+volgt de gekozen taal. De dekking staat in het standaard ingeklapte onderdeel
+**Procedures per toestel** van de instellingen.
 
 ## Eerste gebruik
 

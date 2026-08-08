@@ -1,0 +1,22 @@
+{
+  "id": "bombardier/learjet35a",
+  "manufacturer": "Bombardier",
+  "family": "Learjet 35",
+  "model": "Learjet 35A",
+  "icao_type": "LJ35",
+  "category": "light_jet",
+  "engine_count": 2,
+  "propulsion": "turbofan",
+  "crew": 2,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "learjet 35",
+      "lear 35",
+      "lj35"
+    ],
+    "priority": 10
+  }
+}

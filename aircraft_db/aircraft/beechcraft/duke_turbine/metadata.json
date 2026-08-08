@@ -1,0 +1,20 @@
+{
+  "id": "beechcraft/duke_turbine",
+  "manufacturer": "Beechcraft",
+  "family": "Turbine Duke",
+  "model": "Turbine Duke",
+  "icao_type": "BE60",
+  "category": "twin_turboprop",
+  "engine_count": 2,
+  "propulsion": "turboprop",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "turbine duke"
+    ],
+    "priority": 20
+  }
+}

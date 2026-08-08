@@ -353,10 +353,20 @@ L'interfaccia consente inoltre di configurare:
 - la componente massima di vento in coda;
 - la componente massima di vento al traverso;
 - la lunghezza minima di pista;
+- l'aspetto dell'interfaccia: automatico, chiaro o scuro;
+- la cartella Community di MSFS usata per censire le procedure per aeromobile;
 - la capacità RNP dell'aeromobile.
 
 Nella versione installata, i valori sono conservati in
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Procedure per aeromobile
+
+Il modulo **Procedure** associa l'aeromobile caricato in MSFS al database locale
+di NaviXav. Presenta le procedure normali per fase di volo, il loro avanzamento
+e gli elementi confermati automaticamente tramite SimConnect. La nota sulla fonte
+segue la lingua scelta. La copertura è consultabile nella sezione compressa
+**Procedure per aeromobile** delle impostazioni.
 
 ## Primo utilizzo
 

@@ -1,0 +1,20 @@
+{
+  "comment": [
+    "Variante unique : l'appareil publie les variables standard, ou ses",
+    "LVar propres n'ont pas été relevées. Aucun override deviné."
+  ],
+  "default_variant": "default",
+  "variants": [
+    {
+      "id": "default",
+      "label": "A2A Simulations",
+      "match": {
+        "title_contains": [
+          "aerostar"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

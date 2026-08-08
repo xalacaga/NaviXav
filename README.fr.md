@@ -396,10 +396,20 @@ L’interface permet également de configurer :
 - la composante maximale de vent arrière ;
 - la composante maximale de vent traversier ;
 - la longueur minimale de piste ;
+- l’apparence de l’interface : automatique, claire ou sombre ;
+- le dossier Community de MSFS utilisé pour inventorier les procédures par appareil ;
 - la capacité RNP de l’appareil.
 
 Dans la version installée, les valeurs sont conservées dans
 `%LOCALAPPDATA%\NaviXav\user_settings.json`.
+
+### Procédures par appareil
+
+Le module **Procédures** associe l’appareil chargé dans MSFS à la base locale de
+NaviXav. Il présente les procédures normales par phase de vol, leur progression
+et les éléments confirmés automatiquement par SimConnect. La mention de source
+suit la langue de l’interface. La couverture peut être consultée dans la section
+repliée **Procédures par appareil** des paramètres.
 
 ## Première utilisation
 

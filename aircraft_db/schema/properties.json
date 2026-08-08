@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "comment": [
+    "Vocabulaire fermé des propriétés observables. Une procédure ne peut vérifier",
+    "que ce qui est déclaré ici. C'est le contrat entre la base et le moteur :",
+    "aucune procédure ne nomme jamais une SimVar, et le moteur n'a jamais à",
+    "connaître un avion.",
+    "",
+    "Le champ `source` désigne l'attribut Python qui alimente la propriété. Le",
+    "test tests/test_aircraft_db.py vérifie que chaque source existe encore dans",
+    "navixav.live.base : renommer un attribut sans mettre ce fichier à jour fait",
+    "échouer la suite de tests."
+  ],
+
+  "properties": {
+    "state.on_ground": {
+      "type": "boolean",
+      "source": "AircraftState.on_ground",
+      "description": "Avion au sol."
+    },
+    "state.indicated_airspeed_kt": {
+      "type": "number",
+      "unit": "kt",
+      "source": "AircraftState.indicated_airspeed_kt",
+      "description": "Vitesse indiquée."
+    },
+    "state.ground_speed_kt": {
+      "type": "number",
+      "unit": "kt",
+      "source": "AircraftState.ground_speed_kt",
+      "description": "Vitesse sol."
+    },
+    "state.altitude_ft": {
+      "type": "number",
+      "unit": "ft",
+      "source": "AircraftState.altitude_ft",
+      "description": "Altitude vraie."
+    },
+    "state.height_above_ground_ft": {
+      "type": "number",
+      "unit": "ft",
+      "source": "AircraftState.height_above_ground_ft",
+      "description": "Hauteur au-dessus du sol."
+    },
+    "state.vertical_speed_fpm": {
+      "type": "number",
+      "unit": "fpm",
+      "source": "AircraftState.vertical_speed_fpm",
+      "description": "Vitesse verticale."
+    },
+
+    "configuration.parking_brake": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.parking_brake",
+      "description": "Frein de parc serré."
+    },
+    "configuration.gear_handle_down": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.gear_handle_down",
+      "requires_system": "retractable_gear",
+      "description": "Manette de train sur bas."
+    },
+    "configuration.gear_extended_pct": {
+      "type": "number",
+      "unit": "%",
+      "range": [0, 100],
+      "source": "AircraftConfiguration.gear_extended_pct",
+      "requires_system": "retractable_gear",
+      "description": "Sortie réelle du train, toutes jambes."
+    },
+
+    "configuration.flaps_handle_index": {
+      "type": "integer",
+      "source": "AircraftConfiguration.flaps_handle_index",
+      "requires_system": "flaps",
+      "description": "Cran de volets commandé. 0 = rentré."
+    },
+    "configuration.flaps_angle_deg": {
+      "type": "number",
+      "unit": "deg",
+      "source": "AircraftConfiguration.flaps_angle_deg",
+      "requires_system": "flaps",
+      "description": "Braquage réel des volets. Hors Airbus, c'est le marquage du levier."
+    },
+    "configuration.flaps_extended_pct": {
+      "type": "number",
+      "unit": "%",
+      "range": [0, 100],
+      "source": "AircraftConfiguration.flaps_extended_pct",
+      "requires_system": "flaps",
+      "description": "Sortie réelle des volets."
+    },
+
+    "configuration.spoilers_handle_pct": {
+      "type": "number",
+      "unit": "%",
+      "range": [0, 100],
+      "source": "AircraftConfiguration.spoilers_handle_pct",
+      "requires_system": "spoilers",
+      "description": "Position commandée des aérofreins."
+    },
+    "configuration.spoilers_armed": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.spoilers_armed",
+      "requires_system": "spoilers",
+      "description": "Aérofreins armés pour l'atterrissage."
+    },
+
+    "configuration.lights.landing": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['landing']",
+      "description": "Phare d'atterrissage."
+    },
+    "configuration.lights.taxi": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['taxi']",
+      "description": "Phare de roulage."
+    },
+    "configuration.lights.strobe": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['strobe']",
+      "description": "Feux à éclats."
+    },
+    "configuration.lights.nav": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['nav']",
+      "description": "Feux de navigation."
+    },
+    "configuration.lights.beacon": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['beacon']",
+      "description": "Feu anticollision."
+    },
+    "configuration.lights.logo": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['logo']",
+      "description": "Éclairage de dérive."
+    },
+    "configuration.lights.wing": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.lights['wing']",
+      "description": "Éclairage de voilure."
+    },
+
+    "configuration.altimeter_hpa": {
+      "type": "number",
+      "unit": "hPa",
+      "source": "AircraftConfiguration.altimeter_hpa",
+      "description": "Calage altimétrique affiché."
+    },
+    "configuration.indicated_altitude_ft": {
+      "type": "number",
+      "unit": "ft",
+      "source": "AircraftConfiguration.indicated_altitude_ft",
+      "description": "Altitude lue sur l'altimètre, calage courant."
+    },
+    "configuration.pressure_altitude_ft": {
+      "type": "number",
+      "unit": "ft",
+      "source": "AircraftConfiguration.pressure_altitude_ft",
+      "description": "Altitude pression, atmosphère standard."
+    },
+
+    "configuration.autopilot_master": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.autopilot_master",
+      "requires_system": "autopilot",
+      "description": "Pilote automatique engagé."
+    },
+    "configuration.autopilot_nav_lock": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.autopilot_nav_lock",
+      "requires_system": "autopilot",
+      "description": "Mode latéral asservi à la navigation."
+    },
+    "configuration.autopilot_approach_hold": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.autopilot_approach_hold",
+      "requires_system": "autopilot",
+      "description": "Mode approche armé ou engagé."
+    },
+    "configuration.autopilot_glideslope_hold": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.autopilot_glideslope_hold",
+      "requires_system": "autopilot",
+      "description": "Suivi du plan de descente."
+    },
+    "configuration.autothrottle_active": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.autothrottle_active",
+      "requires_system": "autothrottle",
+      "description": "Automanette active."
+    },
+    "configuration.selected_altitude_ft": {
+      "type": "number",
+      "unit": "ft",
+      "source": "AircraftConfiguration.selected_altitude_ft",
+      "requires_system": "autopilot",
+      "description": "Altitude sélectée."
+    },
+    "configuration.selected_heading_deg": {
+      "type": "number",
+      "unit": "deg",
+      "source": "AircraftConfiguration.selected_heading_deg",
+      "requires_system": "autopilot",
+      "description": "Cap sélecté."
+    },
+
+    "configuration.nav1_frequency_mhz": {
+      "type": "number",
+      "unit": "MHz",
+      "source": "AircraftConfiguration.nav1_frequency_mhz",
+      "description": "Fréquence NAV1 affichée."
+    },
+    "configuration.nav1_course_deg": {
+      "type": "number",
+      "unit": "deg",
+      "source": "AircraftConfiguration.nav1_course_deg",
+      "description": "Route NAV1 affichée."
+    },
+    "configuration.nav1_has_localizer": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.nav1_has_localizer",
+      "description": "NAV1 accroché sur un localizer."
+    },
+    "configuration.nav1_has_glide_slope": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.nav1_has_glide_slope",
+      "description": "NAV1 accroché sur un plan de descente."
+    },
+
+    "configuration.fuel_total_kg": {
+      "type": "number",
+      "unit": "kg",
+      "source": "AircraftConfiguration.fuel_total_kg",
+      "description": "Carburant total à bord."
+    },
+    "configuration.total_weight_kg": {
+      "type": "number",
+      "unit": "kg",
+      "source": "AircraftConfiguration.total_weight_kg",
+      "description": "Masse totale."
+    },
+
+    "configuration.engine_anti_ice": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.engine_anti_ice",
+      "requires_system": "anti_ice",
+      "description": "Antigivrage moteur en service."
+    },
+    "configuration.in_cloud": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.in_cloud",
+      "description": "Avion dans les nuages."
+    },
+    "configuration.total_air_temperature_c": {
+      "type": "number",
+      "unit": "C",
+      "source": "AircraftConfiguration.total_air_temperature_c",
+      "description": "Température totale."
+    },
+
+    "configuration.stall_warning": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.stall_warning",
+      "description": "Alarme de décrochage."
+    },
+    "configuration.overspeed_warning": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.overspeed_warning",
+      "description": "Alarme de survitesse."
+    },
+    "configuration.flap_speed_exceeded": {
+      "type": "boolean",
+      "source": "AircraftConfiguration.flap_speed_exceeded",
+      "description": "Vitesse volets dépassée."
+    }
+  },
+
+  "systems": [
+    "retractable_gear",
+    "flaps",
+    "spoilers",
+    "autopilot",
+    "autothrottle",
+    "anti_ice",
+    "pressurisation",
+    "apu",
+    "irs",
+    "fadec",
+    "tcas",
+    "weather_radar",
+    "lnav",
+    "vnav",
+    "autobrake",
+    "electrical",
+    "hydraulic",
+    "pneumatic",
+    "fuel"
+  ]
+}

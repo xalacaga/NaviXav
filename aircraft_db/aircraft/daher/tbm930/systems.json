@@ -1,0 +1,28 @@
+{
+  "comment": [
+    "Monoturbopropulseur pressurisé à train rentrant. Le levier unique",
+    "commande puissance et hélice ensemble, mais ce n'est pas une",
+    "régulation numérique : `fadec` reste déclaré absent."
+  ],
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": false,
+    "autopilot": true,
+    "autothrottle": false,
+    "anti_ice": true,
+    "pressurisation": true,
+    "apu": false,
+    "irs": false,
+    "fadec": false,
+    "tcas": true,
+    "weather_radar": true,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": false,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": true,
+    "fuel": true
+  }
+}

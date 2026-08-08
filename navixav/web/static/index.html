@@ -7,6 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>NaviXav</title>
+  <script src="/static/theme.js?v=__NAVIXAV_VERSION__"></script>
   <link rel="stylesheet" href="/static/app.css?v=__NAVIXAV_VERSION__" />
   <link rel="icon" type="image/svg+xml" href="/static/navixav-icon.svg?v=__NAVIXAV_VERSION__" />
 </head>
@@ -24,12 +25,9 @@
   </div>
 
   <div class="toolbar">
-    <span class="nav-source" title="Navigation et procédures récupérées directement par SimConnect">
-      Source · MSFS
-    </span>
     <span id="mobile-mode" class="mobile-mode hidden">Mode mobile</span>
     <!-- Les paramètres restent réservés au PC : le client distant garde
-         néanmoins le choix de sa langue, qui ne concerne que son écran. -->
+         néanmoins ses choix locaux de langue et d'apparence. -->
     <select id="mobile-language" class="mobile-language"
             aria-label="Langue de l’interface"
             title="Langue de l’interface">
@@ -42,19 +40,24 @@
       <option value="nl">Nederlands</option>
       <option value="pl">Polski</option>
     </select>
-    <label class="switch" title="Utiliser le vol de démonstration LCPH → EHAM">
+    <select id="mobile-theme" class="mobile-theme"
+            aria-label="Apparence"
+            title="Apparence">
+      <option value="auto">Automatique</option>
+      <option value="light">Clair</option>
+      <option value="dark">Sombre</option>
+    </select>
+    <label class="switch toolbar-demo" title="Utiliser le vol de démonstration LCPH → EHAM">
       <input type="checkbox" id="demo-toggle" />
       <span class="switch-track"><span class="switch-thumb"></span></span>
       <span class="switch-label">Démo</span>
     </label>
-    <button id="settings-open" class="icon-btn" title="Configurer NaviXav">Paramètres</button>
-    <button id="simbrief-create" class="icon-btn" type="button"
+    <button id="simbrief-create" class="icon-btn toolbar-secondary" type="button"
             title="Créer puis générer un OFP dans SimBrief avant de l’importer">
-      Créer un plan SimBrief
-    </button>
-    <button id="update-install" class="icon-btn update-btn" type="button"
-            title="Rechercher une nouvelle version de NaviXav">
-      Rechercher MAJ
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h11v2H6v12h12v-9h2v11H4V4zm9 0h7v7h-2V7.4l-6.3 6.3-1.4-1.4L16.6 6H13V4z"/>
+      </svg>
+      <span>Créer un plan SimBrief</span>
     </button>
     <button id="sim-status" class="sim-status offline" type="button"
             title="État de la connexion à Microsoft Flight Simulator">
@@ -62,14 +65,33 @@
       <span id="sim-status-text">MSFS hors ligne</span>
     </button>
     <div class="toolbar-exit-actions">
-      <button id="support-open-toolbar" class="icon-btn support-toolbar-btn" type="button"
+      <button id="theme-toggle" class="icon-btn toolbar-icon theme-toggle" type="button"
+              title="Changer d’apparence" aria-label="Changer d’apparence">
+        <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+        </svg>
+        <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2z"/>
+        </svg>
+      </button>
+      <button id="settings-open" class="icon-btn toolbar-icon" title="Configurer NaviXav">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 .1-1 7.5 7.5 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4L10.6 6a8 8 0 0 0-1.7 1L6.5 6l-2 3.4 2 1.6a7.5 7.5 0 0 0-.1 1 7.5 7.5 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.4 2.5h4l.4-2.5a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2.1-1.6zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg>
+        <span class="toolbar-label">Paramètres</span>
+      </button>
+      <button id="update-install" class="icon-btn update-btn toolbar-icon" type="button"
+              title="Rechercher une nouvelle version de NaviXav">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.2l3.6-3.6L17 11l-6 6-6-6 1.4-1.4 3.6 3.6V3h2zm-7 16h14v2H5v-2z"/></svg>
+        <span class="toolbar-label">Rechercher MAJ</span>
+      </button>
+      <button id="support-open-toolbar" class="icon-btn support-toolbar-btn toolbar-icon" type="button"
               title="Soutenir NaviXav" aria-label="Soutenir NaviXav">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 7h12v7a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V7zm12 2h1.5a2.5 2.5 0 0 1 0 5H17v-2h1.5a.5.5 0 0 0 0-1H17V9zM8 3h2v3H8V3zm4 0h2v3h-2V3z"/>
         </svg>
       </button>
-      <button id="shutdown" class="icon-btn shutdown-btn" title="Arrêter NaviXav et libérer le port">
-        Quitter
+      <button id="shutdown" class="icon-btn shutdown-btn toolbar-icon" title="Arrêter NaviXav et libérer le port">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2v10h-2V2zm5.7 3.3 1.4-1.4A9 9 0 1 1 5.9 3.9l1.4 1.4a7 7 0 1 0 9.4 0z"/></svg>
+        <span class="toolbar-label">Quitter</span>
       </button>
     </div>
     <button id="refresh" class="btn-primary">
@@ -89,7 +111,7 @@
 <main id="main">
   <section id="banner" class="banner hidden"></section>
 
-  <section id="strip" class="strip hidden"></section>
+  <section id="strip" class="strip hidden" tabindex="0" aria-label="Route du vol"></section>
 
   <section id="terminal" class="grid-terminal hidden">
     <article class="card" id="card-departure"></article>
@@ -121,6 +143,7 @@
     <button data-tab="terminal" class="active">Plan de vol</button>
     <button data-tab="map">Carte</button>
     <button data-tab="ground">Roulage</button>
+    <button data-tab="procedures">Procédures</button>
     <button data-tab="flight">Suivi du vol</button>
     <button data-tab="constraints">Contraintes</button>
     <button data-tab="dispatch">Dispatch</button>
@@ -213,6 +236,7 @@
   </section>
 
   <section id="panel-flight" class="panel hidden"></section>
+  <section id="panel-procedures" class="panel hidden procedure-panel" aria-live="polite"></section>
   <section id="panel-constraints" class="panel hidden"></section>
   <section id="panel-dispatch" class="panel hidden"></section>
   <section id="panel-aircraft" class="panel hidden"></section>
@@ -246,6 +270,14 @@
         <button type="button" id="settings-close" class="icon-btn" aria-label="Fermer">×</button>
       </div>
     </div>
+    <aside class="support-card support-card-top" aria-labelledby="support-title">
+      <div>
+        <h3 id="support-title">Soutenir NaviXav</h3>
+        <p id="support-body">NaviXav reste entièrement gratuit. Si l’outil vous est utile, vous pouvez soutenir son développement avec le montant de votre choix.</p>
+      </div>
+      <button id="support-open" class="icon-btn support-btn" type="button">Soutenir le développement</button>
+      <a class="icon-btn support-btn" href="https://navixav.fr" target="_blank" rel="noreferrer">navixav.fr</a>
+    </aside>
     <div class="settings-grid">
       <label class="field" for="settings-language">
         <span>Langue de l’interface</span>
@@ -258,6 +290,14 @@
           <option value="pt">Português</option>
           <option value="nl">Nederlands</option>
           <option value="pl">Polski</option>
+        </select>
+      </label>
+      <label class="field" for="settings-theme">
+        <span>Apparence</span>
+        <select id="settings-theme">
+          <option value="auto">Automatique (Windows)</option>
+          <option value="light">Clair</option>
+          <option value="dark">Sombre</option>
         </select>
       </label>
       <label class="field" for="settings-pilot-id">
@@ -327,14 +367,39 @@
         <small id="settings-lan-help">Même Wi-Fi requis. Redémarre NaviXav puis autorise le réseau privé si Windows le demande.</small>
       </div>
     </div>
-    <aside class="support-card" aria-labelledby="support-title">
-      <div>
-        <h3 id="support-title">Soutenir NaviXav</h3>
-        <p id="support-body">NaviXav reste entièrement gratuit. Si l’outil vous est utile, vous pouvez soutenir son développement avec le montant de votre choix.</p>
+    <details class="aircraft-settings">
+      <summary class="aircraft-settings-summary">
+        <span>
+          <strong id="aircraft-settings-title">Procédures par appareil</strong>
+          <small id="aircraft-settings-help">NaviXav compare les appareils installés avec sa base locale de procédures.</small>
+        </span>
+        <span class="aircraft-settings-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="aircraft-settings-body">
+        <div class="aircraft-settings-actions">
+          <button id="aircraft-refresh" class="icon-btn" type="button">Actualiser</button>
+        </div>
+        <label class="field" for="settings-aircraft-community">
+          <span id="aircraft-folder-label">Dossier Community</span>
+          <span class="aircraft-folder-row">
+            <input id="settings-aircraft-community" autocomplete="off"
+                   placeholder="Détection automatique depuis MSFS" />
+            <button id="aircraft-folder-browse" class="icon-btn" type="button">Parcourir…</button>
+          </span>
+        </label>
+        <p id="aircraft-survey-status" class="aircraft-survey-status" aria-live="polite"></p>
+        <div class="aircraft-survey-columns">
+          <section>
+            <h4><span id="aircraft-covered-title">Couverts</span> <span id="aircraft-covered-count" class="count-badge">0</span></h4>
+            <div id="aircraft-covered-list" class="aircraft-survey-list"></div>
+          </section>
+          <section>
+            <h4><span id="aircraft-missing-title">Non couverts</span> <span id="aircraft-missing-count" class="count-badge">0</span></h4>
+            <div id="aircraft-missing-list" class="aircraft-survey-list"></div>
+          </section>
+        </div>
       </div>
-      <button id="support-open" class="icon-btn support-btn" type="button">Soutenir le développement</button>
-      <a class="icon-btn support-btn" href="https://navixav.fr" target="_blank" rel="noreferrer">navixav.fr</a>
-    </aside>
+    </details>
     <p id="settings-message" class="settings-message"></p>
     <div class="settings-actions">
       <button type="button" id="settings-cancel" class="icon-btn">Annuler</button>

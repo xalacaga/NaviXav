@@ -176,6 +176,9 @@ let replayActive = false;
 let replaySpeed = 1;
 let replaySourceLabel = "";
 let latestStatus = null;
+let currentProcedures = null;
+let selectedProcedurePhase = null;
+let procedureAircraftKey = "";
 const siaRequests = new Map();
 const officialAirportRequests = new Map();
 const siaOverlayCandidates = new Map();
@@ -193,6 +196,7 @@ const FLIGHT_REPLAY_BASE_MS = 300;
 const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
 const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
 const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
+const PROCEDURE_PROGRESS_PREFIX = "navixav-procedure-progress";
 /* Chronologie du vol : un changement doit tenir avant d'entrer au journal, et
    le journal conservé avec le résumé reste court pour ne pas saturer le
    stockage local d'un pilote qui garde cent vols. */
@@ -253,8 +257,9 @@ async function loadStatus() {
 
 function refreshUpdateButtonText() {
   const button = $("update-install");
+  const label = button.querySelector(".toolbar-label");
   const version = button.dataset.version;
-  button.textContent = version
+  label.textContent = version
     ? `${t("update_available")} ${version}`
     : t("check_update");
   button.title = version ? t("update_title") : t("check_update_title");
@@ -262,9 +267,10 @@ function refreshUpdateButtonText() {
 
 async function checkForUpdates(manual = false) {
   const button = $("update-install");
+  const label = button.querySelector(".toolbar-label");
   if (manual) {
     button.disabled = true;
-    button.textContent = t("checking_update");
+    label.textContent = t("checking_update");
   }
   try {
     const response = await fetch("/api/update/check", { cache: "no-store" });
@@ -311,10 +317,11 @@ async function handleUpdateButton() {
 
 async function installAvailableUpdate() {
   const button = $("update-install");
+  const label = button.querySelector(".toolbar-label");
   const version = button.dataset.version || "";
   if (!window.confirm(t("update_confirm").replace("{version}", version))) return;
   button.disabled = true;
-  button.textContent = t("update_downloading");
+  label.textContent = t("update_downloading");
   try {
     const response = await fetch("/api/update/install", {
       method: "POST",
@@ -322,11 +329,11 @@ async function installAvailableUpdate() {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || t("update_failed"));
-    button.textContent = t("update_restarting");
+    label.textContent = t("update_restarting");
     showBanner("info", t("update_ready"), [t("update_restart_body")]);
   } catch (error) {
     button.disabled = false;
-    button.textContent = `${t("update_available")} ${version}`;
+    label.textContent = `${t("update_available")} ${version}`;
     showBanner("error", t("update_failed"), [String(error)]);
   }
 }
@@ -422,8 +429,9 @@ async function pollSimulatorStatus() {
 
 async function shutdownApplication() {
   const button = $("shutdown");
+  const label = button.querySelector(".toolbar-label");
   button.disabled = true;
-  button.textContent = t("stopping");
+  label.textContent = t("stopping");
   try {
     const response = await fetch("/api/shutdown", { method: "POST" });
     if (!response.ok) throw new Error(t("err_shutdown_refused"));
@@ -434,7 +442,7 @@ async function shutdownApplication() {
     document.body.append(stopped);
   } catch (error) {
     button.disabled = false;
-    button.textContent = t("quit");
+    label.textContent = t("quit");
     showBanner("error", t("err_shutdown"), [String(error)]);
   }
 }
@@ -495,6 +503,118 @@ function setTrailColorField(value) {
   return colour;
 }
 
+function renderAircraftSurvey(report) {
+  const covered = report.covered || [];
+  const missing = report.missing || [];
+  $("aircraft-covered-count").textContent = covered.length;
+  $("aircraft-missing-count").textContent = missing.length;
+  const renderList = (targetId, items, missingAircraft) => {
+    const target = $(targetId);
+    target.replaceChildren();
+    if (!items.length) {
+      target.append(el("p", "aircraft-survey-empty", t("aircraft_none")));
+      return;
+    }
+    for (const aircraft of items) {
+      const row = el("div", "aircraft-survey-item");
+      const copy = el("span");
+      copy.append(el("strong", "", aircraft.label));
+      const detail = missingAircraft
+        ? [aircraft.icao, aircraft.has_checklist ? t("aircraft_checklist") : t("aircraft_no_checklist")].filter(Boolean).join(" · ")
+        : [aircraft.icao, aircraft.aircraft, t(`aircraft_maturity_${aircraft.maturity}`)].filter(Boolean).join(" · ");
+      copy.append(el("small", "", detail));
+      row.append(copy);
+      if (missingAircraft) {
+        const button = el("button", "icon-btn", t("aircraft_scaffold"));
+        button.type = "button";
+        button.addEventListener("click", () => scaffoldAircraft(aircraft, button));
+        row.append(button);
+      }
+      target.append(row);
+    }
+  };
+  renderList("aircraft-covered-list", covered, false);
+  renderList("aircraft-missing-list", missing, true);
+  const folders = report.folders || [];
+  $("aircraft-survey-status").textContent = folders.length
+    ? tf("aircraft_found", { count: report.total || 0 })
+    : t("aircraft_folder_not_found");
+  $("aircraft-survey-status").className = "aircraft-survey-status";
+}
+
+async function loadAircraftSurvey() {
+  const status = $("aircraft-survey-status");
+  status.textContent = t("aircraft_scanning");
+  status.className = "aircraft-survey-status";
+  const community = $("settings-aircraft-community").value.trim();
+  try {
+    const query = community ? `?community=${encodeURIComponent(community)}` : "";
+    const response = await fetch(`/api/aircraft/survey${query}`);
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.detail || t("aircraft_scan_failed"));
+    if (!community && report.folders?.length) {
+      $("settings-aircraft-community").placeholder = report.folders.join(" · ");
+    }
+    renderAircraftSurvey(report);
+  } catch (error) {
+    status.textContent = String(error);
+    status.className = "aircraft-survey-status error";
+  }
+}
+
+async function browseAircraftFolder() {
+  const button = $("aircraft-folder-browse");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/aircraft/select-folder", {
+      method: "POST",
+      headers: { "X-NaviXav-Aircraft": "browse" },
+    });
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.detail || t("aircraft_browse_failed"));
+    if (report.cancelled) return;
+    $("settings-aircraft-community").value = report.selected_path || "";
+    renderAircraftSurvey(report);
+  } catch (error) {
+    const status = $("aircraft-survey-status");
+    status.textContent = String(error);
+    status.className = "aircraft-survey-status error";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function scaffoldAircraft(aircraft, button) {
+  button.disabled = true;
+  button.textContent = t("aircraft_scaffolding");
+  try {
+    const response = await fetch("/api/aircraft/scaffold", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-NaviXav-Aircraft": "scaffold",
+      },
+      body: JSON.stringify({
+        label: aircraft.label,
+        package: aircraft.package,
+        community_path: $("settings-aircraft-community").value.trim(),
+      }),
+    });
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.detail || t("aircraft_scaffold_failed"));
+    renderAircraftSurvey(report);
+    $("aircraft-survey-status").textContent = tf("aircraft_scaffolded", {
+      label: report.created?.label || aircraft.label,
+    });
+  } catch (error) {
+    const status = $("aircraft-survey-status");
+    status.textContent = String(error);
+    status.className = "aircraft-survey-status error";
+    button.disabled = false;
+    button.textContent = t("aircraft_scaffold");
+  }
+}
+
 async function openSettings() {
   const message = $("settings-message");
   message.textContent = "";
@@ -514,10 +634,13 @@ async function openSettings() {
     $("settings-basemap").value = values.map_basemap || "osm";
     setTrailColorField(values.map_trail_color);
     $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
+    $("settings-aircraft-community").value = values.aircraft_community_path || "";
     show($("settings-lan-access"), Boolean(values.lan_enabled));
     $("settings-lan-url").value = latestStatus?.lan_url || "";
     $("settings-language").value = window.I18N.getLanguage();
+    $("settings-theme").value = window.THEME.getPreference();
     $("settings-dialog").showModal();
+    loadAircraftSurvey();
   } catch (error) {
     showBanner("error", t("err_settings_open"), [String(error)]);
   }
@@ -542,6 +665,7 @@ async function saveSettings(event) {
     aircraft_rnp_capable: $("settings-rnp").checked,
     map_basemap: $("settings-basemap").value,
     map_trail_color: $("settings-trail-color").value,
+    aircraft_community_path: $("settings-aircraft-community").value.trim(),
     lan_enabled: $("settings-lan-enabled").checked,
   };
   try {
@@ -822,6 +946,313 @@ function hideBanner() {
 
 /* --------------------------------------------------------------- rendering */
 
+function procedureIdentity(data = currentProcedures) {
+  const aircraft = data?.aircraft;
+  if (!aircraft) return "";
+  return `${aircraft.id}:${aircraft.variant || "default"}`;
+}
+
+function procedureProgressKey(data = currentProcedures) {
+  const flight = currentPlan ? flightSummaryPlanKey(currentPlan) : "no-plan";
+  return `${PROCEDURE_PROGRESS_PREFIX}:${flight}:${procedureIdentity(data)}`;
+}
+
+function procedureManualProgress(data = currentProcedures) {
+  try {
+    return JSON.parse(sessionStorage.getItem(procedureProgressKey(data)) || "{}") || {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveProcedureManualProgress(progress) {
+  sessionStorage.setItem(procedureProgressKey(), JSON.stringify(progress));
+}
+
+function procedureStepKey(phase, step) {
+  return `${phase.id}:${step.id}`;
+}
+
+function procedureStepComplete(phase, step, progress) {
+  if (step.mode === "info") return true;
+  if (step.mode === "auto") {
+    return step.status === "complete"
+      || (step.status === "unknown" && progress[procedureStepKey(phase, step)] === true);
+  }
+  return progress[procedureStepKey(phase, step)] === true;
+}
+
+function procedurePhaseStats(phase, progress) {
+  const required = phase.steps.filter((step) => step.mode !== "info");
+  const complete = required.filter((step) => procedureStepComplete(phase, step, progress));
+  return { complete: complete.length, total: required.length, done: complete.length === required.length };
+}
+
+function inferredProcedurePhase(aircraft) {
+  if (!aircraft) return null;
+  const speed = Number(aircraft.ground_speed_kt || 0);
+  const agl = finiteOr(aircraft.height_above_ground_ft);
+  const key = detectFlightPhaseKey(aircraft, projectAircraftOnFlightPath(aircraft));
+  if (key === "phase_takeoff") return "takeoff";
+  if (key === "phase_taxi_in") return "after_landing";
+  if (key === "phase_landing") return "landing";
+  if (key === "phase_approach") return "approach";
+  if (key === "phase_descent") return "descent";
+  if (key === "phase_cruise") return "cruise";
+  if (key === "phase_climb") return agl !== null && agl < 1500 ? "after_takeoff" : "climb";
+  if (aircraft.on_ground && speed >= 5) return "taxi";
+  return null;
+}
+
+function procedureNote(note) {
+  if (!note || typeof note !== "object") return "";
+  const language = window.I18N.getLanguage();
+  return note[language] || note.en || note.fr || "";
+}
+
+function procedureSourceText(value) {
+  const source = String(value || "");
+  const family = source.match(
+    /^Procédures normales de la famille (.+?), représentation normalisée\. Aucune SOP compagnie, aucun extrait de FCOM\.$/
+  );
+  if (family) return tf("procedure_source_family", { family: family[1] });
+  const manual = source.match(
+    /^(.+?), section 4 — procédures normales, représentation normalisée\.$/
+  );
+  if (manual) return tf("procedure_source_manual", { manual: manual[1] });
+  return source;
+}
+
+const PROCEDURE_PHASE_ICON_PATHS = {
+  before_start: "M12 2v7m-4.7-4.4A8 8 0 1 0 16.7 4.6",
+  start: "M12 4a8 8 0 1 0 7.4 5M18 3v6h-6M12 8v4l3 2",
+  after_start: "M4 12l5 5L20 6M4 4h7M4 20h16",
+  taxi: "M3 19h3c4 0 4-14 9-14h6M17 2l4 3-4 3M10 19h11",
+  before_takeoff: "M4 3v18M8 3v18M13 5h8M13 9h8M13 13h8M13 17h8",
+  takeoff: "M3 20h18M5 17 19 5M10 13l-5-1M15 9l1 5",
+  after_takeoff: "M4 18 18 4M12 4h6v6M4 21h16",
+  climb: "M4 18l6-6 4 3 6-8M15 7h5v5",
+  cruise: "M3 12h18M8 8l-4 4 4 4M16 8l4 4-4 4",
+  descent: "M4 6l6 6 4-3 6 8M15 17h5v-5",
+  approach: "M3 4l7 16M21 4l-7 16M7 12h10M5 17h14",
+  landing: "M3 20h18M5 5l14 12M10 10l-5 1M15 14l1-5",
+  after_landing: "M3 4v7c0 5 4 9 9 9h9M17 17l4 3-4 3M8 4v7",
+  shutdown: "M12 2v9M7 5.5a8 8 0 1 0 10 0",
+};
+
+function procedurePhaseMark(phase) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", PROCEDURE_PHASE_ICON_PATHS[phase] || PROCEDURE_PHASE_ICON_PATHS.cruise);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "1.7");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.append(path);
+  return svg;
+}
+
+function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraft) {
+  const panel = $("panel-procedures");
+  panel.replaceChildren();
+  if (!data?.available) {
+    const empty = el("div", "procedure-empty");
+    empty.append(el("div", "procedure-empty-icon", "✓"));
+    empty.append(el("h2", null, t("procedure_unavailable_title")));
+    empty.append(el("p", null, t(
+      data?.reason === "procedures_unavailable"
+        ? "procedure_unavailable_body"
+        : "procedure_aircraft_uncovered"
+    )));
+    panel.append(empty);
+    return;
+  }
+
+  const identity = procedureIdentity(data);
+  if (identity !== procedureAircraftKey) {
+    procedureAircraftKey = identity;
+    selectedProcedurePhase = null;
+  }
+  const progress = procedureManualProgress(data);
+  const phases = data.phases || [];
+  if (!selectedProcedurePhase || !phases.some((phase) => phase.id === selectedProcedurePhase)) {
+    selectedProcedurePhase = (
+      phases.find((phase) => !procedurePhaseStats(phase, progress).done) || phases[0]
+    )?.id || null;
+  }
+  const inferred = inferredProcedurePhase(aircraft);
+  const header = el("header", "procedure-header");
+  const heading = el("div", "procedure-aircraft");
+  const aircraftMark = el("span", "procedure-aircraft-mark");
+  aircraftMark.append(planeMark());
+  const aircraftCopy = el("div", "procedure-aircraft-copy");
+  aircraftCopy.append(el("div", "card-kicker", t("procedure_kicker")));
+  aircraftCopy.append(el("h2", null, data.aircraft.model || data.aircraft.family));
+  const variant = [data.aircraft.manufacturer, data.aircraft.variant_label].filter(Boolean).join(" · ");
+  if (variant) aircraftCopy.append(el("p", null, variant));
+  heading.append(aircraftMark, aircraftCopy);
+  header.append(heading);
+  const badges = el("div", "procedure-badges");
+  badges.append(el(
+    "span",
+    `procedure-badge maturity-${data.aircraft.maturity}`,
+    t(`procedure_maturity_${data.aircraft.maturity}`)
+  ));
+  badges.append(el(
+    "span",
+    `procedure-badge ${aircraft ? "is-live" : ""}`,
+    aircraft ? t("procedure_live") : t("procedure_offline")
+  ));
+  header.append(badges);
+  panel.append(header);
+
+  const flow = el("nav", "procedure-flow");
+  flow.setAttribute("aria-label", t("procedure_phase_flow"));
+  phases.forEach((phase, index) => {
+    const stats = procedurePhaseStats(phase, progress);
+    const button = el("button", "procedure-phase");
+    button.type = "button";
+    button.title = t(`procedure_phase_${phase.phase}`);
+    button.classList.toggle("active", phase.id === selectedProcedurePhase);
+    button.classList.toggle("done", stats.done);
+    button.classList.toggle("detected", phase.phase === inferred);
+    button.setAttribute(
+      "aria-current",
+      phase.id === selectedProcedurePhase ? "step" : "false"
+    );
+    if (phase.phase === inferred) button.dataset.liveLabel = t("live");
+    const phaseMark = el("span", "procedure-phase-mark");
+    phaseMark.append(procedurePhaseMark(phase.phase));
+    const phaseCopy = el("span", "procedure-phase-copy");
+    phaseCopy.append(el("strong", null, t(`procedure_phase_${phase.phase}`)));
+    phaseCopy.append(el("small", null, `${stats.complete}/${stats.total}`));
+    button.append(phaseMark, phaseCopy);
+    button.append(el("span", "procedure-phase-index", stats.done ? "✓" : String(index + 1)));
+    button.addEventListener("click", () => {
+      selectedProcedurePhase = phase.id;
+      renderProcedurePanel(currentProcedures, latestAircraft);
+    });
+    flow.append(button);
+  });
+  panel.append(flow);
+
+  const phase = phases.find((item) => item.id === selectedProcedurePhase) || phases[0];
+  if (!phase) return;
+  const stats = procedurePhaseStats(phase, progress);
+  const workspace = el("section", "procedure-workspace");
+  const phaseHead = el("div", "procedure-workspace-head");
+  const phaseTitle = el("div", "procedure-workspace-title");
+  const workspaceMark = el("span", "procedure-workspace-mark");
+  workspaceMark.append(procedurePhaseMark(phase.phase));
+  const phaseTitleCopy = el("div");
+  phaseTitleCopy.append(el("div", "card-kicker", t(`procedure_phase_${phase.phase}`)));
+  phaseTitleCopy.append(el("h3", null, phase.title));
+  phaseTitle.append(workspaceMark, phaseTitleCopy);
+  phaseHead.append(phaseTitle);
+  const phaseProgress = el("div", "procedure-progress-copy");
+  phaseProgress.append(el("strong", null, tf("procedure_progress", stats)));
+  const meter = el("span", "procedure-progress-meter");
+  const fill = el("i");
+  fill.style.width = `${stats.total ? (stats.complete / stats.total) * 100 : 100}%`;
+  meter.append(fill);
+  phaseProgress.append(meter);
+  phaseHead.append(phaseProgress);
+  workspace.append(phaseHead);
+
+  const list = el("div", "procedure-checklist");
+  let previousGroup = "";
+  for (const step of phase.steps) {
+    const group = String(step.group || "");
+    if (group && group !== previousGroup) {
+      list.append(el("div", "procedure-group", group.replaceAll("_", " ").toUpperCase()));
+    }
+    previousGroup = group;
+    const key = procedureStepKey(phase, step);
+    const complete = procedureStepComplete(phase, step, progress);
+    const canConfirm = step.mode === "manual" || step.status === "unknown";
+    const row = el("button", `procedure-step mode-${step.mode}`);
+    row.type = "button";
+    row.classList.toggle("complete", complete);
+    row.classList.toggle("unknown", step.status === "unknown" && !complete);
+    row.classList.toggle("pending", step.status === "pending");
+    row.disabled = !canConfirm;
+    row.setAttribute("aria-pressed", String(complete));
+    row.append(el("span", "procedure-check", complete ? "✓" : step.mode === "info" ? "i" : ""));
+    const text = el("span", "procedure-step-copy");
+    text.append(el("strong", "procedure-challenge", step.title));
+    text.append(el("span", "procedure-leader"));
+    text.append(el("span", "procedure-expected", step.expected || ""));
+    const note = procedureNote(step.note);
+    if (note) text.append(el("small", "procedure-note", note));
+    row.append(text);
+    const state = step.mode === "auto"
+      ? step.status === "complete" ? "procedure_confirmed_auto"
+        : step.status === "unknown" ? "procedure_confirm_manual"
+          : "procedure_waiting_sim"
+      : `procedure_mode_${step.mode}`;
+    row.append(el("span", "procedure-step-mode", t(state)));
+    if (canConfirm) {
+      row.addEventListener("click", () => {
+        progress[key] = !complete;
+        saveProcedureManualProgress(progress);
+        renderProcedurePanel(currentProcedures, latestAircraft);
+      });
+    }
+    list.append(row);
+  }
+  workspace.append(list);
+
+  const actions = el("footer", "procedure-actions");
+  const reset = el("button", "icon-btn", t("procedure_reset"));
+  reset.type = "button";
+  reset.addEventListener("click", () => {
+    sessionStorage.removeItem(procedureProgressKey());
+    selectedProcedurePhase = phases[0]?.id || null;
+    renderProcedurePanel(currentProcedures, latestAircraft);
+  });
+  actions.append(reset);
+  const nextIndex = phases.indexOf(phase) + 1;
+  if (nextIndex < phases.length) {
+    const next = el("button", "btn-primary", `${t("procedure_next")} →`);
+    next.type = "button";
+    next.addEventListener("click", () => {
+      selectedProcedurePhase = phases[nextIndex].id;
+      renderProcedurePanel(currentProcedures, latestAircraft);
+    });
+    actions.append(next);
+  }
+  workspace.append(actions);
+  panel.append(workspace);
+  if (data.source) {
+    panel.append(el(
+      "p",
+      "procedure-source",
+      `${t("procedure_source")} · ${procedureSourceText(data.source)}`
+    ));
+  }
+}
+
+function updateProcedures(data, aircraft = latestAircraft) {
+  currentProcedures = data || { available: false, reason: "aircraft_not_covered", phases: [] };
+  renderProcedurePanel(currentProcedures, aircraft);
+}
+
+async function loadProceduresForPlan(plan = currentPlan) {
+  const title = plan?.aircraft_name || plan?.aircraft || "";
+  try {
+    const response = await fetch(`/api/aircraft/procedures?title=${encodeURIComponent(title)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || t("procedure_load_failed"));
+    updateProcedures(data, latestAircraft);
+  } catch (_error) {
+    updateProcedures({ available: false, reason: "procedures_unavailable", phases: [] });
+  }
+}
+
 function renderPlan(plan) {
   siaOverlayCandidates.clear();
   clearSiaMapOverlay();
@@ -839,6 +1270,7 @@ function renderPlan(plan) {
   renderFlightPanel(plan);
   renderDispatch(plan);
   renderAircraft(plan);
+  loadProceduresForPlan(plan);
   renderOfficialCharts(plan);
   renderMcdu(plan);
   renderWeather(plan);
@@ -855,9 +1287,12 @@ function renderPlan(plan) {
 function renderStrip(plan) {
   const strip = $("strip");
   strip.innerHTML = "";
+  strip.setAttribute("aria-label", t("route_title"));
   activeRoutePointIndex = null;
 
   const chip = (label, value, kind, routeIndex = null, routeStage = null) => {
+    const fragment = document.createDocumentFragment();
+    if (strip.childElementCount) fragment.append(el("span", "strip-sep"));
     const node = el("span", `chip ${kind}`);
     if (routeIndex !== null && routeIndex !== undefined) {
       node.dataset.routeIndex = String(routeIndex);
@@ -865,7 +1300,8 @@ function renderStrip(plan) {
     if (routeStage) node.dataset.routeStage = routeStage;
     if (label) node.append(el("small", null, label));
     node.append(document.createTextNode(value));
-    return node;
+    fragment.append(node);
+    return fragment;
   };
 
   const dep = plan.departure;
@@ -966,6 +1402,66 @@ function renderStrip(plan) {
       destinationIndex >= 0 ? destinationIndex : null
     ));
   }
+  window.requestAnimationFrame(updateStripOverflowState);
+}
+
+function updateStripOverflowState() {
+  const strip = $("strip");
+  const maximum = Math.max(0, strip.scrollWidth - strip.clientWidth);
+  strip.classList.toggle("can-scroll", maximum > 2);
+  strip.classList.toggle("at-start", strip.scrollLeft <= 2);
+  strip.classList.toggle("at-end", strip.scrollLeft >= maximum - 2);
+}
+
+function initialiseStripScrolling() {
+  const strip = $("strip");
+  let pointerId = null;
+  let pointerX = 0;
+  let scrollStart = 0;
+
+  strip.addEventListener("scroll", updateStripOverflowState, { passive: true });
+  strip.addEventListener("wheel", (event) => {
+    if (!strip.classList.contains("can-scroll")) return;
+    const movement = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+    if (!movement) return;
+    const before = strip.scrollLeft;
+    const maximum = strip.scrollWidth - strip.clientWidth;
+    strip.scrollLeft = Math.max(0, Math.min(maximum, before + movement));
+    if (strip.scrollLeft === before) return;
+    event.preventDefault();
+  }, { passive: false });
+  strip.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !strip.classList.contains("can-scroll")) return;
+    pointerId = event.pointerId;
+    pointerX = event.clientX;
+    scrollStart = strip.scrollLeft;
+    strip.classList.add("is-dragging");
+    strip.setPointerCapture(pointerId);
+  });
+  strip.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== pointerId) return;
+    strip.scrollLeft = scrollStart - (event.clientX - pointerX);
+  });
+  const finishDrag = (event) => {
+    if (event.pointerId !== pointerId) return;
+    pointerId = null;
+    strip.classList.remove("is-dragging");
+  };
+  strip.addEventListener("pointerup", finishDrag);
+  strip.addEventListener("pointercancel", finishDrag);
+  strip.addEventListener("keydown", (event) => {
+    if (!strip.classList.contains("can-scroll")) return;
+    const distance = Math.max(160, strip.clientWidth * 0.45);
+    if (event.key === "ArrowLeft") strip.scrollBy({ left: -distance, behavior: "smooth" });
+    else if (event.key === "ArrowRight") strip.scrollBy({ left: distance, behavior: "smooth" });
+    else if (event.key === "Home") strip.scrollTo({ left: 0, behavior: "smooth" });
+    else if (event.key === "End") strip.scrollTo({ left: strip.scrollWidth, behavior: "smooth" });
+    else return;
+    event.preventDefault();
+  });
+  new ResizeObserver(updateStripOverflowState).observe(strip);
 }
 
 function routePointForAircraft(aircraft) {
@@ -5890,6 +6386,7 @@ async function pollLive() {
       latestAircraft = null;
       updateFlightPanel(null);
       updateDispatchLive(null);
+      renderProcedurePanel(currentProcedures, null);
       return;
     }
     const aircraft = data.aircraft;
@@ -5900,12 +6397,14 @@ async function pollLive() {
       Boolean(aircraft.paused),
     );
     applyAircraftState(aircraft);
+    updateProcedures(data.procedures, aircraft);
     pollTaxiGuidance(aircraft);
   } catch (error) {
     setLiveState(false, t("connection_error"));
     updateRouteStripProgress(null);
     updateFlightPanel(null);
     updateDispatchLive(null);
+    renderProcedurePanel(currentProcedures, null);
   }
 }
 
@@ -6351,7 +6850,7 @@ function selectTab(name, scrollToModule = false) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
   show($("terminal"), name === "terminal");
-  for (const key of ["map", "ground", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
+  for (const key of ["map", "ground", "procedures", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
@@ -6456,10 +6955,38 @@ $("settings-form").addEventListener("submit", saveSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
 });
+$("settings-theme").addEventListener("change", (event) => {
+  window.THEME.setPreference(event.target.value);
+});
 // La langue ne vit que dans le navigateur : un client distant peut la changer
 // sans toucher aux réglages du PC, qui lui restent fermés.
 $("mobile-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
+});
+$("mobile-theme").addEventListener("change", (event) => {
+  window.THEME.setPreference(event.target.value);
+});
+function syncThemeToggle(theme = document.documentElement.dataset.theme || "dark") {
+  const button = $("theme-toggle");
+  const target = theme === "light" ? "dark" : "light";
+  const label = `${t("theme")} · ${t(`theme_${target}`)}`;
+  button.dataset.targetTheme = target;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-pressed", String(theme === "dark"));
+}
+$("theme-toggle").addEventListener("click", () => {
+  window.THEME.setPreference($("theme-toggle").dataset.targetTheme || "light");
+});
+window.addEventListener("navixav:themechange", (event) => {
+  for (const id of ["settings-theme", "mobile-theme"]) {
+    const select = $(id);
+    if (select) select.value = event.detail.preference;
+  }
+  syncThemeToggle(event.detail.theme);
+  // Les cartes lisent leurs couleurs dans les variables CSS au dessin.
+  MAP.resize();
+  GROUND.resize();
 });
 $("settings-trail-color").addEventListener("input", (event) => {
   setTrailColorField(event.target.value);
@@ -6477,6 +7004,8 @@ for (const id of ["welcome-pilot-id", "welcome-username"]) {
 $("settings-lan-enabled").addEventListener("change", (event) => {
   show($("settings-lan-access"), event.target.checked);
 });
+$("aircraft-refresh").addEventListener("click", loadAircraftSurvey);
+$("aircraft-folder-browse").addEventListener("click", browseAircraftFolder);
 $("settings-lan-copy").addEventListener("click", async () => {
   const value = $("settings-lan-url").value;
   if (!value) return;
@@ -6486,9 +7015,12 @@ $("settings-lan-copy").addEventListener("click", async () => {
 $("shutdown").addEventListener("click", shutdownApplication);
 $("sim-status").addEventListener("click", pollSimulatorStatus);
 $("global-flight-alert").addEventListener("click", openActiveAlerts);
+initialiseStripScrolling();
 window.I18N.apply();
+syncThemeToggle();
 
 window.addEventListener("navixav:languagechange", () => {
+  renderProcedurePanel(currentProcedures, latestAircraft);
   if (currentPlan) renderPlan(currentPlan);
   else {
     updateHud(latestAircraft);
@@ -6497,6 +7029,7 @@ window.addEventListener("navixav:languagechange", () => {
   loadStatus().catch(() => {});
   pollSimulatorStatus();
   refreshUpdateButtonText();
+  syncThemeToggle();
 });
 
 pollSimulatorStatus();

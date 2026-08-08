@@ -1,0 +1,22 @@
+{
+  "id": "fockewulf/fw190",
+  "manufacturer": "Focke-Wulf",
+  "family": "Fw 190",
+  "model": "Fw 190 A-8",
+  "icao_type": "FW19",
+  "category": "warbird",
+  "engine_count": 1,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "fw 190",
+      "fw190",
+      "focke"
+    ],
+    "priority": 10
+  }
+}

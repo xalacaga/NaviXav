@@ -1,0 +1,21 @@
+{
+  "id": "cessna/c414",
+  "manufacturer": "Cessna",
+  "family": "Chancellor",
+  "model": "414AW Chancellor",
+  "icao_type": "C414",
+  "category": "twin_piston",
+  "engine_count": 2,
+  "propulsion": "piston",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "414",
+      "chancellor"
+    ],
+    "priority": 10
+  }
+}

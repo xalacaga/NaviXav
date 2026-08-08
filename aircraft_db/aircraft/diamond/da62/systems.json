@@ -1,0 +1,28 @@
+{
+  "comment": [
+    "Bimoteur à pistons diesel, train rentrant et régulation moteur numérique.",
+    "C'est le premier appareil de la base dont les vérifications de train sont",
+    "légitimes : le C172 les rejette, celui-ci les exige."
+  ],
+  "systems": {
+    "retractable_gear": true,
+    "flaps": true,
+    "spoilers": false,
+    "autopilot": true,
+    "autothrottle": false,
+    "anti_ice": false,
+    "pressurisation": false,
+    "apu": false,
+    "irs": false,
+    "fadec": true,
+    "tcas": false,
+    "weather_radar": false,
+    "lnav": true,
+    "vnav": true,
+    "autobrake": false,
+    "electrical": true,
+    "hydraulic": true,
+    "pneumatic": false,
+    "fuel": true
+  }
+}

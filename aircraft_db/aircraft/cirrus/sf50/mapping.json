@@ -1,0 +1,20 @@
+{
+  "comment": [
+    "Le Vision Jet d'Asobo publie les variables standard."
+  ],
+  "default_variant": "asobo",
+  "variants": [
+    {
+      "id": "asobo",
+      "label": "Asobo / Microsoft",
+      "match": {
+        "title_contains": [
+          "sf50",
+          "vision jet"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

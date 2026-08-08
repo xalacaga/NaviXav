@@ -1,0 +1,38 @@
+{
+  "source": "DA62 AFM, section 2 — limitations.",
+  "note": "Chiffres à recouper avec l'édition de l'AFM correspondant à la variante. Ils n'ont pas encore été relus sur le manuel : ne pas les afficher comme des limites certifiées sans cette vérification.",
+
+  "speeds": {
+    "vne":  { "value": 188, "unit": "kt", "reference": "IAS", "label": "Never exceed" },
+    "vno":  { "value": 151, "unit": "kt", "reference": "IAS", "label": "Maximum structural cruising" },
+    "va":   { "value": 122, "unit": "kt", "reference": "IAS", "label": "Manoeuvring at MTOW" },
+    "vfe":  { "value": 137, "unit": "kt", "reference": "IAS", "label": "Maximum flap extended",
+              "schedule": [
+                { "position": "T/O", "value": 137 },
+                { "position": "LDG", "value": 122 }
+              ] },
+    "vle":  { "value": 188, "unit": "kt", "reference": "IAS", "label": "Maximum gear extended" },
+    "vlo":  { "value": 156, "unit": "kt", "reference": "IAS", "label": "Maximum gear operating" },
+    "vs":   { "value": 68, "unit": "kt", "reference": "IAS", "label": "Stall, clean" },
+    "vs0":  { "value": 63, "unit": "kt", "reference": "IAS", "label": "Stall, landing configuration" },
+    "vmca": { "value": 70, "unit": "kt", "reference": "IAS", "label": "Minimum control, air" },
+    "vyse": { "value": 85, "unit": "kt", "reference": "IAS", "label": "Best rate of climb, one engine inoperative" },
+    "vy":   { "value": 90, "unit": "kt", "reference": "IAS", "label": "Best rate of climb" }
+  },
+
+  "weights": {
+    "max_takeoff": { "value": 1999, "unit": "kg" },
+    "max_landing": { "value": 1999, "unit": "kg" }
+  },
+
+  "fuel": {
+    "grade": "Jet A-1"
+  },
+
+  "engine": {
+    "manufacturer": "Austro Engine",
+    "model": "AE330",
+    "count": 2,
+    "power": { "value": 180, "unit": "hp" }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "comment": [
+    "Variante unique : l'appareil publie les variables standard, ou ses",
+    "LVar propres n'ont pas été relevées. Aucun override deviné."
+  ],
+  "default_variant": "default",
+  "variants": [
+    {
+      "id": "default",
+      "label": "COWS",
+      "match": {
+        "title_contains": [
+          "da42",
+          "da 42"
+        ]
+      },
+      "systems": {},
+      "overrides": {}
+    }
+  ]
+}

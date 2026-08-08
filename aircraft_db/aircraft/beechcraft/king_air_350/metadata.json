@@ -1,0 +1,23 @@
+{
+  "id": "beechcraft/king_air_350",
+  "manufacturer": "Beechcraft",
+  "family": "King Air 350",
+  "model": "King Air 350i",
+  "icao_type": "BE20",
+  "category": "twin_turboprop",
+  "engine_count": 2,
+  "propulsion": "turboprop",
+  "crew": 1,
+  "certification": "FAR 23 commuter",
+  "source": "King Air 350 AFM, procédures normales normalisées.",
+  "match": {
+    "title_contains": [
+      "king air",
+      "b350",
+      "be350",
+      "super king air"
+    ],
+    "priority": 10
+  },
+  "maturity": "authored"
+}

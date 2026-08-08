@@ -1,0 +1,21 @@
+{
+  "id": "pilatus/pc12",
+  "manufacturer": "Pilatus",
+  "family": "PC-12",
+  "model": "PC-12/47",
+  "icao_type": "PC12",
+  "category": "single_turboprop",
+  "engine_count": 1,
+  "propulsion": "turboprop",
+  "crew": 1,
+  "certification": "n/a",
+  "maturity": "draft",
+  "source": "Canevas de classe. Structure et étapes vérifiables justes pour le type ; à reprendre depuis le manuel de l'appareil avant toute revue.",
+  "match": {
+    "title_contains": [
+      "pc-12",
+      "pc12"
+    ],
+    "priority": 10
+  }
+}
