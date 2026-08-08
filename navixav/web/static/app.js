@@ -973,21 +973,47 @@ function procedureManualProgress(data = currentProcedures) {
   }
 }
 
-function saveProcedureManualProgress(progress) {
-  sessionStorage.setItem(procedureProgressKey(), JSON.stringify(progress));
+function saveProcedureManualProgress(progress, data = currentProcedures) {
+  sessionStorage.setItem(procedureProgressKey(data), JSON.stringify(progress));
 }
 
 function procedureStepKey(phase, step) {
   return `${phase.id}:${step.id}`;
 }
 
+/**
+ * Retient les confirmations que SimConnect vient d'accorder.
+ *
+ * `status` décrit ce que le simulateur voit à l'instant, pas ce qui a été
+ * fait : la balise éteinte après l'arrêt, les volets rentrés après le
+ * décollage ou le frein de parking relâché faisaient reculer le compteur d'une
+ * phase depuis longtemps terminée, et le panneau ramenait le pilote en
+ * arrière. Une case obtenue le reste donc jusqu'à la réinitialisation du vol,
+ * exactement comme une case cochée à la main.
+ */
+function latchProcedureProgress(data) {
+  const phases = data?.phases || [];
+  if (!phases.length) return;
+  const progress = procedureManualProgress(data);
+  let changed = false;
+  for (const phase of phases) {
+    for (const step of phase.steps || []) {
+      if (step.mode !== "auto" || step.status !== "complete") continue;
+      const key = procedureStepKey(phase, step);
+      if (progress[key] === true) continue;
+      progress[key] = true;
+      changed = true;
+    }
+  }
+  if (changed) saveProcedureManualProgress(progress, data);
+}
+
 function procedureStepComplete(phase, step, progress) {
   if (step.mode === "info") return true;
-  if (step.mode === "auto") {
-    return step.status === "complete"
-      || (step.status === "unknown" && progress[procedureStepKey(phase, step)] === true);
-  }
-  return progress[procedureStepKey(phase, step)] === true;
+  // Une confirmation acquise ne se reprend pas : seule la réinitialisation du
+  // vol efface la progression.
+  if (progress[procedureStepKey(phase, step)] === true) return true;
+  return step.mode === "auto" && step.status === "complete";
 }
 
 function procedurePhaseStats(phase, progress) {
@@ -1186,7 +1212,7 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
     row.type = "button";
     row.classList.toggle("complete", complete);
     row.classList.toggle("unknown", step.status === "unknown" && !complete);
-    row.classList.toggle("pending", step.status === "pending");
+    row.classList.toggle("pending", step.status === "pending" && !complete);
     row.disabled = !canConfirm;
     row.setAttribute("aria-pressed", String(complete));
     row.append(el("span", "procedure-check", complete ? "✓" : step.mode === "info" ? "i" : ""));
@@ -1197,10 +1223,14 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
     const note = procedureNote(step.note);
     if (note) text.append(el("small", "procedure-note", note));
     row.append(text);
+    // Annoncer « Confirmé · SimConnect » sur un point que le simulateur ne
+    // voit plus serait un mensonge : la case tient, l'étiquette dit d'où elle
+    // vient.
     const state = step.mode === "auto"
       ? step.status === "complete" ? "procedure_confirmed_auto"
-        : step.status === "unknown" ? "procedure_confirm_manual"
-          : "procedure_waiting_sim"
+        : complete ? "procedure_confirmed_earlier"
+          : step.status === "unknown" ? "procedure_confirm_manual"
+            : "procedure_waiting_sim"
       : `procedure_mode_${step.mode}`;
     row.append(el("span", "procedure-step-mode", t(state)));
     if (canConfirm) {
@@ -1246,6 +1276,9 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
 
 function updateProcedures(data, aircraft = latestAircraft) {
   currentProcedures = data || { available: false, reason: "aircraft_not_covered", phases: [] };
+  // Avant l'affichage : c'est l'arrivée d'un état frais qui fait foi, et lui
+  // seul peut ajouter une confirmation.
+  latchProcedureProgress(currentProcedures);
   renderProcedurePanel(currentProcedures, aircraft);
 }
 

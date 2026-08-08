@@ -1,15 +1,19 @@
-# NaviXav 1.4.12
+# NaviXav 1.4.13
 
 Publié le 2026-08-08.
 
+## Nouveautés
+
+- Le plan de roulage affiche désormais la vitesse sol en direct et prévient à l'approche de la vitesse de roulage maximale, puis déclenche une alarme clignotante et un bip sonore dès qu'elle est dépassée ; la limite se resserre d'elle-même dans les virages, avant une barre d'arrêt et à l'approche du poste d'arrivée, et ne s'applique jamais sur une piste.
+- Les paramètres retiennent désormais la vitesse de roulage maximale, la limite plus basse appliquée en virage et un interrupteur pour l'alarme sonore, que la barre du plan de roulage permet aussi de couper directement.
+- Le code source actuel de NaviXav autorise désormais les usages non commerciaux sous PolyForm Noncommercial 1.0.0, avec une licence commerciale distincte pour toute réutilisation payante.
+
 ## Corrections
 
-- Les mises à jour automatiques attendent désormais la fermeture complète de l'ancien processus NaviXav, réinstallent dans le dossier réellement utilisé et conservent un journal d'installation, empêchant l'ancienne version de redémarrer et de reproposer la même mise à jour.
-- La préparation d'une Release gère désormais une catégorie Nouveautés ou Corrections vide sans décaler les arguments PowerShell suivants ni interrompre la publication.
+- La préparation des versions distingue désormais la version de NaviXav de celle de la licence PolyForm et conserve la borne historique des versions Apache.
 
 ## Modifications
 
-- Correction bug.
-- Bug de versioning.
+- Mise a jour License et ajout GS pour taxi.
 
 L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique.

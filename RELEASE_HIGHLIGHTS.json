@@ -15,37 +15,17 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [
+  "added": [],
+  "fixed": [
     {
-      "en": "The taxi chart now shows live ground speed and warns you as you approach the taxi speed limit, then raises a flashing alarm and an audible beep once you exceed it; the limit tightens automatically for turns, hold short bars and the arrival stand, and never applies on a runway",
-      "fr": "Le plan de roulage affiche désormais la vitesse sol en direct et prévient à l'approche de la vitesse de roulage maximale, puis déclenche une alarme clignotante et un bip sonore dès qu'elle est dépassée ; la limite se resserre d'elle-même dans les virages, avant une barre d'arrêt et à l'approche du poste d'arrivée, et ne s'applique jamais sur une piste",
-      "de": "Der Rollplan zeigt jetzt die Geschwindigkeit über Grund in Echtzeit, warnt beim Annähern an die maximale Rollgeschwindigkeit und löst bei Überschreitung einen blinkenden Alarm mit Signalton aus; die Grenze verschärft sich automatisch in Kurven, vor Haltebalken und beim Anrollen an den Standplatz und gilt auf einer Piste nie",
-      "es": "El plano de rodaje muestra ahora la velocidad respecto al suelo en directo y avisa al acercarse a la velocidad máxima de rodaje, y luego activa una alarma parpadeante con un pitido en cuanto se supera; el límite se reduce por sí solo en los giros, antes de una barra de espera y al aproximarse al puesto de llegada, y nunca se aplica en una pista",
-      "it": "La planimetria di rullaggio mostra ora la velocità al suolo in tempo reale e avvisa all'avvicinarsi della velocità massima di rullaggio, poi attiva un allarme lampeggiante e un segnale acustico non appena viene superata; il limite si restringe da solo in curva, prima di una barra d'arresto e in avvicinamento alla piazzola di arrivo, e non si applica mai su una pista",
-      "pt": "A planta de rolagem mostra agora a velocidade em relação ao solo em direto e avisa ao aproximar-se da velocidade máxima de rolagem, ativando depois um alarme intermitente e um sinal sonoro assim que é ultrapassada; o limite aperta-se sozinho nas curvas, antes de uma barra de espera e na aproximação ao lugar de chegada, e nunca se aplica numa pista",
-      "nl": "De taxikaart toont nu de grondsnelheid live en waarschuwt zodra je de maximale taxisnelheid nadert, met een knipperend alarm en een pieptoon zodra je die overschrijdt; de limiet wordt vanzelf strenger in bochten, voor een stopbalk en bij het naderen van de aankomststand, en geldt nooit op een baan",
-      "pl": "Plan kołowania pokazuje teraz prędkość względem ziemi na żywo i ostrzega przy zbliżaniu się do maksymalnej prędkości kołowania, a po jej przekroczeniu uruchamia migający alarm z sygnałem dźwiękowym; limit sam się zaostrza na zakrętach, przed poprzeczką zatrzymania i przy podjeżdżaniu do stanowiska, a na pasie nie obowiązuje nigdy"
-    },
-    {
-      "en": "Settings now hold the maximum taxi speed, the lower limit used in turns and a switch for the audible alarm, which can also be muted straight from the taxi toolbar",
-      "fr": "Les paramètres retiennent désormais la vitesse de roulage maximale, la limite plus basse appliquée en virage et un interrupteur pour l'alarme sonore, que la barre du plan de roulage permet aussi de couper directement",
-      "de": "Die Einstellungen enthalten jetzt die maximale Rollgeschwindigkeit, die niedrigere Grenze für Kurven und einen Schalter für den akustischen Alarm, der sich auch direkt in der Rollplan-Leiste stummschalten lässt",
-      "es": "Los ajustes guardan ahora la velocidad máxima de rodaje, el límite más bajo aplicado en los giros y un interruptor para la alarma sonora, que también puede silenciarse desde la barra del plano de rodaje",
-      "it": "Le impostazioni conservano ora la velocità massima di rullaggio, il limite più basso applicato in curva e un interruttore per l'allarme sonoro, che si può silenziare anche dalla barra della planimetria di rullaggio",
-      "pt": "As definições guardam agora a velocidade máxima de rolagem, o limite mais baixo aplicado nas curvas e um interruptor para o alarme sonoro, que também pode ser silenciado a partir da barra da planta de rolagem",
-      "nl": "De instellingen bewaren nu de maximale taxisnelheid, de lagere limiet voor bochten en een schakelaar voor het geluidsalarm, dat ook rechtstreeks vanaf de taxibalk gedempt kan worden",
-      "pl": "Ustawienia przechowują teraz maksymalną prędkość kołowania, niższy limit stosowany na zakrętach oraz przełącznik alarmu dźwiękowego, który można też wyciszyć bezpośrednio z paska planu kołowania"
-    },
-    {
-      "en": "The current NaviXav source now permits noncommercial use under PolyForm Noncommercial 1.0.0, with separate commercial licensing for paid reuse.",
-      "fr": "Le code source actuel de NaviXav autorise désormais les usages non commerciaux sous PolyForm Noncommercial 1.0.0, avec une licence commerciale distincte pour toute réutilisation payante.",
-      "de": "Der aktuelle NaviXav-Quellcode erlaubt jetzt nichtkommerzielle Nutzung unter PolyForm Noncommercial 1.0.0; für kostenpflichtige Wiederverwendung ist eine separate kommerzielle Lizenz vorgesehen.",
-      "es": "El código fuente actual de NaviXav permite ahora usos no comerciales bajo PolyForm Noncommercial 1.0.0, con una licencia comercial independiente para la reutilización de pago.",
-      "it": "Il codice sorgente attuale di NaviXav consente ora gli usi non commerciali con PolyForm Noncommercial 1.0.0, con una licenza commerciale separata per il riutilizzo a pagamento.",
-      "pt": "O código-fonte atual do NaviXav permite agora utilizações não comerciais sob PolyForm Noncommercial 1.0.0, com uma licença comercial separada para reutilização paga.",
-      "nl": "De huidige NaviXav-broncode staat nu niet-commercieel gebruik toe onder PolyForm Noncommercial 1.0.0, met een afzonderlijke commerciële licentie voor betaald hergebruik.",
-      "pl": "Aktualny kod źródłowy NaviXav zezwala teraz na użycie niekomercyjne na licencji PolyForm Noncommercial 1.0.0, z oddzielną licencją komercyjną na płatne ponowne wykorzystanie."
+      "en": "A procedure item already confirmed now stays confirmed for the rest of the flight: a phase no longer loses its ticks when the simulator state moves on, such as the beacon switched off, the flaps retracted or the parking brake released, and an item the simulator no longer reports reads Confirmed earlier instead of Confirmed · SimConnect",
+      "fr": "Un point de procédure déjà confirmé le reste jusqu'à la fin du vol : une phase ne perd plus ses coches quand l'état du simulateur évolue, balise éteinte, volets rentrés ou frein de parking relâché, et un point que le simulateur ne voit plus indique Confirmé plus tôt au lieu de Confirmé · SimConnect",
+      "de": "Ein bereits bestätigter Verfahrenspunkt bleibt für den Rest des Fluges bestätigt: Eine Phase verliert ihre Haken nicht mehr, wenn sich der Simulatorzustand ändert — Blitzlicht aus, Klappen eingefahren oder Feststellbremse gelöst —, und ein Punkt, den der Simulator nicht mehr meldet, zeigt Zuvor bestätigt statt Bestätigt · SimConnect",
+      "es": "Un punto de procedimiento ya confirmado permanece confirmado hasta el final del vuelo: una fase deja de perder sus marcas cuando cambia el estado del simulador, con la baliza apagada, los flaps recogidos o el freno de estacionamiento liberado, y un punto que el simulador ya no detecta indica Confirmado antes en lugar de Confirmado · SimConnect",
+      "it": "Un punto di procedura già confermato resta confermato fino alla fine del volo: una fase non perde più le sue spunte quando lo stato del simulatore cambia, con il beacon spento, i flap retratti o il freno di stazionamento rilasciato, e un punto che il simulatore non rileva più indica Confermato prima invece di Confermato · SimConnect",
+      "pt": "Um ponto de procedimento já confirmado permanece confirmado até ao fim do voo: uma fase deixa de perder as suas marcas quando o estado do simulador muda, com a baliza apagada, os flaps recolhidos ou o travão de estacionamento libertado, e um ponto que o simulador já não deteta indica Confirmado antes em vez de Confirmado · SimConnect",
+      "nl": "Een al bevestigd procedurepunt blijft de rest van de vlucht bevestigd: een fase verliest haar vinkjes niet meer wanneer de simulatorstatus verandert, zoals de beacon uit, de flaps ingetrokken of de parkeerrem los, en een punt dat de simulator niet meer meldt toont Eerder bevestigd in plaats van Bevestigd · SimConnect",
+      "pl": "Potwierdzony już punkt procedury pozostaje potwierdzony do końca lotu: faza nie traci już zaznaczeń, gdy stan symulatora się zmienia — wyłączona lampa błyskowa, schowane klapy czy zwolniony hamulec postojowy — a punkt, którego symulator już nie widzi, pokazuje Potwierdzone wcześniej zamiast Potwierdzone · SimConnect"
     }
-  ],
-  "fixed": []
+  ]
 }

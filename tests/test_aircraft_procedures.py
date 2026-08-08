@@ -152,3 +152,42 @@ def test_interface_exposes_a_modern_procedure_module_in_all_languages():
     procedure_kicker = procedure_kicker[: procedure_kicker.index("}")]
     assert "font-size: 0.8rem" in procedure_kicker
     assert "font-weight: 700" in procedure_kicker
+
+
+def test_a_confirmed_procedure_item_is_never_taken_back():
+    """`status` dit ce que le simulateur voit, pas ce qui a été fait.
+
+    La balise éteinte après l'arrêt, les volets rentrés après le décollage ou
+    le frein de parking relâché faisaient reculer le compteur d'une phase
+    depuis longtemps terminée.
+    """
+    static = Path(web_app.__file__).parent / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    latch = javascript[javascript.index("function latchProcedureProgress"):]
+    latch = latch[: latch.index("\n}\n")]
+    assert 'step.mode !== "auto" || step.status !== "complete"' in latch
+    assert "saveProcedureManualProgress(progress, data)" in latch
+    # Seule l'arrivée d'un état frais peut ajouter une confirmation.
+    assert "latchProcedureProgress(currentProcedures);" in javascript
+
+    complete = javascript[javascript.index("function procedureStepComplete"):]
+    complete = complete[: complete.index("\n}\n")]
+    assert "if (progress[procedureStepKey(phase, step)] === true) return true;" in complete
+
+    # La réinitialisation du vol reste la seule sortie.
+    reset = javascript[javascript.index('t("procedure_reset")'):]
+    reset = reset[: reset.index("actions.append(reset);")]
+    assert "sessionStorage.removeItem(procedureProgressKey())" in reset
+
+
+def test_a_latched_item_says_where_its_confirmation_comes_from():
+    """Annoncer « Confirmé · SimConnect » sur un point démenti serait faux."""
+    static = Path(web_app.__file__).parent / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'complete ? "procedure_confirmed_earlier"' in javascript
+    # Une ligne cochée ne porte plus la mise en forme de l'attente.
+    assert 'row.classList.toggle("pending", step.status === "pending" && !complete);' in javascript
+    assert translations.count("procedure_confirmed_earlier:") == 8

@@ -71,7 +71,10 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
     $Root = Join-Path $ProjectRoot "publishing"
     if (-not (Test-Path -LiteralPath $Root)) { return }
 
-    $Pattern = [regex]::Escape($Current)
+    # Une version précédée de « v » décrit une borne historique immuable
+    # (par exemple la dernière Release encore disponible sous une ancienne
+    # licence), pas la Release en cours de préparation.
+    $Pattern = "(?<!v)" + [regex]::Escape($Current)
     $Touched = @()
     foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
         $Content = [System.IO.File]::ReadAllText($File.FullName)
@@ -91,9 +94,23 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
     foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
         $Content = [System.IO.File]::ReadAllText($File.FullName)
         foreach ($Match in [regex]::Matches($Content, '\d+\.\d+\.\d+')) {
-            if ($Match.Value -ne $Next) {
-                $Stale += "$($File.Name) : $($Match.Value)"
+            if ($Match.Value -eq $Next) { continue }
+
+            # « v1.4.12 » peut être une Release historique citée à dessein.
+            if ($Match.Index -gt 0 -and $Content[$Match.Index - 1] -eq 'v') {
+                continue
             }
+
+            # PolyForm Noncommercial 1.0.0 est le nom officiel de la licence,
+            # pas une version de NaviXav. Le préfixe accepte les retours à la
+            # ligne utilisés dans les textes de publication.
+            $PrefixStart = [Math]::Max(0, $Match.Index - 80)
+            $Prefix = $Content.Substring($PrefixStart, $Match.Index - $PrefixStart)
+            if ($Prefix -match 'PolyForm\s+Noncommercial(?:\s+License)?\s*$') {
+                continue
+            }
+
+            $Stale += "$($File.Name) : $($Match.Value)"
         }
     }
     if ($Stale.Count -gt 0) {
