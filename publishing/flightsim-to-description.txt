@@ -152,7 +152,7 @@ Installation
 
 Extract the downloaded Flightsim.to ZIP archive.
 
-Run NaviXav-Setup-1.4.11.exe.
+Run NaviXav-Setup-1.4.12.exe.
 
 Follow the installation wizard.
 

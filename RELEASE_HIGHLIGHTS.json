@@ -16,26 +16,5 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": [
-    {
-      "en": "Automatic updates now wait for the old NaviXav process to close completely, reinstall into the directory actually in use and keep an installation log, preventing the previous version from restarting and offering the same update again",
-      "fr": "Les mises à jour automatiques attendent désormais la fermeture complète de l'ancien processus NaviXav, réinstallent dans le dossier réellement utilisé et conservent un journal d'installation, empêchant l'ancienne version de redémarrer et de reproposer la même mise à jour",
-      "de": "Automatische Updates warten jetzt, bis der alte NaviXav-Prozess vollständig beendet ist, installieren erneut in das tatsächlich verwendete Verzeichnis und führen ein Installationsprotokoll, sodass die vorherige Version nicht mehr neu startet und dasselbe Update erneut anbietet",
-      "es": "Las actualizaciones automáticas esperan ahora a que el proceso anterior de NaviXav se cierre por completo, reinstalan en la carpeta realmente utilizada y conservan un registro de instalación, evitando que la versión anterior se reinicie y vuelva a ofrecer la misma actualización",
-      "it": "Gli aggiornamenti automatici attendono ora la chiusura completa del vecchio processo NaviXav, reinstallano nella cartella realmente utilizzata e conservano un registro di installazione, impedendo alla versione precedente di riavviarsi e riproporre lo stesso aggiornamento",
-      "pt": "As atualizações automáticas aguardam agora o encerramento completo do processo NaviXav anterior, reinstalam na pasta realmente utilizada e mantêm um registo de instalação, impedindo que a versão anterior reinicie e volte a propor a mesma atualização",
-      "nl": "Automatische updates wachten nu tot het oude NaviXav-proces volledig is afgesloten, installeren opnieuw in de werkelijk gebruikte map en bewaren een installatielogboek, zodat de vorige versie niet opnieuw start en dezelfde update blijft aanbieden",
-      "pl": "Aktualizacje automatyczne czekają teraz na całkowite zamknięcie starego procesu NaviXav, instalują ponownie w rzeczywiście używanym folderze i zachowują dziennik instalacji, dzięki czemu poprzednia wersja nie uruchamia się ponownie i nie proponuje tej samej aktualizacji"
-    },
-    {
-      "en": "Release preparation now handles an empty Added or Fixed category without shifting the following PowerShell arguments or interrupting publication",
-      "fr": "La préparation d'une Release gère désormais une catégorie Nouveautés ou Corrections vide sans décaler les arguments PowerShell suivants ni interrompre la publication",
-      "de": "Die Release-Vorbereitung verarbeitet jetzt eine leere Kategorie Neu oder Behoben, ohne nachfolgende PowerShell-Argumente zu verschieben oder die Veröffentlichung abzubrechen",
-      "es": "La preparación de una Release admite ahora una categoría Novedades o Correcciones vacía sin desplazar los argumentos PowerShell siguientes ni interrumpir la publicación",
-      "it": "La preparazione di una Release gestisce ora una categoria Novità o Correzioni vuota senza spostare gli argomenti PowerShell successivi né interrompere la pubblicazione",
-      "pt": "A preparação de uma Release aceita agora uma categoria Novidades ou Correções vazia sem deslocar os argumentos PowerShell seguintes nem interromper a publicação",
-      "nl": "De voorbereiding van een release verwerkt nu een lege categorie Nieuw of Opgelost zonder de volgende PowerShell-argumenten te verschuiven of de publicatie te onderbreken",
-      "pl": "Przygotowanie wydania obsługuje teraz pustą kategorię Nowości lub Poprawki bez przesuwania kolejnych argumentów PowerShell ani przerywania publikacji"
-    }
-  ]
+  "fixed": []
 }
