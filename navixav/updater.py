@@ -247,4 +247,23 @@ class GitHubUpdater:
             update.latest_version,
             received,
         )
+        self._prune_previous_downloads(destination)
         return destination
+
+    def _prune_previous_downloads(self, keep: Path) -> None:
+        """Efface les installateurs déjà téléchargés, sauf le dernier.
+
+        L'installateur fait le même ménage en fin d'installation, mais lui ne
+        s'exécute que lorsqu'elle aboutit : une mise à jour qui échoue en
+        boucle empilait un fichier de vingt mégaoctets à chaque tentative.
+        Le nettoyage appartient donc aussi à celui qui télécharge.
+        """
+        for previous in self.download_dir.glob("NaviXav-Setup-*"):
+            if previous == keep or previous.suffix not in {".exe", ".part"}:
+                continue
+            try:
+                previous.unlink()
+            except OSError:
+                # Un installateur encore en cours d'exécution reste verrouillé :
+                # la tentative suivante l'emportera.
+                LOGGER.debug("Installateur non supprimé : %s", previous.name)

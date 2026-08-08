@@ -133,3 +133,70 @@ def test_same_or_older_release_is_not_offered():
     )
     update = GitHubUpdater("0.1.0", session=session).check()
     assert update.available is False
+
+
+def test_previous_installers_are_swept_when_a_new_one_lands(tmp_path):
+    """Vingt-cinq installateurs et un demi-gigaoctet s'étaient empilés.
+
+    L'installateur fait le même ménage, mais lui ne s'exécute que lorsque la
+    mise à jour aboutit : une mise à jour qui échoue en boucle accumulait un
+    fichier par tentative.
+    """
+    stale = [
+        tmp_path / "NaviXav-Setup-0.1.0.exe",
+        tmp_path / "NaviXav-Setup-1.4.12.exe",
+        tmp_path / "NaviXav-Setup-1.4.14.part",
+    ]
+    for path in stale:
+        path.write_bytes(b"ancien")
+    # Les journaux servent à comprendre une panne : ils restent.
+    trace = tmp_path / "NaviXav-Setup-1.4.12.install.log"
+    trace.write_text("journal", encoding="utf-8")
+
+    data = b"MZ nouvelle version"
+    digest = hashlib.sha256(data).hexdigest()
+    session = FakeSession(
+        [
+            FakeResponse(
+                payload=release_payload("0.2.0", data, digest=f"sha256:{digest}")
+            ),
+            FakeResponse(content=data),
+        ]
+    )
+    updater = GitHubUpdater("0.1.0", session=session, download_dir=tmp_path)
+
+    installer = updater.download(updater.check())
+
+    assert installer.is_file()
+    for path in stale:
+        assert not path.exists()
+    assert trace.is_file()
+
+
+def test_a_locked_installer_never_breaks_the_update(tmp_path, monkeypatch):
+    """Un installateur encore en cours d'exécution reste verrouillé."""
+    locked = tmp_path / "NaviXav-Setup-1.4.12.exe"
+    locked.write_bytes(b"verrouille")
+    original = Path.unlink
+
+    def refuse(self, *args, **kwargs):
+        if self.name == locked.name:
+            raise PermissionError(self.name)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", refuse)
+
+    data = b"MZ nouvelle version"
+    digest = hashlib.sha256(data).hexdigest()
+    session = FakeSession(
+        [
+            FakeResponse(
+                payload=release_payload("0.2.0", data, digest=f"sha256:{digest}")
+            ),
+            FakeResponse(content=data),
+        ]
+    )
+    updater = GitHubUpdater("0.1.0", session=session, download_dir=tmp_path)
+
+    assert updater.download(updater.check()).is_file()
+    assert locked.is_file()

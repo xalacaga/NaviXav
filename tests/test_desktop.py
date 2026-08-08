@@ -397,6 +397,26 @@ def test_silent_update_restarts_navixav():
     assert "skipifsilent" not in run_entry
 
 
+def test_the_installer_sweeps_the_downloads_it_leaves_behind():
+    """Vingt-cinq installateurs et un demi-gigaoctet s'étaient accumulés."""
+    project = Path(desktop.__file__).parent.parent
+    installer = (project / "installer" / "NaviXav.iss").read_text(encoding="utf-8")
+
+    cleanup = installer[installer.index("procedure CleanUpDownloadedInstallers"):]
+    cleanup = cleanup[: cleanup.index("procedure CurStepChanged")]
+    assert r"{localappdata}\NaviXav\updates" in cleanup
+    assert r"\NaviXav-Setup-*.exe" in cleanup
+    # Téléchargements interrompus : ils ne reprennent jamais.
+    assert r"\NaviXav-Setup-*.part" in cleanup
+    # Windows verrouille l'installateur en cours : il est épargné.
+    assert "{srcexe}" in cleanup
+    assert "CompareText(Candidate, Running) <> 0" in cleanup
+
+    # Un échec ne doit pas priver l'utilisateur de ce qu'il vient de charger.
+    assert "if CurStep = ssPostInstall then" in installer
+    assert "CleanUpDownloadedInstallers();" in installer
+
+
 def test_update_waits_for_the_old_process_and_reuses_its_install_directory(tmp_path):
     installer = tmp_path / "NaviXav-Setup-1.4.12.exe"
     install_directory = Path(r"D:\MSFS2024\NaviXav")

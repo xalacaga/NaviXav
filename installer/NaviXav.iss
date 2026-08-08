@@ -167,3 +167,54 @@ begin
       'Microsoft WebView2 n''a pas pu être installé. ' +
       'Vérifiez votre connexion Internet puis relancez l''installation.';
 end;
+
+{ Les installateurs téléchargés par la mise à jour automatique s'empilaient
+  sans jamais être effacés : plus de vingt fichiers et un demi-gigaoctet chez
+  un utilisateur suivi depuis les premières versions. Une fois la mise à jour
+  faite, ils ne servent plus à rien. Celui qui s'exécute en ce moment est
+  épargné — Windows le verrouille, et il sera balayé par la mise à jour
+  suivante. Les journaux, eux, restent : ils pèsent quelques kilo-octets et
+  servent à comprendre une panne. }
+procedure CleanUpDownloadedInstallers();
+var
+  Directory: String;
+  Running: String;
+  Candidate: String;
+  Search: TFindRec;
+begin
+  Directory := ExpandConstant('{localappdata}\NaviXav\updates');
+  if not DirExists(Directory) then
+    Exit;
+  Running := ExpandConstant('{srcexe}');
+  if FindFirst(Directory + '\NaviXav-Setup-*.exe', Search) then
+  begin
+    try
+      repeat
+        Candidate := Directory + '\' + Search.Name;
+        if CompareText(Candidate, Running) <> 0 then
+          DeleteFile(Candidate);
+      until not FindNext(Search);
+    finally
+      FindClose(Search);
+    end;
+  end;
+  { Téléchargements interrompus : ils ne reprennent jamais. }
+  if FindFirst(Directory + '\NaviXav-Setup-*.part', Search) then
+  begin
+    try
+      repeat
+        DeleteFile(Directory + '\' + Search.Name);
+      until not FindNext(Search);
+    finally
+      FindClose(Search);
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  { Après l'installation seulement : un échec ne doit pas priver l'utilisateur
+    de l'installateur qu'il vient de télécharger. }
+  if CurStep = ssPostInstall then
+    CleanUpDownloadedInstallers();
+end;
