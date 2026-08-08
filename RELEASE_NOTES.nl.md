@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Uitgebracht op 2026-08-08.
 
 ## Opgelost
 
-- Vragen over commerciële licenties en bijdragen gebruiken nu het speciale NaviXav-contactadres.
-- De automatische update installeert zichzelf nu echt: het hulpprogramma dat wacht tot NaviXav sluit werd zonder console gestart en stierf meteen, waardoor de update als gepland werd gemeld en de toepassing weer opende op de vorige versie. Het hulpprogramma houdt bovendien een eigen logboek naast het installatieprogramma, zodat een toekomstige storing te onderzoeken is.
-- Gedownloade installatieprogramma's stapelen zich niet meer op: elke update wist de vorige, en het installatieprogramma doet hetzelfde na afloop. Op een machine die sinds de eerste versies wordt gevolgd was een halve gigabyte samengekomen. De logboeken blijven bewaard, zodat een storing nog te onderzoeken is.
+- De speedbrakes van de Fenix A319/A320/A321 tonen nu betrouwbaar ARMED, ook wanneer de vliegtuigbenaming in SimBrief algemeen is.
+- Het Top of Descent is nu een vast punt op de route, berekend vanaf het kruisniveau: de waarde telt af tot nul en wordt daarna als gepasseerd weergegeven. Voorheen kon die tijdens een daling van 3° blijven staan of zelfs oplopen wanneer de daling te vroeg werd ingezet.
+- De afwijking ten opzichte van het daalprofiel blijft zichtbaar tijdens een niveauvlucht onder het kruisniveau. Voorheen verdween die zodra de verticale snelheid weer nul werd, juist wanneer het toestel ver onder het profiel zat.
+- Het Top of Descent houdt nu rekening met de gepubliceerde hoogteplafonds van de STAR en de nadering, en leest de hoogte in de standaardatmosfeer zoals een vliegniveau.
+- De verticale snelheid die nodig is voor de volgende beperking wordt nu vergeleken met de aangegeven hoogte, de enige die vergelijkbaar is met een gepubliceerde beperking.
 
 ## Gewijzigd
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 Het installatieprogramma wordt vóór elke automatische update geverifieerd aan de hand van zijn SHA-256-controlesom.

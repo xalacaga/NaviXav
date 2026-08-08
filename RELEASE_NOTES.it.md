@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Pubblicato il 2026-08-08.
 
 ## Correzioni
 
-- Le richieste relative alle licenze commerciali e ai contributi utilizzano ora l'indirizzo di contatto dedicato a NaviXav.
-- L'aggiornamento automatico ora si installa davvero: l'assistente che attende la chiusura di NaviXav veniva avviato senza alcuna console e moriva subito, così l'aggiornamento veniva annunciato come pianificato e l'applicazione si riapriva sulla versione precedente. L'assistente tiene inoltre un proprio registro accanto all'installatore, perché un guasto futuro sia analizzabile.
-- Gli installatori scaricati non si accumulano più: ogni aggiornamento cancella i precedenti e l'installatore fa lo stesso al termine. Su una macchina seguita fin dalle prime versioni si era accumulato mezzo gigabyte. I registri vengono conservati, perché un guasto resti analizzabile.
+- Gli speedbrake dei Fenix A319/A320/A321 ora mostrano correttamente ARMED anche quando il nome dell’aeromobile in SimBrief è generico.
+- Il Top of Descent è ora un punto fisso della rotta, calcolato dal livello di crociera: diminuisce fino a zero e poi viene indicato come superato. In precedenza poteva bloccarsi durante una discesa a 3° o addirittura aumentare quando la discesa veniva iniziata troppo presto.
+- Lo scostamento dal profilo di discesa continua a essere segnalato durante un livellamento al di sotto del livello di crociera. Prima spariva non appena la velocità verticale tornava a zero, proprio quando l’aeromobile era molto sotto il profilo.
+- Il Top of Descent tiene ora conto dei tetti di altitudine pubblicati della STAR e dell’avvicinamento e legge l’altitudine nell’atmosfera standard come un livello di volo.
+- La velocità verticale richiesta per il vincolo successivo viene ora confrontata con l’altitudine indicata, l’unica comparabile con un vincolo pubblicato.
 
 ## Modifiche
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 Il programma di installazione è verificato tramite il suo checksum SHA-256 prima di ogni aggiornamento automatico.

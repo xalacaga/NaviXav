@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Opublikowano 2026-08-08.
 
 ## Poprawki
 
-- Zapytania dotyczące licencji komercyjnych i współtworzenia korzystają teraz z dedykowanego adresu kontaktowego NaviXav.
-- Automatyczna aktualizacja naprawdę się teraz instaluje: pomocnik czekający na zamknięcie NaviXav był uruchamiany bez żadnej konsoli i natychmiast kończył pracę, więc aktualizacja była zgłaszana jako zaplanowana, a aplikacja otwierała się ponownie na poprzedniej wersji. Pomocnik prowadzi też własny dziennik obok instalatora, aby przyszłą awarię dało się zbadać.
-- Pobrane instalatory nie gromadzą się już: każda aktualizacja usuwa poprzednie, a instalator robi to samo po zakończeniu. Na komputerze używanym od pierwszych wersji zebrało się pół gigabajta. Dzienniki są zachowywane, aby awarię nadal dało się zbadać.
+- Hamulce aerodynamiczne Fenix A319/A320/A321 pokazują teraz poprawnie ARMED, nawet gdy nazwa samolotu w SimBrief jest ogólna.
+- Top of Descent jest teraz stałym punktem trasy, wyznaczanym na podstawie poziomu przelotowego: wartość maleje do zera, a następnie pokazuje przekroczenie. Wcześniej mogła zatrzymać się podczas zniżania 3° lub nawet rosnąć, gdy zniżanie rozpoczęto zbyt wcześnie.
+- Odchylenie od profilu zniżania pozostaje widoczne podczas lotu poziomego poniżej poziomu przelotowego. Wcześniej znikało, gdy tylko prędkość pionowa wracała do zera, czyli dokładnie wtedy, gdy samolot był głęboko pod profilem.
+- Top of Descent uwzględnia teraz opublikowane pułapy wysokości procedury STAR i podejścia oraz odczytuje wysokość w atmosferze wzorcowej, tak jak poziom lotu.
+- Prędkość pionowa wymagana do spełnienia następnego ograniczenia jest teraz porównywana z wysokością wskazywaną, jedyną porównywalną z ograniczeniem opublikowanym.
 
 ## Zmiany
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 Instalator jest weryfikowany za pomocą sumy kontrolnej SHA-256 przed każdą automatyczną aktualizacją.

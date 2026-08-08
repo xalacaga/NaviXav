@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Publié le 2026-08-08.
 
 ## Corrections
 
-- Les demandes de licence commerciale et de contribution utilisent désormais l'adresse de contact dédiée à NaviXav.
-- La mise à jour automatique s'installe désormais réellement : l'assistant qui attend la fermeture de NaviXav était lancé sans aucune console et mourait aussitôt, si bien que la mise à jour était annoncée comme planifiée et que l'application rouvrait sur la version précédente. L'assistant tient de plus son propre journal à côté de l'installateur, afin qu'une panne future soit analysable.
-- Les installateurs téléchargés ne s'accumulent plus : chaque mise à jour efface les précédents, et l'installateur fait de même en fin d'installation. Un demi-gigaoctet s'était accumulé sur une machine suivie depuis les premières versions. Les journaux sont conservés, afin qu'une panne reste analysable.
+- Les aérofreins des Fenix A319/A320/A321 affichent désormais correctement ARMÉS même lorsque le nom d’avion SimBrief est générique.
+- Le Top of Descent est désormais un point fixe de la route, calculé depuis le niveau de croisière : il décroît jusqu’à zéro puis s’affiche comme dépassé. Il pouvait auparavant se figer pendant une descente à 3°, voire grandir lorsque la descente était entamée trop tôt.
+- L’écart au profil de descente reste annoncé pendant un palier sous le niveau de croisière. Il disparaissait jusqu’ici dès que la vitesse verticale revenait à zéro, c’est-à-dire au moment précis où l’avion était très bas sur le profil.
+- Le Top of Descent tient désormais compte des plafonds d’altitude publiés de la STAR et de l’approche, et lit l’altitude dans l’atmosphère standard comme un niveau de vol.
+- La vitesse verticale requise pour la prochaine contrainte se compare désormais à l’altitude indiquée, la seule comparable à une contrainte publiée.
 
 ## Modifications
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique.

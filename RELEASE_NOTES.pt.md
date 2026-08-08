@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Publicado em 2026-08-08.
 
 ## Correções
 
-- Os pedidos sobre licenciamento comercial e contribuições utilizam agora o endereço de contacto dedicado ao NaviXav.
-- A atualização automática passa a instalar-se realmente: o assistente que aguarda o fecho do NaviXav era lançado sem qualquer consola e morria de imediato, pelo que a atualização era anunciada como agendada e a aplicação reabria na versão anterior. O assistente mantém ainda o seu próprio registo junto do instalador, para que uma falha futura possa ser analisada.
-- Os instaladores transferidos deixam de se acumular: cada atualização apaga os anteriores e o instalador faz o mesmo no final. Meio gigabyte tinha-se acumulado numa máquina acompanhada desde as primeiras versões. Os registos são mantidos, para que uma falha continue a poder ser analisada.
+- Os speedbrakes dos Fenix A319/A320/A321 agora apresentam ARMED corretamente mesmo quando o nome da aeronave no SimBrief é genérico.
+- O Top of Descent é agora um ponto fixo da rota, calculado a partir do nível de cruzeiro: diminui até zero e depois é indicado como ultrapassado. Antes podia ficar parado durante uma descida a 3° ou até aumentar quando a descida era iniciada demasiado cedo.
+- O desvio em relação ao perfil de descida continua a ser indicado durante um nivelamento abaixo do nível de cruzeiro. Antes desaparecia assim que a velocidade vertical voltava a zero, precisamente quando a aeronave estava muito abaixo do perfil.
+- O Top of Descent passa a ter em conta os tetos de altitude publicados da STAR e da aproximação e lê a altitude na atmosfera padrão como um nível de voo.
+- A velocidade vertical necessária para a restrição seguinte passa a ser comparada com a altitude indicada, a única comparável com uma restrição publicada.
 
 ## Alterações
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 O instalador é verificado através da sua soma de verificação SHA-256 antes de qualquer atualização automática.

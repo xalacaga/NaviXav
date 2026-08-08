@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Publicado el 2026-08-08.
 
 ## Correcciones
 
-- Las consultas sobre licencias comerciales y contribuciones utilizan ahora la dirección de contacto específica de NaviXav.
-- La actualización automática ya se instala de verdad: el asistente que espera al cierre de NaviXav se lanzaba sin ninguna consola y moría de inmediato, de modo que la actualización se anunciaba como programada y la aplicación volvía a abrirse con la versión anterior. Además, el asistente mantiene su propio registro junto al instalador, para poder analizar un fallo futuro.
-- Los instaladores descargados ya no se acumulan: cada actualización borra los anteriores, y el instalador hace lo mismo al terminar. Se había acumulado medio gigabyte en un equipo seguido desde las primeras versiones. Los registros se conservan, para que un fallo siga siendo analizable.
+- Los aerofrenos de los Fenix A319/A320/A321 ahora muestran ARMED correctamente aunque el nombre del avión en SimBrief sea genérico.
+- El Top of Descent es ahora un punto fijo de la ruta, calculado a partir del nivel de crucero: disminuye hasta cero y después se indica como superado. Antes podía quedarse congelado durante un descenso a 3° o incluso aumentar cuando el descenso se iniciaba demasiado pronto.
+- La desviación respecto al perfil de descenso se sigue indicando durante un nivel intermedio por debajo del nivel de crucero. Antes desaparecía en cuanto la velocidad vertical volvía a cero, justo cuando el avión estaba muy por debajo del perfil.
+- El Top of Descent tiene ahora en cuenta los techos de altitud publicados de la STAR y de la aproximación, y lee la altitud en la atmósfera estándar como un nivel de vuelo.
+- La velocidad vertical necesaria para la siguiente restricción se compara ahora con la altitud indicada, la única comparable con una restricción publicada.
 
 ## Cambios
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 El instalador se verifica con su suma de comprobación SHA-256 antes de cualquier actualización automática.

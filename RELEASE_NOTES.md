@@ -1,17 +1,17 @@
-# NaviXav 1.4.15
+# NaviXav 1.4.16
 
 Released on 2026-08-08.
 
 ## Fixed
 
-- Commercial licensing and contribution enquiries now use the dedicated NaviXav contact address.
-- The automatic update now really installs itself: the helper that waits for NaviXav to close was started without any console and died immediately, so the update was announced as scheduled and the application reopened on the previous version. The helper also keeps its own log next to the installer, so a future failure can be diagnosed.
-- Downloaded installers no longer pile up: each update sweeps the previous ones, and the installer does the same once it finishes. Half a gigabyte had accumulated on a machine followed since the first versions. The logs are kept, so a failure can still be examined.
+- Fenix A319/A320/A321 speedbrakes now show ARMED reliably even when the SimBrief aircraft name is generic.
+- Top of Descent is now a fixed point on the route, computed from the cruise level: it counts down to zero and then reads as passed. It could previously freeze during a 3° descent, or even grow when the descent was started too early.
+- The deviation from the descent profile keeps being reported during a level-off below the cruise level. It used to disappear as soon as the vertical speed returned to zero, exactly when the aircraft was far below profile.
+- Top of Descent now honours the published altitude ceilings of the STAR and the approach, and reads altitude in the standard atmosphere like a flight level.
+- The vertical speed required for the next constraint is now compared with the indicated altitude, the only one comparable with a published constraint.
 
 ## Changed
 
-- Nettoyage des installateurs telecharges.
-- Correctif mise a jour automatique.
-- Update NaviXav contact email.
+- Correction bug TOD.
 
 The installer is verified against its SHA-256 checksum before any automatic update.
