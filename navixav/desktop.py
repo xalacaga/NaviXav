@@ -58,13 +58,26 @@ def _update_helper_command(
     powershell_arguments = ", ".join(
         _powershell_literal(argument) for argument in arguments
     )
+    # Le helper tient son propre journal, distinct de celui d'Inno Setup : sans
+    # lui, un helper qui ne démarre pas ne laisse aucune trace et la mise à
+    # jour échoue en silence, l'application rouvrant sur l'ancienne version.
+    trace = _powershell_literal(str(log_path.with_suffix(".helper.log")))
     script = (
         "$ErrorActionPreference = 'Stop'\n"
+        f"$trace = {trace}\n"
+        "function Trace($message) {\n"
+        "  Add-Content -Path $trace"
+        " -Value \"$(Get-Date -Format o) $message\" -Encoding utf8\n"
+        "}\n"
+        "Trace 'helper demarre'\n"
         f"Wait-Process -Id {parent_pid} -ErrorAction SilentlyContinue\n"
+        "Trace 'NaviXav ferme, lancement de l''installateur'\n"
         f"$installer = {_powershell_literal(str(installer))}\n"
         f"$arguments = @({powershell_arguments})\n"
         "& $installer @arguments\n"
-        "exit $LASTEXITCODE\n"
+        "$code = $LASTEXITCODE\n"
+        "Trace \"installateur termine, code $code\"\n"
+        "exit $code\n"
     )
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     system_root = os.environ.get("SystemRoot", r"C:\Windows")
@@ -252,9 +265,15 @@ def _run_desktop_window(url: str, server: object) -> None:
             """Lance l'installateur vérifié, puis ferme l'instance courante."""
             def launch() -> None:
                 try:
+                    # DETACHED_PROCESS prive l'enfant de toute console, et
+                    # powershell.exe, application console, meurt aussitôt : la
+                    # création réussissait, la mise à jour ne s'exécutait
+                    # jamais et NaviXav rouvrait sur l'ancienne version.
+                    # CREATE_NO_WINDOW donne une console simplement invisible,
+                    # et le nouveau groupe suffit à survivre à la fermeture.
                     flags = (
                         subprocess.CREATE_NEW_PROCESS_GROUP
-                        | subprocess.DETACHED_PROCESS
+                        | subprocess.CREATE_NO_WINDOW
                     )
                     install_directory = (
                         Path(sys.executable).resolve().parent
@@ -272,6 +291,12 @@ def _run_desktop_window(url: str, server: object) -> None:
                         command,
                         close_fds=True,
                         creationflags=flags,
+                        # L'exécutable est construit sans console : ses trois
+                        # descripteurs standards sont invalides et l'enfant en
+                        # hériterait.
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                     logging.info(
                         "Mise à jour planifiée après fermeture : %s vers %s",

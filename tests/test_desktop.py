@@ -419,6 +419,51 @@ def test_update_waits_for_the_old_process_and_reuses_its_install_directory(tmp_p
     assert script.index("Wait-Process") < script.index("& $installer")
 
 
+def test_the_update_helper_keeps_a_console_and_never_detaches():
+    """DETACHED_PROCESS privait powershell.exe de toute console.
+
+    L'application est construite sans console : la création du processus
+    réussissait, le helper mourait aussitôt, et NaviXav journalisait une mise à
+    jour « planifiée » qui ne s'exécutait jamais — trois tentatives de suite
+    rouvraient l'ancienne version.
+    """
+    source = Path(desktop.__file__).read_text(encoding="utf-8")
+    launcher = source[source.index("def install_update(installer: Path)"):]
+    launcher = launcher[: launcher.index("def open_simbrief")]
+
+    # Le commentaire nomme le drapeau fautif : c'est bien son usage qu'on
+    # interdit, pas la mémoire de la panne.
+    assert "subprocess.DETACHED_PROCESS" not in launcher
+    assert "subprocess.CREATE_NO_WINDOW" in launcher
+    # Le nouveau groupe suffit à survivre à la fermeture de la fenêtre.
+    assert "subprocess.CREATE_NEW_PROCESS_GROUP" in launcher
+    # Sans console, les trois descripteurs hérités sont invalides.
+    for stream in ("stdin", "stdout", "stderr"):
+        assert f"{stream}=subprocess.DEVNULL" in launcher
+
+
+def test_the_update_helper_traces_its_own_run(tmp_path):
+    """Un helper qui ne démarre pas ne laissait aucune trace à examiner."""
+    log_path = tmp_path / "NaviXav-Setup-9.9.9.install.log"
+
+    command = desktop._update_helper_command(
+        tmp_path / "NaviXav-Setup-9.9.9.exe",
+        parent_pid=4242,
+        install_directory=None,
+        log_path=log_path,
+    )
+    script = base64.b64decode(
+        command[command.index("-EncodedCommand") + 1]
+    ).decode("utf-16-le")
+
+    # Le journal du helper est distinct de celui qu'Inno Setup écrase.
+    assert str(log_path.with_suffix(".helper.log")) in script
+    assert "Trace 'helper demarre'" in script
+    assert "$code = $LASTEXITCODE" in script
+    assert script.index("Trace 'helper demarre'") < script.index("Wait-Process")
+    assert script.index("& $installer") < script.index("$code = $LASTEXITCODE")
+
+
 def test_mobile_lan_interface_is_protected_and_responsive():
     project = Path(desktop.__file__).parent.parent
     static = Path(desktop.__file__).parent / "web" / "static"
