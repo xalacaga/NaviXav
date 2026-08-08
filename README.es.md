@@ -552,6 +552,10 @@ El instalador se descarga en `%LOCALAPPDATA%\NaviXav\updates\` y después se
 compara su huella SHA-256 con la publicada por GitHub. Si la huella falta o
 difiere, el archivo se elimina y nunca se ejecuta. Una avería de GitHub o de
 Internet no bloquea ni el inicio ni las funciones de vuelo.
+Antes de la instalación, un asistente independiente de Windows espera al cierre
+completo del proceso NaviXav. Después actualiza la carpeta realmente utilizada,
+reinicia la aplicación y conserva un archivo `.install.log` junto al instalador
+descargado.
 
 El repositorio es público en lectura. Un usuario puede consultar el código y
 descargar las Releases sin cuenta de GitHub, pero solo los colaboradores

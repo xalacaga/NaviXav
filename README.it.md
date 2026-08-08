@@ -549,6 +549,10 @@ L'installer viene scaricato in `%LOCALAPPDATA%\NaviXav\updates\`, quindi la sua
 impronta SHA-256 viene confrontata con quella pubblicata da GitHub. In caso di
 impronta assente o diversa, il file viene eliminato e non viene mai eseguito.
 Un guasto di GitHub o di Internet non blocca né l'avvio né le funzioni di volo.
+Prima dell'installazione, un helper Windows indipendente attende la chiusura
+completa del processo NaviXav. Aggiorna quindi la cartella realmente utilizzata,
+riavvia l'applicazione e conserva un file `.install.log` accanto all'installer
+scaricato.
 
 Il repository è pubblico in lettura. Un utente può consultare il codice e
 scaricare le Release senza account GitHub, ma solo i collaboratori autorizzati

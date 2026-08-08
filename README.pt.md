@@ -551,6 +551,10 @@ O instalador é transferido para `%LOCALAPPDATA%\NaviXav\updates\` e a sua
 impressão SHA-256 é depois comparada com a publicada pelo GitHub. Em caso de
 impressão ausente ou diferente, o ficheiro é eliminado e nunca é executado. Uma
 avaria do GitHub ou da Internet não bloqueia o arranque nem as funções de voo.
+Antes da instalação, um auxiliar Windows independente aguarda o encerramento
+completo do processo NaviXav. Em seguida, atualiza a pasta realmente utilizada,
+reinicia a aplicação e conserva um ficheiro `.install.log` junto do instalador
+transferido.
 
 O repositório é público em leitura. Um utilizador pode consultar o código e
 transferir as Releases sem conta GitHub, mas apenas os colaboradores

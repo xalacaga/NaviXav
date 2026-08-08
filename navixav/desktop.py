@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import ctypes
 import json
 import logging
@@ -30,6 +31,60 @@ LAST_PORT = 8775
 WEBVIEW2_CLIENT_ID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 APP_USER_MODEL_ID = "Galvo.NaviXav"
 SUPPORT_URL = "https://buymeacoffee.com/xalacaga"
+
+
+def _powershell_literal(value: str) -> str:
+    """Protège une valeur injectée dans le helper PowerShell encodé."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _update_helper_command(
+    installer: Path,
+    *,
+    parent_pid: int,
+    install_directory: Path | None,
+    log_path: Path,
+) -> list[str]:
+    """Attend la fin de NaviXav avant d'exécuter l'installateur vérifié."""
+    arguments = [
+        "/SILENT",
+        "/SP-",
+        "/CLOSEAPPLICATIONS",
+        "/RESTARTAPPLICATIONS",
+        f"/LOG={log_path}",
+    ]
+    if install_directory is not None:
+        arguments.append(f"/DIR={install_directory}")
+    powershell_arguments = ", ".join(
+        _powershell_literal(argument) for argument in arguments
+    )
+    script = (
+        "$ErrorActionPreference = 'Stop'\n"
+        f"Wait-Process -Id {parent_pid} -ErrorAction SilentlyContinue\n"
+        f"$installer = {_powershell_literal(str(installer))}\n"
+        f"$arguments = @({powershell_arguments})\n"
+        "& $installer @arguments\n"
+        "exit $LASTEXITCODE\n"
+    )
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    powershell = (
+        Path(system_root)
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    return [
+        str(powershell),
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-EncodedCommand",
+        encoded,
+    ]
 
 
 def _show_error(message: str) -> None:
@@ -201,20 +256,27 @@ def _run_desktop_window(url: str, server: object) -> None:
                         subprocess.CREATE_NEW_PROCESS_GROUP
                         | subprocess.DETACHED_PROCESS
                     )
+                    install_directory = (
+                        Path(sys.executable).resolve().parent
+                        if bool(getattr(sys, "frozen", False))
+                        else None
+                    )
+                    install_log = installer.with_suffix(".install.log")
+                    command = _update_helper_command(
+                        installer,
+                        parent_pid=os.getpid(),
+                        install_directory=install_directory,
+                        log_path=install_log,
+                    )
                     subprocess.Popen(
-                        [
-                            str(installer),
-                            "/SILENT",
-                            "/SP-",
-                            "/CLOSEAPPLICATIONS",
-                            "/RESTARTAPPLICATIONS",
-                        ],
+                        command,
                         close_fds=True,
                         creationflags=flags,
                     )
                     logging.info(
-                        "Installateur de mise à jour lancé : %s",
+                        "Mise à jour planifiée après fermeture : %s vers %s",
                         installer.name,
+                        install_directory or "dossier Inno Setup",
                     )
                     stop_from_interface()
                 except Exception:

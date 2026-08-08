@@ -602,6 +602,10 @@ heruntergeladen, anschließend wird seine SHA-256-Prüfsumme mit der von GitHub
 veröffentlichten verglichen. Fehlt die Prüfsumme oder weicht sie ab, wird die
 Datei gelöscht und niemals ausgeführt. Ein Ausfall von GitHub oder des
 Internets blockiert weder den Start noch die Flugfunktionen.
+Vor der Installation wartet ein unabhängiger Windows-Helfer, bis der laufende
+NaviXav-Prozess vollständig beendet ist. Danach aktualisiert er das tatsächlich
+verwendete Verzeichnis, startet die Anwendung neu und speichert eine
+`.install.log`-Datei neben dem heruntergeladenen Installationsprogramm.
 
 Das Repository ist öffentlich lesbar. Nutzer können den Code einsehen und
 Releases ohne GitHub-Konto herunterladen, aber nur berechtigte Mitwirkende

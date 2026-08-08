@@ -555,6 +555,10 @@ Het installatieprogramma wordt gedownload naar
 vergeleken met de door GitHub gepubliceerde. Ontbreekt de controlesom of wijkt
 ze af, dan wordt het bestand verwijderd en nooit uitgevoerd. Een storing van
 GitHub of van het internet blokkeert noch het opstarten, noch de vluchtfuncties.
+Vóór de installatie wacht een losstaande Windows-helper tot het actieve
+NaviXav-proces volledig is afgesloten. Daarna werkt hij de werkelijk gebruikte
+map bij, start de toepassing opnieuw en bewaart een `.install.log` naast het
+gedownloade installatieprogramma.
 
 De repository is openbaar leesbaar. Een gebruiker kan de code inzien en releases
 downloaden zonder GitHub-account, maar alleen gemachtigde medewerkers kunnen

@@ -600,6 +600,10 @@ L’installateur est téléchargé dans
 celle publiée par GitHub. En cas d’empreinte absente ou différente, le fichier
 est supprimé et n’est jamais exécuté. Une panne de GitHub ou d’Internet ne
 bloque ni le démarrage ni les fonctions de vol.
+Avant l’installation, un assistant Windows détaché attend la fermeture complète
+du processus NaviXav. Il met ensuite à jour le dossier réellement utilisé,
+redémarre l’application et conserve un fichier `.install.log` à côté de
+l’installateur téléchargé.
 
 Le dépôt est public en lecture. Un utilisateur peut consulter le code et
 télécharger les Releases sans compte GitHub, mais seuls les collaborateurs

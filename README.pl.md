@@ -551,6 +551,9 @@ Instalator jest pobierany do `%LOCALAPPDATA%\NaviXav\updates\`, a następnie jeg
 suma SHA-256 jest porównywana z sumą opublikowaną przez GitHub. W przypadku
 braku lub niezgodności sumy plik jest usuwany i nigdy nie zostaje uruchomiony.
 Awaria GitHuba lub internetu nie blokuje ani uruchomienia, ani funkcji lotu.
+Przed instalacją niezależny pomocnik Windows czeka na całkowite zamknięcie
+procesu NaviXav. Następnie aktualizuje rzeczywiście używany folder, ponownie
+uruchamia aplikację i zapisuje plik `.install.log` obok pobranego instalatora.
 
 Repozytorium jest publiczne do odczytu. Użytkownik może przeglądać kod i
 pobierać wydania bez konta GitHub, ale tylko upoważnieni współpracownicy mogą

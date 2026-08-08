@@ -1,6 +1,7 @@
 """Fenêtre native et cycle de vie du service local."""
 
 import asyncio
+import base64
 import re
 import sys
 import time
@@ -394,6 +395,28 @@ def test_silent_update_restarts_navixav():
     assert "postinstall" in run_entry
     assert "runasoriginaluser" in run_entry
     assert "skipifsilent" not in run_entry
+
+
+def test_update_waits_for_the_old_process_and_reuses_its_install_directory(tmp_path):
+    installer = tmp_path / "NaviXav-Setup-1.4.12.exe"
+    install_directory = Path(r"D:\MSFS2024\NaviXav")
+    log_path = tmp_path / "NaviXav-Setup-1.4.12.install.log"
+
+    command = desktop._update_helper_command(
+        installer,
+        parent_pid=4242,
+        install_directory=install_directory,
+        log_path=log_path,
+    )
+    encoded = command[command.index("-EncodedCommand") + 1]
+    script = base64.b64decode(encoded).decode("utf-16-le")
+
+    assert command[0].lower().endswith("powershell.exe")
+    assert "Wait-Process -Id 4242" in script
+    assert str(installer) in script
+    assert f"/DIR={install_directory}" in script
+    assert f"/LOG={log_path}" in script
+    assert script.index("Wait-Process") < script.index("& $installer")
 
 
 def test_mobile_lan_interface_is_protected_and_responsive():

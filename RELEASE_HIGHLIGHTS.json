@@ -16,5 +16,16 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": []
+  "fixed": [
+    {
+      "en": "Automatic updates now wait for the old NaviXav process to close completely, reinstall into the directory actually in use and keep an installation log, preventing the previous version from restarting and offering the same update again",
+      "fr": "Les mises à jour automatiques attendent désormais la fermeture complète de l'ancien processus NaviXav, réinstallent dans le dossier réellement utilisé et conservent un journal d'installation, empêchant l'ancienne version de redémarrer et de reproposer la même mise à jour",
+      "de": "Automatische Updates warten jetzt, bis der alte NaviXav-Prozess vollständig beendet ist, installieren erneut in das tatsächlich verwendete Verzeichnis und führen ein Installationsprotokoll, sodass die vorherige Version nicht mehr neu startet und dasselbe Update erneut anbietet",
+      "es": "Las actualizaciones automáticas esperan ahora a que el proceso anterior de NaviXav se cierre por completo, reinstalan en la carpeta realmente utilizada y conservan un registro de instalación, evitando que la versión anterior se reinicie y vuelva a ofrecer la misma actualización",
+      "it": "Gli aggiornamenti automatici attendono ora la chiusura completa del vecchio processo NaviXav, reinstallano nella cartella realmente utilizzata e conservano un registro di installazione, impedendo alla versione precedente di riavviarsi e riproporre lo stesso aggiornamento",
+      "pt": "As atualizações automáticas aguardam agora o encerramento completo do processo NaviXav anterior, reinstalam na pasta realmente utilizada e mantêm um registo de instalação, impedindo que a versão anterior reinicie e volte a propor a mesma atualização",
+      "nl": "Automatische updates wachten nu tot het oude NaviXav-proces volledig is afgesloten, installeren opnieuw in de werkelijk gebruikte map en bewaren een installatielogboek, zodat de vorige versie niet opnieuw start en dezelfde update blijft aanbieden",
+      "pl": "Aktualizacje automatyczne czekają teraz na całkowite zamknięcie starego procesu NaviXav, instalują ponownie w rzeczywiście używanym folderze i zachowują dziennik instalacji, dzięki czemu poprzednia wersja nie uruchamia się ponownie i nie proponuje tej samej aktualizacji"
+    }
+  ]
 }

@@ -581,6 +581,9 @@ The installer is downloaded to `%LOCALAPPDATA%\NaviXav\updates\`, then its
 SHA-256 checksum is compared with the one published by GitHub. If the checksum
 is missing or different, the file is deleted and never executed. A GitHub or
 Internet outage blocks neither startup nor the flight functions.
+Before installation, a detached Windows helper waits until the running NaviXav
+process has fully closed. It then updates the directory actually in use, restarts
+the application and keeps an `.install.log` beside the downloaded installer.
 
 The repository is publicly readable. A user can browse the code and download
 Releases without a GitHub account, but only authorised collaborators can write
