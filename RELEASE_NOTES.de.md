@@ -1,14 +1,17 @@
-# NaviXav 1.4.14
+# NaviXav 1.4.15
 
 Veröffentlicht am 2026-08-08.
 
 ## Behoben
 
-- Ein bereits bestätigter Verfahrenspunkt bleibt für den Rest des Fluges bestätigt: Eine Phase verliert ihre Haken nicht mehr, wenn sich der Simulatorzustand ändert — Blitzlicht aus, Klappen eingefahren oder Feststellbremse gelöst —, und ein Punkt, den der Simulator nicht mehr meldet, zeigt Zuvor bestätigt statt Bestätigt · SimConnect.
+- Anfragen zu kommerziellen Lizenzen und Beiträgen verwenden jetzt die eigene NaviXav-Kontaktadresse.
+- Die automatische Aktualisierung installiert sich jetzt wirklich: Das Hilfsprogramm, das auf das Schließen von NaviXav wartet, wurde ohne Konsole gestartet und starb sofort, sodass die Aktualisierung als geplant gemeldet wurde und die Anwendung mit der alten Version wieder öffnete. Das Hilfsprogramm führt zudem ein eigenes Protokoll neben dem Installationsprogramm, damit ein künftiger Fehler nachvollziehbar bleibt.
+- Heruntergeladene Installationsprogramme häufen sich nicht mehr an: Jede Aktualisierung löscht die vorherigen, und das Installationsprogramm tut nach Abschluss dasselbe. Auf einem seit den ersten Versionen begleiteten Rechner hatte sich ein halbes Gigabyte angesammelt. Die Protokolle bleiben erhalten, damit ein Fehler weiterhin untersucht werden kann.
 
 ## Geändert
 
-- Correctif procedure.
-- Mise a jour License et ajout GS pour taxi.
+- Nettoyage des installateurs telecharges.
+- Correctif mise a jour automatique.
+- Update NaviXav contact email.
 
 Das Installationsprogramm wird vor jeder automatischen Aktualisierung anhand seiner SHA-256-Prüfsumme verifiziert.

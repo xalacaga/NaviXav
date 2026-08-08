@@ -16,36 +16,5 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": [
-    {
-      "en": "Commercial licensing and contribution enquiries now use the dedicated NaviXav contact address.",
-      "fr": "Les demandes de licence commerciale et de contribution utilisent désormais l'adresse de contact dédiée à NaviXav.",
-      "de": "Anfragen zu kommerziellen Lizenzen und Beiträgen verwenden jetzt die eigene NaviXav-Kontaktadresse.",
-      "es": "Las consultas sobre licencias comerciales y contribuciones utilizan ahora la dirección de contacto específica de NaviXav.",
-      "it": "Le richieste relative alle licenze commerciali e ai contributi utilizzano ora l'indirizzo di contatto dedicato a NaviXav.",
-      "pt": "Os pedidos sobre licenciamento comercial e contribuições utilizam agora o endereço de contacto dedicado ao NaviXav.",
-      "nl": "Vragen over commerciële licenties en bijdragen gebruiken nu het speciale NaviXav-contactadres.",
-      "pl": "Zapytania dotyczące licencji komercyjnych i współtworzenia korzystają teraz z dedykowanego adresu kontaktowego NaviXav."
-    },
-    {
-      "en": "The automatic update now really installs itself: the helper that waits for NaviXav to close was started without any console and died immediately, so the update was announced as scheduled and the application reopened on the previous version. The helper also keeps its own log next to the installer, so a future failure can be diagnosed.",
-      "fr": "La mise à jour automatique s'installe désormais réellement : l'assistant qui attend la fermeture de NaviXav était lancé sans aucune console et mourait aussitôt, si bien que la mise à jour était annoncée comme planifiée et que l'application rouvrait sur la version précédente. L'assistant tient de plus son propre journal à côté de l'installateur, afin qu'une panne future soit analysable.",
-      "de": "Die automatische Aktualisierung installiert sich jetzt wirklich: Das Hilfsprogramm, das auf das Schließen von NaviXav wartet, wurde ohne Konsole gestartet und starb sofort, sodass die Aktualisierung als geplant gemeldet wurde und die Anwendung mit der alten Version wieder öffnete. Das Hilfsprogramm führt zudem ein eigenes Protokoll neben dem Installationsprogramm, damit ein künftiger Fehler nachvollziehbar bleibt.",
-      "es": "La actualización automática ya se instala de verdad: el asistente que espera al cierre de NaviXav se lanzaba sin ninguna consola y moría de inmediato, de modo que la actualización se anunciaba como programada y la aplicación volvía a abrirse con la versión anterior. Además, el asistente mantiene su propio registro junto al instalador, para poder analizar un fallo futuro.",
-      "it": "L'aggiornamento automatico ora si installa davvero: l'assistente che attende la chiusura di NaviXav veniva avviato senza alcuna console e moriva subito, così l'aggiornamento veniva annunciato come pianificato e l'applicazione si riapriva sulla versione precedente. L'assistente tiene inoltre un proprio registro accanto all'installatore, perché un guasto futuro sia analizzabile.",
-      "pt": "A atualização automática passa a instalar-se realmente: o assistente que aguarda o fecho do NaviXav era lançado sem qualquer consola e morria de imediato, pelo que a atualização era anunciada como agendada e a aplicação reabria na versão anterior. O assistente mantém ainda o seu próprio registo junto do instalador, para que uma falha futura possa ser analisada.",
-      "nl": "De automatische update installeert zichzelf nu echt: het hulpprogramma dat wacht tot NaviXav sluit werd zonder console gestart en stierf meteen, waardoor de update als gepland werd gemeld en de toepassing weer opende op de vorige versie. Het hulpprogramma houdt bovendien een eigen logboek naast het installatieprogramma, zodat een toekomstige storing te onderzoeken is.",
-      "pl": "Automatyczna aktualizacja naprawdę się teraz instaluje: pomocnik czekający na zamknięcie NaviXav był uruchamiany bez żadnej konsoli i natychmiast kończył pracę, więc aktualizacja była zgłaszana jako zaplanowana, a aplikacja otwierała się ponownie na poprzedniej wersji. Pomocnik prowadzi też własny dziennik obok instalatora, aby przyszłą awarię dało się zbadać."
-    },
-    {
-      "en": "Downloaded installers no longer pile up: each update sweeps the previous ones, and the installer does the same once it finishes. Half a gigabyte had accumulated on a machine followed since the first versions. The logs are kept, so a failure can still be examined.",
-      "fr": "Les installateurs téléchargés ne s'accumulent plus : chaque mise à jour efface les précédents, et l'installateur fait de même en fin d'installation. Un demi-gigaoctet s'était accumulé sur une machine suivie depuis les premières versions. Les journaux sont conservés, afin qu'une panne reste analysable.",
-      "de": "Heruntergeladene Installationsprogramme häufen sich nicht mehr an: Jede Aktualisierung löscht die vorherigen, und das Installationsprogramm tut nach Abschluss dasselbe. Auf einem seit den ersten Versionen begleiteten Rechner hatte sich ein halbes Gigabyte angesammelt. Die Protokolle bleiben erhalten, damit ein Fehler weiterhin untersucht werden kann.",
-      "es": "Los instaladores descargados ya no se acumulan: cada actualización borra los anteriores, y el instalador hace lo mismo al terminar. Se había acumulado medio gigabyte en un equipo seguido desde las primeras versiones. Los registros se conservan, para que un fallo siga siendo analizable.",
-      "it": "Gli installatori scaricati non si accumulano più: ogni aggiornamento cancella i precedenti e l'installatore fa lo stesso al termine. Su una macchina seguita fin dalle prime versioni si era accumulato mezzo gigabyte. I registri vengono conservati, perché un guasto resti analizzabile.",
-      "pt": "Os instaladores transferidos deixam de se acumular: cada atualização apaga os anteriores e o instalador faz o mesmo no final. Meio gigabyte tinha-se acumulado numa máquina acompanhada desde as primeiras versões. Os registos são mantidos, para que uma falha continue a poder ser analisada.",
-      "nl": "Gedownloade installatieprogramma's stapelen zich niet meer op: elke update wist de vorige, en het installatieprogramma doet hetzelfde na afloop. Op een machine die sinds de eerste versies wordt gevolgd was een halve gigabyte samengekomen. De logboeken blijven bewaard, zodat een storing nog te onderzoeken is.",
-      "pl": "Pobrane instalatory nie gromadzą się już: każda aktualizacja usuwa poprzednie, a instalator robi to samo po zakończeniu. Na komputerze używanym od pierwszych wersji zebrało się pół gigabajta. Dzienniki są zachowywane, aby awarię nadal dało się zbadać."
-    }
-  ]
+  "fixed": []
 }
