@@ -26,6 +26,16 @@
       "pt": "As atualizações automáticas aguardam agora o encerramento completo do processo NaviXav anterior, reinstalam na pasta realmente utilizada e mantêm um registo de instalação, impedindo que a versão anterior reinicie e volte a propor a mesma atualização",
       "nl": "Automatische updates wachten nu tot het oude NaviXav-proces volledig is afgesloten, installeren opnieuw in de werkelijk gebruikte map en bewaren een installatielogboek, zodat de vorige versie niet opnieuw start en dezelfde update blijft aanbieden",
       "pl": "Aktualizacje automatyczne czekają teraz na całkowite zamknięcie starego procesu NaviXav, instalują ponownie w rzeczywiście używanym folderze i zachowują dziennik instalacji, dzięki czemu poprzednia wersja nie uruchamia się ponownie i nie proponuje tej samej aktualizacji"
+    },
+    {
+      "en": "Release preparation now handles an empty Added or Fixed category without shifting the following PowerShell arguments or interrupting publication",
+      "fr": "La préparation d'une Release gère désormais une catégorie Nouveautés ou Corrections vide sans décaler les arguments PowerShell suivants ni interrompre la publication",
+      "de": "Die Release-Vorbereitung verarbeitet jetzt eine leere Kategorie Neu oder Behoben, ohne nachfolgende PowerShell-Argumente zu verschieben oder die Veröffentlichung abzubrechen",
+      "es": "La preparación de una Release admite ahora una categoría Novedades o Correcciones vacía sin desplazar los argumentos PowerShell siguientes ni interrumpir la publicación",
+      "it": "La preparazione di una Release gestisce ora una categoria Novità o Correzioni vuota senza spostare gli argomenti PowerShell successivi né interrompere la pubblicazione",
+      "pt": "A preparação de uma Release aceita agora uma categoria Novidades ou Correções vazia sem deslocar os argumentos PowerShell seguintes nem interromper a publicação",
+      "nl": "De voorbereiding van een release verwerkt nu een lege categorie Nieuw of Opgelost zonder de volgende PowerShell-argumenten te verschuiven of de publicatie te onderbreken",
+      "pl": "Przygotowanie wydania obsługuje teraz pustą kategorię Nowości lub Poprawki bez przesuwania kolejnych argumentów PowerShell ani przerywania publikacji"
     }
   ]
 }

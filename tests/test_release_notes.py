@@ -116,6 +116,20 @@ def test_prepare_reads_the_structured_highlights():
     assert '$Locales = @("en", "fr", "de", "es", "it", "pt", "nl", "pl")' in prepare
 
 
+def test_prepare_keeps_empty_release_categories_in_their_named_parameters():
+    """Un tableau vide ne doit pas décaler les arguments PowerShell suivants."""
+    prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$FeatureItems = @(" in prepare
+    assert "$FixItems = @(" in prepare
+    assert "Where-Object { $null -ne $_ }" in prepare
+    assert "-AddedEntries $FeatureItems" in prepare
+    assert "-FixedEntries $FixItems" in prepare
+    assert "-ChangedItems $Other" in prepare
+
+
 def test_prepare_writes_one_note_per_language():
     prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
         encoding="utf-8"

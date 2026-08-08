@@ -220,12 +220,17 @@ function Add-Category(
 
 # Texte d'une entrée dans une langue donnée, avec repli sur l'anglais.
 function Get-EntryText($Entry, [string]$Locale) {
+    if ($null -eq $Entry) { return "" }
     if ($Entry.ContainsKey($Locale)) { return $Entry[$Locale] }
     return $Entry["en"]
 }
 
 function Select-EntryTexts([object[]]$Entries, [string]$Locale) {
-    return @($Entries | ForEach-Object { Get-EntryText $_ $Locale })
+    return @(
+        $Entries |
+            Where-Object { $null -ne $_ } |
+            ForEach-Object { Get-EntryText $_ $Locale }
+    )
 }
 
 # Nouveautés et corrections rédigées à la main pour cette version.
@@ -378,22 +383,32 @@ $Other = @(
 # du produit, là où le sujet de commit ne décrit que le dépôt. Un sujet de
 # commit repris faute de mieux n'existe que dans sa langue d'origine : il est
 # rangé sous « en », d'où toutes les autres langues le reprendront.
-$FeatureItems = if ($Highlights.Features.Count -gt 0) {
-    $Highlights.Features
-} else {
-    @($Features | ForEach-Object { @{ en = $_ } })
-}
-$FixItems = if ($Highlights.Fixes.Count -gt 0) {
-    $Highlights.Fixes
-} else {
-    @($Fixes | ForEach-Object { @{ en = $_ } })
-}
+$FeatureItems = @(
+    if ($Highlights.Features.Count -gt 0) {
+        $Highlights.Features
+    } else {
+        $Features | ForEach-Object { @{ en = $_ } }
+    }
+)
+$FixItems = @(
+    if ($Highlights.Fixes.Count -gt 0) {
+        $Highlights.Fixes
+    } else {
+        $Fixes | ForEach-Object { @{ en = $_ } }
+    }
+)
 
 # Une note par langue de l'interface. « RELEASE_NOTES.md » reste l'anglais :
 # c'est le corps de la release GitHub, lu par tout le monde.
 $NotesByLocale = @{}
 foreach ($Locale in $Locales) {
-    $NotesByLocale[$Locale] = New-ReleaseNotes $Locale $Next $Date $FeatureItems $FixItems $Other
+    $NotesByLocale[$Locale] = New-ReleaseNotes `
+        -Locale $Locale `
+        -Version $Next `
+        -Date $Date `
+        -AddedEntries $FeatureItems `
+        -FixedEntries $FixItems `
+        -ChangedItems $Other
 }
 $Notes = $NotesByLocale["en"]
 
