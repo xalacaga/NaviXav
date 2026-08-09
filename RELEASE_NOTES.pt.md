@@ -1,17 +1,18 @@
-# NaviXav 1.4.16
+# NaviXav 1.4.17
 
-Publicado em 2026-08-08.
+Publicado em 2026-08-09.
+
+## Novidades
+
+- O mapa mostra as restrições de altitude e velocidade publicadas sob cada ponto das SID, STAR e aproximações, com a cor do seu procedimento; um botão Restrições na barra do mapa permite ocultá-las.
+- A rolagem pode ser ditada: escreve na barra da planta do aeroporto os caminhos de circulação indicados pelo controlador — «N D B» — e o NaviXav traça e guia exatamente essa rota, útil na VATSIM e na IVAO. Um caminho que não prolonga o anterior é recusado indicando o seu nome, nunca substituído em silêncio pela rota calculada; uma autorização que termina antes da pista é prolongada a tracejado.
 
 ## Correções
 
-- Os speedbrakes dos Fenix A319/A320/A321 agora apresentam ARMED corretamente mesmo quando o nome da aeronave no SimBrief é genérico.
-- O Top of Descent é agora um ponto fixo da rota, calculado a partir do nível de cruzeiro: diminui até zero e depois é indicado como ultrapassado. Antes podia ficar parado durante uma descida a 3° ou até aumentar quando a descida era iniciada demasiado cedo.
-- O desvio em relação ao perfil de descida continua a ser indicado durante um nivelamento abaixo do nível de cruzeiro. Antes desaparecia assim que a velocidade vertical voltava a zero, precisamente quando a aeronave estava muito abaixo do perfil.
-- O Top of Descent passa a ter em conta os tetos de altitude publicados da STAR e da aproximação e lê a altitude na atmosfera padrão como um nível de voo.
-- A velocidade vertical necessária para a restrição seguinte passa a ser comparada com a altitude indicada, a única comparável com uma restrição publicada.
+- As mensagens da rolagem — caminho desconhecido, estacionamento não encontrado, pista não servida — seguem agora o idioma da interface. Apareciam em francês qualquer que fosse o idioma escolhido.
 
 ## Alterações
 
-- Correction bug TOD.
+- Ajout fonctionnalites.
 
 O instalador é verificado através da sua soma de verificação SHA-256 antes de qualquer atualização automática.

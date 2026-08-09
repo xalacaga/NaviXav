@@ -1,17 +1,18 @@
-# NaviXav 1.4.16
+# NaviXav 1.4.17
 
-Publicado el 2026-08-08.
+Publicado el 2026-08-09.
+
+## Novedades
+
+- El mapa muestra las restricciones de altitud y velocidad publicadas bajo cada punto de las SID, STAR y aproximaciones, con el color de su procedimiento; un botón Restricciones en la barra del mapa permite ocultarlas.
+- El rodaje puede dictarse: escribe en la barra del plano del aeródromo las calles de rodaje indicadas por el controlador — «N D B» — y NaviXav traza y guía exactamente esa ruta, útil en VATSIM e IVAO. Una calle que no prolonga la anterior se rechaza nombrándola, nunca se sustituye en silencio por la ruta calculada; una autorización que se detiene antes de la pista se prolonga con trazo discontinuo.
 
 ## Correcciones
 
-- Los aerofrenos de los Fenix A319/A320/A321 ahora muestran ARMED correctamente aunque el nombre del avión en SimBrief sea genérico.
-- El Top of Descent es ahora un punto fijo de la ruta, calculado a partir del nivel de crucero: disminuye hasta cero y después se indica como superado. Antes podía quedarse congelado durante un descenso a 3° o incluso aumentar cuando el descenso se iniciaba demasiado pronto.
-- La desviación respecto al perfil de descenso se sigue indicando durante un nivel intermedio por debajo del nivel de crucero. Antes desaparecía en cuanto la velocidad vertical volvía a cero, justo cuando el avión estaba muy por debajo del perfil.
-- El Top of Descent tiene ahora en cuenta los techos de altitud publicados de la STAR y de la aproximación, y lee la altitud en la atmósfera estándar como un nivel de vuelo.
-- La velocidad vertical necesaria para la siguiente restricción se compara ahora con la altitud indicada, la única comparable con una restricción publicada.
+- Los mensajes del rodaje — calle desconocida, puesto no encontrado, pista no servida — siguen ahora el idioma de la interfaz. Se mostraban en francés fuera cual fuera el idioma elegido.
 
 ## Cambios
 
-- Correction bug TOD.
+- Ajout fonctionnalites.
 
 El instalador se verifica con su suma de comprobación SHA-256 antes de cualquier actualización automática.

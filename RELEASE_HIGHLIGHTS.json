@@ -15,38 +15,6 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [
-    {
-      "fr": "la carte affiche les contraintes d’altitude et de vitesse publiées sous chaque repère des SID, STAR et approches, avec la couleur de leur procédure ; un bouton Contraintes de la barre carte permet de les masquer",
-      "en": "the map now shows the published altitude and speed constraints under each SID, STAR and approach fix, in the colour of their procedure; a Constraints button in the map bar hides them",
-      "de": "die Karte zeigt die veröffentlichten Höhen- und Geschwindigkeitsbeschränkungen unter jedem Wegpunkt der SID, STAR und Anflüge in der Farbe ihres Verfahrens; eine Schaltfläche Beschränkungen in der Kartenleiste blendet sie aus",
-      "es": "el mapa muestra las restricciones de altitud y velocidad publicadas bajo cada punto de las SID, STAR y aproximaciones, con el color de su procedimiento; un botón Restricciones en la barra del mapa permite ocultarlas",
-      "it": "la mappa mostra i vincoli di quota e velocità pubblicati sotto ogni punto di SID, STAR e avvicinamenti, con il colore della loro procedura; un pulsante Vincoli nella barra della mappa consente di nasconderli",
-      "pt": "o mapa mostra as restrições de altitude e velocidade publicadas sob cada ponto das SID, STAR e aproximações, com a cor do seu procedimento; um botão Restrições na barra do mapa permite ocultá-las",
-      "nl": "de kaart toont de gepubliceerde hoogte- en snelheidsbeperkingen onder elk punt van de SID, STAR en naderingen, in de kleur van hun procedure; een knop Beperkingen in de kaartbalk verbergt ze",
-      "pl": "mapa pokazuje opublikowane ograniczenia wysokości i prędkości pod każdym punktem SID, STAR i podejść, w kolorze ich procedury; przycisk Ograniczenia na pasku mapy pozwala je ukryć"
-    },
-    {
-      "fr": "le roulage peut être dicté : saisis dans la barre du plan de terrain les voies données par le contrôleur — « N D B » — et NaviXav trace et guide exactement cet itinéraire, utile sur VATSIM et IVAO. Une voie qui ne prolonge pas la précédente est refusée en la nommant, jamais remplacée en silence par l’itinéraire calculé ; une clairance qui s’arrête avant la piste est prolongée en pointillé",
-      "en": "taxi routes can now be dictated: type the taxiways given by the controller — \"N D B\" — in the airport chart bar and NaviXav draws and guides exactly that route, which helps on VATSIM and IVAO. A taxiway that does not extend the previous one is refused by name, never silently replaced by the computed route; a clearance stopping short of the runway is extended as a dashed portion",
-      "de": "die Rollroute kann vorgegeben werden: Gib in der Leiste der Flughafenkarte die vom Lotsen genannten Rollwege ein — „N D B“ — und NaviXav zeichnet und führt genau diese Route, nützlich auf VATSIM und IVAO. Ein Rollweg, der den vorherigen nicht fortsetzt, wird namentlich abgelehnt und nie stillschweigend durch die berechnete Route ersetzt; eine vor der Piste endende Freigabe wird gestrichelt verlängert",
-      "es": "el rodaje puede dictarse: escribe en la barra del plano del aeródromo las calles de rodaje indicadas por el controlador — «N D B» — y NaviXav traza y guía exactamente esa ruta, útil en VATSIM e IVAO. Una calle que no prolonga la anterior se rechaza nombrándola, nunca se sustituye en silencio por la ruta calculada; una autorización que se detiene antes de la pista se prolonga con trazo discontinuo",
-      "it": "il rullaggio può essere dettato: digita nella barra della mappa dell'aeroporto le vie di rullaggio indicate dal controllore — «N D B» — e NaviXav traccia e guida esattamente quel percorso, utile su VATSIM e IVAO. Una via che non prolunga la precedente viene rifiutata indicandone il nome, mai sostituita in silenzio dal percorso calcolato; un'autorizzazione che si ferma prima della pista viene prolungata in tratteggio",
-      "pt": "a rolagem pode ser ditada: escreve na barra da planta do aeroporto os caminhos de circulação indicados pelo controlador — «N D B» — e o NaviXav traça e guia exatamente essa rota, útil na VATSIM e na IVAO. Um caminho que não prolonga o anterior é recusado indicando o seu nome, nunca substituído em silêncio pela rota calculada; uma autorização que termina antes da pista é prolongada a tracejado",
-      "nl": "de taxiroute kan worden opgegeven: typ in de balk van de luchthavenkaart de door de verkeersleider genoemde taxibanen — \"N D B\" — en NaviXav tekent en begeleidt precies die route, handig op VATSIM en IVAO. Een taxibaan die de vorige niet voortzet wordt met naam geweigerd en nooit stilzwijgend vervangen door de berekende route; een klaring die vóór de baan stopt wordt gestreept verlengd",
-      "pl": "kołowanie można podyktować: wpisz na pasku planu lotniska drogi kołowania podane przez kontrolera — „N D B” — a NaviXav wyrysuje i poprowadzi dokładnie tę trasę, co pomaga na VATSIM i IVAO. Droga, która nie stanowi przedłużenia poprzedniej, zostaje odrzucona wraz z jej nazwą i nigdy nie jest po cichu zastąpiona trasą wyliczoną; zezwolenie kończące się przed drogą startową jest przedłużane linią przerywaną"
-    }
-  ],
-  "fixed": [
-    {
-      "fr": "les messages du roulage au sol — voie inconnue, poste introuvable, piste non desservie — suivent maintenant la langue de l’interface. Ils s’affichaient en français quelle que soit la langue choisie",
-      "en": "ground taxi messages — unknown taxiway, stand not found, runway not served — now follow the interface language. They were shown in French whatever language was selected",
-      "de": "die Meldungen des Rollverkehrs — unbekannter Rollweg, Abstellposition nicht gefunden, Piste nicht bedient — folgen jetzt der Oberflächensprache. Sie erschienen bisher auf Französisch, unabhängig von der gewählten Sprache",
-      "es": "los mensajes del rodaje — calle desconocida, puesto no encontrado, pista no servida — siguen ahora el idioma de la interfaz. Se mostraban en francés fuera cual fuera el idioma elegido",
-      "it": "i messaggi del rullaggio — via sconosciuta, piazzola non trovata, pista non servita — seguono ora la lingua dell'interfaccia. Comparivano in francese qualunque fosse la lingua scelta",
-      "pt": "as mensagens da rolagem — caminho desconhecido, estacionamento não encontrado, pista não servida — seguem agora o idioma da interface. Apareciam em francês qualquer que fosse o idioma escolhido",
-      "nl": "de meldingen van het taxiën — onbekende taxibaan, opstelplaats niet gevonden, baan niet bediend — volgen nu de taal van de interface. Ze verschenen in het Frans, ongeacht de gekozen taal",
-      "pl": "komunikaty kołowania — nieznana droga kołowania, nie znaleziono stanowiska, droga startowa nieobsługiwana — są teraz zgodne z językiem interfejsu. Wyświetlały się po francusku niezależnie od wybranego języka"
-    }
-  ]
+  "added": [],
+  "fixed": []
 }

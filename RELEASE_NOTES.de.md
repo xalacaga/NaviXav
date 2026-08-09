@@ -1,17 +1,18 @@
-# NaviXav 1.4.16
+# NaviXav 1.4.17
 
-Veröffentlicht am 2026-08-08.
+Veröffentlicht am 2026-08-09.
+
+## Neu
+
+- Die Karte zeigt die veröffentlichten Höhen- und Geschwindigkeitsbeschränkungen unter jedem Wegpunkt der SID, STAR und Anflüge in der Farbe ihres Verfahrens; eine Schaltfläche Beschränkungen in der Kartenleiste blendet sie aus.
+- Die Rollroute kann vorgegeben werden: Gib in der Leiste der Flughafenkarte die vom Lotsen genannten Rollwege ein — „N D B“ — und NaviXav zeichnet und führt genau diese Route, nützlich auf VATSIM und IVAO. Ein Rollweg, der den vorherigen nicht fortsetzt, wird namentlich abgelehnt und nie stillschweigend durch die berechnete Route ersetzt; eine vor der Piste endende Freigabe wird gestrichelt verlängert.
 
 ## Behoben
 
-- Die Speedbrakes der Fenix A319/A320/A321 zeigen jetzt zuverlässig ARMED an, auch wenn der Flugzeugname in SimBrief generisch ist.
-- Der Top of Descent ist jetzt ein fester Punkt auf der Route, berechnet aus der Reiseflughöhe: Der Wert zählt bis null herunter und wird danach als überschritten angezeigt. Zuvor konnte er während eines Sinkflugs mit 3° einfrieren oder sogar ansteigen, wenn der Sinkflug zu früh begonnen wurde.
-- Die Abweichung vom Sinkflugprofil wird jetzt auch während eines Zwischenniveaus unterhalb der Reiseflughöhe angezeigt. Bisher verschwand sie, sobald die Vertikalgeschwindigkeit auf null zurückging, also genau dann, wenn das Flugzeug weit unter dem Profil lag.
-- Der Top of Descent berücksichtigt jetzt die veröffentlichten Höhenobergrenzen der STAR und des Anflugs und liest die Höhe wie eine Flugfläche in der Standardatmosphäre.
-- Die für die nächste Beschränkung erforderliche Vertikalgeschwindigkeit wird jetzt mit der angezeigten Höhe verglichen, der einzigen, die mit einer veröffentlichten Beschränkung vergleichbar ist.
+- Die Meldungen des Rollverkehrs — unbekannter Rollweg, Abstellposition nicht gefunden, Piste nicht bedient — folgen jetzt der Oberflächensprache. Sie erschienen bisher auf Französisch, unabhängig von der gewählten Sprache.
 
 ## Geändert
 
-- Correction bug TOD.
+- Ajout fonctionnalites.
 
 Das Installationsprogramm wird vor jeder automatischen Aktualisierung anhand seiner SHA-256-Prüfsumme verifiziert.

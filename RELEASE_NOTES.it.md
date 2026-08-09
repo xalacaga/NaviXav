@@ -1,17 +1,18 @@
-# NaviXav 1.4.16
+# NaviXav 1.4.17
 
-Pubblicato il 2026-08-08.
+Pubblicato il 2026-08-09.
+
+## Novità
+
+- La mappa mostra i vincoli di quota e velocità pubblicati sotto ogni punto di SID, STAR e avvicinamenti, con il colore della loro procedura; un pulsante Vincoli nella barra della mappa consente di nasconderli.
+- Il rullaggio può essere dettato: digita nella barra della mappa dell'aeroporto le vie di rullaggio indicate dal controllore — «N D B» — e NaviXav traccia e guida esattamente quel percorso, utile su VATSIM e IVAO. Una via che non prolunga la precedente viene rifiutata indicandone il nome, mai sostituita in silenzio dal percorso calcolato; un'autorizzazione che si ferma prima della pista viene prolungata in tratteggio.
 
 ## Correzioni
 
-- Gli speedbrake dei Fenix A319/A320/A321 ora mostrano correttamente ARMED anche quando il nome dell’aeromobile in SimBrief è generico.
-- Il Top of Descent è ora un punto fisso della rotta, calcolato dal livello di crociera: diminuisce fino a zero e poi viene indicato come superato. In precedenza poteva bloccarsi durante una discesa a 3° o addirittura aumentare quando la discesa veniva iniziata troppo presto.
-- Lo scostamento dal profilo di discesa continua a essere segnalato durante un livellamento al di sotto del livello di crociera. Prima spariva non appena la velocità verticale tornava a zero, proprio quando l’aeromobile era molto sotto il profilo.
-- Il Top of Descent tiene ora conto dei tetti di altitudine pubblicati della STAR e dell’avvicinamento e legge l’altitudine nell’atmosfera standard come un livello di volo.
-- La velocità verticale richiesta per il vincolo successivo viene ora confrontata con l’altitudine indicata, l’unica comparabile con un vincolo pubblicato.
+- I messaggi del rullaggio — via sconosciuta, piazzola non trovata, pista non servita — seguono ora la lingua dell'interfaccia. Comparivano in francese qualunque fosse la lingua scelta.
 
 ## Modifiche
 
-- Correction bug TOD.
+- Ajout fonctionnalites.
 
 Il programma di installazione è verificato tramite il suo checksum SHA-256 prima di ogni aggiornamento automatico.

@@ -1,17 +1,18 @@
-# NaviXav 1.4.16
+# NaviXav 1.4.17
 
-Uitgebracht op 2026-08-08.
+Uitgebracht op 2026-08-09.
+
+## Nieuw
+
+- De kaart toont de gepubliceerde hoogte- en snelheidsbeperkingen onder elk punt van de SID, STAR en naderingen, in de kleur van hun procedure; een knop Beperkingen in de kaartbalk verbergt ze.
+- De taxiroute kan worden opgegeven: typ in de balk van de luchthavenkaart de door de verkeersleider genoemde taxibanen — "N D B" — en NaviXav tekent en begeleidt precies die route, handig op VATSIM en IVAO. Een taxibaan die de vorige niet voortzet wordt met naam geweigerd en nooit stilzwijgend vervangen door de berekende route; een klaring die vóór de baan stopt wordt gestreept verlengd.
 
 ## Opgelost
 
-- De speedbrakes van de Fenix A319/A320/A321 tonen nu betrouwbaar ARMED, ook wanneer de vliegtuigbenaming in SimBrief algemeen is.
-- Het Top of Descent is nu een vast punt op de route, berekend vanaf het kruisniveau: de waarde telt af tot nul en wordt daarna als gepasseerd weergegeven. Voorheen kon die tijdens een daling van 3° blijven staan of zelfs oplopen wanneer de daling te vroeg werd ingezet.
-- De afwijking ten opzichte van het daalprofiel blijft zichtbaar tijdens een niveauvlucht onder het kruisniveau. Voorheen verdween die zodra de verticale snelheid weer nul werd, juist wanneer het toestel ver onder het profiel zat.
-- Het Top of Descent houdt nu rekening met de gepubliceerde hoogteplafonds van de STAR en de nadering, en leest de hoogte in de standaardatmosfeer zoals een vliegniveau.
-- De verticale snelheid die nodig is voor de volgende beperking wordt nu vergeleken met de aangegeven hoogte, de enige die vergelijkbaar is met een gepubliceerde beperking.
+- De meldingen van het taxiën — onbekende taxibaan, opstelplaats niet gevonden, baan niet bediend — volgen nu de taal van de interface. Ze verschenen in het Frans, ongeacht de gekozen taal.
 
 ## Gewijzigd
 
-- Correction bug TOD.
+- Ajout fonctionnalites.
 
 Het installatieprogramma wordt vóór elke automatische update geverifieerd aan de hand van zijn SHA-256-controlesom.

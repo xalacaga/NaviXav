@@ -7,4 +7,4 @@ de navigation locale.
 
 from __future__ import annotations
 
-__version__ = "1.4.16"
+__version__ = "1.4.17"
