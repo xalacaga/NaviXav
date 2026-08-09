@@ -12,6 +12,22 @@ const constraintText = (value) => window.I18N.constraintText(value);
 const groundLabel = (value) => window.I18N.groundLabel(value);
 const chartCategory = (value) => window.I18N.chartCategory(value);
 
+/**
+ * Message d'erreur du service, rendu dans la langue de l'interface.
+ *
+ * Le service renvoie un code et ses paramètres plutôt qu'une phrase : il ne
+ * connaît pas la langue choisie, qui ne vit que dans ce navigateur. Le message
+ * français qui accompagne le code sert de repli, pour qu'un code oublié
+ * affiche encore quelque chose d'utile plutôt que rien.
+ */
+function serviceError(detail) {
+  if (typeof detail === "string") return detail;
+  if (!detail || typeof detail !== "object") return null;
+  const key = detail.code ? `err_${detail.code}` : null;
+  if (key && window.I18N.has(key)) return tf(key, detail.params || {});
+  return detail.message || null;
+}
+
 /** Localises explanations produced by the planner while preserving identifiers. */
 function plannerText(value) {
   const text = String(value || "");
@@ -142,6 +158,9 @@ let currentTaxiPlan = null;
 let currentTaxiGuidance = null;
 let automaticTaxiRouteKey = null;
 let automaticTaxiRoutePending = false;
+// Clairance saisie, telle que le pilote l'a tapée. Elle est renvoyée avec
+// chaque position : le service ne garde aucun état de session.
+let currentTaxiClearance = "";
 let taxiRouteRevision = 0;
 let taxiRouteRequestController = null;
 let liveTimer = null;
@@ -6162,7 +6181,14 @@ async function loadChart(icao, runway, mapRole) {
       stage: segment.stage,
       points: segment.points.map((point) => {
         const projected = projectToChart(point.lat, point.lon);
-        return { ...projected, ident: point.ident, via: point.via };
+        return {
+          ...projected,
+          ident: point.ident,
+          via: point.via,
+          // Contraintes publiées : la carte les affiche sous le nom du repère.
+          altitude: point.altitude,
+          speed: point.speed,
+        };
       }),
     }));
     MAP.setRouteSegments(routeSegments);
@@ -6214,6 +6240,7 @@ async function requestTaxiRoute(parking) {
     parking,
     runway,
     direction: currentMapRole === "arrival" ? "arrival" : "departure",
+    via: currentTaxiClearance,
   });
   taxiRouteRequestController?.abort();
   const controller = new AbortController();
@@ -6227,6 +6254,15 @@ async function requestTaxiRoute(parking) {
     const payload = await response.json();
     if (revision !== taxiRouteRevision) return;
     if (!response.ok) {
+      // Une clairance refusée garde le tracé précédent et dit pourquoi : le
+      // message du service nomme la voie fautive, et se rabattre en silence sur
+      // l'itinéraire calculé ferait rouler hors clairance sans le dire.
+      if (currentTaxiClearance) {
+        showBanner("warn", t("taxi_clearance_refused"), [
+          serviceError(payload?.detail) || t("taxi_unavailable_body"),
+        ]);
+        return;
+      }
       clearTaxiPlan();
       showBanner("warn", t("taxi_unavailable"), [t("taxi_unavailable_body")]);
       return;
@@ -6258,6 +6294,9 @@ function maybeRequestAutomaticTaxiRoute(aircraft) {
     currentTaxiPlan || automaticTaxiRoutePending
     || currentMapRole !== "departure" || !aircraft?.on_ground
   ) return;
+  // Une clairance saisie, même refusée, interdit la proposition automatique :
+  // elle substituerait en silence un itinéraire calculé à celui qu'on a dicté.
+  if (currentTaxiClearance) return;
   const nearest = GROUND.nearestParking(aircraft);
   if (!nearest || nearest.distance_m > 180) return;
   const key = `${currentIcao}:${currentChart?.highlight_runway}:${nearest.label}`;
@@ -6274,8 +6313,41 @@ function clearTaxiPlan() {
   cancelPendingTaxiRoute();
   currentTaxiPlan = null;
   currentTaxiGuidance = null;
+  currentTaxiClearance = "";
+  const field = $("ground-clearance");
+  if (field) {
+    field.value = "";
+    field.classList.remove("refused");
+  }
   GROUND.setPlan(null);
   updateGroundHud();
+}
+
+/**
+ * Applique la clairance saisie et recalcule le roulage.
+ *
+ * Le poste ne se redemande pas : c'est celui de l'itinéraire en cours, ou à
+ * défaut celui où l'avion se trouve. Une saisie vide rend la main à
+ * l'itinéraire calculé par NaviXav.
+ */
+async function applyTaxiClearance(text) {
+  const clearance = String(text || "").trim();
+  const parking = currentTaxiPlan?.parking?.label
+    || (latestAircraft ? GROUND.nearestParking(latestAircraft)?.label : null);
+  const field = $("ground-clearance");
+  if (!parking) {
+    showBanner("warn", t("taxi_no_parking"), [t("taxi_no_parking_body")]);
+    return;
+  }
+
+  currentTaxiClearance = clearance;
+  await requestTaxiRoute(parking);
+  if (field) {
+    field.classList.toggle(
+      "refused",
+      Boolean(clearance) && !currentTaxiPlan?.dictated
+    );
+  }
 }
 
 /**
@@ -6308,6 +6380,9 @@ async function pollTaxiGuidance(aircraft) {
     direction: requestedPlan.direction,
     latitude: aircraft.latitude,
     longitude: aircraft.longitude,
+    // La clairance repart avec la position : c'est ce qui la fait survivre au
+    // guidage sans que le service ait à la mémoriser.
+    via: (requestedPlan.via || []).join(" "),
   });
   try {
     const response = await fetch(`/api/ground/${currentIcao}/guidance?${params}`);
@@ -6396,6 +6471,13 @@ function updateGroundHud() {
     "ground-steps",
     currentTaxiPlan.summary.map(groundLabel).join(" › ")
   ));
+  // Le tracé montre déjà en pointillé ce qui dépasse la clairance ; le bandeau
+  // le dit en toutes lettres, parce qu'on ne roule pas les yeux sur la carte.
+  if (currentTaxiPlan.completed) {
+    hud.append(el("div", "ground-hint", t("taxi_clearance_completed")));
+  } else if (currentTaxiPlan.dictated) {
+    hud.append(el("div", "ground-hint", t("taxi_clearance_followed")));
+  }
   // Une fois le roulage commencé, c'est la distance restante qui compte.
   hud.append(el("div", null, guidance
     ? tf("metres_remaining", { distance: Math.round(guidance.remaining_m) })
@@ -7286,6 +7368,7 @@ $("map-zoom-in").addEventListener("click", () => MAP.zoomIn());
 $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
+$("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
 $("map-basemap-style").addEventListener("change", (event) => {
   const applied = MAP.setBasemap(event.target.value);
   $("settings-basemap").value = applied;
@@ -7301,6 +7384,14 @@ $("map-route").addEventListener("click", () => MAP.fitRoute());
 $("ground-fit").addEventListener("click", () => GROUND.fit());
 $("ground-plan").addEventListener("click", () => GROUND.fitPlan());
 $("ground-clear").addEventListener("click", () => clearTaxiPlan());
+$("ground-clearance").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  applyTaxiClearance(event.target.value);
+});
+$("ground-clearance-apply").addEventListener("click", () => {
+  applyTaxiClearance($("ground-clearance").value);
+});
 $("ground-follow").addEventListener("click", () => GROUND.toggleFollow());
 $("ground-secondary").addEventListener("click", () => GROUND.toggleSecondaryTaxiways());
 $("ground-alarm").addEventListener("click", () => toggleTaxiAlarmSound());

@@ -25,6 +25,7 @@ une conséquence mesurable.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 
@@ -35,6 +36,7 @@ from navixav.ground import (
     TaxiCosts,
     build_graph,
     find_route,
+    parse_taxiways,
     plan_taxi,
 )
 from navixav.navdata import msfs_store
@@ -312,7 +314,8 @@ def test_the_payload_carries_what_the_map_needs(graph):
     assert payload["distance_m"] > 0
     for leg in payload["legs"]:
         assert set(leg) == {
-            "name", "kind", "distance_m", "turn", "hold_short", "points"
+            "name", "kind", "distance_m", "turn", "hold_short", "points",
+            "from_clearance",
         }
         assert all(set(point) == {"x", "y"} for point in leg["points"])
 
@@ -544,4 +547,152 @@ def test_the_service_reports_an_impossible_route(routable_app):
             "TEST", "porte Z 9", "09", DEPARTURE
         )
     assert refused.value.status_code == 404
-    assert "poste nommé" in refused.value.detail
+    assert refused.value.detail["code"] == "ground_unknown_parking"
+    assert refused.value.detail["params"]["parking"] == "porte Z 9"
+    assert "poste nommé" in refused.value.detail["message"]
+
+
+# --------------------------------------------------------------------------- #
+# Roulage dicté par le contrôleur
+# --------------------------------------------------------------------------- #
+
+
+def test_a_clearance_is_read_the_way_it_is_heard():
+    assert parse_taxiways("N D B") == ("N", "D", "B")
+    assert parse_taxiways("n, d, b") == ("N", "D", "B")
+    assert parse_taxiways("A-B/C") == ("A", "B", "C")
+    assert parse_taxiways("   ") == ()
+
+
+def test_the_dictated_route_follows_the_named_taxiways(graph):
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("A", "B"))
+    assert plan.is_dictated
+    assert [leg["name"] for leg in plan.legs() if leg["name"]] == [
+        "porte A 1", "A", "B"
+    ]
+    assert plan.summary() == ("porte A 1", "A", "B", "attente 09")
+
+
+def test_the_dictated_route_matches_the_automatic_one_when_it_is_the_same(graph):
+    dictated = plan_taxi(graph, parking="porte A 1", runway="09", via=("A", "B"))
+    automatic = plan_taxi(graph, parking="porte A 1", runway="09")
+    assert dictated.polyline() == automatic.polyline()
+    assert not dictated.is_completed
+
+
+def test_a_clearance_stopping_short_is_completed_and_says_so(graph):
+    """Le contrôleur n'a dit que « A » : le reste est ajouté, et se distingue."""
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("A",))
+    assert plan.is_completed
+    added = [leg["name"] for leg in plan.legs() if not leg["from_clearance"]]
+    assert "B" in added
+
+
+def test_the_leg_of_the_clearance_itself_is_not_marked_as_added(graph):
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("A",))
+    cleared = [
+        leg["name"] for leg in plan.legs()
+        if leg["from_clearance"] and leg["name"] and leg["kind"] != "stand"
+    ]
+    assert cleared == ["A"]
+
+
+def test_an_unknown_taxiway_is_reported_with_the_ones_that_exist(graph):
+    with pytest.raises(GroundError) as refused:
+        plan_taxi(graph, parking="porte A 1", runway="09", via=("Z",))
+    assert "« Z »" in str(refused.value)
+    assert "A, B, C" in str(refused.value)
+
+
+def test_a_taxiway_that_does_not_extend_the_previous_one_is_reported(graph):
+    """Le message doit nommer la voie fautive : c'est le mot mal entendu."""
+    with pytest.raises(GroundError) as refused:
+        plan_taxi(graph, parking="porte A 1", runway="09", via=("A", "B", "C"))
+    assert "« C »" in str(refused.value)
+    assert "« B »" in str(refused.value)
+
+
+def test_a_clearance_omitting_the_stand_taxiway_still_works(graph):
+    """« B » seul depuis le poste : A est ajoutée, marquée comme telle."""
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("B",))
+    named = {leg["name"]: leg["from_clearance"] for leg in plan.legs() if leg["name"]}
+    assert named["B"] is True
+    assert named["A"] is False
+
+
+def test_the_dictated_route_never_takes_the_closed_shortcut(graph):
+    """Le raccourci fermé 0→3 reste interdit, clairance ou pas."""
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("A", "B"))
+    assert plan.distance_m > 600
+
+
+def test_the_arrival_can_be_dictated_too(graph):
+    plan = plan_taxi(
+        graph, parking="porte A 1", runway="09", direction=ARRIVAL, via=("B", "A")
+    )
+    assert plan.is_dictated
+    assert plan.summary()[-1] == "porte A 1"
+
+
+def test_the_payload_announces_the_clearance(graph):
+    payload = plan_taxi(
+        graph, parking="porte A 1", runway="09", via=("A", "B")
+    ).to_dict()
+    assert payload["via"] == ["A", "B"]
+    assert payload["dictated"] is True
+    assert payload["completed"] is False
+
+
+def test_the_service_accepts_a_dictated_route(routable_app):
+    payload = _endpoint(routable_app, "/api/ground/{icao}/route")(
+        "TEST", "porte A 1", "09", DEPARTURE, "A B"
+    )
+    assert payload["via"] == ["A", "B"]
+    assert payload["dictated"] is True
+
+
+def test_the_service_reports_why_a_clearance_is_impossible(routable_app):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as refused:
+        _endpoint(routable_app, "/api/ground/{icao}/route")(
+            "TEST", "porte A 1", "09", DEPARTURE, "A B C"
+        )
+    assert refused.value.status_code == 404
+    # Le détail part structuré : le client compose la phrase dans sa langue.
+    assert refused.value.detail["code"] == "clearance_not_connected"
+    assert refused.value.detail["params"] == {
+        "icao": "TEST", "taxiway": "C", "previous": "B",
+    }
+
+
+def test_no_clearance_keeps_the_automatic_route(routable_app):
+    payload = _endpoint(routable_app, "/api/ground/{icao}/route")(
+        "TEST", "porte A 1", "09", DEPARTURE, ""
+    )
+    assert payload["dictated"] is False
+    assert payload["summary"] == ["porte A 1", "A", "B", "attente 09"]
+
+
+def test_every_ground_error_code_is_translated_in_every_language():
+    """Un code sans traduction s'afficherait en français chez tout le monde.
+
+    C'est exactement le défaut qui avait échappé : le service composait la
+    phrase, et l'interface anglaise affichait du français. Le message français
+    reste comme repli, mais le dépôt exige la traduction complète.
+    """
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    codes = set()
+    for module in (root / "navixav" / "ground").glob("*.py"):
+        codes |= set(re.findall(r'code="([a-z_]+)"', module.read_text("utf-8")))
+    assert codes, "aucun code d'erreur trouvé dans le module au sol"
+
+    catalogue = (root / "navixav" / "web" / "static" / "i18n.js").read_text("utf-8")
+    missing = {
+        code: catalogue.count(f"err_{code}:")
+        for code in sorted(codes)
+        if catalogue.count(f"err_{code}:") != 8
+    }
+    assert not missing, f"codes sans leurs huit traductions : {missing}"

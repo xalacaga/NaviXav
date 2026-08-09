@@ -714,3 +714,10 @@ Powtarzalny profil używany do zbudowania dystrybucji:
 
 Testy oznaczone `live_msfs` odpytują faktycznie uruchomiony symulator i nie są
 zatem częścią automatycznej kontroli instalatora.
+
+## Podziękowania
+
+NaviXav rozwija się dzięki temu, co zgłaszają osoby z niego korzystające.
+Podziękowania dla [Cojarop](https://flightsim.to/profile/Cojarop) za
+zaproponowanie ograniczeń wysokości i prędkości na mapie oraz kołowania
+podanego przez kontrolera.

@@ -758,3 +758,10 @@ The reproducible profile used to build the distribution is:
 
 Tests marked `live_msfs` query a simulator that is actually running and are
 therefore not part of the installer's automatic check.
+
+## Acknowledgements
+
+NaviXav grows from what the people who fly it report. Thanks to
+[Cojarop](https://flightsim.to/profile/Cojarop) for suggesting the altitude
+and speed constraints shown on the map, and the taxi route dictated by
+the controller.

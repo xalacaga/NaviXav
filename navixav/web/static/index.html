@@ -170,6 +170,8 @@
           <option value="carto_light">CartoDB Positron · clair</option>
           <option value="carto_dark">CartoDB Dark Matter · cockpit</option>
         </select>
+        <button id="map-constraints" class="icon-btn active" aria-pressed="true"
+                title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
@@ -218,6 +220,15 @@
       <div class="map-actions">
         <span class="live-pill" id="ground-live-pill">
           <span class="live-dot"></span><span id="ground-live-text">Recherche du simulateur…</span>
+        </span>
+        <span class="ground-clearance-field">
+          <input id="ground-clearance" class="ground-clearance" type="text"
+                 autocomplete="off" spellcheck="false" placeholder="Clairance : N D B"
+                 aria-label="Voies de circulation dictées par le contrôleur"
+                 title="Saisir les voies dictées par le contrôleur, puis Entrée" />
+          <button id="ground-clearance-apply" class="ground-clearance-apply"
+                  type="button" title="Appliquer la clairance saisie"
+                  aria-label="Appliquer la clairance saisie">→</button>
         </span>
         <button id="ground-plan" class="icon-btn" title="Cadrer sur l'itinéraire de roulage">Itinéraire</button>
         <button id="ground-clear" class="icon-btn" title="Effacer l'itinéraire de roulage">Effacer</button>

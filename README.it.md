@@ -713,3 +713,10 @@ Il profilo riproducibile utilizzato per costruire la distribuzione è:
 
 I test contrassegnati `live_msfs` interrogano un simulatore realmente avviato e
 non fanno quindi parte del controllo automatico dell'installer.
+
+## Ringraziamenti
+
+NaviXav cresce grazie a ciò che segnala chi lo usa. Grazie a
+[Cojarop](https://flightsim.to/profile/Cojarop) per aver proposto i
+vincoli di quota e velocità sulla mappa e il rullaggio dettato dal
+controllore.

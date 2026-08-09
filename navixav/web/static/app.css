@@ -1265,6 +1265,49 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
   border-color: var(--border-strong);
 }
 .map-basemap-style:disabled { opacity: 0.45; cursor: not-allowed; }
+/*
+  Saisie de la clairance de roulage. Les noms de voies sont des identifiants
+  courts et lus à voix haute : la casse est forcée en capitales et la graisse
+  monospacée les rend comparables d'un coup d'œil à ce qui est écrit sur le
+  tracé.
+*/
+/*
+  Le bouton de validation vit dans le champ plutôt qu'à côté : la barre est
+  déjà pleine de boutons, et un bouton détaché se lirait comme une action de
+  plus au lieu de la fin de la saisie.
+*/
+.ground-clearance-field { position: relative; display: inline-flex; }
+.ground-clearance {
+  min-width: 0; width: clamp(140px, 19vw, 230px);
+  min-height: 34px; padding: 6px 34px 6px 11px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface-raised); color: var(--text);
+  font: 600 0.82rem var(--font-mono, var(--font));
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.ground-clearance-apply {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-dim);
+  font: 700 0.95rem var(--font); line-height: 1; cursor: pointer;
+}
+.ground-clearance-apply:hover {
+  background: var(--accent-soft); color: var(--accent);
+}
+.ground-clearance-apply:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.ground-clearance::placeholder {
+  color: var(--text-faint); text-transform: none; letter-spacing: normal;
+}
+.ground-clearance:hover { border-color: var(--border-strong); }
+.ground-clearance:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ground-clearance.refused { border-color: var(--high, #f87171); }
 .sim-status {
   display: inline-flex; align-items: center; gap: 8px;
   min-height: 34px; padding: 6px 10px; border-radius: 9px;

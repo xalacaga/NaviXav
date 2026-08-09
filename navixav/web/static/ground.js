@@ -381,10 +381,13 @@ const GROUND = (() => {
     if (!plan?.legs?.length) return [];
     const points = [];
     for (const leg of plan.legs) {
+      // Chaque point retient d'où vient le tronçon qui y mène : c'est ce qui
+      // permet de tracer autrement ce que NaviXav a ajouté à la clairance.
+      const cleared = leg.from_clearance !== false;
       for (const point of leg.points || []) {
         const last = points[points.length - 1];
         if (last && last.x === point.x && last.y === point.y) continue;
-        points.push(point);
+        points.push({ x: point.x, y: point.y, cleared });
       }
     }
     return points;
@@ -421,13 +424,18 @@ const GROUND = (() => {
         const split = {
           x: from.x + (to.x - from.x) * ratio,
           y: from.y + (to.y - from.y) * ratio,
+          cleared: to.cleared,
         };
         pieces.push([from, split, true], [split, to, false]);
       }
+      // Ce que le contrôleur n'a pas dit se trace en pointillé : le pilote doit
+      // pouvoir lire sur le tracé où s'arrête sa clairance.
+      const cleared = to.cleared !== false;
       for (const [a, b, done] of pieces) {
         const [x1, y1] = toScreen(a.x, a.y);
         const [x2, y2] = toScreen(b.x, b.y);
         if (!onScreen(x1, y1, x2, y2)) continue;
+        context.setLineDash([]);
         context.strokeStyle = css("--ground-bg");
         context.globalAlpha = 0.9;
         context.lineWidth = Math.max(5, Math.min(12, 18 * view.scale));
@@ -436,13 +444,16 @@ const GROUND = (() => {
         context.lineTo(x2, y2);
         context.stroke();
 
+        const width = Math.max(3, Math.min(8, 12 * view.scale));
+        if (!cleared) context.setLineDash([width * 2.2, width * 1.8]);
         context.strokeStyle = css(done ? "--taxi-done" : "--taxi-ahead");
-        context.globalAlpha = done ? 0.5 : 1;
-        context.lineWidth = Math.max(3, Math.min(8, 12 * view.scale));
+        context.globalAlpha = done ? 0.5 : cleared ? 1 : 0.75;
+        context.lineWidth = width;
         context.beginPath();
         context.moveTo(x1, y1);
         context.lineTo(x2, y2);
         context.stroke();
+        context.setLineDash([]);
       }
       walked += length;
     }

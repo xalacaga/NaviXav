@@ -29,10 +29,14 @@ from navixav.ground.plan import (
 )
 from navixav.ground.route import (
     DEFAULT_COSTS,
+    MAX_LINK_M,
     RouteLeg,
     TaxiCosts,
     TaxiRoute,
     find_route,
+    follow_route,
+    parse_taxiways,
+    taxiway_names,
 )
 
 __all__ = [
@@ -42,6 +46,7 @@ __all__ = [
     "DEFAULT_COSTS",
     "DEPARTURE",
     "DIRECTIONS",
+    "MAX_LINK_M",
     "OFF_ROUTE_M",
     "GroundError",
     "Guidance",
@@ -56,10 +61,13 @@ __all__ = [
     "TaxiRoute",
     "build_graph",
     "find_route",
+    "follow_route",
     "forget_graphs",
     "guide",
+    "parse_taxiways",
     "plan_taxi",
     "project_on_route",
     "replan",
     "replan_needed",
+    "taxiway_names",
 ]

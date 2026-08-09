@@ -30,7 +30,28 @@ RUNWAY_KIND = "runway"
 
 
 class GroundError(RuntimeError):
-    """Le réseau ne permet pas de répondre, avec le motif à afficher."""
+    """Le réseau ne permet pas de répondre, avec le motif à afficher.
+
+    Le message reste rédigé en français : il part dans les traces, où il est lu
+    par une seule personne. Ce qui s'affiche, lui, doit suivre la langue de
+    l'interface, et celle-ci n'est connue que du navigateur. L'erreur porte
+    donc en plus un `code` et ses `params`, que le client traduit — le message
+    ne servant plus que de repli quand un code n'a pas encore sa traduction.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        **params: Any,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.params = params
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"message": str(self), "code": self.code, "params": self.params}
 
 
 @dataclass(frozen=True)
@@ -134,7 +155,10 @@ class TaxiGraph:
             else list(self.routable_nodes or self.nodes)
         )
         if not candidates:
-            raise GroundError(f"{self.icao} n'a aucun point de circulation.")
+            raise GroundError(
+                f"{self.icao} n'a aucun point de circulation.",
+                code="ground_no_network", icao=self.icao,
+            )
         return min(
             candidates,
             key=lambda index: math.hypot(
@@ -170,6 +194,7 @@ class TaxiGraph:
             raise GroundError(
                 f"Le tracé au sol de {self.icao} ne distingue pas les pistes "
                 "des voies de circulation.",
+                code="ground_no_kinds", icao=self.icao,
             )
         wanted = {normalise_runway(runway_name), reciprocal_runway(runway_name)}
         entries = []
@@ -262,7 +287,10 @@ def forget_graphs() -> None:
 def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
     airport = provider.airport(key)
     if airport is None:
-        raise GroundError(f"{key} est absent de la base de navigation.")
+        raise GroundError(
+            f"{key} est absent de la base de navigation.",
+            code="ground_airport_absent", icao=key,
+        )
 
     nodes = {
         row["idx"]: TaxiNode(
@@ -273,7 +301,10 @@ def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
         )
     }
     if not nodes:
-        raise GroundError(f"{key} n'a pas de tracé au sol dans la base.")
+        raise GroundError(
+            f"{key} n'a pas de tracé au sol dans la base.",
+            code="ground_no_layout", icao=key,
+        )
 
     edges = []
     # Pour un TAXI_PATH de type PARKING, SimConnect encode START comme un

@@ -89,6 +89,63 @@ def format_speed(leg: ProcedureLeg) -> str | None:
     return f"{speed} kt"
 
 
+# Seuil d'écriture en niveau de vol sur la carte. C'est une convention
+# d'affichage, pas l'altitude de transition du terrain : celle-ci varie d'un
+# aérodrome à l'autre et la base ne la publie pas. 10 000 ft la place au-dessus
+# de la quasi-totalité des transitions rencontrées, si bien qu'une contrainte
+# écrite en niveau en est bien un.
+_FLIGHT_LEVEL_FLOOR_FT = 10000
+
+
+def _level(feet: int) -> str:
+    """Une altitude en pieds, ou en niveau de vol au-dessus du seuil."""
+    if feet < _FLIGHT_LEVEL_FLOOR_FT:
+        return str(feet)
+    return f"FL{round(feet / 100):03d}"
+
+
+def compact_altitude(leg: ProcedureLeg) -> str | None:
+    """Contrainte d'altitude en notation de carte, pour une étiquette de carte.
+
+    Le tableau des contraintes peut s'offrir une phrase ; une étiquette posée
+    sur la route, non — elle doit tenir en quelques caractères sans masquer le
+    tracé. On reprend donc la notation des cartes d'approche : le signe porte
+    le sens, la valeur s'écrit en pieds ou en niveau selon `_level`.
+
+    Les deux bornes d'une fenêtre sont converties chacune pour son compte : une
+    fenêtre à cheval sur le seuil s'écrit donc « FL110/9000 », ce qui est le
+    plus fidèle aux deux valeurs publiées.
+    """
+    first = int(leg.altitude1_ft or 0)
+    second = int(leg.altitude2_ft or 0)
+    if not first and not second:
+        return None
+
+    descriptor = (leg.alt_descriptor or "").strip().upper()
+    if descriptor == "B" and first and second:
+        low, high = sorted((first, second))
+        return f"{_level(high)}/{_level(low)}"
+    if descriptor == "+":
+        return f"+{_level(first)}"
+    if descriptor == "-":
+        return f"-{_level(first)}"
+    return _level(first or second)
+
+
+def compact_speed(leg: ProcedureLeg) -> str | None:
+    """Contrainte de vitesse en notation de carte, ou None s'il n'y en a pas.
+
+    Une vitesse publiée est un maximum sauf mention contraire : seul le
+    plancher mérite son signe, comme sur les cartes.
+    """
+    speed = leg.speed_limit_kt
+    if not speed:
+        return None
+    if (leg.speed_limit_type or "-").strip() == "+":
+        return f"+{speed}Kt"
+    return f"{speed}Kt"
+
+
 def rows_from_legs(legs: Iterable[ProcedureLeg]) -> list[ConstraintRow]:
     """Ne retient que les segments porteurs d'une contrainte."""
     rows: list[ConstraintRow] = []
@@ -169,12 +226,28 @@ def procedure_path(
         )
         if position is None:
             continue
-        point = {
+        point: dict[str, object] = {
             "ident": leg.fix_ident or leg.leg_type or "segment",
             "lat": position[0],
             "lon": position[1],
         }
-        if path and path[-1] == point:
+        altitude = compact_altitude(leg)
+        speed = compact_speed(leg)
+        if altitude:
+            point["altitude"] = altitude
+        if speed:
+            point["speed"] = speed
+
+        # Un même repère porté par deux segments consécutifs ne fait qu'un point
+        # sur la carte. La comparaison ne peut donc porter que sur l'identité et
+        # la position : si le second segment est celui qui publie la contrainte,
+        # comparer les points entiers la ferait passer pour un repère distinct,
+        # et deux étiquettes se superposeraient au même endroit.
+        previous = path[-1] if path else None
+        if previous and all(previous[key] == point[key] for key in ("ident", "lat", "lon")):
+            for key in ("altitude", "speed"):
+                if key in point and key not in previous:
+                    previous[key] = point[key]
             continue
         path.append(point)
     return path

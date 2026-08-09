@@ -775,3 +775,10 @@ Das reproduzierbare Profil, das zum Erstellen der Distribution verwendet wird:
 Die mit `live_msfs` markierten Tests fragen einen tatsächlich gestarteten
 Simulator ab und gehören daher nicht zur automatischen Prüfung des
 Installationsprogramms.
+
+## Danksagungen
+
+NaviXav wächst mit dem, was die Fliegenden zurückmelden. Dank an
+[Cojarop](https://flightsim.to/profile/Cojarop) für die Anregung, die
+Höhen- und Geschwindigkeitsbeschränkungen auf der Karte anzuzeigen und
+die Rollroute vom Lotsen vorgeben zu lassen.

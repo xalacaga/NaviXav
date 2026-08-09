@@ -36,6 +36,7 @@ from navixav.ground import (
     GroundError,
     build_graph,
     guide,
+    parse_taxiways,
     plan_taxi,
     replan,
     replan_needed,
@@ -680,16 +681,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         parking: str,
         runway: str,
         direction: str = DEPARTURE,
+        via: str = "",
     ) -> dict[str, Any]:
-        """Itinéraire de roulage entre un poste de stationnement et une piste."""
+        """Itinéraire de roulage entre un poste de stationnement et une piste.
+
+        `via` est la suite de voies dictée par le contrôleur, telle que le
+        pilote l'a saisie. Vide, l'itinéraire est celui que NaviXav calcule.
+        """
         provider = open_provider()
         try:
             graph = build_graph(provider, icao)
             return plan_taxi(
-                graph, parking=parking, runway=runway, direction=direction
+                graph,
+                parking=parking,
+                runway=runway,
+                direction=direction,
+                via=parse_taxiways(via),
             ).to_dict()
         except GroundError as exc:
-            raise HTTPException(404, str(exc)) from exc
+            # Le détail part structuré : la langue d'affichage n'est connue
+            # que du navigateur, qui recompose le message à partir du code.
+            raise HTTPException(404, exc.to_dict()) from exc
         finally:
             provider.close()
 
@@ -701,6 +713,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         latitude: float,
         longitude: float,
         direction: str = DEPARTURE,
+        via: str = "",
     ) -> dict[str, Any]:
         """Situation de l'avion sur son roulage, et consigne du moment.
 
@@ -708,16 +721,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         d'un appel à l'autre : le service ne garde aucun état de session, et le
         réseau étant en cache, le calcul complet tient en quelques
         millisecondes.
+
+        C'est ce qui permet à une clairance saisie de survivre au guidage sans
+        rien stocker : le client la renvoie avec chaque position, exactement
+        comme le poste et la piste.
         """
         provider = open_provider()
         try:
             graph = build_graph(provider, icao)
             position = graph.to_local(latitude, longitude)
+            clearance = parse_taxiways(via)
             plan = plan_taxi(
-                graph, parking=parking, runway=runway, direction=direction
+                graph,
+                parking=parking,
+                runway=runway,
+                direction=direction,
+                via=clearance,
             )
             guidance = guide(plan, *position)
-            if replan_needed(guidance):
+            if replan_needed(guidance, plan):
                 plan = replan(plan, *position)
                 guidance = guide(plan, *position)
             return {
@@ -726,7 +748,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "recomputed": plan.from_position,
             }
         except GroundError as exc:
-            raise HTTPException(404, str(exc)) from exc
+            # Le détail part structuré : la langue d'affichage n'est connue
+            # que du navigateur, qui recompose le message à partir du code.
+            raise HTTPException(404, exc.to_dict()) from exc
         finally:
             provider.close()
 
@@ -737,7 +761,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             graph = build_graph(provider, icao)
         except GroundError as exc:
-            raise HTTPException(404, str(exc)) from exc
+            # Le détail part structuré : la langue d'affichage n'est connue
+            # que du navigateur, qui recompose le message à partir du code.
+            raise HTTPException(404, exc.to_dict()) from exc
         else:
             return {
                 "icao": graph.icao,

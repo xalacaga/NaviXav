@@ -279,6 +279,20 @@ def test_a_route_is_taken_up_again_only_when_it_has_been_left(departure):
     assert replan_needed(guide(departure, 100.0, 150.0)) is True
 
 
+def test_a_dictated_route_is_never_recomputed(graph, departure):
+    """S'écarter d'une clairance ne doit pas en faire apparaître une autre.
+
+    Le pilote verrait un tracé neuf à l'endroit précis où il s'est trompé, et
+    le croirait encore issu de ce que le contrôleur lui a dit.
+    """
+    dictated = plan_taxi(graph, parking="porte A 1", runway="09", via=("A", "B"))
+    astray = guide(dictated, 100.0, 150.0)
+    assert astray.on_route is False
+    assert replan_needed(astray, dictated) is False
+    # Le même écart, sur l'itinéraire calculé, se reprend comme avant.
+    assert replan_needed(guide(departure, 100.0, 150.0), departure) is True
+
+
 def test_an_arrived_aircraft_is_never_sent_a_new_route(departure):
     """La fin d'un roulage éloigne du dernier point : le guidage boucherait."""
     guidance = guide(departure, 320.0, 300.0)

@@ -724,3 +724,10 @@ Het reproduceerbare profiel dat wordt gebruikt om de distributie te bouwen:
 De tests met de markering `live_msfs` bevragen een daadwerkelijk gestarte
 simulator en maken dus geen deel uit van de automatische controle van het
 installatieprogramma.
+
+## Dankwoord
+
+NaviXav groeit door wat de gebruikers ervan melden. Met dank aan
+[Cojarop](https://flightsim.to/profile/Cojarop) voor het voorstel om de
+hoogte- en snelheidsbeperkingen op de kaart te tonen, en voor de door de
+verkeersleider opgegeven taxiroute.

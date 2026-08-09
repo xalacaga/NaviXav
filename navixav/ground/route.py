@@ -16,7 +16,7 @@ from __future__ import annotations
 import heapq
 import math
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from navixav.ground.graph import (
     FORBIDDEN_KINDS,
@@ -75,6 +75,10 @@ class RouteLeg:
     turn: str | None
     points: tuple[tuple[float, float], ...]
     hold_short: str | None
+    # Faux pour la portion ajoutée par NaviXav au-delà de la clairance saisie.
+    # L'affichage doit pouvoir la distinguer : ce n'est pas le contrôleur qui
+    # l'a dite.
+    from_clearance: bool = True
 
     @property
     def label(self) -> str:
@@ -93,6 +97,18 @@ class TaxiRoute:
     @property
     def is_empty(self) -> bool:
         return len(self.nodes) < 2
+
+    @property
+    def is_completed(self) -> bool:
+        """Le tracé continue-t-il au-delà de la clairance saisie ?
+
+        Seule la fin compte. Le début aussi peut sortir de la clairance — celle
+        qui nomme la voie sortant du poste est rare — mais rejoindre la première
+        voie dictée n'est pas la dépasser, et l'annoncer comme tel ferait
+        passer toute clairance pour incomplète.
+        """
+        origins = [leg.from_clearance for leg in self.legs]
+        return bool(origins) and True in origins and not origins[-1]
 
     def summary(self) -> tuple[str, ...]:
         """Enchaînement des voies, tel qu'on l'annoncerait au pilote.
@@ -133,6 +149,7 @@ def find_route(
         raise GroundError(
             f"Le tracé au sol de {graph.icao} ne distingue pas les pistes des "
             "voies de service : reprends le terrain avec le simulateur ouvert.",
+            code="ground_no_kinds", icao=graph.icao,
         )
 
     starts = frozenset([start] if isinstance(start, int) else start)
@@ -157,7 +174,12 @@ def find_route(
         )
 
     best: dict[tuple[int, TaxiEdge | None], float] = {}
-    came_from: dict[tuple[int, TaxiEdge | None], tuple[int, TaxiEdge | None]] = {}
+    # La valeur porte l'état précédent et l'origine du tronçon. Ici tout vient
+    # de NaviXav, donc tout est « de la clairance » : la distinction ne sert
+    # qu'au roulage dicté, qui partage cette reconstruction.
+    came_from: dict[
+        tuple[int, TaxiEdge | None], tuple[tuple[int, TaxiEdge | None], bool]
+    ] = {}
     # Le compteur départage les états de même coût : sans lui, le tas
     # comparerait des segments entre eux, ce qu'ils ne savent pas faire.
     counter = 0
@@ -190,7 +212,7 @@ def find_route(
             if candidate >= best.get(next_state, math.inf):
                 continue
             best[next_state] = candidate
-            came_from[next_state] = state
+            came_from[next_state] = (state, True)
             counter += 1
             heapq.heappush(
                 queue,
@@ -200,6 +222,210 @@ def find_route(
     raise GroundError(
         f"Aucun itinéraire de roulage praticable sur {graph.icao} "
         "entre ces deux points.",
+        code="ground_no_route", icao=graph.icao,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Itinéraire dicté : la clairance du contrôleur
+# --------------------------------------------------------------------------- #
+
+# Longueur au-delà de laquelle un segment sans nom n'est plus une liaison.
+#
+# Le simulateur sème entre deux voies nommées de courts segments anonymes : les
+# refuser ferait échouer presque toute clairance à la première jonction. Les
+# accepter sans limite en ferait des raccourcis, et l'itinéraire s'écarterait
+# des voies dictées par un chemin que personne n'a annoncé.
+MAX_LINK_M = 80.0
+
+
+def taxiway_names(graph: TaxiGraph) -> tuple[str, ...]:
+    """Voies de circulation nommées du terrain, triées."""
+    return tuple(sorted({
+        edge.name.strip().upper()
+        for edge in graph.edges
+        if edge.name and not edge.is_runway
+    }))
+
+
+def parse_taxiways(text: str) -> tuple[str, ...]:
+    """Suite de voies telle que le pilote la saisit.
+
+    On accepte ce qu'une clairance donne à l'oreille — « N D B », « n, d, b »,
+    « N-D-B » — parce que le pilote la recopie en écoutant et non en relisant.
+    """
+    separators = str.maketrans(",;/-\t\n", "      ")
+    return tuple(
+        word for word in text.translate(separators).upper().split() if word
+    )
+
+
+def _is_link(edge: TaxiEdge, arrived_by: TaxiEdge | None) -> bool:
+    """Le segment peut-il servir de raccord entre deux voies dictées ?
+
+    Une traversée de piste en fait partie — l'interdire rendrait inaccessibles
+    les terrains où la clairance franchit une piste — mais une seule à la fois :
+    deux segments de piste enchaînés, ce n'est plus une traversée, c'est un
+    roulage sur la piste. Sans cette limite, une clairance impossible finissait
+    par se satisfaire en remontant la piste jusqu'à la voie manquante, au lieu
+    d'être signalée comme fausse.
+    """
+    if edge.is_runway:
+        return not (arrived_by is not None and arrived_by.is_runway)
+    return not edge.name and edge.length_m <= MAX_LINK_M
+
+
+def follow_route(
+    graph: TaxiGraph,
+    start: int | Iterable[int],
+    goal: int | Iterable[int],
+    names: Sequence[str],
+    costs: TaxiCosts = DEFAULT_COSTS,
+    *,
+    require_kinds: bool = True,
+) -> TaxiRoute:
+    """Itinéraire suivant les voies dictées, prolongé jusqu'à la piste.
+
+    La recherche est celle de `find_route`, avec une dimension de plus dans
+    l'état : le rang atteint dans la suite des voies. On ne peut, tant que la
+    clairance n'est pas épuisée, que rester sur la voie en cours, entrer dans la
+    suivante, ou emprunter une liaison. Le rang ne recule jamais : une clairance
+    se parcourt dans l'ordre où elle a été donnée.
+
+    La recherche est libre aux deux bouts : avant d'être entré dans la première
+    voie dictée — une clairance nomme rarement celle qui sort du poste — et
+    après la dernière, ce qui complète une clairance donnée en deux fois. Les
+    tronçons ainsi ajoutés sont les seuls dont `from_clearance` est faux, et
+    l'affichage les distingue de ce que le contrôleur a réellement dit.
+    """
+    if require_kinds and not graph.has_kinds:
+        raise GroundError(
+            f"Le tracé au sol de {graph.icao} ne distingue pas les pistes des "
+            "voies de service : reprends le terrain avec le simulateur ouvert.",
+            code="ground_no_kinds", icao=graph.icao,
+        )
+    if not names:
+        raise GroundError(
+            "Aucune voie de circulation n'a été saisie.",
+            code="clearance_empty",
+        )
+
+    known = set(taxiway_names(graph))
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        catalogue = ", ".join(taxiway_names(graph)) or "aucune"
+        raise GroundError(
+            f"{graph.icao} n'a pas de voie « {unknown[0]} » "
+            f"(voies du terrain : {catalogue}).",
+            code="clearance_unknown_taxiway",
+            icao=graph.icao, taxiway=unknown[0], taxiways=catalogue,
+        )
+
+    starts = frozenset([start] if isinstance(start, int) else start)
+    goals = frozenset([goal] if isinstance(goal, int) else goal)
+    if not starts or not goals:
+        raise GroundError(
+            "Le roulage dicté n'a pas ses deux extrémités.",
+            code="ground_no_endpoints",
+        )
+
+    total = len(names)
+    targets = [(graph.nodes[index].x, graph.nodes[index].y) for index in goals]
+
+    def heuristic(node: int) -> float:
+        position = graph.nodes[node]
+        return min(math.hypot(position.x - x, position.y - y) for x, y in targets)
+
+    State = tuple[int, TaxiEdge | None, int]
+    best: dict[State, float] = {}
+    came_from: dict[State, tuple[State, bool]] = {}
+    counter = 0
+    queue: list[tuple[float, int, float, State]] = []
+    for index in sorted(starts):
+        state: State = (index, None, 0)
+        best[state] = 0.0
+        counter += 1
+        heapq.heappush(queue, (heuristic(index), counter, 0.0, state))
+
+    # Rang le plus avancé jamais atteint : c'est lui qui désigne la voie sur
+    # laquelle la clairance s'est rompue, et donc le message à afficher.
+    furthest = 0
+
+    while queue:
+        _estimate, _tie, cost, state = heapq.heappop(queue)
+        node, arrived_by, rank = state
+        if cost > best.get(state, math.inf):
+            continue
+        furthest = max(furthest, rank)
+        if rank == total and node in goals:
+            return _build_route(graph, came_from, state)
+
+        for edge in graph.neighbours(node):
+            if not costs.allows(edge):
+                continue
+            following = edge.other(node)
+            if arrived_by is not None and following == _origin(arrived_by, node):
+                continue
+
+            name = edge.name.strip().upper() if edge.name else None
+            if rank < total and name == names[rank]:
+                next_rank, cleared = rank + 1, True
+            elif rank >= 1 and name is not None and name == names[rank - 1]:
+                next_rank, cleared = rank, True
+            elif rank >= 1 and rank < total and _is_link(edge, arrived_by):
+                next_rank, cleared = rank, True
+            elif rank in (0, total):
+                # Avant la première voie dictée comme après la dernière, la
+                # recherche est libre : une clairance omet presque toujours la
+                # voie qui sort du poste, et s'y arrêter rendrait la saisie
+                # inutilisable. Ces tronçons ne sont pas dits par le contrôleur
+                # et le disent — `cleared` est faux, l'affichage les distingue.
+                next_rank, cleared = rank, False
+            else:
+                continue
+
+            step = edge.length_m * costs.multiplier(edge.kind)
+            step += _manoeuvre_penalty(graph, node, arrived_by, edge, costs)
+            candidate = cost + step
+            next_state: State = (following, edge, next_rank)
+            if candidate >= best.get(next_state, math.inf):
+                continue
+            best[next_state] = candidate
+            came_from[next_state] = (state, cleared)
+            counter += 1
+            heapq.heappush(
+                queue,
+                (candidate + heuristic(following), counter, candidate, next_state),
+            )
+
+    raise _clearance_error(graph, names, furthest)
+
+
+def _clearance_error(
+    graph: TaxiGraph, names: Sequence[str], furthest: int
+) -> GroundError:
+    """Motif exact de l'échec, à l'endroit où la clairance s'est rompue.
+
+    C'est l'information utile : savoir *quelle* voie ne se raccorde pas à la
+    précédente, c'est savoir qu'on a mal entendu ce mot-là de la clairance.
+    """
+    if furthest >= len(names):
+        return GroundError(
+            f"Les voies saisies ne rejoignent pas la piste sur {graph.icao}.",
+            code="clearance_no_runway", icao=graph.icao,
+        )
+    blocked = names[furthest]
+    if furthest == 0:
+        return GroundError(
+            f"La voie « {blocked} » ne se rejoint pas depuis ce point "
+            f"sur {graph.icao}.",
+            code="clearance_unreachable", icao=graph.icao, taxiway=blocked,
+        )
+    return GroundError(
+        f"La voie « {blocked} » ne prolonge pas « {names[furthest - 1]} » "
+        f"sur {graph.icao}.",
+        code="clearance_not_connected",
+        icao=graph.icao, taxiway=blocked, previous=names[furthest - 1],
     )
 
 
@@ -258,17 +484,28 @@ def _bearing(graph: TaxiGraph, origin: int, target: int) -> float:
 
 def _build_route(
     graph: TaxiGraph,
-    came_from: dict[tuple[int, TaxiEdge | None], tuple[int, TaxiEdge | None]],
-    final: tuple[int, TaxiEdge | None],
+    came_from: dict[Any, tuple[Any, bool]],
+    final: Any,
 ) -> TaxiRoute:
-    states = [final]
-    while states[-1] in came_from:
-        states.append(came_from[states[-1]])
-    states.reverse()
+    """Remonte la chaîne des états jusqu'au départ et en fait un itinéraire.
 
-    nodes = tuple(node for node, _edge in states)
-    edges = tuple(edge for _node, edge in states[1:] if edge is not None)
-    legs = _split_into_legs(graph, nodes, edges)
+    Les états de la recherche libre et ceux du roulage dicté n'ont pas la même
+    forme — le second porte en plus le rang atteint dans la clairance — mais
+    tous commencent par le nœud et le segment d'arrivée, les deux seuls dont la
+    reconstruction a besoin.
+    """
+    states = [final]
+    cleared: list[bool] = []
+    while states[-1] in came_from:
+        previous, from_clearance = came_from[states[-1]]
+        cleared.append(from_clearance)
+        states.append(previous)
+    states.reverse()
+    cleared.reverse()
+
+    nodes = tuple(state[0] for state in states)
+    edges = tuple(state[1] for state in states[1:] if state[1] is not None)
+    legs = _split_into_legs(graph, nodes, edges, tuple(cleared))
     return TaxiRoute(
         icao=graph.icao,
         nodes=nodes,
@@ -278,7 +515,10 @@ def _build_route(
 
 
 def _split_into_legs(
-    graph: TaxiGraph, nodes: tuple[int, ...], edges: tuple[TaxiEdge, ...]
+    graph: TaxiGraph,
+    nodes: tuple[int, ...],
+    edges: tuple[TaxiEdge, ...],
+    cleared: tuple[bool, ...] = (),
 ) -> tuple[RouteLeg, ...]:
     """Regroupe les segments consécutifs parcourus sur une même voie.
 
@@ -286,28 +526,38 @@ def _split_into_legs(
     ouvrir une : le simulateur en sème entre les voies, et les annoncer une à
     une noierait les instructions utiles. Seules celles rencontrées avant toute
     voie nommée forment une portion à part, faute de quoi les rattacher.
+
+    Le passage de la clairance à sa complétion ouvre une portion, lui aussi :
+    une même portion ne peut pas être à la fois dite par le contrôleur et
+    ajoutée par NaviXav, puisque l'affichage doit les distinguer.
     """
     if not edges:
         return ()
+    origins = cleared or (True,) * len(edges)
 
     legs: list[RouteLeg] = []
     current: list[TaxiEdge] = []
     current_nodes: list[int] = [nodes[0]]
     current_name: str | None = None
+    current_origin: bool = origins[0]
     turn: str | None = None
     pending_turn: str | None = None
 
     for position, edge in enumerate(edges):
-        opens_leg = bool(edge.name) and current and edge.name != current_name
+        changes_origin = bool(current) and origins[position] != current_origin
+        opens_leg = changes_origin or (
+            bool(edge.name) and current and edge.name != current_name
+        )
         if opens_leg:
             legs.append(_leg(
                 graph, current, current_nodes, current_name, turn,
-                next_edge=edge,
+                next_edge=edge, from_clearance=current_origin,
             ))
             turn = pending_turn
             current = []
             current_nodes = [nodes[position]]
             current_name = None
+            current_origin = origins[position]
 
         current.append(edge)
         current_nodes.append(nodes[position + 1])
@@ -316,7 +566,10 @@ def _split_into_legs(
         if position + 1 < len(edges):
             pending_turn = _turn_label(_turn_at(graph, nodes, position + 1))
 
-    legs.append(_leg(graph, current, current_nodes, current_name, turn, None))
+    legs.append(_leg(
+        graph, current, current_nodes, current_name, turn, None,
+        from_clearance=current_origin,
+    ))
     return tuple(legs)
 
 
@@ -327,6 +580,7 @@ def _leg(
     name: str | None,
     turn: str | None,
     next_edge: TaxiEdge | None,
+    from_clearance: bool = True,
 ) -> RouteLeg:
     return RouteLeg(
         name=name,
@@ -337,6 +591,7 @@ def _leg(
             (graph.nodes[index].x, graph.nodes[index].y) for index in nodes
         ),
         hold_short=_hold_short_runway(graph, nodes[-1], next_edge),
+        from_clearance=from_clearance,
     )
 
 

@@ -182,12 +182,20 @@ def project_on_route(
     return best
 
 
-def replan_needed(guidance: Guidance) -> bool:
+def replan_needed(guidance: Guidance, plan: TaxiPlan | None = None) -> bool:
     """Faut-il reprendre l'itinéraire ?
 
     Arrivé, on ne recalcule rien : la fin d'un roulage éloigne forcément l'avion
     du dernier point du tracé, et le guidage repartirait en boucle.
+
+    Un itinéraire dicté ne se recalcule pas non plus. Reprendre reviendrait à
+    proposer un chemin que le contrôleur n'a pas donné, au moment précis où le
+    pilote s'est écarté du sien : il verrait un tracé neuf et le croirait
+    encore issu de sa clairance. Mieux vaut lui laisser celle-ci sous les yeux
+    et lui dire qu'il n'est plus dessus.
     """
+    if plan is not None and plan.is_dictated:
+        return False
     return not guidance.on_route and not guidance.arrived
 
 

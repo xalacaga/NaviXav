@@ -15,10 +15,16 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 from navixav.ground.graph import GroundError, Parking, TaxiGraph
-from navixav.ground.route import DEFAULT_COSTS, TaxiCosts, TaxiRoute, find_route
+from navixav.ground.route import (
+    DEFAULT_COSTS,
+    TaxiCosts,
+    TaxiRoute,
+    find_route,
+    follow_route,
+)
 from navixav.navdata.base import normalise_runway, reciprocal_runway
 
 DEPARTURE = "departure"
@@ -54,10 +60,23 @@ class TaxiPlan:
     # Position de l'avion quand l'itinéraire a été repris en cours de roulage,
     # en mètres locaux. Absente pour un itinéraire calculé depuis le poste.
     origin: tuple[float, float] | None = None
+    # Voies dictées par le contrôleur, dans l'ordre. Vide pour un itinéraire
+    # calculé par NaviXav seul.
+    via: tuple[str, ...] = ()
 
     @property
     def from_position(self) -> bool:
         return self.origin is not None
+
+    @property
+    def is_dictated(self) -> bool:
+        """L'itinéraire suit-il une clairance saisie par le pilote ?"""
+        return bool(self.via)
+
+    @property
+    def is_completed(self) -> bool:
+        """La clairance saisie s'arrêtait-elle avant la piste ?"""
+        return self.is_dictated and self.route.is_completed
 
     @property
     def icao(self) -> str:
@@ -104,6 +123,7 @@ class TaxiPlan:
                 "turn": leg.turn,
                 "hold_short": self._hold_short(leg.hold_short),
                 "points": [{"x": x, "y": y} for x, y in leg.points],
+                "from_clearance": leg.from_clearance,
             }
             for leg in self.route.legs
         ]
@@ -140,6 +160,9 @@ class TaxiPlan:
                 {"x": self.origin[0], "y": self.origin[1]},
                 {"x": node.x, "y": node.y},
             ],
+            # Rejoindre le réseau ne relève d'aucune clairance : c'est le trajet
+            # que l'avion fait de toute façon pour se remettre sur le tracé.
+            "from_clearance": True,
         }
 
     def _stand_leg(self) -> dict[str, Any]:
@@ -158,6 +181,7 @@ class TaxiPlan:
             "turn": None,
             "hold_short": None,
             "points": points,
+            "from_clearance": True,
         }
 
     def summary(self) -> tuple[str, ...]:
@@ -205,6 +229,9 @@ class TaxiPlan:
             "direction": self.direction,
             "runway": self.runway,
             "from_position": self.from_position,
+            "via": list(self.via),
+            "dictated": self.is_dictated,
+            "completed": self.is_completed,
             "parking": {
                 "label": self.parking.label,
                 "kind": self.parking.kind,
@@ -226,22 +253,32 @@ def plan_taxi(
     direction: str = DEPARTURE,
     costs: TaxiCosts = DEFAULT_COSTS,
     position: tuple[float, float] | None = None,
+    via: Sequence[str] = (),
 ) -> TaxiPlan:
     """Itinéraire entre un poste et une piste, dans le sens demandé.
 
     `position`, en mètres locaux, remplace le point de départ par le nœud le
     plus proche de l'avion. C'est ce qui permet de reprendre l'itinéraire au
     milieu du roulage, sans renvoyer le pilote à son point de départ.
+
+    `via` est la suite de voies dictée par le contrôleur. Elle ne change ni les
+    extrémités ni la sortie : seule la façon de les relier passe de la recherche
+    libre à la recherche contrainte. Une clairance qui n'atteint pas la piste
+    est prolongée, et les tronçons ajoutés se signalent par `from_clearance`.
     """
     if direction not in DIRECTIONS:
         raise GroundError(
             f"Sens de roulage inconnu : « {direction} ». "
             f"Attendu {' ou '.join(DIRECTIONS)}.",
+            code="ground_unknown_direction", direction=direction,
         )
 
     stand = graph.parking(parking)
     if stand is None:
-        raise GroundError(f"{graph.icao} n'a pas de poste nommé « {parking} ».")
+        raise GroundError(
+            f"{graph.icao} n'a pas de poste nommé « {parking} ».",
+            code="ground_unknown_parking", icao=graph.icao, parking=parking,
+        )
 
     # Au départ, on vise le seuil demandé ; à l'arrivée, toute sortie de la
     # bande convient et c'est la recherche qui retient la plus proche du poste.
@@ -255,6 +292,8 @@ def plan_taxi(
         raise GroundError(
             f"Le réseau de {graph.icao} ne rejoint pas la piste {runway} "
             f"(pistes desservies : {known}).",
+            code="ground_runway_not_served",
+            icao=graph.icao, runway=runway, runways=known,
         )
 
     # Reprise en cours de roulage : on repart d'où l'avion est, pas de l'autre
@@ -266,10 +305,12 @@ def plan_taxi(
     else:
         start = entries
 
-    if direction == DEPARTURE:
-        route = find_route(graph, start, entries, costs)
+    goal = entries if direction == DEPARTURE else stand.node
+    clearance = tuple(via)
+    if clearance:
+        route = follow_route(graph, start, goal, clearance, costs)
     else:
-        route = find_route(graph, start, stand.node, costs)
+        route = find_route(graph, start, goal, costs)
 
     return TaxiPlan(
         graph=graph,
@@ -279,4 +320,5 @@ def plan_taxi(
         route=route,
         entries=entries,
         origin=position,
+        via=clearance,
     )

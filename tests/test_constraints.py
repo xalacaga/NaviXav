@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from navixav.constraints import (
     ConstraintRow,
+    compact_altitude,
+    compact_speed,
     format_altitude,
     format_speed,
+    procedure_path,
     rows_from_legs,
 )
-from navixav.navdata.base import ProcedureKind, ProcedureLeg
+from navixav.navdata.base import Procedure, ProcedureKind, ProcedureLeg
 from navixav.planner.engine import CompletionEngine
 from navixav.preferences import AirportPreferences
 
@@ -85,6 +88,48 @@ def test_no_speed_limit():
 
 
 # --------------------------------------------------------------------------- #
+# Notation courte, pour les étiquettes de la carte
+# --------------------------------------------------------------------------- #
+
+
+def test_compact_altitude_keeps_the_chart_notation():
+    assert compact_altitude(_leg("+", 8000)) == "+8000"
+    assert compact_altitude(_leg("-", 4000)) == "-4000"
+    assert compact_altitude(_leg("A", 547)) == "547"
+
+
+def test_compact_altitude_shows_the_window_ceiling_first():
+    """Comme sur une carte : le plafond au-dessus du plancher."""
+    assert compact_altitude(_leg("B", 3000, 5000)) == "5000/3000"
+
+
+def test_compact_altitude_without_constraint():
+    assert compact_altitude(_leg("A", 0)) is None
+
+
+def test_altitude_below_ten_thousand_stays_in_feet():
+    assert compact_altitude(_leg("A", 7000)) == "7000"
+    assert compact_altitude(_leg("+", 9900)) == "+9900"
+
+
+def test_altitude_from_ten_thousand_is_written_as_a_flight_level():
+    assert compact_altitude(_leg("A", 10000)) == "FL100"
+    assert compact_altitude(_leg("+", 12000)) == "+FL120"
+    assert compact_altitude(_leg("-", 35000)) == "-FL350"
+
+
+def test_window_converts_each_bound_on_its_own():
+    """Une fenêtre à cheval sur le seuil garde ses deux valeurs telles quelles."""
+    assert compact_altitude(_leg("B", 9000, 11000)) == "FL110/9000"
+
+
+def test_compact_speed_marks_only_the_floor():
+    assert compact_speed(_leg(speed=205)) == "205Kt"
+    assert compact_speed(_leg(speed=205, speed_type="+")) == "+205Kt"
+    assert compact_speed(_leg(speed=None)) is None
+
+
+# --------------------------------------------------------------------------- #
 # Assemblage
 # --------------------------------------------------------------------------- #
 
@@ -112,6 +157,55 @@ def test_repeated_fix_is_merged():
     assert len(rows) == 1
     assert rows[0].altitude == "≥ 3000 ft"
     assert rows[0].speed == "max 210 kt"
+
+
+def _procedure(*legs: ProcedureLeg) -> Procedure:
+    return Procedure(
+        provider_id=1,
+        kind=ProcedureKind.SID,
+        ident="TESTS",
+        arinc_name=None,
+        proc_type=None,
+        suffix=None,
+        runway_name=None,
+        runways=(),
+        legs=tuple(legs),
+    )
+
+
+def _path(*legs: ProcedureLeg) -> list[dict]:
+    return procedure_path(
+        _procedure(*legs), position_lookup=lambda ident: (43.6, 1.4)
+    )
+
+
+def test_path_points_carry_their_constraint():
+    point = _path(_leg("+", 3000, speed=210, fix="EEEEE"))[0]
+    assert point["altitude"] == "+3000"
+    assert point["speed"] == "210Kt"
+
+
+def test_path_point_without_constraint_stays_bare():
+    point = _path(_leg(fix="FFFFF"))[0]
+    assert "altitude" not in point and "speed" not in point
+
+
+def test_repeated_fix_stays_one_point_and_keeps_its_constraint():
+    """Deux segments au même repère : une seule étiquette, contrainte comprise.
+
+    Le second segment peut être celui qui publie la contrainte ; le repère ne
+    doit pas pour autant se dédoubler sur la carte.
+    """
+    path = _path(_leg(fix="GGGGG"), _leg("-", 6000, fix="GGGGG"))
+    assert len(path) == 1
+    assert path[0]["altitude"] == "-6000"
+
+
+def test_repeated_fix_merges_altitude_and_speed():
+    path = _path(_leg("+", 3000, fix="HHHHH"), _leg(speed=210, fix="HHHHH"))
+    assert len(path) == 1
+    assert path[0]["altitude"] == "+3000"
+    assert path[0]["speed"] == "210Kt"
 
 
 def test_summary_joins_both_constraints():
@@ -155,6 +249,33 @@ def test_selected_procedures_expose_their_map_paths(provider, settings, ofp):
         *plan.arrival.approach_path,
     ]:
         assert {"ident", "lat", "lon"} <= point.keys()
+
+
+def test_real_star_path_carries_the_map_constraint(provider, settings, ofp):
+    """La contrainte lue dans le tableau doit se retrouver sur le tracé."""
+    plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
+    adimo = [p for p in plan.arrival.star_path if p["ident"] == "ADIMO"]
+    assert adimo, "ADIMO absent du tracé de la STAR"
+    assert adimo[0]["altitude"] == "+8000"
+
+
+def test_real_approach_path_carries_the_threshold_altitude(provider, settings, ofp):
+    plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
+    threshold = [p for p in plan.arrival.approach_path if p["ident"] == "RW32R"]
+    assert threshold and threshold[0]["altitude"] == "+547"
+
+
+def test_constraint_without_a_fix_stays_off_the_map(provider, settings, ofp):
+    """Une contrainte portée par un segment sans repère n'a pas où s'afficher.
+
+    Le SID de référence limite la vitesse à 205 kt sur une montée au cap, qui
+    n'a ni nom ni coordonnées : le tableau des contraintes l'annonce, la carte
+    ne peut pas l'y poser. Inventer un point pour l'accrocher serait pire que
+    de ne pas l'afficher.
+    """
+    plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
+    assert any(row.speed and not row.is_fix for row in plan.departure.sid_constraints)
+    assert not [p for p in plan.departure.sid_path if p.get("speed")]
 
 
 def test_missed_approach_altitude_is_reported(provider, settings, ofp):

@@ -26,6 +26,7 @@ const MAP = (() => {
   let routeSegments = [];
   let dragging = null;
   let basemapVisible = true;
+  let constraintsVisible = true;
   let basemapKey = "osm";
   let trailColor = "#22d3ee";
   const tileCache = new Map();
@@ -478,6 +479,9 @@ const MAP = (() => {
     // La route se recolle d'un seul tenant, procédures comprises : chaque
     // segment reprend là où le précédent s'arrête, antiméridien inclus.
     const joined = continuous(segments.flatMap((entry) => entry.points), view.centerX);
+    // Les étiquettes sont posées après tous les tracés : une route qui repasse
+    // sur elle-même effacerait sinon le libellé déjà écrit.
+    const labels = [];
     let consumed = 0;
     for (const source of segments) {
       const segment = {
@@ -499,22 +503,104 @@ const MAP = (() => {
       context.stroke();
       context.setLineDash([]);
 
+      const colour = css(colours[segment.stage] || "--accent");
       for (const point of segment.points) {
         const [x, y] = toScreen(point.x, point.y);
         if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) {
           continue;
         }
-        context.fillStyle = css(colours[segment.stage] || "--accent");
+        context.fillStyle = colour;
         context.beginPath();
         context.arc(x, y, segment.stage === "approach" ? 5 : 4, 0, Math.PI * 2);
         context.fill();
-        context.font = "650 11px 'Inter', system-ui, sans-serif";
-        context.textAlign = "center";
-        context.fillStyle = css("--label-text");
-        context.fillText(point.ident, x, y - 10);
+        labels.push({ x, y, point, colour, constraint: constraintText(point) });
       }
     }
+
+    // Les repères porteurs d'une contrainte passent en premier : à faible
+    // échelle les étiquettes ne tiennent pas toutes, et celle qui annonce une
+    // altitude ou une vitesse vaut mieux qu'un simple nom de repère.
+    // Les couleurs sont relues une fois par tracé : `getComputedStyle` par
+    // étiquette et par image se paierait pendant les déplacements à la souris.
+    const palette = {
+      background: css("--label-bg"),
+      border: css("--label-border"),
+      text: css("--label-text"),
+    };
+    const boxes = [];
+    for (const label of labels) if (label.constraint) drawRouteLabel(label, boxes, palette);
+    for (const label of labels) if (!label.constraint) drawRouteLabel(label, boxes, palette);
     context.restore();
+  }
+
+  /** Contrainte publiée d'un repère, en une ligne, ou null s'il n'en porte pas. */
+  function constraintText(point) {
+    if (!constraintsVisible) return null;
+    const parts = [point.altitude, point.speed].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  /** Vrai si le cadre chevauche une étiquette déjà posée. */
+  function overlaps(box, boxes) {
+    return boxes.some((other) => (
+      box.x < other.x + other.width
+      && box.x + box.width > other.x
+      && box.y < other.y + other.height
+      && box.y + box.height > other.y
+    ));
+  }
+
+  /**
+   * Étiquette d'un repère : son nom, et sous lui la contrainte publiée. Le
+   * cadre opaque n'est pas décoratif — sans lui le texte se perdrait dans le
+   * fond de carte, qui est une photo de terrain et non un aplat.
+   *
+   * L'étiquette qui recouvrirait une voisine est abandonnée plutôt que
+   * décalée : déplacer un libellé le détacherait de son repère, et une
+   * altitude lue en face du mauvais point est pire qu'une altitude absente.
+   */
+  function drawRouteLabel(label, boxes, palette) {
+    const { x, y, point, colour, constraint } = label;
+    const identFont = "650 11px 'Inter', system-ui, sans-serif";
+    const constraintFont = "700 11px 'Inter', system-ui, sans-serif";
+    const padding = 5;
+    const lineHeight = 13;
+
+    context.font = identFont;
+    let width = context.measureText(point.ident).width;
+    if (constraint) {
+      context.font = constraintFont;
+      width = Math.max(width, context.measureText(constraint).width);
+    }
+    width += padding * 2;
+    const height = (constraint ? lineHeight * 2 : lineHeight) + padding * 2 - 4;
+
+    const box = { x: x - width / 2, y: y - 12 - height, width, height };
+    if (overlaps(box, boxes)) return;
+    boxes.push(box);
+
+    context.fillStyle = palette.background;
+    context.strokeStyle = palette.border;
+    context.lineWidth = 1;
+    context.globalAlpha = 0.92;
+    roundRect(box.x, box.y, width, height, 5);
+    context.fill();
+    context.globalAlpha = 1;
+    context.stroke();
+
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    context.font = identFont;
+    context.fillStyle = palette.text;
+    context.fillText(point.ident, x, box.y + padding - 2);
+    if (constraint) {
+      context.font = constraintFont;
+      // La contrainte reprend la couleur de sa procédure : on voit du premier
+      // coup d'œil si l'altitude annoncée est celle du SID ou celle de la STAR.
+      context.fillStyle = colour;
+      context.fillText(constraint, x, box.y + padding - 2 + lineHeight);
+    }
+    context.textBaseline = "alphabetic";
   }
 
   function drawAircraft() {
@@ -784,6 +870,16 @@ const MAP = (() => {
       syncBasemapSelect();
       draw();
     },
+    toggleConstraints() {
+      constraintsVisible = !constraintsVisible;
+      const button = document.getElementById("map-constraints");
+      if (button) {
+        button.classList.toggle("active", constraintsVisible);
+        button.setAttribute("aria-pressed", String(constraintsVisible));
+      }
+      draw();
+    },
+    get constraintsShown() { return constraintsVisible; },
     /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
     setBasemap(key) {
       const applied = applyBasemap(key);
