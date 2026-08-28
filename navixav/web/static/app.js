@@ -6118,12 +6118,57 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
     const availability = el("p", "stat-note");
     const frame = el("iframe", "sia-document-frame hidden");
     frame.loading = "lazy";
+    const zoomControls = el("div", "sia-pdf-zoom hidden");
+    const zoomOut = el("button", "icon-btn sia-pdf-zoom-button", "−");
+    zoomOut.type = "button";
+    zoomOut.title = t("chart_zoom_out");
+    zoomOut.setAttribute("aria-label", t("chart_zoom_out"));
+    const zoomLevel = el("span", "sia-pdf-zoom-level", t("chart_zoom_fit"));
+    zoomLevel.setAttribute("aria-live", "polite");
+    const zoomIn = el("button", "icon-btn sia-pdf-zoom-button", "+");
+    zoomIn.type = "button";
+    zoomIn.title = t("chart_zoom_in");
+    zoomIn.setAttribute("aria-label", t("chart_zoom_in"));
+    const zoomFit = el("button", "icon-btn sia-pdf-fit", t("chart_zoom_fit"));
+    zoomFit.type = "button";
+    zoomFit.title = t("chart_zoom_fit_title");
+    zoomControls.append(zoomOut, zoomLevel, zoomIn, zoomFit);
     let accessGeneration = 0;
     let frameObjectUrl = "";
+    let frameBaseUrl = "";
+    let zoomPercent = 100;
+    let zoomIsFit = true;
+
+    const applyPdfZoom = () => {
+      if (!frameBaseUrl) return;
+      const parameters = zoomIsFit ? "view=FitH" : `zoom=${zoomPercent}`;
+      frame.src = `${frameBaseUrl.split("#", 1)[0]}#${parameters}`;
+      zoomLevel.textContent = zoomIsFit
+        ? t("chart_zoom_fit")
+        : tf("chart_zoom_level", { level: zoomPercent });
+      zoomOut.disabled = !zoomIsFit && zoomPercent <= 50;
+      zoomIn.disabled = !zoomIsFit && zoomPercent >= 200;
+    };
+
+    const setNumericZoom = (change) => {
+      zoomPercent = Math.min(200, Math.max(50, zoomPercent + change));
+      zoomIsFit = false;
+      applyPdfZoom();
+    };
+
+    zoomOut.addEventListener("click", () => setNumericZoom(-25));
+    zoomIn.addEventListener("click", () => setNumericZoom(25));
+    zoomFit.addEventListener("click", () => {
+      zoomPercent = 100;
+      zoomIsFit = true;
+      applyPdfZoom();
+    });
 
     const closeFrame = () => {
       frame.classList.add("hidden");
+      zoomControls.classList.add("hidden");
       frame.removeAttribute("src");
+      frameBaseUrl = "";
       card.classList.remove("pdf-open");
       if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
       frameObjectUrl = "";
@@ -6219,7 +6264,7 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
           }
           if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
           frameObjectUrl = URL.createObjectURL(await response.blob());
-          frame.src = frameObjectUrl;
+          frameBaseUrl = frameObjectUrl;
         } catch (error) {
           closeFrame();
           availability.textContent = String(error.message || error);
@@ -6230,18 +6275,22 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
           display.textContent = t("chart_show_pdf");
         }
       } else {
-        frame.src = chart.pdf_url;
+        frameBaseUrl = chart.pdf_url;
         display.disabled = false;
         display.textContent = t("chart_show_pdf");
       }
+      zoomPercent = 100;
+      zoomIsFit = true;
+      applyPdfZoom();
       card.classList.add("pdf-open");
       frame.title = tf("chart_frame_title", {
         provider: officialProviderName(data),
         title: chart.title,
       });
+      zoomControls.classList.remove("hidden");
       frame.classList.remove("hidden");
     });
-    card.append(controls, availability, frame);
+    card.append(controls, availability, zoomControls, frame);
     updateSelection();
   }).catch((error) => {
     status.textContent = t("chart_unavailable");

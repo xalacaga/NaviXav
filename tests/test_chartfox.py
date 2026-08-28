@@ -275,6 +275,11 @@ def test_chartfox_controls_are_present_in_settings_and_flight_charts():
     translations = (static / "i18n.js").read_text(encoding="utf-8")
     assert translations.count("chartfox_account_required:") == 8
     assert translations.count("chartfox_simulation_only:") == 8
+    assert translations.count("chart_zoom_out:") == 8
+    assert translations.count("chart_zoom_in:") == 8
+    assert translations.count("chart_zoom_fit:") == 8
+    assert translations.count("chart_zoom_fit_title:") == 8
+    assert translations.count("chart_zoom_level:") == 8
     assert '"#chartfox-settings-simulation": "chartfox_simulation_only"' in translations
     assert "Un compte ChartFox/VATSIM est requis" in translations
     assert "A ChartFox/VATSIM account is required" in translations
@@ -282,5 +287,10 @@ def test_chartfox_controls_are_present_in_settings_and_flight_charts():
     assert 'chartfox_iframe_blocked' in javascript
     assert 'chartfox_use_official_provider' in javascript
     assert 'officialAirportLibrary(icao, role, airport, plan, "official")' in javascript
+    assert '"view=FitH"' in javascript
+    assert '`zoom=${zoomPercent}`' in javascript
+    assert 'zoomOut.addEventListener("click"' in javascript
+    assert 'zoomIn.addEventListener("click"' in javascript
+    assert 'zoomFit.addEventListener("click"' in javascript
     gitignore = (static.parents[2] / ".gitignore").read_text(encoding="utf-8")
     assert "data/credentials/" in gitignore

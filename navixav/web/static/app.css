@@ -2663,9 +2663,20 @@ pre {
 }
 .sia-document-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sia-document-actions a { display: inline-block; text-decoration: none; }
+.sia-pdf-zoom {
+  display: flex; align-items: center; justify-content: flex-end; gap: 7px;
+  margin-top: 14px;
+}
+.sia-pdf-zoom-button {
+  min-width: 38px; padding-inline: 10px; font-size: 1rem; line-height: 1;
+}
+.sia-pdf-zoom-level {
+  min-width: 72px; color: var(--text-muted); font-size: 0.74rem; text-align: center;
+}
+.sia-pdf-fit { padding-inline: 12px; }
 .sia-document-frame {
   display: block; width: 100%; height: min(72vh, 780px);
-  margin-top: 14px; border: 1px solid var(--border); border-radius: 8px;
+  margin-top: 8px; border: 1px solid var(--border); border-radius: 8px;
   background: #fff;
 }
 @media (max-width: 620px) {
