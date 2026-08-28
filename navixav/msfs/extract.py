@@ -12,10 +12,16 @@ from typing import Any, Sequence
 from navixav.msfs import fields as F
 from navixav.msfs.client import (
     SimConnectClient,
+    SimConnectLayout,
     SimConnectRefused,
     FacilityDefinition,
     group_blocks,
 )
+
+# Un champ optionnel peut être refusé, mais aussi changer de largeur d'une
+# version du simulateur à l'autre : les deux se rattrapent en rejouant la
+# définition sans lui.
+_RETRYABLE = (SimConnectRefused, SimConnectLayout)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -90,12 +96,15 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
     Le bloc des noms de voies étant le seul dont la présence n'est pas acquise
     sur les versions antérieures, on réessaie une fois sans lui : mieux vaut un
     plan de terrain sans noms qu'aucune donnée du tout.
+
+    Une charge d'une taille inattendue vaut un refus : le champ optionnel a
+    changé de largeur, et le retirer rend l'aéroport de nouveau lisible.
     """
     try:
         return _extract_airport(
             client, icao, with_taxi_names=True, with_runway_lights=True
         )
-    except SimConnectRefused:
+    except _RETRYABLE:
         LOGGER.warning(
             "Noms de voies de circulation refusés par le simulateur : "
             "nouvel essai sans eux"
@@ -104,7 +113,7 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
         return _extract_airport(
             client, icao, with_taxi_names=False, with_runway_lights=True
         )
-    except SimConnectRefused:
+    except _RETRYABLE:
         LOGGER.warning(
             "Éclairage des pistes refusé par le simulateur : "
             "nouvel essai sans lui, avec les noms de voies"
@@ -113,7 +122,7 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
         return _extract_airport(
             client, icao, with_taxi_names=True, with_runway_lights=False
         )
-    except SimConnectRefused:
+    except _RETRYABLE:
         LOGGER.warning(
             "Noms de voies et éclairage indisponibles : dernier essai "
             "avec la définition historique minimale"

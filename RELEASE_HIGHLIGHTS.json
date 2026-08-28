@@ -16,5 +16,26 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": []
+  "fixed": [
+    {
+      "fr": "les aérodromes absents du cache sont de nouveau importés depuis le simulateur : l'éclairage des pistes était lu sur une largeur erronée, ce qui faisait perdre tout l'aéroport et affichait un plan de terrain indisponible",
+      "en": "airports missing from the cache are imported from the simulator again: runway lighting was read with the wrong field width, which lost the whole airport and left its ground chart unavailable",
+      "de": "Flugplätze, die im Cache fehlen, werden wieder aus dem Simulator importiert: Die Pistenbefeuerung wurde mit falscher Feldbreite gelesen, wodurch der gesamte Flugplatz verloren ging und sein Flughafenplan nicht verfügbar war",
+      "es": "los aeródromos ausentes de la caché vuelven a importarse desde el simulador: el balizamiento de pista se leía con un ancho de campo erróneo, lo que hacía perder todo el aeródromo y dejaba su plano indisponible",
+      "it": "gli aeroporti assenti dalla cache tornano a essere importati dal simulatore: le luci di pista erano lette con una larghezza di campo errata, il che faceva perdere l'intero aeroporto e rendeva la planimetria non disponibile",
+      "pt": "os aeródromos ausentes da cache voltam a ser importados do simulador: a iluminação de pista era lida com uma largura de campo errada, o que fazia perder todo o aeródromo e deixava a sua planta indisponível",
+      "nl": "luchthavens die in de cache ontbreken worden weer uit de simulator geïmporteerd: de baanverlichting werd met een verkeerde veldbreedte gelezen, waardoor de hele luchthaven verloren ging en de plattegrond niet beschikbaar bleef",
+      "pl": "lotniska brakujące w pamięci podręcznej są ponownie importowane z symulatora: oświetlenie drogi startowej odczytywano o błędnej szerokości pola, przez co tracone było całe lotnisko, a jego plan pozostawał niedostępny"
+    },
+    {
+      "fr": "un plan de terrain indisponible dit désormais pourquoi — aérodrome absent de la base — au lieu d'annoncer une erreur réseau, et l'intensité d'éclairage inconnue n'est plus affichée comme éteinte",
+      "en": "an unavailable ground chart now says why — airport missing from the database — instead of reporting a network error, and unknown lighting intensity is no longer shown as off",
+      "de": "Ein nicht verfügbarer Flughafenplan nennt jetzt den Grund — Flugplatz fehlt in der Datenbank — statt einen Netzwerkfehler zu melden, und eine unbekannte Befeuerungsstärke wird nicht mehr als ausgeschaltet angezeigt",
+      "es": "un plano de aeródromo no disponible indica ahora el motivo — aeródromo ausente de la base — en lugar de anunciar un error de red, y una intensidad de balizamiento desconocida ya no se muestra como apagada",
+      "it": "una planimetria non disponibile indica ora il motivo — aeroporto assente dalla base dati — anziché segnalare un errore di rete, e un'intensità delle luci sconosciuta non è più mostrata come spenta",
+      "pt": "uma planta de aeródromo indisponível indica agora o motivo — aeródromo ausente da base de dados — em vez de anunciar um erro de rede, e uma intensidade de iluminação desconhecida deixa de ser apresentada como apagada",
+      "nl": "een niet-beschikbare plattegrond geeft nu de reden — luchthaven ontbreekt in de database — in plaats van een netwerkfout te melden, en een onbekende verlichtingssterkte wordt niet langer als uit getoond",
+      "pl": "niedostępny plan lotniska podaje teraz przyczynę — brak lotniska w bazie — zamiast zgłaszać błąd sieci, a nieznane natężenie oświetlenia nie jest już pokazywane jako wyłączone"
+    }
+  ]
 }

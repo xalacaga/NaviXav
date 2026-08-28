@@ -76,12 +76,12 @@ class Field:
     """Un champ d'une définition, avec son décodage."""
 
     name: str
-    kind: str  # "f64" | "f32" | "i32" | "str8" | "str32" | "str64"
+    kind: str  # "f64" | "f32" | "i32" | "u8" | "str8" | "str32" | "str64"
 
     @property
     def size(self) -> int:
         return {
-            "f64": 8, "f32": 4, "i32": 4,
+            "f64": 8, "f32": 4, "i32": 4, "u8": 1,
             "str8": 8, "str32": 32, "str64": 64,
         }[self.kind]
 
@@ -96,6 +96,10 @@ def f32(name: str) -> Field:
 
 def i32(name: str) -> Field:
     return Field(name, "i32")
+
+
+def u8(name: str) -> Field:
+    return Field(name, "u8")
 
 
 def s8(name: str) -> Field:
@@ -132,8 +136,12 @@ RUNWAY_FIELDS = (
     s8("SECONDARY_ILS_ICAO"),
 )
 
+# L'intensité de l'éclairage tient sur un octet, et non sur un entier comme
+# les autres énumérations : mesuré sur les réponses du simulateur, où un bloc
+# RUNWAY complet fait 74 octets et non 80. Les valeurs vont de 0 (éteint) à
+# 3 (forte).
 RUNWAY_LIGHT_FIELDS = (
-    i32("EDGE_LIGHTS"), i32("CENTER_LIGHTS"),
+    u8("EDGE_LIGHTS"), u8("CENTER_LIGHTS"),
 )
 
 APPROACH_FIELDS = (

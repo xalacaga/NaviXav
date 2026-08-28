@@ -86,6 +86,15 @@ class SimConnectRefused(SimConnectError):
         self.codes = tuple(codes)
 
 
+class SimConnectLayout(SimConnectError):
+    """La charge reçue ne fait pas la taille annoncée par la définition.
+
+    Une version du simulateur peut changer la largeur d'un champ. Le bloc reste
+    inexploitable, mais la définition, elle, peut être rejouée sans le champ
+    optionnel fautif : c'est une erreur de forme, pas une absence de réponse.
+    """
+
+
 class _RECV(ct.Structure):
     _fields_ = [
         ("dwSize", wintypes.DWORD),
@@ -161,9 +170,9 @@ def decode(payload: bytes, fields: Sequence[Field]) -> dict[str, Any]:
     expected = sum(field.size for field in fields)
     if len(payload) != expected:
         names = ", ".join(field.name for field in fields)
-        raise SimConnectError(
+        raise SimConnectLayout(
             f"Charge de {len(payload)} octets pour {expected} attendus. "
-            f"Un champ a été refusé parmi : {names}"
+            f"Un champ a été refusé ou a changé de largeur parmi : {names}"
         )
 
     values: dict[str, Any] = {}
@@ -177,6 +186,8 @@ def decode(payload: bytes, fields: Sequence[Field]) -> dict[str, Any]:
             values[field.name] = struct.unpack("<f", chunk)[0]
         elif field.kind == "i32":
             values[field.name] = struct.unpack("<i", chunk)[0]
+        elif field.kind == "u8":
+            values[field.name] = chunk[0]
         else:
             values[field.name] = chunk.split(b"\x00")[0].decode("utf-8", "replace").strip()
     return values

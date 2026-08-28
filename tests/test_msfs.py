@@ -20,6 +20,7 @@ from navixav.msfs.client import (
     FacilityDefinition,
     SimConnectClient,
     SimConnectError,
+    SimConnectLayout,
     SimConnectRefused,
     decode,
 )
@@ -52,6 +53,18 @@ def test_decode_rejects_a_short_payload():
 def test_decode_rejects_a_long_payload():
     with pytest.raises(SimConnectError):
         decode(struct.pack("<dd", 1.0, 2.0), (F.f64("A"),))
+
+
+def test_runway_lights_are_read_as_single_bytes():
+    """Le simulateur donne l'intensité sur un octet, pas sur un entier.
+
+    Un bloc RUNWAY complet fait 74 octets : lu en entiers, il décalerait tout
+    et ferait perdre l'aéroport entier.
+    """
+    assert sum(field.size for field in F.RUNWAY_FIELDS + F.RUNWAY_LIGHT_FIELDS) == 74
+    assert decode(b"", F.RUNWAY_LIGHT_FIELDS) == {
+        "EDGE_LIGHTS": 3, "CENTER_LIGHTS": 1
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -413,8 +426,28 @@ class _LightsRefusingClient:
         return []
 
 
+class _LightsMissizingClient(_LightsRefusingClient):
+    """Simulateur qui accepte le champ, puis en renvoie une autre largeur."""
+
+    def request(self, definition, icao):
+        try:
+            return super().request(definition, icao)
+        except SimConnectRefused as exc:
+            raise SimConnectLayout("charge de 74 octets pour 80 attendus") from exc
+
+
 def test_refused_runway_lights_fall_back_to_the_legacy_airport_definition():
     client = _LightsRefusingClient()
+    airport = extract.extract_airport(client, "lfst")
+    assert client.attempts == [
+        (True, True), (False, True), (True, False)
+    ]
+    assert airport["icao"] == "LFST"
+
+
+def test_a_light_field_of_another_width_falls_back_like_a_refusal():
+    """Une charge d'une taille inattendue ne doit pas coûter l'aéroport."""
+    client = _LightsMissizingClient()
     airport = extract.extract_airport(client, "lfst")
     assert client.attempts == [
         (True, True), (False, True), (True, False)

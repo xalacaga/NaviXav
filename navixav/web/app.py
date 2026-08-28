@@ -765,7 +765,14 @@ def create_app(
         try:
             return build_chart(provider, icao, runway)
         except LookupError as exc:
-            raise HTTPException(404, str(exc)) from exc
+            # Même forme que le roulage : le message français part dans les
+            # traces, le code et ses paramètres traversent pour que le
+            # navigateur affiche la raison dans la langue de l'interface.
+            raise HTTPException(404, {
+                "message": str(exc),
+                "code": "ground_airport_absent",
+                "params": {"icao": icao.upper()},
+            }) from exc
         finally:
             provider.close()
 

@@ -218,8 +218,14 @@ class MsfsProvider:
         key = icao.strip().upper()
         try:
             self.ensure(key)
-        except (NavdataError, SimConnectError):
+        except (NavdataError, SimConnectError) as exc:
             if not self._has(key):
+                # Sans cette trace, l'absence du terrain se lit plus loin comme
+                # une simple lacune de la base, et la raison — simulateur muet
+                # ou définition refusée — ne serait consignée nulle part.
+                LOGGER.warning(
+                    "Mise en cache MSFS d'un aérodrome impossible : %s", exc
+                )
                 return None
 
         row = self._conn.execute(

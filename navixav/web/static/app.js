@@ -4946,7 +4946,10 @@ function runwayNote(runway) {
   }
   if (runway.length_ft) bits.push(`${Math.round(runway.length_ft).toLocaleString(displayLocale())} ft`);
   if (runway.ils_ident) bits.push(`ILS ${runway.ils_ident}`);
-  const lightLevel = (value) => ["OFF", "LOW", "MED", "HIGH"][Number(value)] || null;
+  // Une intensité inconnue reste tue : l'annoncer éteinte serait une affirmation
+  // que la base ne porte pas.
+  const lightLevel = (value) =>
+    value === null || value === undefined ? null : ["OFF", "LOW", "MED", "HIGH"][Number(value)] || null;
   const edgeLights = lightLevel(runway.edge_lights);
   const centerLights = lightLevel(runway.center_lights);
   if (edgeLights) bits.push(`EDGE ${edgeLights}`);
@@ -6682,8 +6685,12 @@ async function loadChart(icao, runway, mapRole) {
   try {
     const response = await fetch(`/api/chart/${icao}?${params}`);
     if (!response.ok) {
-      const payload = await response.json();
-      showBanner("error", tf("chart_unavailable", { icao }), [t("network_error")]);
+      // Le service dit pourquoi — terrain absent de la base, simulateur muet.
+      // Annoncer « erreur réseau » enverrait chercher la panne du mauvais côté.
+      const payload = await response.json().catch(() => null);
+      showBanner("error", tf("ground_chart_unavailable", { icao }), [
+        serviceError(payload?.detail) || t("ground_chart_unavailable_body"),
+      ]);
       return;
     }
     currentChart = await response.json();
