@@ -16,16 +16,5 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": [
-    {
-      "fr": "les PDF de Charts s’ajustent maintenant à la largeur disponible au lieu de s’ouvrir surdimensionnés, avec des commandes pour réduire, agrandir ou rétablir l’ajustement",
-      "en": "PDFs in Charts now fit the available width instead of opening oversized, with controls to zoom out, zoom in or restore the fitted view",
-      "de": "PDFs in Charts werden nun an die verfügbare Breite angepasst, statt übergroß geöffnet zu werden, und bieten Schaltflächen zum Verkleinern, Vergrößern und Wiederherstellen der angepassten Ansicht",
-      "es": "los PDF de Charts se ajustan ahora al ancho disponible en lugar de abrirse sobredimensionados, con controles para reducir, ampliar o restablecer la vista ajustada",
-      "it": "i PDF in Charts ora si adattano alla larghezza disponibile invece di aprirsi sovradimensionati, con comandi per ridurre, ingrandire o ripristinare la vista adattata",
-      "pt": "os PDF em Charts ajustam-se agora à largura disponível em vez de abrirem sobredimensionados, com controlos para reduzir, ampliar ou repor a vista ajustada",
-      "nl": "PDF’s in Charts passen zich nu aan de beschikbare breedte aan in plaats van te groot te openen, met knoppen om uit of in te zoomen en de passende weergave te herstellen",
-      "pl": "pliki PDF w Charts są teraz dopasowywane do dostępnej szerokości zamiast otwierać się w zbyt dużym powiększeniu, a elementy sterujące pozwalają pomniejszać, powiększać i przywracać dopasowany widok"
-    }
-  ]
+  "fixed": []
 }
