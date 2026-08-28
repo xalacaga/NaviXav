@@ -1,17 +1,14 @@
-# NaviXav 1.5.2
+# NaviXav 1.5.3
 
 Opublikowano 2026-08-28.
 
-## Nowości
-
-- Śledzenie MSFS rozróżnia teraz bezpośrednio STD i QNH, pokazuje oświetlenie krawędzi oraz osi pasa i może ostrzegać o niebezpiecznie otwartych drzwiach, luku lub osłonie kabiny.
-
 ## Poprawki
 
-- Mapy ChartFox dostarczane jako obraz dopasowują się teraz do szerokości panelu Charts i reagują na przyciski powiększenia; otwierały się za duże, a przyciski nie działały.
+- Lotniska brakujące w pamięci podręcznej są ponownie importowane z symulatora: oświetlenie drogi startowej odczytywano o błędnej szerokości pola, przez co tracone było całe lotnisko, a jego plan pozostawał niedostępny.
+- Niedostępny plan lotniska podaje teraz przyczynę — brak lotniska w bazie — zamiast zgłaszać błąd sieci, a nieznane natężenie oświetlenia nie jest już pokazywane jako wyłączone.
 
 ## Zmiany
 
-- Mise a jout varsim.
+- Bug correction.
 
 Instalator jest weryfikowany za pomocą sumy kontrolnej SHA-256 przed każdą automatyczną aktualizacją.

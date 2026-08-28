@@ -1,17 +1,14 @@
-# NaviXav 1.5.2
+# NaviXav 1.5.3
 
 Released on 2026-08-28.
 
-## Added
-
-- MSFS tracking now explicitly distinguishes STD from QNH, shows runway edge and centreline lighting, and can warn about an open door, hatch or canopy that presents a risk.
-
 ## Fixed
 
-- ChartFox charts delivered as images now fit the width of the Charts panel and follow the zoom buttons; they opened oversized and the controls had no effect.
+- Airports missing from the cache are imported from the simulator again: runway lighting was read with the wrong field width, which lost the whole airport and left its ground chart unavailable.
+- An unavailable ground chart now says why — airport missing from the database — instead of reporting a network error, and unknown lighting intensity is no longer shown as off.
 
 ## Changed
 
-- Mise a jout varsim.
+- Bug correction.
 
 The installer is verified against its SHA-256 checksum before any automatic update.

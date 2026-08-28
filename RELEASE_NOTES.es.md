@@ -1,17 +1,14 @@
-# NaviXav 1.5.2
+# NaviXav 1.5.3
 
 Publicado el 2026-08-28.
 
-## Novedades
-
-- El seguimiento de MSFS ahora distingue explícitamente STD de QNH, muestra las luces de borde y eje de pista y puede avisar de una puerta, escotilla o cúpula abierta que suponga un riesgo.
-
 ## Correcciones
 
-- Las cartas de ChartFox entregadas como imagen se ajustan ahora al ancho del panel Charts y siguen los botones de zoom; se abrían demasiado grandes y los controles no tenían efecto.
+- Los aeródromos ausentes de la caché vuelven a importarse desde el simulador: el balizamiento de pista se leía con un ancho de campo erróneo, lo que hacía perder todo el aeródromo y dejaba su plano indisponible.
+- Un plano de aeródromo no disponible indica ahora el motivo — aeródromo ausente de la base — en lugar de anunciar un error de red, y una intensidad de balizamiento desconocida ya no se muestra como apagada.
 
 ## Cambios
 
-- Mise a jout varsim.
+- Bug correction.
 
 El instalador se verifica con su suma de comprobación SHA-256 antes de cualquier actualización automática.

@@ -1,17 +1,14 @@
-# NaviXav 1.5.2
+# NaviXav 1.5.3
 
 Pubblicato il 2026-08-28.
 
-## Novità
-
-- Il monitoraggio MSFS ora distingue esplicitamente STD da QNH, mostra le luci di bordo e asse pista e può segnalare una porta, un portello o un tettuccio aperto che rappresenta un rischio.
-
 ## Correzioni
 
-- Le carte ChartFox fornite come immagine si adattano ora alla larghezza del pannello Charts e seguono i pulsanti di zoom; si aprivano troppo grandi e i comandi non avevano effetto.
+- Gli aeroporti assenti dalla cache tornano a essere importati dal simulatore: le luci di pista erano lette con una larghezza di campo errata, il che faceva perdere l'intero aeroporto e rendeva la planimetria non disponibile.
+- Una planimetria non disponibile indica ora il motivo — aeroporto assente dalla base dati — anziché segnalare un errore di rete, e un'intensità delle luci sconosciuta non è più mostrata come spenta.
 
 ## Modifiche
 
-- Mise a jout varsim.
+- Bug correction.
 
 Il programma di installazione è verificato tramite il suo checksum SHA-256 prima di ogni aggiornamento automatico.
