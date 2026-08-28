@@ -66,6 +66,24 @@ def test_release_version_check_skips_the_regenerated_flightsim_to_changelog():
     assert prepare.count("foreach ($File in $Files) {") == 2
 
 
+def test_release_version_check_leaves_dated_announcements_alone():
+    """Une annonce « what's new » porte le numéro de sa propre version.
+
+    L'aligner sur la version préparée transformerait l'annonce d'une version
+    déjà publiée en annonce de la suivante, et la construction échouerait sur
+    un fichier modifié hors de la liste des fichiers de Release.
+    """
+    prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        r"$Historical = '^flightsim-to-whats-new-\d+\.\d+\.\d+\.txt$'"
+        in prepare
+    )
+    assert "$_.Name -notmatch $Historical" in prepare
+
+
 def test_windows_distribution_includes_aircraft_photo_credits():
     collect = (PROJECT_ROOT / "scripts" / "collect_licenses.ps1").read_text(
         encoding="utf-8"

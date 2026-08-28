@@ -77,9 +77,17 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
     # précédente en celui de la version préparée, et le garde-fou y verrait
     # autant de publications oubliées qu'il existe de versions.
     $Generated = @("flightsim-to-changelog.txt")
+
+    # Une annonce « what's new » porte le numéro de la version qu'elle
+    # annonce : c'est un texte daté, pas une fiche à tenir à jour. L'aligner
+    # daterait de la version préparée l'annonce d'une version déjà publiée.
+    $Historical = '^flightsim-to-whats-new-\d+\.\d+\.\d+\.txt$'
+
     $Files = @(
         Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt" |
-            Where-Object { $Generated -notcontains $_.Name }
+            Where-Object {
+                $Generated -notcontains $_.Name -and $_.Name -notmatch $Historical
+            }
     )
 
     # Une version précédée de « v » décrit une borne historique immuable
