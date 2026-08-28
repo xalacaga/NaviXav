@@ -24,11 +24,16 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_STORE = user_data_path("navixav.sqlite")
 SCHEMA_VERSION = 2
 
-# Version de la géométrie du sol enregistrée pour un terrain. Elle est portée
-# par l'aéroport lui-même plutôt que par la base : un terrain importé avant
-# l'arrivée des noms de voies doit être repris au simulateur, sans pour autant
-# invalider les autres.
-GROUND_VERSION = 1
+# Version de l'extraction enregistrée pour un terrain — géométrie du sol à
+# l'origine, découpage des procédures depuis. Elle est portée par l'aéroport
+# lui-même plutôt que par la base : un terrain importé par une version
+# antérieure doit être repris au simulateur, sans pour autant invalider les
+# autres.
+#
+#   2 : les branches de piste d'une SID rejoignent le tronc commun. Avant, une
+#       SID desservant deux seuils laissait tous ses segments dans ses branches
+#       et se retrouvait sans tracé ni contrainte.
+GROUND_VERSION = 2
 
 EARTH_RADIUS_M = 6378137.0
 METRES_TO_FEET = 3.280839895
@@ -621,9 +626,15 @@ def _split_trunk(
 
     MSFS ne publie aucun segment au niveau de la procédure : tout est réparti
     dans les transitions de piste. Une SID n'en a qu'une, elle constitue donc
-    la procédure entière. Une STAR en a plusieurs, qui partagent un début et
-    divergent en finale : le tronc donne le point d'entrée, chaque branche
-    conserve sa sortie propre.
+    la procédure entière.
+
+    Au-delà d'une transition, les deux sens de vol sont symétriques et non
+    identiques. Une STAR partage un **début** et diverge en finale, piste par
+    piste : sa partie commune est un préfixe. Une SID diverge dès le décollage,
+    piste par piste, puis converge sur une fin commune : sa partie commune est
+    un **suffixe**. Chercher un préfixe dans une SID ne trouve rien dès que les
+    deux seuils partent différemment, et laisserait le tracé entier dans les
+    branches — c'est-à-dire aucun tracé du tout.
     """
     transitions = procedure["runway_transitions"]
     common = procedure.get("legs", [])
@@ -634,15 +645,22 @@ def _split_trunk(
         return common + transitions[0]["legs"], [(transitions[0]["ident"], [])]
 
     sequences = [transition["legs"] for transition in transitions]
-    shared = _common_prefix(sequences)
-    # Une STAR se lit dans le sens du vol ; le tronc précède les branches.
-    trunk = common + shared if kind == "STAR" else common
-    offset = len(shared) if kind == "STAR" else 0
-    branches = [
-        (transition["ident"], transition["legs"][offset:])
-        for transition in transitions
-    ]
-    return trunk, branches
+    if kind == "STAR":
+        shared = _common_prefix(sequences)
+        branches = [
+            (transition["ident"], transition["legs"][len(shared):])
+            for transition in transitions
+        ]
+    else:
+        shared = _common_suffix(sequences)
+        branches = [
+            (
+                transition["ident"],
+                transition["legs"][: len(transition["legs"]) - len(shared)],
+            )
+            for transition in transitions
+        ]
+    return common + shared, branches
 
 
 def _common_prefix(
@@ -659,6 +677,24 @@ def _common_prefix(
             break
         length += 1
     return sequences[0][:length]
+
+
+def _common_suffix(
+    sequences: list[list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Plus longue fin partagée par toutes les séquences, comparée par repère."""
+    if not sequences:
+        return []
+    shortest = min(len(sequence) for sequence in sequences)
+    length = 0
+    while length < shortest:
+        fixes = {sequence[-1 - length].get("fix") for sequence in sequences}
+        if len(fixes) != 1:
+            break
+        length += 1
+    if not length:
+        return []
+    return sequences[0][len(sequences[0]) - length:]
 
 
 def _needs_rnp(legs: Iterable[dict[str, Any]]) -> bool:

@@ -42,6 +42,29 @@ def test_aircraft_survey_route_serializes_detected_folders(monkeypatch, tmp_path
     app.state.close_resources()
 
 
+def test_aircraft_photo_route_only_serves_a_scanned_community_thumbnail(
+    monkeypatch, tmp_path
+):
+    community = tmp_path / "Community"
+    community.mkdir()
+    directory = community / "vendor" / "SimObjects" / "Airplanes" / "widget"
+    directory.mkdir(parents=True)
+    thumbnail = directory / "thumbnail.jpg"
+    thumbnail.write_bytes(b"jpeg")
+    aircraft = InstalledAircraft(
+        package="vendor", directory=directory, titles=("Fenix A321 CFM",),
+        manufacturer="Fenix", model="A321", icao="A21N",
+    )
+    monkeypatch.setattr(web_app, "community_folders", lambda explicit=None: [community])
+    monkeypatch.setattr(web_app, "scan", lambda folders: [aircraft])
+    app = create_app(Settings())
+
+    response = _endpoint(app, "/api/aircraft/photo")(icao="A21N", name="Fenix A321")
+
+    assert Path(response.path) == thumbnail
+    app.state.close_resources()
+
+
 def test_folder_selector_returns_the_inventory_without_saving(monkeypatch, tmp_path):
     community = tmp_path / "Community"
     community.mkdir()
@@ -103,4 +126,32 @@ def test_settings_contain_the_complete_aircraft_panel():
     assert 'id="aircraft-covered-list"' in html
     assert 'id="aircraft-missing-list"' in html
     assert 'fetch("/api/aircraft/scaffold"' in javascript
+    assert 'visual.classList.add("aircraft-survey-photo")' in javascript
     assert "aircraft-survey-columns" in css
+    assert ".aircraft-survey-photo" in css
+
+
+def test_aircraft_panel_uses_bundled_photos_then_community_thumbnails():
+    static = Path(web_app.__file__).parent / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    photos = static / "aircraft"
+
+    assert 'asset: "airbus-a321"' in javascript
+    assert javascript.index('asset: "airbus-a321"') < javascript.index('asset: "airbus-a320"')
+    assert '`/api/aircraft/photo?icao=${encodeURIComponent(plan.aircraft || "")}`' in javascript
+    assert 'photo.classList.remove("hidden")' in javascript
+    assert 'mark.classList.add("hidden")' in javascript
+    assert "photo.hidden" not in javascript
+    assert "mark.hidden" not in javascript
+    assert "aircraft-photo" in css
+    assert 'id="aircraft-photo-dialog"' in html
+    assert 'id="aircraft-photo-large"' in html
+    assert 'id="aircraft-photo-close"' in html
+    assert "function openAircraftPhoto(" in javascript
+    assert 'visual.setAttribute("role", "button")' in javascript
+    assert 'event.key !== "Enter" && event.key !== " "' in javascript
+    assert ".aircraft-photo-dialog::backdrop" in css
+    assert len(list(photos.glob("*.jpg"))) == 31
+    assert all(path.stat().st_size > 20_000 for path in photos.glob("*.jpg"))

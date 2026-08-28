@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from navixav.models import AirportWeather, EnrouteWeather, WeatherBriefing
 from navixav.simbrief.parser import OfpSummary
@@ -132,37 +133,35 @@ def _airport(
     return report
 
 
-def _notes(report: AirportWeather) -> list[str]:
-    """Points d'attention déduits du METAR, sans jamais inventer de minima."""
-    notes: list[str] = []
+def _notes(report: AirportWeather) -> list[dict[str, Any]]:
+    """Points d'attention déduits du METAR, sans jamais inventer de minima.
+
+    Une note est un code et ses valeurs, jamais une phrase : l'interface seule
+    connaît la langue affichée. Une phrase assemblée ici arriverait en français
+    dans une interface anglaise.
+    """
+    notes: list[dict[str, Any]] = []
     if report.raw_metar is None:
-        notes.append("Aucun METAR disponible pour ce terrain.")
+        notes.append({"code": "wx_note_no_metar", "params": {}})
         return notes
 
     if report.stale and report.age_minutes is not None:
-        notes.append(f"Observation vieille de {_age_label(report.age_minutes)}.")
+        notes.append(
+            {"code": "wx_note_stale", "params": {"minutes": report.age_minutes}}
+        )
     if report.spread_c is not None and report.spread_c <= FOG_RISK_SPREAD_C:
         notes.append(
-            f"Écart température/point de rosée de {report.spread_c} °C : "
-            "risque de brume ou de brouillard."
+            {"code": "wx_note_fog_risk", "params": {"spread": report.spread_c}}
         )
     if report.temperature_c is not None and report.temperature_c <= FREEZING_TEMPERATURE_C:
-        notes.append("Température basse : givrage et état de piste à vérifier.")
+        notes.append({"code": "wx_note_freezing", "params": {}})
     if report.wind.gust_kt is not None:
-        notes.append(f"Rafales à {report.wind.gust_kt} kt.")
+        notes.append(
+            {"code": "wx_note_gusts", "params": {"gust": report.wind.gust_kt}}
+        )
     if report.flight_category in {"IFR", "LIFR"}:
-        notes.append("Conditions IFR basses : vérifier les minima de l'approche.")
+        notes.append({"code": "wx_note_low_ifr", "params": {}})
     return notes
-
-
-def _age_label(minutes: int) -> str:
-    """« 10 111 min » ne se lit pas : au-delà de l'heure, on passe à h puis à j."""
-    if minutes < 60:
-        return f"{minutes} min"
-    if minutes < 48 * 60:
-        hours, remainder = divmod(minutes, 60)
-        return f"{hours} h {remainder:02d}" if remainder else f"{hours} h"
-    return f"{minutes // (24 * 60)} jours"
 
 
 def _enroute(ofp: OfpSummary) -> EnrouteWeather:
@@ -182,22 +181,28 @@ def _enroute(ofp: OfpSummary) -> EnrouteWeather:
     if enroute.wind_component_kt is not None:
         if enroute.wind_component_kt < 0:
             enroute.notes.append(
-                f"Vent de face moyen de {abs(enroute.wind_component_kt)} kt."
+                {
+                    "code": "wx_note_headwind",
+                    "params": {"value": abs(enroute.wind_component_kt)},
+                }
             )
         elif enroute.wind_component_kt > 0:
             enroute.notes.append(
-                f"Vent arrière moyen de {enroute.wind_component_kt} kt."
+                {
+                    "code": "wx_note_tailwind",
+                    "params": {"value": enroute.wind_component_kt},
+                }
             )
     if enroute.temperature_dev_c is not None and enroute.temperature_dev_c >= 10:
         enroute.notes.append(
-            f"ISA +{enroute.temperature_dev_c} : plafond et performances dégradés."
+            {"code": "wx_note_isa_high", "params": {"value": enroute.temperature_dev_c}}
         )
     if (
         enroute.tropopause_ft is not None
         and enroute.cruise_altitude_ft is not None
         and enroute.cruise_altitude_ft >= enroute.tropopause_ft
     ):
-        enroute.notes.append("Croisière au niveau de la tropopause ou au-dessus.")
+        enroute.notes.append({"code": "wx_note_tropopause", "params": {}})
     return enroute
 
 

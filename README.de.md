@@ -184,9 +184,8 @@ Die Karte umfasst:
 - Zoom, Verschieben und Einpassen auf Flughafen oder Route;
 - die vollständige tatsächlich geflogene Spur von Abflug bis Ankunft;
 - eine frei wählbare Farbe der Flugspur;
-- die Wahl zwischen OpenStreetMap Standard, OpenTopoMap, CartoDB Positron
-  (hell) und CartoDB Dark Matter (dunkel, Cockpit) – direkt in der Kartenleiste
-  oder in den Einstellungen.
+- die Wahl zwischen OpenStreetMap Standard und OpenTopoMap – direkt in der
+  Kartenleiste oder in den Einstellungen.
 
 ### Rollen am Boden
 
@@ -254,6 +253,20 @@ Ein Land wird erst dann in die automatische Liste aufgenommen, wenn ein
 direkter und stabiler Zugriff auf seine amtlichen PDFs geprüft wurde. Eine
 fehlende Quelle wird daher nie stillschweigend durch einen fremden Aggregator
 ersetzt.
+
+ChartFox steht als optionale Quelle in derselben Registerkarte **Karten** zur
+Verfügung. Verknüpfe dein ChartFox-/VATSIM-Konto in den **Einstellungen** und
+wähle danach ChartFox für Abflug oder Ankunft. Die Anmeldung erfolgt im
+Systembrowser über OAuth 2.0 mit PKCE; NaviXav fragt nie nach VATSIM-Zugangsdaten
+und schützt das Benutzertoken lokal mit Windows DPAPI. Dokumente werden nur bei
+Bedarf geladen, nicht auf der Festplatte gespeichert, sind ausschließlich für
+die Flugsimulation bestimmt und behalten den Hinweis „Chart data powered by
+ChartFox“. ChartFox-Überlagerungen bleiben deaktiviert, bis NaviXav den Scope
+`charts:geos` erhält.
+Wenn eine Quelle das Einbetten verbietet, erklärt NaviXav die Einschränkung und
+bietet die ChartFox-Seite der Karte an, statt einen leeren Betrachter zu zeigen.
+Wenn ein nationaler Anschluss den Flugplatz abdeckt, bietet NaviXav zuerst den
+Wechsel zum amtlichen Katalog an, damit die Karte in der Anwendung bleibt.
 
 ## Voraussetzungen
 
@@ -440,8 +453,7 @@ nachdem ein Flug in SimBrief erzeugt oder geändert wurde.
 
 - **Kartenhintergrund**: blendet die gewählte freie Karte ein oder aus.
 - **Hintergrundauswahl**: wechselt direkt auf der Karte zwischen OpenStreetMap
-  Standard, OpenTopoMap, CartoDB Positron (hell) und CartoDB Dark Matter
-  (dunkel, Cockpit). Die Wahl wird in den Einstellungen gespeichert.
+  Standard und OpenTopoMap. Die Wahl wird in den Einstellungen gespeichert.
 - **Einstellungen**: bietet dieselbe Hintergrundauswahl sowie die Farbe der
   vollständigen Flugspur.
 - **Amtliche Überlagerung**: erscheint nur für das georeferenzierte Blatt des

@@ -37,7 +37,7 @@
       tab_constraints: "Contraintes",
       tab_dispatch: "Dispatch",
       tab_aircraft: "Avion",
-      tab_charts: "Cartes officielles",
+      tab_charts: "Cartes",
       tab_mcdu: "Fiche MCDU",
       tab_weather: "Météo",
       module_menu: "Modules",
@@ -159,13 +159,95 @@
       wx_condition_snow: "Neige",
       wx_condition_thunder: "Orage",
       wx_condition_fog: "Brume",
+      // Notes du briefing : le service envoie un code et ses valeurs.
+      wx_note_no_metar: "Aucun METAR disponible pour ce terrain.",
+      wx_note_stale: "Observation vieille de {age}.",
+      wx_note_fog_risk: "Écart température/point de rosée de {spread} °C : risque de brume ou de brouillard.",
+      wx_note_freezing: "Température basse : givrage et état de piste à vérifier.",
+      wx_note_gusts: "Rafales à {gust} kt.",
+      wx_note_low_ifr: "Conditions IFR basses : vérifier les minima de l’approche.",
+      wx_note_headwind: "Vent de face moyen de {value} kt.",
+      wx_note_tailwind: "Vent arrière moyen de {value} kt.",
+      wx_note_isa_high: "ISA +{value} : plafond et performances dégradés.",
+      wx_note_tropopause: "Croisière au niveau de la tropopause ou au-dessus.",
+      wx_age_minutes: "{value} min",
+      wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}",
+      wx_age_days: "{value} jours",
+      // Phénomènes METAR. Le code reste affiché tel quel ; seul le libellé en
+      // langage clair est traduit.
+      wx_ph_DZ: "bruine",
+      wx_ph_RA: "pluie",
+      wx_ph_SN: "neige",
+      wx_ph_SG: "neige en grains",
+      wx_ph_IC: "cristaux de glace",
+      wx_ph_PL: "granules de glace",
+      wx_ph_GR: "grêle",
+      wx_ph_GS: "grésil",
+      wx_ph_UP: "précipitation inconnue",
+      wx_ph_BR: "brume",
+      wx_ph_FG: "brouillard",
+      wx_ph_FU: "fumée",
+      wx_ph_VA: "cendres volcaniques",
+      wx_ph_DU: "poussière",
+      wx_ph_SA: "sable",
+      wx_ph_HZ: "brume sèche",
+      wx_ph_PY: "embruns",
+      wx_ph_PO: "tourbillons de poussière",
+      wx_ph_SQ: "grain",
+      wx_ph_FC: "tornade",
+      wx_ph_SS: "tempête de sable",
+      wx_ph_DS: "tempête de poussière",
+      // Combinaisons descripteur + phénomène. Elles sont explicites parce que
+      // l'accord et la préposition varient d'un couple à l'autre : « pluie
+      // verglaçante » mais « brouillard givrant ».
+      wx_ph_TSRA: "orage avec pluie",
+      wx_ph_TSSN: "orage avec neige",
+      wx_ph_TSGR: "orage avec grêle",
+      wx_ph_TSGS: "orage avec grésil",
+      wx_ph_TSPL: "orage avec granules de glace",
+      wx_ph_SHRA: "averse de pluie",
+      wx_ph_SHSN: "averse de neige",
+      wx_ph_SHGR: "averse de grêle",
+      wx_ph_SHGS: "averse de grésil",
+      wx_ph_SHPL: "averse de granules de glace",
+      wx_ph_FZRA: "pluie verglaçante",
+      wx_ph_FZDZ: "bruine verglaçante",
+      wx_ph_FZFG: "brouillard givrant",
+      wx_ph_MIFG: "brouillard mince",
+      wx_ph_BCFG: "bancs de brouillard",
+      wx_ph_PRFG: "brouillard partiel",
+      wx_ph_DRSN: "chasse-neige basse",
+      wx_ph_DRSA: "chasse-sable basse",
+      wx_ph_DRDU: "chasse-poussière basse",
+      wx_ph_BLSN: "chasse-neige élevée",
+      wx_ph_BLSA: "chasse-sable élevée",
+      wx_ph_BLDU: "chasse-poussière élevée",
+      wx_ph_BLPY: "embruns soulevés",
+      // Gabarits d'assemblage : l'ordre des mots change selon la langue.
+      wx_ph_ts_alone: "orage", wx_ph_shower_alone: "averses",
+      wx_ph_ts_with: "orage avec {phenomenon}",
+      wx_ph_shower: "averse de {phenomenon}",
+      wx_ph_freezing: "{phenomenon} verglaçante",
+      wx_ph_descriptor: "{phenomenon} {descriptor}",
+      wx_ph_and: "{first} et {second}",
+      wx_ph_intensity: "{label} {intensity}",
+      wx_ph_vicinity: "{label} à proximité",
+      wx_ph_light: "faible",
+      // « intense » plutôt que « forte » : l'adjectif suit un nom dont le genre
+      // change — la pluie est féminine, le grésil masculin — et seule une forme
+      // invariable reste juste dans les deux cas.
+      wx_ph_heavy: "intense",
+      wx_desc_MI: "mince",
+      wx_desc_BC: "en bancs",
+      wx_desc_PR: "partiel",
+      wx_desc_DR: "basse",
+      wx_desc_BL: "élevée",
       searching_sim: "Recherche du simulateur…",
       basemap: "Fond carte",
       basemap_title: "Afficher ou masquer le fond de carte libre",
       basemap_style: "Fond de carte",
       basemap_style_title: "Choisir le fond de carte affiché",
-      basemap_carto_light: "CartoDB Positron · clair",
-      basemap_carto_dark: "CartoDB Dark Matter · cockpit",
       map_constraints: "Contraintes",
       map_constraints_title: "Afficher ou masquer les contraintes d’altitude et de vitesse sur la route",
       overlay: "Calque officiel",
@@ -361,8 +443,11 @@
       flight_lateral_deviation_note: "Distance par rapport au segment actif", flight_remaining_distance: "Distance restante",
       flight_next_constraint: "Prochaine contrainte", flight_constraint_distance: "Distance contrainte",
       flight_required_rate: "Taux requis", flight_required_rate_note: "Pour respecter la prochaine altitude",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Point estimé par NaviXav",
       flight_vertical_profile: "Profil vertical", flight_vertical_profile_note: "Évalué à partir du TOD",
       flight_descent_rate: "Descente indicative", flight_descent_rate_note: "Base 3° · à confirmer",
+      toc_in: "dans {distance} NM", toc_now: "maintenant", toc_passed: "dépassé de {distance} NM",
       tod_in: "dans {distance} NM", tod_now: "maintenant", tod_passed: "dépassé de {distance} NM",
       profile_waiting: "En attente du TOD · {distance} NM", profile_available_descent: "Profil disponible en descente",
       profile_correct: "Profil correct", profile_high: "Trop haut de {distance} ft", profile_low: "Trop bas de {distance} ft",
@@ -576,6 +661,32 @@
       chart_none: "Aucun document publié pour cet aérodrome.",
       chart_unavailable: "Indisponible",
       chart_catalogue_unavailable: "Catalogue officiel indisponible.",
+      chart_source: "Source",
+      chartfox_source_auto: "Automatique",
+      chartfox_source_official: "Source officielle",
+      chartfox_source_chartfox: "ChartFox",
+      chartfox_account_required: "Un compte ChartFox/VATSIM est requis pour accéder aux cartes AIRAC ChartFox.",
+      chartfox_settings_help: "Reliez votre compte ChartFox/VATSIM pour ajouter ses cartes aux aérodromes du vol.",
+      chartfox_disconnected: "Non connecté",
+      chartfox_connected: "Connecté",
+      chartfox_connected_as: "Connecté · {name}",
+      chartfox_connect: "Connecter ChartFox",
+      chartfox_disconnect: "Déconnecter",
+      chartfox_waiting: "Connexion dans le navigateur…",
+      chartfox_connect_failed: "Connexion ChartFox impossible.",
+      chartfox_connect_timeout: "La connexion ChartFox a expiré.",
+      chartfox_status_failed: "État ChartFox indisponible",
+      chartfox_credit: "Chart data powered by ChartFox · simulation uniquement",
+      chartfox_simulation_only: "simulation uniquement",
+      chartfox_checking_access: "Vérification des droits d’affichage de cette publication…",
+      chartfox_iframe_blocked: "Cette source interdit l’affichage intégré. Ouvrez la carte directement sur ChartFox.",
+      chartfox_preauth_required: "Cette publication demande une autorisation préalable. Ouvrez-la sur ChartFox pour continuer.",
+      chartfox_open_external: "Ouvrir sur ChartFox",
+      chartfox_access_unavailable: "Impossible de vérifier les droits d’affichage ChartFox.",
+      chartfox_use_official: "Afficher via la source officielle",
+      chartfox_use_official_provider: "Afficher via {provider} dans NaviXav",
+      chartfox_iframe_official_available: "Cette source interdit l’affichage intégré, mais le catalogue officiel de cet aérodrome est disponible directement dans NaviXav.",
+      chartfox_preauth_official_available: "Cette publication demande une autorisation préalable, mais le catalogue officiel de cet aérodrome est disponible directement dans NaviXav.",
       chart_document: "Document",
       chart_show_pdf: "Afficher le PDF",
       chart_open_tab: "Ouvrir dans un nouvel onglet",
@@ -673,7 +784,7 @@
       tab_constraints: "Constraints",
       tab_dispatch: "Dispatch",
       tab_aircraft: "Aircraft",
-      tab_charts: "Official charts",
+      tab_charts: "Charts",
       tab_mcdu: "MCDU sheet",
       tab_weather: "Weather",
       module_menu: "Modules",
@@ -795,13 +906,85 @@
       wx_condition_snow: "Snow",
       wx_condition_thunder: "Thunderstorm",
       wx_condition_fog: "Mist",
+      wx_note_no_metar: "No METAR available for this airport.",
+      wx_note_stale: "Observation {age} old.",
+      wx_note_fog_risk: "Temperature/dew-point spread of {spread} °C: risk of mist or fog.",
+      wx_note_freezing: "Low temperature: check icing and runway condition.",
+      wx_note_gusts: "Gusting {gust} kt.",
+      wx_note_low_ifr: "Low IFR conditions: check the approach minima.",
+      wx_note_headwind: "Average headwind of {value} kt.",
+      wx_note_tailwind: "Average tailwind of {value} kt.",
+      wx_note_isa_high: "ISA +{value}: reduced ceiling and performance.",
+      wx_note_tropopause: "Cruise at or above the tropopause.",
+      wx_age_minutes: "{value} min",
+      wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}",
+      wx_age_days: "{value} days",
+      wx_ph_DZ: "drizzle",
+      wx_ph_RA: "rain",
+      wx_ph_SN: "snow",
+      wx_ph_SG: "snow grains",
+      wx_ph_IC: "ice crystals",
+      wx_ph_PL: "ice pellets",
+      wx_ph_GR: "hail",
+      wx_ph_GS: "small hail",
+      wx_ph_UP: "unknown precipitation",
+      wx_ph_BR: "mist",
+      wx_ph_FG: "fog",
+      wx_ph_FU: "smoke",
+      wx_ph_VA: "volcanic ash",
+      wx_ph_DU: "dust",
+      wx_ph_SA: "sand",
+      wx_ph_HZ: "haze",
+      wx_ph_PY: "spray",
+      wx_ph_PO: "dust whirls",
+      wx_ph_SQ: "squall",
+      wx_ph_FC: "funnel cloud",
+      wx_ph_SS: "sandstorm",
+      wx_ph_DS: "duststorm",
+      wx_ph_TSRA: "thunderstorm with rain",
+      wx_ph_TSSN: "thunderstorm with snow",
+      wx_ph_TSGR: "thunderstorm with hail",
+      wx_ph_TSGS: "thunderstorm with small hail",
+      wx_ph_TSPL: "thunderstorm with ice pellets",
+      wx_ph_SHRA: "rain showers",
+      wx_ph_SHSN: "snow showers",
+      wx_ph_SHGR: "hail showers",
+      wx_ph_SHGS: "small hail showers",
+      wx_ph_SHPL: "ice pellet showers",
+      wx_ph_FZRA: "freezing rain",
+      wx_ph_FZDZ: "freezing drizzle",
+      wx_ph_FZFG: "freezing fog",
+      wx_ph_MIFG: "shallow fog",
+      wx_ph_BCFG: "fog patches",
+      wx_ph_PRFG: "partial fog",
+      wx_ph_DRSN: "low drifting snow",
+      wx_ph_DRSA: "low drifting sand",
+      wx_ph_DRDU: "low drifting dust",
+      wx_ph_BLSN: "blowing snow",
+      wx_ph_BLSA: "blowing sand",
+      wx_ph_BLDU: "blowing dust",
+      wx_ph_BLPY: "blowing spray",
+      wx_ph_ts_alone: "thunderstorm", wx_ph_shower_alone: "showers",
+      wx_ph_ts_with: "thunderstorm with {phenomenon}",
+      wx_ph_shower: "{phenomenon} showers",
+      wx_ph_freezing: "freezing {phenomenon}",
+      wx_ph_descriptor: "{descriptor} {phenomenon}",
+      wx_ph_and: "{first} and {second}",
+      wx_ph_intensity: "{intensity} {label}",
+      wx_ph_vicinity: "{label} in the vicinity",
+      wx_ph_light: "light",
+      wx_ph_heavy: "heavy",
+      wx_desc_MI: "shallow",
+      wx_desc_BC: "patches of",
+      wx_desc_PR: "partial",
+      wx_desc_DR: "low drifting",
+      wx_desc_BL: "blowing",
       searching_sim: "Searching for simulator…",
       basemap: "Base map",
       basemap_title: "Show or hide the open-source base map",
       basemap_style: "Base map",
       basemap_style_title: "Choose the displayed base map",
-      basemap_carto_light: "CartoDB Positron · light",
-      basemap_carto_dark: "CartoDB Dark Matter · cockpit",
       map_constraints: "Constraints",
       map_constraints_title: "Show or hide altitude and speed constraints along the route",
       overlay: "Official overlay",
@@ -975,8 +1158,11 @@
       flight_lateral_deviation_note: "Distance from the active segment", flight_remaining_distance: "Remaining distance",
       flight_next_constraint: "Next constraint", flight_constraint_distance: "Constraint distance",
       flight_required_rate: "Required rate", flight_required_rate_note: "To meet the next altitude",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Point estimated by NaviXav",
       flight_vertical_profile: "Vertical profile", flight_vertical_profile_note: "Calculated from the TOD",
       flight_descent_rate: "Advisory descent rate", flight_descent_rate_note: "3° basis · confirm before use",
+      toc_in: "in {distance} NM", toc_now: "now", toc_passed: "passed by {distance} NM",
       tod_in: "in {distance} NM", tod_now: "now", tod_passed: "passed by {distance} NM",
       profile_waiting: "Waiting for TOD · {distance} NM", profile_available_descent: "Profile available during descent",
       profile_correct: "On profile", profile_high: "{distance} ft high", profile_low: "{distance} ft low",
@@ -1190,6 +1376,32 @@
       chart_none: "No document published for this airport.",
       chart_unavailable: "Unavailable",
       chart_catalogue_unavailable: "Official catalogue unavailable.",
+      chart_source: "Source",
+      chartfox_source_auto: "Automatic",
+      chartfox_source_official: "Official source",
+      chartfox_source_chartfox: "ChartFox",
+      chartfox_account_required: "A ChartFox/VATSIM account is required to access ChartFox AIRAC charts.",
+      chartfox_settings_help: "Link your ChartFox/VATSIM account to add its charts to the airports of the flight.",
+      chartfox_disconnected: "Not connected",
+      chartfox_connected: "Connected",
+      chartfox_connected_as: "Connected · {name}",
+      chartfox_connect: "Connect ChartFox",
+      chartfox_disconnect: "Disconnect",
+      chartfox_waiting: "Connecting in the browser…",
+      chartfox_connect_failed: "Could not connect ChartFox.",
+      chartfox_connect_timeout: "The ChartFox connection timed out.",
+      chartfox_status_failed: "ChartFox status unavailable",
+      chartfox_credit: "Chart data powered by ChartFox · simulation only",
+      chartfox_simulation_only: "simulation only",
+      chartfox_checking_access: "Checking this publication’s display permissions…",
+      chartfox_iframe_blocked: "This source does not allow embedded display. Open the chart directly on ChartFox.",
+      chartfox_preauth_required: "This publication requires prior authorisation. Open it on ChartFox to continue.",
+      chartfox_open_external: "Open on ChartFox",
+      chartfox_access_unavailable: "Could not check the ChartFox display permissions.",
+      chartfox_use_official: "Use the official source",
+      chartfox_use_official_provider: "Show with {provider} in NaviXav",
+      chartfox_iframe_official_available: "This source does not allow embedded display, but this airport’s official catalogue is available directly in NaviXav.",
+      chartfox_preauth_official_available: "This publication requires prior authorisation, but this airport’s official catalogue is available directly in NaviXav.",
       chart_document: "Document",
       chart_show_pdf: "Show the PDF",
       chart_open_tab: "Open in a new tab",
@@ -1269,7 +1481,7 @@
       quit: "Beenden", quit_title: "NaviXav beenden und Port freigeben",
       complete: "Flugplan importieren", terminal_title: "Abflug · Route · Ankunft", tab_terminal: "Flugplan",
       tab_map: "Karte", tab_flight: "Flugverfolgung", tab_constraints: "Beschränkungen", tab_dispatch: "Dispatch",
-      tab_aircraft: "Flugzeug", tab_charts: "Offizielle Karten", tab_mcdu: "MCDU-Daten", tab_weather: "Wetter",
+      tab_aircraft: "Flugzeug", tab_charts: "Karten", tab_mcdu: "MCDU-Daten", tab_weather: "Wetter",
       searching_sim: "Simulator wird gesucht…", basemap: "Grundkarte",
       map_constraints: "Beschränkungen",
       map_constraints_title: "Höhen- und Geschwindigkeitsbeschränkungen entlang der Route ein- oder ausblenden",
@@ -1296,6 +1508,9 @@
       reset_choice_action: "Zurück zur automatischen Auswahl",
       reason_sid_simbrief_validated: "SID von SimBrief übernommen und mit der Navigationsdatenbank abgeglichen",
       reason_star_simbrief_validated: "STAR von SimBrief übernommen und mit der Navigationsdatenbank abgeglichen",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Von NaviXav geschätzter Punkt",
+      toc_in: "in {distance} NM", toc_now: "jetzt", toc_passed: "vor {distance} NM passiert",
       demo_restart_failed: "Die Demonstration konnte nicht neu gestartet werden",
       changelog_title: "Versionsverlauf",
       changelog_intro: "Alle wichtigen Änderungen seit Beginn der Versionsverfolgung.",
@@ -1303,6 +1518,51 @@
       changelog_failed: "Verlauf nicht lesbar", changelog_installed: "Installierte Version",
       changelog_kind_added: "Neu", changelog_kind_fixed: "Behoben",
       changelog_kind_changed: "Geändert", changelog_kind_maintenance: "Wartung",
+      wx_note_no_metar: "Für diesen Flugplatz liegt kein METAR vor.",
+      wx_note_stale: "Beobachtung {age} alt.",
+      wx_note_fog_risk: "Temperatur/Taupunkt-Spanne von {spread} °C: Gefahr von feuchtem Dunst oder Nebel.",
+      wx_note_freezing: "Niedrige Temperatur: Vereisung und Bahnzustand prüfen.",
+      wx_note_gusts: "Böen mit {gust} kt.",
+      wx_note_low_ifr: "Niedrige IFR-Bedingungen: Anflugminima prüfen.",
+      wx_note_headwind: "Mittlerer Gegenwind von {value} kt.",
+      wx_note_tailwind: "Mittlerer Rückenwind von {value} kt.",
+      wx_note_isa_high: "ISA +{value}: geringere Gipfelhöhe und Leistung.",
+      wx_note_tropopause: "Reiseflug auf oder über der Tropopause.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} Tage",
+      wx_ph_DZ: "Nieselregen", wx_ph_RA: "Regen", wx_ph_SN: "Schnee",
+      wx_ph_SG: "Schneegriesel", wx_ph_IC: "Eiskristalle", wx_ph_PL: "Eiskörner",
+      wx_ph_GR: "Hagel", wx_ph_GS: "Graupel", wx_ph_UP: "unbekannter Niederschlag",
+      wx_ph_BR: "feuchter Dunst", wx_ph_FG: "Nebel", wx_ph_FU: "Rauch",
+      wx_ph_VA: "Vulkanasche", wx_ph_DU: "Staub", wx_ph_SA: "Sand",
+      wx_ph_HZ: "trockener Dunst", wx_ph_PY: "Gischt", wx_ph_PO: "Staubwirbel",
+      wx_ph_SQ: "Bö", wx_ph_FC: "Trichterwolke", wx_ph_SS: "Sandsturm",
+      wx_ph_DS: "Staubsturm",
+      wx_ph_TSRA: "Gewitter mit Regen", wx_ph_TSSN: "Gewitter mit Schnee",
+      wx_ph_TSGR: "Gewitter mit Hagel", wx_ph_TSGS: "Gewitter mit Graupel",
+      wx_ph_TSPL: "Gewitter mit Eiskörnern",
+      wx_ph_SHRA: "Regenschauer", wx_ph_SHSN: "Schneeschauer",
+      wx_ph_SHGR: "Hagelschauer", wx_ph_SHGS: "Graupelschauer",
+      wx_ph_SHPL: "Eiskornschauer",
+      wx_ph_FZRA: "gefrierender Regen", wx_ph_FZDZ: "gefrierender Nieselregen",
+      wx_ph_FZFG: "gefrierender Nebel",
+      wx_ph_MIFG: "flacher Nebel", wx_ph_BCFG: "Nebelschwaden",
+      wx_ph_PRFG: "teilweiser Nebel",
+      wx_ph_DRSN: "Schneefegen", wx_ph_DRSA: "Sandfegen", wx_ph_DRDU: "Staubfegen",
+      wx_ph_BLSN: "Schneetreiben", wx_ph_BLSA: "Sandtreiben",
+      wx_ph_BLDU: "Staubtreiben", wx_ph_BLPY: "Gischttreiben",
+      wx_ph_ts_alone: "Gewitter", wx_ph_shower_alone: "Schauer", wx_ph_ts_with: "Gewitter mit {phenomenon}",
+      wx_ph_shower: "Schauer mit {phenomenon}",
+      wx_ph_freezing: "gefrierender {phenomenon}",
+      wx_ph_descriptor: "{descriptor} {phenomenon}",
+      wx_ph_and: "{first} und {second}",
+      // Deutsche Adjektive vor dem Substantiv werden gebeugt. Die Intensität
+      // steht deshalb als unveränderlicher Zusatz dahinter.
+      wx_ph_intensity: "{label} ({intensity})",
+      wx_ph_vicinity: "{label} in der Umgebung",
+      wx_ph_light: "leicht", wx_ph_heavy: "stark",
+      wx_desc_MI: "flacher", wx_desc_BC: "Schwaden von", wx_desc_PR: "teilweiser",
+      wx_desc_DR: "niedriges Fegen von", wx_desc_BL: "hohes Treiben von",
     },
     es: {
       subtitle: "Tu copiloto IFR", source_title: "Navegación y procedimientos obtenidos directamente mediante SimConnect",
@@ -1312,7 +1572,7 @@
       quit: "Salir", quit_title: "Detener NaviXav y liberar el puerto",
       complete: "Importar plan de vuelo", terminal_title: "Salida · Ruta · Llegada", tab_terminal: "Plan de vuelo",
       tab_map: "Mapa", tab_flight: "Seguimiento", tab_constraints: "Restricciones", tab_dispatch: "Despacho",
-      tab_aircraft: "Avión", tab_charts: "Cartas oficiales", tab_mcdu: "Ficha MCDU", tab_weather: "Meteorología",
+      tab_aircraft: "Avión", tab_charts: "Cartas", tab_mcdu: "Ficha MCDU", tab_weather: "Meteorología",
       searching_sim: "Buscando el simulador…", basemap: "Mapa base",
       map_constraints: "Restricciones",
       map_constraints_title: "Mostrar u ocultar las restricciones de altitud y velocidad en la ruta",
@@ -1339,6 +1599,9 @@
       reset_choice_action: "Volver a la elección automática",
       reason_sid_simbrief_validated: "SID proporcionada por SimBrief y validada con la base de navegación",
       reason_star_simbrief_validated: "STAR proporcionada por SimBrief y validada con la base de navegación",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Punto estimado por NaviXav",
+      toc_in: "en {distance} NM", toc_now: "ahora", toc_passed: "superado hace {distance} NM",
       demo_restart_failed: "No se pudo reiniciar la demostración",
       changelog_title: "Historial de versiones",
       changelog_intro: "Todos los cambios importantes desde el inicio del seguimiento de versiones.",
@@ -1346,6 +1609,57 @@
       changelog_failed: "Historial ilegible", changelog_installed: "Versión instalada",
       changelog_kind_added: "Novedades", changelog_kind_fixed: "Correcciones",
       changelog_kind_changed: "Cambios", changelog_kind_maintenance: "Mantenimiento",
+      wx_note_no_metar: "No hay METAR disponible para este aeródromo.",
+      wx_note_stale: "Observación de hace {age}.",
+      wx_note_fog_risk: "Diferencia temperatura/punto de rocío de {spread} °C: riesgo de neblina o niebla.",
+      wx_note_freezing: "Temperatura baja: comprobar engelamiento y estado de pista.",
+      wx_note_gusts: "Rachas de {gust} kt.",
+      wx_note_low_ifr: "Condiciones IFR bajas: comprobar los mínimos de aproximación.",
+      wx_note_headwind: "Viento en cara medio de {value} kt.",
+      wx_note_tailwind: "Viento en cola medio de {value} kt.",
+      wx_note_isa_high: "ISA +{value}: techo y prestaciones reducidos.",
+      wx_note_tropopause: "Crucero en la tropopausa o por encima.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} días",
+      wx_ph_DZ: "llovizna", wx_ph_RA: "lluvia", wx_ph_SN: "nieve",
+      wx_ph_SG: "cinarra", wx_ph_IC: "cristales de hielo",
+      wx_ph_PL: "hielo granulado", wx_ph_GR: "granizo",
+      wx_ph_GS: "granizo pequeño", wx_ph_UP: "precipitación desconocida",
+      wx_ph_BR: "neblina", wx_ph_FG: "niebla", wx_ph_FU: "humo",
+      wx_ph_VA: "ceniza volcánica", wx_ph_DU: "polvo", wx_ph_SA: "arena",
+      wx_ph_HZ: "calima", wx_ph_PY: "agua pulverizada",
+      wx_ph_PO: "remolinos de polvo", wx_ph_SQ: "turbonada",
+      wx_ph_FC: "nube embudo", wx_ph_SS: "tormenta de arena",
+      wx_ph_DS: "tormenta de polvo",
+      wx_ph_TSRA: "tormenta con lluvia", wx_ph_TSSN: "tormenta con nieve",
+      wx_ph_TSGR: "tormenta con granizo",
+      wx_ph_TSGS: "tormenta con granizo pequeño",
+      wx_ph_TSPL: "tormenta con hielo granulado",
+      wx_ph_SHRA: "chubascos de lluvia", wx_ph_SHSN: "chubascos de nieve",
+      wx_ph_SHGR: "chubascos de granizo",
+      wx_ph_SHGS: "chubascos de granizo pequeño",
+      wx_ph_SHPL: "chubascos de hielo granulado",
+      wx_ph_FZRA: "lluvia engelante", wx_ph_FZDZ: "llovizna engelante",
+      wx_ph_FZFG: "niebla engelante",
+      wx_ph_MIFG: "niebla baja", wx_ph_BCFG: "bancos de niebla",
+      wx_ph_PRFG: "niebla parcial",
+      wx_ph_DRSN: "ventisca baja de nieve", wx_ph_DRSA: "ventisca baja de arena",
+      wx_ph_DRDU: "ventisca baja de polvo",
+      wx_ph_BLSN: "ventisca alta de nieve", wx_ph_BLSA: "ventisca alta de arena",
+      wx_ph_BLDU: "ventisca alta de polvo",
+      wx_ph_BLPY: "agua pulverizada levantada",
+      wx_ph_ts_alone: "tormenta", wx_ph_shower_alone: "chubascos", wx_ph_ts_with: "tormenta con {phenomenon}",
+      wx_ph_shower: "chubascos de {phenomenon}",
+      wx_ph_freezing: "{phenomenon} engelante",
+      wx_ph_descriptor: "{phenomenon} {descriptor}",
+      wx_ph_and: "{first} y {second}",
+      // « débil » y « fuerte » no varían con el género: valen para la lluvia
+      // como para el granizo.
+      wx_ph_intensity: "{label} {intensity}",
+      wx_ph_vicinity: "{label} en las proximidades",
+      wx_ph_light: "débil", wx_ph_heavy: "fuerte",
+      wx_desc_MI: "baja", wx_desc_BC: "en bancos", wx_desc_PR: "parcial",
+      wx_desc_DR: "en ventisca baja", wx_desc_BL: "en ventisca alta",
     },
     it: {
       subtitle: "Il tuo copilota IFR", source_title: "Navigazione e procedure recuperate direttamente tramite SimConnect",
@@ -1355,7 +1669,7 @@
       quit: "Esci", quit_title: "Arresta NaviXav e libera la porta",
       complete: "Importa piano di volo", terminal_title: "Partenza · Rotta · Arrivo", tab_terminal: "Piano di volo",
       tab_map: "Mappa", tab_flight: "Monitoraggio volo", tab_constraints: "Vincoli", tab_dispatch: "Dispatch",
-      tab_aircraft: "Aeromobile", tab_charts: "Carte ufficiali", tab_mcdu: "Scheda MCDU", tab_weather: "Meteo",
+      tab_aircraft: "Aeromobile", tab_charts: "Carte", tab_mcdu: "Scheda MCDU", tab_weather: "Meteo",
       searching_sim: "Ricerca del simulatore…", basemap: "Mappa di base",
       map_constraints: "Vincoli",
       map_constraints_title: "Mostrare o nascondere i vincoli di quota e velocità lungo la rotta",
@@ -1382,6 +1696,9 @@
       reset_choice_action: "Torna alla scelta automatica",
       reason_sid_simbrief_validated: "SID fornita da SimBrief e verificata nel database di navigazione",
       reason_star_simbrief_validated: "STAR fornita da SimBrief e verificata nel database di navigazione",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Punto stimato da NaviXav",
+      toc_in: "tra {distance} NM", toc_now: "ora", toc_passed: "superato di {distance} NM",
       demo_restart_failed: "Impossibile riavviare la dimostrazione",
       changelog_title: "Cronologia delle versioni",
       changelog_intro: "Tutte le modifiche importanti dall'inizio del tracciamento delle versioni.",
@@ -1389,6 +1706,52 @@
       changelog_failed: "Cronologia illeggibile", changelog_installed: "Versione installata",
       changelog_kind_added: "Novità", changelog_kind_fixed: "Correzioni",
       changelog_kind_changed: "Modifiche", changelog_kind_maintenance: "Manutenzione",
+      wx_note_no_metar: "Nessun METAR disponibile per questo aeroporto.",
+      wx_note_stale: "Osservazione di {age} fa.",
+      wx_note_fog_risk: "Scarto temperatura/punto di rugiada di {spread} °C: rischio di foschia o nebbia.",
+      wx_note_freezing: "Temperatura bassa: verificare ghiaccio e stato della pista.",
+      wx_note_gusts: "Raffiche a {gust} kt.",
+      wx_note_low_ifr: "Condizioni IFR basse: verificare i minimi di avvicinamento.",
+      wx_note_headwind: "Vento contrario medio di {value} kt.",
+      wx_note_tailwind: "Vento a favore medio di {value} kt.",
+      wx_note_isa_high: "ISA +{value}: quota e prestazioni ridotte.",
+      wx_note_tropopause: "Crociera alla tropopausa o al di sopra.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} giorni",
+      wx_ph_DZ: "pioviggine", wx_ph_RA: "pioggia", wx_ph_SN: "neve",
+      wx_ph_SG: "neve granulosa", wx_ph_IC: "cristalli di ghiaccio",
+      wx_ph_PL: "granuli di ghiaccio", wx_ph_GR: "grandine",
+      wx_ph_GS: "gragnola", wx_ph_UP: "precipitazione sconosciuta",
+      wx_ph_BR: "foschia", wx_ph_FG: "nebbia", wx_ph_FU: "fumo",
+      wx_ph_VA: "cenere vulcanica", wx_ph_DU: "polvere", wx_ph_SA: "sabbia",
+      wx_ph_HZ: "caligine", wx_ph_PY: "spruzzi", wx_ph_PO: "turbini di polvere",
+      wx_ph_SQ: "groppo", wx_ph_FC: "nube a imbuto",
+      wx_ph_SS: "tempesta di sabbia", wx_ph_DS: "tempesta di polvere",
+      wx_ph_TSRA: "temporale con pioggia", wx_ph_TSSN: "temporale con neve",
+      wx_ph_TSGR: "temporale con grandine", wx_ph_TSGS: "temporale con gragnola",
+      wx_ph_TSPL: "temporale con granuli di ghiaccio",
+      wx_ph_SHRA: "rovesci di pioggia", wx_ph_SHSN: "rovesci di neve",
+      wx_ph_SHGR: "rovesci di grandine", wx_ph_SHGS: "rovesci di gragnola",
+      wx_ph_SHPL: "rovesci di granuli di ghiaccio",
+      wx_ph_FZRA: "pioggia congelantesi", wx_ph_FZDZ: "pioviggine congelantesi",
+      wx_ph_FZFG: "nebbia congelantesi",
+      wx_ph_MIFG: "nebbia bassa", wx_ph_BCFG: "banchi di nebbia",
+      wx_ph_PRFG: "nebbia parziale",
+      wx_ph_DRSN: "neve bassa sollevata", wx_ph_DRSA: "sabbia bassa sollevata",
+      wx_ph_DRDU: "polvere bassa sollevata",
+      wx_ph_BLSN: "neve alta sollevata", wx_ph_BLSA: "sabbia alta sollevata",
+      wx_ph_BLDU: "polvere alta sollevata", wx_ph_BLPY: "spruzzi sollevati",
+      wx_ph_ts_alone: "temporale", wx_ph_shower_alone: "rovesci", wx_ph_ts_with: "temporale con {phenomenon}",
+      wx_ph_shower: "rovesci di {phenomenon}",
+      wx_ph_freezing: "{phenomenon} congelantesi",
+      wx_ph_descriptor: "{phenomenon} {descriptor}",
+      wx_ph_and: "{first} e {second}",
+      // « debole » e « forte » sono invariabili nel genere.
+      wx_ph_intensity: "{label} {intensity}",
+      wx_ph_vicinity: "{label} nelle vicinanze",
+      wx_ph_light: "debole", wx_ph_heavy: "forte",
+      wx_desc_MI: "bassa", wx_desc_BC: "a banchi", wx_desc_PR: "parziale",
+      wx_desc_DR: "bassa sollevata", wx_desc_BL: "alta sollevata",
     },
     pt: {
       subtitle: "O teu copiloto IFR", source_title: "Navegação e procedimentos obtidos diretamente pelo SimConnect",
@@ -1398,7 +1761,7 @@
       quit: "Sair", quit_title: "Parar NaviXav e libertar a porta",
       complete: "Importar plano de voo", terminal_title: "Partida · Rota · Chegada", tab_terminal: "Plano de voo",
       tab_map: "Mapa", tab_flight: "Acompanhamento", tab_constraints: "Restrições", tab_dispatch: "Despacho",
-      tab_aircraft: "Aeronave", tab_charts: "Cartas oficiais", tab_mcdu: "Ficha MCDU", tab_weather: "Meteorologia",
+      tab_aircraft: "Aeronave", tab_charts: "Cartas", tab_mcdu: "Ficha MCDU", tab_weather: "Meteorologia",
       searching_sim: "A procurar o simulador…", basemap: "Mapa base",
       map_constraints: "Restrições",
       map_constraints_title: "Mostrar ou ocultar as restrições de altitude e velocidade na rota",
@@ -1425,6 +1788,9 @@
       reset_choice_action: "Voltar à escolha automática",
       reason_sid_simbrief_validated: "SID fornecida pelo SimBrief e validada com a base de navegação",
       reason_star_simbrief_validated: "STAR fornecida pelo SimBrief e validada com a base de navegação",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Ponto estimado pelo NaviXav",
+      toc_in: "dentro de {distance} NM", toc_now: "agora", toc_passed: "ultrapassado há {distance} NM",
       demo_restart_failed: "Não foi possível reiniciar a demonstração",
       changelog_title: "Histórico de versões",
       changelog_intro: "Todas as alterações importantes desde o início do acompanhamento de versões.",
@@ -1432,6 +1798,54 @@
       changelog_failed: "Histórico ilegível", changelog_installed: "Versão instalada",
       changelog_kind_added: "Novidades", changelog_kind_fixed: "Correções",
       changelog_kind_changed: "Alterações", changelog_kind_maintenance: "Manutenção",
+      wx_note_no_metar: "Não há METAR disponível para este aeródromo.",
+      wx_note_stale: "Observação de há {age}.",
+      wx_note_fog_risk: "Diferença temperatura/ponto de orvalho de {spread} °C: risco de névoa ou nevoeiro.",
+      wx_note_freezing: "Temperatura baixa: verificar gelo e estado da pista.",
+      wx_note_gusts: "Rajadas de {gust} kt.",
+      wx_note_low_ifr: "Condições IFR baixas: verificar os mínimos de aproximação.",
+      wx_note_headwind: "Vento de nariz médio de {value} kt.",
+      wx_note_tailwind: "Vento de cauda médio de {value} kt.",
+      wx_note_isa_high: "ISA +{value}: tecto e desempenho reduzidos.",
+      wx_note_tropopause: "Cruzeiro na tropopausa ou acima.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} dias",
+      wx_ph_DZ: "chuvisco", wx_ph_RA: "chuva", wx_ph_SN: "neve",
+      wx_ph_SG: "neve granular", wx_ph_IC: "cristais de gelo",
+      wx_ph_PL: "grãos de gelo", wx_ph_GR: "granizo", wx_ph_GS: "saraiva",
+      wx_ph_UP: "precipitação desconhecida", wx_ph_BR: "névoa húmida",
+      wx_ph_FG: "nevoeiro", wx_ph_FU: "fumo", wx_ph_VA: "cinza vulcânica",
+      wx_ph_DU: "poeira", wx_ph_SA: "areia", wx_ph_HZ: "névoa seca",
+      wx_ph_PY: "salpicos", wx_ph_PO: "remoinhos de poeira",
+      wx_ph_SQ: "borrasca", wx_ph_FC: "nuvem em funil",
+      wx_ph_SS: "tempestade de areia", wx_ph_DS: "tempestade de poeira",
+      wx_ph_TSRA: "trovoada com chuva", wx_ph_TSSN: "trovoada com neve",
+      wx_ph_TSGR: "trovoada com granizo", wx_ph_TSGS: "trovoada com saraiva",
+      wx_ph_TSPL: "trovoada com grãos de gelo",
+      wx_ph_SHRA: "aguaceiros de chuva", wx_ph_SHSN: "aguaceiros de neve",
+      wx_ph_SHGR: "aguaceiros de granizo", wx_ph_SHGS: "aguaceiros de saraiva",
+      wx_ph_SHPL: "aguaceiros de grãos de gelo",
+      wx_ph_FZRA: "chuva gelada", wx_ph_FZDZ: "chuvisco gelado",
+      wx_ph_FZFG: "nevoeiro gelado",
+      wx_ph_MIFG: "nevoeiro baixo", wx_ph_BCFG: "bancos de nevoeiro",
+      wx_ph_PRFG: "nevoeiro parcial",
+      wx_ph_DRSN: "neve rasteira", wx_ph_DRSA: "areia rasteira",
+      wx_ph_DRDU: "poeira rasteira",
+      wx_ph_BLSN: "neve levantada", wx_ph_BLSA: "areia levantada",
+      wx_ph_BLDU: "poeira levantada", wx_ph_BLPY: "salpicos levantados",
+      wx_ph_ts_alone: "trovoada", wx_ph_shower_alone: "aguaceiros", wx_ph_ts_with: "trovoada com {phenomenon}",
+      wx_ph_shower: "aguaceiros de {phenomenon}",
+      // « congelante » não varia com o género, ao contrário de « gelado ».
+      wx_ph_freezing: "{phenomenon} congelante",
+      wx_ph_descriptor: "{phenomenon} {descriptor}",
+      wx_ph_and: "{first} e {second}",
+      // A intensidade qualifica « intensidade », não o fenómeno : assim a
+      // concordância vale tanto para a chuva como para o granizo.
+      wx_ph_intensity: "{label} de {intensity} intensidade",
+      wx_ph_vicinity: "{label} nas proximidades",
+      wx_ph_light: "fraca", wx_ph_heavy: "forte",
+      wx_desc_MI: "baixo", wx_desc_BC: "em bancos", wx_desc_PR: "parcial",
+      wx_desc_DR: "rasteira", wx_desc_BL: "levantada",
     },
     nl: {
       subtitle: "Jouw IFR-copiloot", source_title: "Navigatie en procedures rechtstreeks opgehaald via SimConnect",
@@ -1441,7 +1855,7 @@
       quit: "Afsluiten", quit_title: "NaviXav stoppen en poort vrijgeven",
       complete: "Vluchtplan importeren", terminal_title: "Vertrek · Route · Aankomst", tab_terminal: "Vluchtplan",
       tab_map: "Kaart", tab_flight: "Vlucht volgen", tab_constraints: "Beperkingen", tab_dispatch: "Dispatch",
-      tab_aircraft: "Vliegtuig", tab_charts: "Officiële kaarten", tab_mcdu: "MCDU-blad", tab_weather: "Weer",
+      tab_aircraft: "Vliegtuig", tab_charts: "Kaarten", tab_mcdu: "MCDU-blad", tab_weather: "Weer",
       searching_sim: "Simulator zoeken…", basemap: "Basiskaart",
       map_constraints: "Beperkingen",
       map_constraints_title: "Hoogte- en snelheidsbeperkingen langs de route tonen of verbergen",
@@ -1468,6 +1882,9 @@
       reset_choice_action: "Terug naar de automatische keuze",
       reason_sid_simbrief_validated: "SID aangeleverd door SimBrief en gecontroleerd aan de hand van de navigatiedatabase",
       reason_star_simbrief_validated: "STAR aangeleverd door SimBrief en gecontroleerd aan de hand van de navigatiedatabase",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Door NaviXav geschat punt",
+      toc_in: "over {distance} NM", toc_now: "nu", toc_passed: "{distance} NM geleden gepasseerd",
       demo_restart_failed: "De demonstratie kon niet opnieuw worden gestart",
       changelog_title: "Versiegeschiedenis",
       changelog_intro: "Alle belangrijke wijzigingen sinds het begin van de versiebijhouding.",
@@ -1475,6 +1892,52 @@
       changelog_failed: "Geschiedenis onleesbaar", changelog_installed: "Geïnstalleerde versie",
       changelog_kind_added: "Nieuw", changelog_kind_fixed: "Opgelost",
       changelog_kind_changed: "Gewijzigd", changelog_kind_maintenance: "Onderhoud",
+      wx_note_no_metar: "Geen METAR beschikbaar voor dit vliegveld.",
+      wx_note_stale: "Waarneming {age} oud.",
+      wx_note_fog_risk: "Verschil temperatuur/dauwpunt van {spread} °C: kans op nevel of mist.",
+      wx_note_freezing: "Lage temperatuur: ijsvorming en baanconditie controleren.",
+      wx_note_gusts: "Windstoten tot {gust} kt.",
+      wx_note_low_ifr: "Lage IFR-omstandigheden: de naderingsminima controleren.",
+      wx_note_headwind: "Gemiddelde tegenwind van {value} kt.",
+      wx_note_tailwind: "Gemiddelde rugwind van {value} kt.",
+      wx_note_isa_high: "ISA +{value}: lager plafond en verminderde prestaties.",
+      wx_note_tropopause: "Kruisvlucht op of boven de tropopauze.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} dagen",
+      wx_ph_DZ: "motregen", wx_ph_RA: "regen", wx_ph_SN: "sneeuw",
+      wx_ph_SG: "motsneeuw", wx_ph_IC: "ijskristallen", wx_ph_PL: "ijskorrels",
+      wx_ph_GR: "hagel", wx_ph_GS: "zachte hagel",
+      wx_ph_UP: "onbekende neerslag", wx_ph_BR: "nevel", wx_ph_FG: "mist",
+      wx_ph_FU: "rook", wx_ph_VA: "vulkaanas", wx_ph_DU: "stof",
+      wx_ph_SA: "zand", wx_ph_HZ: "heiigheid", wx_ph_PY: "stuifwater",
+      wx_ph_PO: "stofhozen", wx_ph_SQ: "windstoot", wx_ph_FC: "trechterwolk",
+      wx_ph_SS: "zandstorm", wx_ph_DS: "stofstorm",
+      wx_ph_TSRA: "onweer met regen", wx_ph_TSSN: "onweer met sneeuw",
+      wx_ph_TSGR: "onweer met hagel", wx_ph_TSGS: "onweer met zachte hagel",
+      wx_ph_TSPL: "onweer met ijskorrels",
+      wx_ph_SHRA: "regenbuien", wx_ph_SHSN: "sneeuwbuien",
+      wx_ph_SHGR: "hagelbuien", wx_ph_SHGS: "buien met zachte hagel",
+      wx_ph_SHPL: "buien met ijskorrels",
+      wx_ph_FZRA: "ijzel", wx_ph_FZDZ: "onderkoelde motregen",
+      wx_ph_FZFG: "onderkoelde mist",
+      wx_ph_MIFG: "lage mist", wx_ph_BCFG: "mistbanken",
+      wx_ph_PRFG: "gedeeltelijke mist",
+      wx_ph_DRSN: "lage sneeuwjacht", wx_ph_DRSA: "lage zandjacht",
+      wx_ph_DRDU: "lage stofjacht",
+      wx_ph_BLSN: "hoge sneeuwjacht", wx_ph_BLSA: "hoge zandjacht",
+      wx_ph_BLDU: "hoge stofjacht", wx_ph_BLPY: "opwaaiend stuifwater",
+      wx_ph_ts_alone: "onweer", wx_ph_shower_alone: "buien", wx_ph_ts_with: "onweer met {phenomenon}",
+      wx_ph_shower: "buien met {phenomenon}",
+      wx_ph_freezing: "onderkoelde {phenomenon}",
+      wx_ph_descriptor: "{descriptor} {phenomenon}",
+      wx_ph_and: "{first} en {second}",
+      // Het bijvoeglijk naamwoord vóór het zelfstandig naamwoord verbuigt mee.
+      // De intensiteit staat er daarom onveranderlijk achter.
+      wx_ph_intensity: "{label} ({intensity})",
+      wx_ph_vicinity: "{label} in de omgeving",
+      wx_ph_light: "licht", wx_ph_heavy: "zwaar",
+      wx_desc_MI: "lage", wx_desc_BC: "banken", wx_desc_PR: "gedeeltelijke",
+      wx_desc_DR: "lage jacht", wx_desc_BL: "hoge jacht",
     },
     pl: {
       subtitle: "Twój drugi pilot IFR", source_title: "Nawigacja i procedury pobierane bezpośrednio przez SimConnect",
@@ -1484,7 +1947,7 @@
       quit: "Zakończ", quit_title: "Zatrzymaj NaviXav i zwolnij port",
       complete: "Importuj plan lotu", terminal_title: "Odlot · Trasa · Przylot", tab_terminal: "Plan lotu",
       tab_map: "Mapa", tab_flight: "Śledzenie lotu", tab_constraints: "Ograniczenia", tab_dispatch: "Dispatch",
-      tab_aircraft: "Samolot", tab_charts: "Oficjalne mapy", tab_mcdu: "Karta MCDU", tab_weather: "Pogoda",
+      tab_aircraft: "Samolot", tab_charts: "Mapy", tab_mcdu: "Karta MCDU", tab_weather: "Pogoda",
       searching_sim: "Wyszukiwanie symulatora…", basemap: "Mapa bazowa",
       map_constraints: "Ograniczenia",
       map_constraints_title: "Pokaż lub ukryj ograniczenia wysokości i prędkości na trasie",
@@ -1511,6 +1974,9 @@
       reset_choice_action: "Powrót do wyboru automatycznego",
       reason_sid_simbrief_validated: "SID dostarczona przez SimBrief i zweryfikowana w bazie nawigacyjnej",
       reason_star_simbrief_validated: "STAR dostarczona przez SimBrief i zweryfikowana w bazie nawigacyjnej",
+      flight_top_of_climb: "Top of Climb", flight_top_of_descent: "Top of Descent",
+      flight_calculated_point_note: "Punkt oszacowany przez NaviXav",
+      toc_in: "za {distance} NM", toc_now: "teraz", toc_passed: "minięty {distance} NM temu",
       demo_restart_failed: "Nie udało się ponownie uruchomić demonstracji",
       changelog_title: "Historia wersji",
       changelog_intro: "Wszystkie ważne zmiany od początku śledzenia wersji.",
@@ -1518,6 +1984,54 @@
       changelog_failed: "Historia nieczytelna", changelog_installed: "Zainstalowana wersja",
       changelog_kind_added: "Nowości", changelog_kind_fixed: "Poprawki",
       changelog_kind_changed: "Zmiany", changelog_kind_maintenance: "Konserwacja",
+      wx_note_no_metar: "Brak dostępnego METAR dla tego lotniska.",
+      wx_note_stale: "Obserwacja sprzed {age}.",
+      wx_note_fog_risk: "Różnica temperatury i punktu rosy wynosi {spread} °C: ryzyko zamglenia lub mgły.",
+      wx_note_freezing: "Niska temperatura: sprawdzić oblodzenie i stan drogi startowej.",
+      wx_note_gusts: "Porywy do {gust} kt.",
+      wx_note_low_ifr: "Niskie warunki IFR: sprawdzić minima podejścia.",
+      wx_note_headwind: "Średni wiatr czołowy {value} kt.",
+      wx_note_tailwind: "Średni wiatr tylny {value} kt.",
+      wx_note_isa_high: "ISA +{value}: obniżony pułap i osiągi.",
+      wx_note_tropopause: "Przelot na wysokości tropopauzy lub powyżej.",
+      wx_age_minutes: "{value} min", wx_age_hours: "{value} h",
+      wx_age_hours_minutes: "{hours} h {minutes}", wx_age_days: "{value} dni",
+      wx_ph_DZ: "mżawka", wx_ph_RA: "deszcz", wx_ph_SN: "śnieg",
+      wx_ph_SG: "śnieg ziarnisty", wx_ph_IC: "kryształki lodu",
+      wx_ph_PL: "grudki lodu", wx_ph_GR: "grad", wx_ph_GS: "krupa śnieżna",
+      wx_ph_UP: "nieznane opady", wx_ph_BR: "zamglenie", wx_ph_FG: "mgła",
+      wx_ph_FU: "dym", wx_ph_VA: "popiół wulkaniczny", wx_ph_DU: "pył",
+      wx_ph_SA: "piasek", wx_ph_HZ: "zmętnienie",
+      wx_ph_PY: "rozpylona woda", wx_ph_PO: "wiry pyłowe",
+      wx_ph_SQ: "szkwał", wx_ph_FC: "trąba powietrzna",
+      wx_ph_SS: "burza piaskowa", wx_ph_DS: "burza pyłowa",
+      wx_ph_TSRA: "burza z deszczem", wx_ph_TSSN: "burza ze śniegiem",
+      wx_ph_TSGR: "burza z gradem", wx_ph_TSGS: "burza z krupą śnieżną",
+      wx_ph_TSPL: "burza z grudkami lodu",
+      wx_ph_SHRA: "przelotny deszcz", wx_ph_SHSN: "przelotny śnieg",
+      wx_ph_SHGR: "przelotny grad", wx_ph_SHGS: "przelotna krupa śnieżna",
+      wx_ph_SHPL: "przelotne grudki lodu",
+      wx_ph_FZRA: "marznący deszcz", wx_ph_FZDZ: "marznąca mżawka",
+      wx_ph_FZFG: "marznąca mgła",
+      wx_ph_MIFG: "mgła płytka", wx_ph_BCFG: "mgła płatami",
+      wx_ph_PRFG: "mgła częściowa",
+      wx_ph_DRSN: "zamieć niska śnieżna", wx_ph_DRSA: "zamieć niska piaskowa",
+      wx_ph_DRDU: "zamieć niska pyłowa",
+      wx_ph_BLSN: "zamieć wysoka śnieżna", wx_ph_BLSA: "zamieć wysoka piaskowa",
+      wx_ph_BLDU: "zamieć wysoka pyłowa", wx_ph_BLPY: "uniesiona rozpylona woda",
+      wx_ph_ts_alone: "burza", wx_ph_shower_alone: "opady przelotne",
+      // Formy z dwukropkiem omijają odmianę przez przypadki: « burza z »
+      // wymagałoby narzędnika, którego szablon nie zna.
+      wx_ph_ts_with: "burza: {phenomenon}",
+      wx_ph_shower: "opady przelotne: {phenomenon}",
+      wx_ph_freezing: "marznące: {phenomenon}",
+      wx_ph_descriptor: "{phenomenon} {descriptor}",
+      wx_ph_and: "{first} i {second}",
+      wx_ph_intensity: "{label} ({intensity})",
+      wx_ph_vicinity: "{label} w pobliżu",
+      wx_ph_light: "słaba intensywność", wx_ph_heavy: "duża intensywność",
+      wx_desc_MI: "płytka", wx_desc_BC: "płatami", wx_desc_PR: "częściowa",
+      wx_desc_DR: "niska", wx_desc_BL: "wysoka",
     },
   });
 
@@ -2035,6 +2549,43 @@
     taxi_speed_alarm_setting: "Alarm dźwiękowy prędkości kołowania",
   });
 
+  Object.assign(TRANSLATIONS.de, {
+    chart_source: "Quelle", chartfox_source_auto: "Automatisch", chartfox_source_official: "Offizielle Quelle", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Für den Zugriff auf ChartFox-AIRAC-Karten ist ein ChartFox-/VATSIM-Konto erforderlich.",
+    chartfox_settings_help: "Verknüpfe dein ChartFox-/VATSIM-Konto, um Karten für die Flugplätze des Fluges hinzuzufügen.", chartfox_disconnected: "Nicht verbunden", chartfox_connected: "Verbunden", chartfox_connected_as: "Verbunden · {name}", chartfox_connect: "ChartFox verbinden", chartfox_disconnect: "Trennen", chartfox_waiting: "Verbindung im Browser…", chartfox_connect_failed: "ChartFox konnte nicht verbunden werden.", chartfox_connect_timeout: "Die ChartFox-Verbindung ist abgelaufen.", chartfox_status_failed: "ChartFox-Status nicht verfügbar", chartfox_credit: "Chart data powered by ChartFox · nur für Simulation", chartfox_simulation_only: "nur für Simulation",
+    chartfox_checking_access: "Anzeigerechte werden geprüft…", chartfox_iframe_blocked: "Diese Quelle erlaubt keine eingebettete Anzeige. Öffne die Karte direkt auf ChartFox.", chartfox_preauth_required: "Diese Veröffentlichung erfordert eine vorherige Genehmigung. Öffne sie auf ChartFox.", chartfox_open_external: "Auf ChartFox öffnen", chartfox_access_unavailable: "ChartFox-Anzeigerechte konnten nicht geprüft werden.",
+    chartfox_use_official: "Amtliche Quelle verwenden", chartfox_use_official_provider: "Mit {provider} in NaviXav anzeigen", chartfox_iframe_official_available: "Diese Quelle erlaubt keine eingebettete Anzeige, aber der amtliche Flugplatzkatalog ist direkt in NaviXav verfügbar.", chartfox_preauth_official_available: "Diese Veröffentlichung erfordert eine vorherige Genehmigung, aber der amtliche Flugplatzkatalog ist direkt in NaviXav verfügbar.",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    chart_source: "Fuente", chartfox_source_auto: "Automática", chartfox_source_official: "Fuente oficial", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Se necesita una cuenta de ChartFox/VATSIM para acceder a las cartas AIRAC de ChartFox.",
+    chartfox_settings_help: "Vincula tu cuenta de ChartFox/VATSIM para añadir sus cartas a los aeropuertos del vuelo.", chartfox_disconnected: "Sin conexión", chartfox_connected: "Conectado", chartfox_connected_as: "Conectado · {name}", chartfox_connect: "Conectar ChartFox", chartfox_disconnect: "Desconectar", chartfox_waiting: "Conectando en el navegador…", chartfox_connect_failed: "No se pudo conectar ChartFox.", chartfox_connect_timeout: "La conexión con ChartFox ha caducado.", chartfox_status_failed: "Estado de ChartFox no disponible", chartfox_credit: "Chart data powered by ChartFox · solo simulación", chartfox_simulation_only: "solo simulación",
+    chartfox_checking_access: "Comprobando los permisos de visualización…", chartfox_iframe_blocked: "Esta fuente no permite la visualización integrada. Abre la carta directamente en ChartFox.", chartfox_preauth_required: "Esta publicación requiere autorización previa. Ábrela en ChartFox.", chartfox_open_external: "Abrir en ChartFox", chartfox_access_unavailable: "No se pudieron comprobar los permisos de ChartFox.",
+    chartfox_use_official: "Usar la fuente oficial", chartfox_use_official_provider: "Mostrar con {provider} en NaviXav", chartfox_iframe_official_available: "Esta fuente no permite la visualización integrada, pero el catálogo oficial del aeropuerto está disponible directamente en NaviXav.", chartfox_preauth_official_available: "Esta publicación requiere autorización previa, pero el catálogo oficial del aeropuerto está disponible directamente en NaviXav.",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    chart_source: "Fonte", chartfox_source_auto: "Automatica", chartfox_source_official: "Fonte ufficiale", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Per accedere alle carte AIRAC di ChartFox è necessario un account ChartFox/VATSIM.",
+    chartfox_settings_help: "Collega il tuo account ChartFox/VATSIM per aggiungere le sue carte agli aeroporti del volo.", chartfox_disconnected: "Non connesso", chartfox_connected: "Connesso", chartfox_connected_as: "Connesso · {name}", chartfox_connect: "Connetti ChartFox", chartfox_disconnect: "Disconnetti", chartfox_waiting: "Connessione nel browser…", chartfox_connect_failed: "Impossibile connettere ChartFox.", chartfox_connect_timeout: "La connessione ChartFox è scaduta.", chartfox_status_failed: "Stato ChartFox non disponibile", chartfox_credit: "Chart data powered by ChartFox · solo simulazione", chartfox_simulation_only: "solo simulazione",
+    chartfox_checking_access: "Verifica dei permessi di visualizzazione…", chartfox_iframe_blocked: "Questa fonte non consente la visualizzazione integrata. Apri la carta direttamente su ChartFox.", chartfox_preauth_required: "Questa pubblicazione richiede un'autorizzazione preventiva. Aprila su ChartFox.", chartfox_open_external: "Apri su ChartFox", chartfox_access_unavailable: "Impossibile verificare i permessi di ChartFox.",
+    chartfox_use_official: "Usa la fonte ufficiale", chartfox_use_official_provider: "Mostra con {provider} in NaviXav", chartfox_iframe_official_available: "Questa fonte non consente la visualizzazione integrata, ma il catalogo ufficiale dell'aeroporto è disponibile direttamente in NaviXav.", chartfox_preauth_official_available: "Questa pubblicazione richiede un'autorizzazione preventiva, ma il catalogo ufficiale dell'aeroporto è disponibile direttamente in NaviXav.",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    chart_source: "Fonte", chartfox_source_auto: "Automática", chartfox_source_official: "Fonte oficial", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "É necessária uma conta ChartFox/VATSIM para aceder às cartas AIRAC do ChartFox.",
+    chartfox_settings_help: "Liga a tua conta ChartFox/VATSIM para adicionar as cartas aos aeroportos do voo.", chartfox_disconnected: "Não ligado", chartfox_connected: "Ligado", chartfox_connected_as: "Ligado · {name}", chartfox_connect: "Ligar ChartFox", chartfox_disconnect: "Desligar", chartfox_waiting: "A ligar no navegador…", chartfox_connect_failed: "Não foi possível ligar o ChartFox.", chartfox_connect_timeout: "A ligação ChartFox expirou.", chartfox_status_failed: "Estado ChartFox indisponível", chartfox_credit: "Chart data powered by ChartFox · apenas simulação", chartfox_simulation_only: "apenas simulação",
+    chartfox_checking_access: "A verificar as permissões de visualização…", chartfox_iframe_blocked: "Esta fonte não permite visualização integrada. Abre a carta diretamente no ChartFox.", chartfox_preauth_required: "Esta publicação requer autorização prévia. Abre-a no ChartFox.", chartfox_open_external: "Abrir no ChartFox", chartfox_access_unavailable: "Não foi possível verificar as permissões do ChartFox.",
+    chartfox_use_official: "Usar a fonte oficial", chartfox_use_official_provider: "Mostrar com {provider} no NaviXav", chartfox_iframe_official_available: "Esta fonte não permite visualização integrada, mas o catálogo oficial do aeródromo está disponível diretamente no NaviXav.", chartfox_preauth_official_available: "Esta publicação requer autorização prévia, mas o catálogo oficial do aeródromo está disponível diretamente no NaviXav.",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    chart_source: "Bron", chartfox_source_auto: "Automatisch", chartfox_source_official: "Officiële bron", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Een ChartFox-/VATSIM-account is vereist voor toegang tot de AIRAC-kaarten van ChartFox.",
+    chartfox_settings_help: "Koppel je ChartFox-/VATSIM-account om kaarten voor de luchthavens van de vlucht toe te voegen.", chartfox_disconnected: "Niet verbonden", chartfox_connected: "Verbonden", chartfox_connected_as: "Verbonden · {name}", chartfox_connect: "ChartFox verbinden", chartfox_disconnect: "Verbinding verbreken", chartfox_waiting: "Verbinden in de browser…", chartfox_connect_failed: "Kan ChartFox niet verbinden.", chartfox_connect_timeout: "De ChartFox-verbinding is verlopen.", chartfox_status_failed: "ChartFox-status niet beschikbaar", chartfox_credit: "Chart data powered by ChartFox · alleen simulatie", chartfox_simulation_only: "alleen simulatie",
+    chartfox_checking_access: "Weergaverechten controleren…", chartfox_iframe_blocked: "Deze bron staat geen ingebedde weergave toe. Open de kaart rechtstreeks op ChartFox.", chartfox_preauth_required: "Deze publicatie vereist voorafgaande toestemming. Open haar op ChartFox.", chartfox_open_external: "Openen op ChartFox", chartfox_access_unavailable: "De ChartFox-weergaverechten konden niet worden gecontroleerd.",
+    chartfox_use_official: "Officiële bron gebruiken", chartfox_use_official_provider: "Met {provider} in NaviXav tonen", chartfox_iframe_official_available: "Deze bron staat geen ingebedde weergave toe, maar de officiële luchthavencatalogus is rechtstreeks in NaviXav beschikbaar.", chartfox_preauth_official_available: "Deze publicatie vereist voorafgaande toestemming, maar de officiële luchthavencatalogus is rechtstreeks in NaviXav beschikbaar.",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    chart_source: "Źródło", chartfox_source_auto: "Automatycznie", chartfox_source_official: "Źródło oficjalne", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Dostęp do map AIRAC ChartFox wymaga konta ChartFox/VATSIM.",
+    chartfox_settings_help: "Połącz konto ChartFox/VATSIM, aby dodać mapy lotnisk dla bieżącego lotu.", chartfox_disconnected: "Nie połączono", chartfox_connected: "Połączono", chartfox_connected_as: "Połączono · {name}", chartfox_connect: "Połącz ChartFox", chartfox_disconnect: "Rozłącz", chartfox_waiting: "Łączenie w przeglądarce…", chartfox_connect_failed: "Nie udało się połączyć z ChartFox.", chartfox_connect_timeout: "Połączenie ChartFox wygasło.", chartfox_status_failed: "Stan ChartFox niedostępny", chartfox_credit: "Chart data powered by ChartFox · tylko do symulacji", chartfox_simulation_only: "tylko do symulacji",
+    chartfox_checking_access: "Sprawdzanie uprawnień do wyświetlania…", chartfox_iframe_blocked: "To źródło nie zezwala na osadzone wyświetlanie. Otwórz mapę bezpośrednio w ChartFox.", chartfox_preauth_required: "Ta publikacja wymaga wcześniejszej zgody. Otwórz ją w ChartFox.", chartfox_open_external: "Otwórz w ChartFox", chartfox_access_unavailable: "Nie udało się sprawdzić uprawnień ChartFox.",
+    chartfox_use_official: "Użyj źródła oficjalnego", chartfox_use_official_provider: "Pokaż przez {provider} w NaviXav", chartfox_iframe_official_available: "To źródło nie zezwala na osadzone wyświetlanie, ale oficjalny katalog lotniska jest dostępny bezpośrednio w NaviXav.", chartfox_preauth_official_available: "Ta publikacja wymaga wcześniejszej zgody, ale oficjalny katalog lotniska jest dostępny bezpośrednio w NaviXav.",
+  });
+
   const ELEMENTS = {
     ".brand-sub": "subtitle",
     ".switch-label": "demo",
@@ -2065,8 +2616,6 @@
     "#ground-secondary": "ground_secondary",
     "#ground-fit": "fit",
     "#map-basemap": "basemap",
-    '#map-basemap-style option[value="carto_light"]': "basemap_carto_light",
-    '#map-basemap-style option[value="carto_dark"]': "basemap_carto_dark",
     "#map-constraints": "map_constraints",
     "#map-sia": "overlay",
     "#map-route": "full_route",
@@ -2109,8 +2658,6 @@
     'label[for="settings-crosswind"] span': "max_crosswind",
     'label[for="settings-runway-length"] span': "min_runway",
     'label[for="settings-basemap"] span': "map_basemap",
-    '#settings-basemap option[value="carto_light"]': "basemap_carto_light",
-    '#settings-basemap option[value="carto_dark"]': "basemap_carto_dark",
     'label[for="settings-trail-color"] span': "map_trail_color",
     'label[for="settings-taxi-speed"] span': "taxi_speed_setting",
     'label[for="settings-taxi-turn-speed"] span': "taxi_turn_speed_setting",
@@ -2133,6 +2680,11 @@
     "#support-title": "support_title",
     "#support-body": "support_body",
     "#support-open": "support_button",
+    "#chartfox-settings-help": "chartfox_settings_help",
+    "#chartfox-settings-simulation": "chartfox_simulation_only",
+    "#chartfox-settings-status": "chartfox_disconnected",
+    "#chartfox-connect": "chartfox_connect",
+    "#chartfox-disconnect": "chartfox_disconnect",
     "#settings-cancel": "cancel",
     '#settings-form button[type="submit"]': "save",
   };
@@ -2145,6 +2697,7 @@
   const ARIA_LABELS = {
     "#ground-clearance": "clearance_label",
     "#ground-clearance-apply": "clearance_apply",
+    "#aircraft-photo-close": "close",
   };
 
   const TITLES = {
@@ -2282,6 +2835,114 @@
     return key ? t(key) : String(value || "");
   }
 
+  /** Âge d'une observation : « 45 min », « 3 h 20 », puis « 4 jours ». */
+  function weatherAge(minutes) {
+    const value = Number(minutes);
+    if (!Number.isFinite(value)) return "";
+    if (value < 60) return format("wx_age_minutes", { value });
+    if (value < 48 * 60) {
+      const hours = Math.floor(value / 60);
+      const rest = value % 60;
+      return rest
+        ? format("wx_age_hours_minutes", {
+          hours,
+          minutes: String(rest).padStart(2, "0"),
+        })
+        : format("wx_age_hours", { value: hours });
+    }
+    return format("wx_age_days", { value: Math.floor(value / (24 * 60)) });
+  }
+
+  /**
+   * Note de briefing météo, telle que le service la décrit.
+   *
+   * Le service envoie un code et ses valeurs, jamais une phrase : il ignore la
+   * langue affichée. Une note inconnue se rabat sur son code plutôt que de
+   * disparaître, pour que le défaut se voie au lieu de se taire.
+   */
+  function weatherNote(note) {
+    if (typeof note === "string") return note;
+    const code = String(note?.code || "");
+    if (!code) return "";
+    const params = { ...(note?.params || {}) };
+    if (params.minutes !== undefined) params.age = weatherAge(params.minutes);
+    return has(code) ? format(code, params) : code;
+  }
+
+  /**
+   * Libellé en langage clair d'un groupe de phénomènes METAR.
+   *
+   * Le service n'envoie que les composants du groupe. L'assemblage appartient
+   * à la langue : « averse de pluie » place la préposition avant, « rain
+   * showers » place le nom après, et l'intensité se postpose en français quand
+   * elle se prépose en anglais.
+   */
+  function phenomenonLabel(item) {
+    const phenomenon = String(item?.phenomenon || "");
+    const descriptor = String(item?.descriptor || "");
+    const term = (code) => (has(`wx_ph_${code}`) ? t(`wx_ph_${code}`) : code);
+
+    let label;
+    // Un descripteur peut venir seul : « TS » annonce un orage sans
+    // précipitation, « VCSH » des averses au voisinage. L'intensité et le
+    // voisinage s'appliquent quand même, d'où le passage par la suite plutôt
+    // qu'un retour immédiat — sans quoi « VCTS » perdrait « à proximité ».
+    if (!phenomenon) {
+      if (descriptor === "TS") label = t("wx_ph_ts_alone");
+      else if (descriptor === "SH") label = t("wx_ph_shower_alone");
+      else if (descriptor) {
+        label = has(`wx_desc_${descriptor}`) ? t(`wx_desc_${descriptor}`) : descriptor;
+      } else {
+        return String(item?.code || "");
+      }
+      const lone = String(item?.intensity || "");
+      if (lone === "VC") return format("wx_ph_vicinity", { label });
+      if (lone === "-") {
+        return format("wx_ph_intensity", { label, intensity: t("wx_ph_light") });
+      }
+      if (lone === "+") {
+        return format("wx_ph_intensity", { label, intensity: t("wx_ph_heavy") });
+      }
+      return label;
+    }
+
+    const base = term(phenomenon);
+    // Un couple descripteur + phénomène attesté se traduit d'un bloc : c'est
+    // le seul moyen de respecter l'accord et l'idiome de chaque langue, où
+    // « pluie verglaçante » côtoie « brouillard givrant ».
+    if (descriptor && has(`wx_ph_${descriptor}${phenomenon}`)) {
+      label = t(`wx_ph_${descriptor}${phenomenon}`);
+    } else if (descriptor === "TS") {
+      label = format("wx_ph_ts_with", { phenomenon: base });
+    } else if (descriptor === "SH") {
+      label = format("wx_ph_shower", { phenomenon: base });
+    } else if (descriptor === "FZ") {
+      label = format("wx_ph_freezing", { phenomenon: base });
+    } else if (descriptor) {
+      label = format("wx_ph_descriptor", {
+        phenomenon: base,
+        descriptor: has(`wx_desc_${descriptor}`)
+          ? t(`wx_desc_${descriptor}`)
+          : descriptor,
+      });
+    } else {
+      label = base;
+    }
+
+    const extra = String(item?.extra || "");
+    if (extra) label = format("wx_ph_and", { first: label, second: term(extra) });
+
+    const intensity = String(item?.intensity || "");
+    if (intensity === "VC") return format("wx_ph_vicinity", { label });
+    if (intensity === "-") {
+      return format("wx_ph_intensity", { label, intensity: t("wx_ph_light") });
+    }
+    if (intensity === "+") {
+      return format("wx_ph_intensity", { label, intensity: t("wx_ph_heavy") });
+    }
+    return label;
+  }
+
   /** Contrainte publiée : seul « entre X et Y ft » porte du français. */
   function constraintText(value) {
     const text = String(value ?? "");
@@ -2374,8 +3035,10 @@
     groundLabel,
     has,
     hasLanguage,
+    phenomenonLabel,
     setLanguage,
     suggestedLanguage,
     t,
+    weatherNote,
   };
 })();

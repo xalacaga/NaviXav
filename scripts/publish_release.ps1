@@ -34,7 +34,10 @@ $ReleaseFiles = @(
     # publiés sur Flightsim.to. Ils font partie du même commit de Release.
     "publishing/flightsim-to-description.txt",
     "publishing/flightsim-to-installer/README-FIRST.txt",
-    "publishing/flightsim-to-listing.md"
+    "publishing/flightsim-to-listing.md",
+    # Journal complet mis en forme pour la fiche Flightsim.to, reconstruit à
+    # chaque version depuis CHANGELOG.md.
+    "publishing/flightsim-to-changelog.txt"
 )
 $BuildSideEffectFiles = @(
     "tests/data/navdata_test.sqlite"

@@ -167,8 +167,6 @@
                 title="Choisir le fond de carte affiché">
           <option value="osm">OpenStreetMap Standard</option>
           <option value="opentopo">OpenTopoMap</option>
-          <option value="carto_light">CartoDB Positron · clair</option>
-          <option value="carto_dark">CartoDB Dark Matter · cockpit</option>
         </select>
         <button id="map-constraints" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
@@ -272,6 +270,14 @@
   </section>
 </main>
 
+<dialog id="aircraft-photo-dialog" class="aircraft-photo-dialog" aria-labelledby="aircraft-photo-caption">
+  <button type="button" id="aircraft-photo-close" class="aircraft-photo-close" aria-label="Fermer">×</button>
+  <figure>
+    <img id="aircraft-photo-large" alt="" />
+    <figcaption id="aircraft-photo-caption"></figcaption>
+  </figure>
+</dialog>
+
 <dialog id="settings-dialog" class="settings-dialog">
   <form id="settings-form">
     <div class="settings-head">
@@ -297,6 +303,18 @@
       <button id="support-open" class="icon-btn support-btn" type="button">Soutenir le développement</button>
       <a class="icon-btn support-btn" href="https://navixav.fr" target="_blank" rel="noreferrer">navixav.fr</a>
     </aside>
+    <section class="chartfox-settings" aria-labelledby="chartfox-settings-title">
+      <div>
+        <h3 id="chartfox-settings-title">ChartFox</h3>
+        <p id="chartfox-settings-help">Relie ton compte ChartFox/VATSIM pour ajouter ses cartes aux aérodromes du vol.</p>
+        <p class="chartfox-credit">Chart data powered by <a href="https://chartfox.org" target="_blank" rel="noreferrer">ChartFox</a> · <span id="chartfox-settings-simulation">simulation uniquement</span></p>
+      </div>
+      <div class="chartfox-settings-actions">
+        <span id="chartfox-settings-status" class="badge">Non connecté</span>
+        <button id="chartfox-connect" class="btn-primary" type="button">Connecter ChartFox</button>
+        <button id="chartfox-disconnect" class="icon-btn hidden" type="button">Déconnecter</button>
+      </div>
+    </section>
     <div class="settings-grid">
       <label class="field" for="settings-language">
         <span>Langue de l’interface</span>
@@ -355,8 +373,6 @@
         <select id="settings-basemap">
           <option value="osm">OpenStreetMap Standard</option>
           <option value="opentopo">OpenTopoMap</option>
-          <option value="carto_light">CartoDB Positron · clair</option>
-          <option value="carto_dark">CartoDB Dark Matter · cockpit</option>
         </select>
       </label>
       <label class="field" for="settings-trail-color">

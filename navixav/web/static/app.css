@@ -38,6 +38,8 @@
   --route-enroute: #a78bfa;
   --route-star: #f59e0b;
   --route-approach: #34d399;
+  --route-toc: #ec4899;
+  --route-tod: #ef4444;
 
   /* Roulage au sol.
      Le plan de roulage reste sombre dans les deux thèmes : c'est une carte
@@ -103,6 +105,8 @@
     --route-enroute: #7c3aed;
     --route-star: #b45309;
     --route-approach: #047857;
+    --route-toc: #be185d;
+    --route-tod: #b91c1c;
 
     /* Le plan de roulage garde son fond sombre en thème clair : seules les
        couleurs de l'itinéraire s'accordent au reste de l'interface. */
@@ -1509,6 +1513,12 @@ body.remote-client .mobile-theme {
   border-radius: 8px;
   background: var(--surface-solid);
 }
+.aircraft-photo.aircraft-survey-photo {
+  width: 68px;
+  height: 44px;
+  border-radius: 9px;
+}
+.aircraft-survey-photo .aircraft-mark { font-size: 0.68rem; }
 .aircraft-survey-item > span { min-width: 0; }
 .aircraft-survey-item strong,
 .aircraft-survey-item small { display: block; overflow-wrap: anywhere; }
@@ -1538,6 +1548,28 @@ body.remote-client .mobile-theme {
   color: var(--text-dim);
   font-size: 0.76rem;
   line-height: 1.45;
+}
+.chartfox-settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 10px 0 14px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, #f97316 38%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #f97316 8%, var(--surface-raised));
+}
+.chartfox-settings h3 { margin: 0 0 3px; font-size: 0.86rem; }
+.chartfox-settings p { margin: 0; color: var(--text-dim); font-size: 0.76rem; }
+.chartfox-settings .chartfox-credit { margin-top: 5px; color: var(--text-faint); }
+.chartfox-settings .chartfox-credit a { color: var(--accent); }
+.chartfox-settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .support-btn {
   flex: 0 0 auto;
@@ -1620,6 +1652,8 @@ body.remote-client .mobile-theme {
   .aircraft-survey-columns { grid-template-columns: 1fr; }
   .aircraft-folder-row { align-items: stretch; flex-direction: column; }
   .support-card { align-items: stretch; flex-direction: column; }
+  .chartfox-settings { align-items: stretch; flex-direction: column; }
+  .chartfox-settings-actions { justify-content: flex-start; }
   .support-btn { width: 100%; white-space: normal; }
 }
 
@@ -1961,12 +1995,78 @@ body.remote-client .mobile-theme {
   background: var(--surface-raised);
 }
 .aircraft-identity h2 { margin: 3px 0 8px; }
+.aircraft-identity > :last-child { min-width: 0; }
+.aircraft-photo {
+  position: relative; flex: 0 0 auto;
+  width: 124px; height: 78px;
+  border-radius: 16px; overflow: hidden;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.aircraft-photo img {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+}
+.aircraft-photo.has-photo { cursor: zoom-in; }
+.aircraft-photo.has-photo img { transition: transform 160ms ease; }
+.aircraft-photo.has-photo:hover img { transform: scale(1.045); }
+.aircraft-photo.has-photo:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: 3px;
+}
+.aircraft-photo-dialog {
+  box-sizing: border-box;
+  width: min(1120px, calc(100vw - 32px));
+  max-width: none;
+  padding: 0;
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #020617;
+  color: white;
+  box-shadow: 0 28px 100px #000c;
+}
+.aircraft-photo-dialog::backdrop {
+  background: #020617dc;
+  backdrop-filter: blur(5px);
+}
+.aircraft-photo-dialog figure { margin: 0; }
+.aircraft-photo-dialog img {
+  display: block;
+  width: 100%;
+  height: min(78dvh, 760px);
+  object-fit: contain;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.aircraft-photo-dialog figcaption {
+  min-height: 22px;
+  padding: 10px 16px 11px;
+  color: #dbeafe;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.aircraft-photo-close {
+  position: absolute;
+  z-index: 1;
+  right: 10px;
+  top: 10px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #ffffff3d;
+  border-radius: 50%;
+  background: #0f172acc;
+  color: white;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+.aircraft-photo-close:hover { background: #1e293be8; }
 .aircraft-mark {
-  display: grid; place-items: center; flex: 0 0 auto;
-  width: 76px; height: 76px; border-radius: 18px;
+  display: grid; place-items: center;
+  width: 100%; height: 100%;
   background: var(--accent-soft); color: var(--accent);
   font-family: var(--mono); font-size: 1.15rem; font-weight: 750;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .stat {
   padding: 14px 16px;
@@ -2518,6 +2618,7 @@ pre {
 }
 .sia-library-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
   gap: 16px; margin-top: 18px;
 }
 .sia-airport-library {
@@ -2525,9 +2626,33 @@ pre {
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
-.sia-airport-library.pdf-open { grid-column: 1 / -1; }
 .sia-library-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.chart-source-field { min-width: 150px; margin-left: auto; }
+.chart-source-field span { font-size: 0.68rem; }
+.chart-source-field select { min-width: 150px; }
+.sia-airport-library > .chartfox-credit {
+  margin: 0 0 10px;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+}
+.chartfox-settings-link {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.chartfox-settings-link:hover { color: color-mix(in srgb, var(--accent) 72%, var(--text)); }
+.chartfox-settings-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 .sia-library-head h2 { margin: 3px 0 12px; }
 .sia-document-controls { display: grid; gap: 12px; margin: 14px 0 10px; }
@@ -2545,6 +2670,9 @@ pre {
 }
 @media (max-width: 620px) {
   .sia-library-grid { grid-template-columns: 1fr; }
+  .sia-library-head { flex-wrap: wrap; }
+  .chart-source-field { order: 3; width: 100%; }
+  .chart-source-field select { width: 100%; }
 }
 .minima-editor-head h2 { margin: 3px 0 14px; font-size: 1rem; }
 .minima-fields {
@@ -3024,12 +3152,14 @@ pre {
   .ground-speed { right: 8px; bottom: 8px; padding: 6px 10px; }
   .ground-speed-value { font-size: 1.3rem; }
   .sia-library-grid { grid-template-columns: minmax(0, 1fr); }
+  .sia-airport-library.pdf-open { order: 2; }
   .sia-chart-preview iframe, .sia-document-frame {
     height: min(68dvh, 620px);
   }
   .mcdu-line { grid-template-columns: 94px minmax(0, 1fr); }
   .aircraft-identity { align-items: flex-start; padding: 14px; }
-  .aircraft-mark { width: 58px; height: 58px; border-radius: 14px; }
+  .aircraft-photo { width: 96px; height: 62px; border-radius: 13px; }
+  .aircraft-mark { font-size: 0.95rem; }
   table { display: block; overflow-x: auto; white-space: nowrap; }
   button, .icon-btn, .btn-primary, select, input { min-height: 44px; }
   /* Cible tactile pleine, mais toujours un simple crayon sans cadre. */
@@ -3073,7 +3203,7 @@ pre {
   .flight-progress-airport.is-right { grid-column: 2; }
   .flight-progress-middle { grid-row: 2; grid-column: 1 / -1; }
   .flight-progress-name { display: none; }
-  .approach-profile-head, .missed-altitude, .aircraft-identity {
+  .approach-profile-head, .missed-altitude {
     align-items: flex-start;
     flex-direction: column;
   }

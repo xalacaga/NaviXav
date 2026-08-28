@@ -24,6 +24,7 @@ from navixav.navdata.base import (
     ProcedureKind,
     ProcedureLeg,
     Runway,
+    Transition,
 )
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.preferences import AirportPreferences
@@ -61,11 +62,24 @@ def _runway(icao: str, name: str, heading: float) -> Runway:
     )
 
 
-def _sid(provider_id: int, ident: str, runway: str) -> Procedure:
+def _sid(
+    provider_id: int, ident: str, runway: str, branch: tuple[str, ...] = ()
+) -> Procedure:
     return Procedure(
         provider_id=provider_id, kind=ProcedureKind.SID, ident=ident,
         arinc_name=None, proc_type=None, suffix=None, runway_name=None,
         runways=(runway,), legs=(_leg(f"D{runway}"), _leg("LAVRA")),
+        runway_transitions=(
+            (
+                Transition(
+                    ident=runway,
+                    transition_type="RUNWAY",
+                    legs=tuple(_leg(fix) for fix in branch),
+                ),
+            )
+            if branch
+            else ()
+        ),
     )
 
 
@@ -78,11 +92,18 @@ class _Provider:
 
     POSITIONS = {
         "LAVRA": (45.60, 1.20), "D11": (44.95, 1.60), "D29": (45.10, 1.35),
+        "D11B": (44.99, 1.55), "D29B": (45.06, 1.40),
     }
 
-    def __init__(self, sid_runways=("11",)) -> None:
+    def __init__(self, sid_runways=("11",), runway_branches=None) -> None:
+        branches = runway_branches or {}
         self._sids = [
-            _sid(index, f"NORD2{ascii_uppercase[index + 1]}", runway)
+            _sid(
+                index,
+                f"NORD2{ascii_uppercase[index + 1]}",
+                runway,
+                branches.get(runway, ()),
+            )
             for index, runway in enumerate(sid_runways)
         ]
 
@@ -126,9 +147,9 @@ def _ofp() -> OfpSummary:
     )
 
 
-def _departure(sid_runways=("11",), overrides=None):
+def _departure(sid_runways=("11",), overrides=None, runway_branches=None):
     engine = CompletionEngine(
-        _Provider(sid_runways), Settings(metar_source="simbrief"),
+        _Provider(sid_runways, runway_branches), Settings(metar_source="simbrief"),
         AirportPreferences.load(),
     )
     return engine.complete(_ofp(), overrides)
@@ -183,6 +204,22 @@ def test_forcing_the_sid_still_works_and_says_why_it_is_odd():
 def test_no_path_is_drawn_for_a_departure_without_a_sid():
     """Rien à tracer tant qu'aucune procédure n'est retenue."""
     assert _departure(sid_runways=("11",)).departure.sid_path == []
+
+
+def test_a_sid_described_only_by_its_runway_branch_is_still_drawn():
+    """MSFS répartit parfois tout le tracé d'une SID dans ses branches.
+
+    Une SID desservant deux seuils qui divergent n'a plus qu'une fin commune au
+    tronc : sans la branche de la piste retenue, le départ perdrait son début,
+    et une SID entièrement divergente ne se tracerait pas du tout.
+    """
+    plan = _departure(
+        sid_runways=("11", "29"), runway_branches={"29": ("D29B",)}
+    )
+    assert plan.departure.runway.choice.value == "29"
+    assert [point["ident"] for point in plan.departure.sid_path] == [
+        "D29B", "D29", "LAVRA",
+    ]
 
 
 # --------------------------------------------------------------------------- #

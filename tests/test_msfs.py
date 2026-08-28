@@ -206,12 +206,63 @@ def test_a_star_keeps_its_diverging_branches():
     ]
 
 
+def test_a_sid_serving_two_runways_keeps_its_converging_trunk():
+    """Une SID diverge par seuil puis converge : le partagé est une fin.
+
+    Chercher un début partagé ne trouverait rien et laisserait tout le tracé
+    dans les branches, c'est-à-dire une SID sans aucun segment.
+    """
+    procedure = {
+        "legs": [],
+        "runway_transitions": [
+            {"ident": "32L", "legs": [_leg("BO321"), _leg("MEDAP"), _leg("MEN")]},
+            {"ident": "32R", "legs": [_leg("BO322"), _leg("MEDAP"), _leg("MEN")]},
+        ],
+        "enroute_transitions": [],
+    }
+    trunk, branches = msfs_store._split_trunk(procedure, "SID")
+    assert [leg["fix"] for leg in trunk] == ["MEDAP", "MEN"]
+    assert [(ident, [leg["fix"] for leg in legs]) for ident, legs in branches] == [
+        ("32L", ["BO321"]),
+        ("32R", ["BO322"]),
+    ]
+
+
+def test_a_sid_with_identical_runway_branches_keeps_everything():
+    """Deux seuils décrits à l'identique : rien ne reste en branche."""
+    legs = [_leg("TOU"), _leg("BO321"), _leg("MEDAP"), _leg("MEN")]
+    procedure = {
+        "legs": [],
+        "runway_transitions": [
+            {"ident": "32L", "legs": list(legs)},
+            {"ident": "32R", "legs": list(legs)},
+        ],
+        "enroute_transitions": [],
+    }
+    trunk, branches = msfs_store._split_trunk(procedure, "SID")
+    assert [leg["fix"] for leg in trunk] == ["TOU", "BO321", "MEDAP", "MEN"]
+    assert [legs for _ident, legs in branches] == [[], []]
+
+
 def test_common_prefix_stops_at_the_first_difference():
     sequences = [
         [_leg("A"), _leg("B"), _leg("C")],
         [_leg("A"), _leg("X")],
     ]
     assert [leg["fix"] for leg in msfs_store._common_prefix(sequences)] == ["A"]
+
+
+def test_common_suffix_stops_at_the_first_difference():
+    sequences = [
+        [_leg("A"), _leg("B"), _leg("C")],
+        [_leg("X"), _leg("C")],
+    ]
+    assert [leg["fix"] for leg in msfs_store._common_suffix(sequences)] == ["C"]
+
+
+def test_common_suffix_is_empty_when_the_last_fixes_differ():
+    sequences = [[_leg("A"), _leg("B")], [_leg("A"), _leg("C")]]
+    assert msfs_store._common_suffix(sequences) == []
 
 
 # --------------------------------------------------------------------------- #

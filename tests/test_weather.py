@@ -98,6 +98,37 @@ def test_decode_metar_icao_is_not_read_as_phenomenon():
     assert report.phenomena == []
 
 
+@pytest.mark.parametrize(
+    ("metar", "expected"),
+    [
+        # Un orage sans précipitation observée s'annonce par le seul descripteur.
+        ("LFPG 021230Z 27015KT 9999 TS SCT030CB 18/12 Q1013", ["TS"]),
+        ("KJFK 021230Z 27015KT 10SM VCTS SCT030 18/12 A2992", ["VCTS"]),
+        ("KJFK 021230Z 27015KT 10SM VCSH BKN030 18/12 A2992", ["VCSH"]),
+        ("LFPG 021230Z 27015KT 3000 +TSRA FZFG BKN008 02/02 Q1013", ["+TSRA", "FZFG"]),
+    ],
+)
+def test_decode_metar_reads_descriptor_only_groups(metar, expected):
+    report = decode_metar("LFPG", metar, now=NOW)
+    assert [item["code"] for item in report.phenomena] == expected
+
+
+@pytest.mark.parametrize(
+    ("metar", "note"),
+    [
+        # « TEMPO » se termine par « PO », le code des tourbillons de poussière.
+        ("LFPG 021230Z 27010KT 9999 SCT025 TEMPO 0214/0218 Q1013", "TEMPO"),
+        # « TSNO » et « PRESFR » sont des remarques, pas des phénomènes.
+        ("KJFK 021230Z AUTO 27015KT 10SM CLR 18/12 A2992 RMK AO2 TSNO", "TSNO"),
+        ("KJFK 021230Z 27015KT 10SM CLR 18/12 A2992 RMK AO2 PRESFR", "PRESFR"),
+    ],
+)
+def test_decode_metar_ignores_words_that_merely_contain_a_code(metar, note):
+    """Un groupe commence un mot : sinon « TEMPO » annoncerait de la poussière."""
+    report = decode_metar("LFPG", metar, now=NOW)
+    assert report.phenomena == [], f"{note} lu comme un phénomène"
+
+
 # ----------------------------------------------------------------------- TAF
 
 
@@ -265,14 +296,33 @@ def test_build_briefing_enroute_comes_from_the_ofp():
     assert enroute.temperature_dev_c == 11
     # Standard −56,5 °C au niveau 360, plus l'écart ISA annoncé par SimBrief.
     assert enroute.outside_air_temperature_c == pytest.approx(-45, abs=1)
-    assert any("face" in note for note in enroute.notes)
+    assert any(note["code"] == "wx_note_headwind" for note in enroute.notes)
 
 
 def test_build_briefing_raises_operational_notes():
     briefing = build_briefing(_ofp(), metar_source="none", now=NOW)
-    notes = " ".join(briefing.departure.notes)
-    assert "brouillard" in notes  # écart température/point de rosée de 1 °C
-    assert "28 kt" in notes  # rafales
+    notes = {note["code"]: note["params"] for note in briefing.departure.notes}
+    # Écart température/point de rosée de 1 °C, puis les rafales observées.
+    assert notes["wx_note_fog_risk"]["spread"] == 1
+    assert notes["wx_note_gusts"]["gust"] == 28
+
+
+def test_briefing_notes_carry_no_language():
+    """Une note est un code : le service ignore la langue de l'interface.
+
+    Une phrase assemblée ici arriverait en français dans une interface
+    anglaise — c'est précisément le défaut que ce contrat empêche.
+    """
+    briefing = build_briefing(_ofp(), metar_source="none", now=NOW)
+    every_note = [
+        *briefing.departure.notes,
+        *briefing.arrival.notes,
+        *briefing.enroute.notes,
+    ]
+    assert every_note
+    for note in every_note:
+        assert set(note) == {"code", "params"}
+        assert note["code"].startswith("wx_note_")
 
 
 def test_build_briefing_warns_when_weather_is_missing():
@@ -282,7 +332,7 @@ def test_build_briefing_warns_when_weather_is_missing():
         ofp, metar_source="none", metar_fetcher=_no_fetch, taf_fetcher=_no_fetch, now=NOW
     )
     assert "Météo indisponible pour LFPG." in briefing.warnings
-    assert briefing.departure.notes == ["Aucun METAR disponible pour ce terrain."]
+    assert briefing.departure.notes == [{"code": "wx_note_no_metar", "params": {}}]
 
 
 def test_briefing_serialises_for_the_interface():

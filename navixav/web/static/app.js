@@ -11,6 +11,9 @@ const tf = (key, values = {}) => Object.entries(values).reduce(
 const constraintText = (value) => window.I18N.constraintText(value);
 const groundLabel = (value) => window.I18N.groundLabel(value);
 const chartCategory = (value) => window.I18N.chartCategory(value);
+/* Météo : le service envoie des codes, la mise en mots se fait ici. */
+const weatherNote = (note) => window.I18N.weatherNote(note);
+const phenomenonLabel = (item) => window.I18N.phenomenonLabel(item);
 
 /**
  * Message d'erreur du service, rendu dans la langue de l'interface.
@@ -173,6 +176,10 @@ let activeRoutePointIndex = null;
 let latestAircraft = null;
 let flightGeometry = [];
 let flightRouteTotalNm = 0;
+let climbGuidanceState = {
+  gradientFtPerNm: 450,
+  topOfClimbDistanceNm: null,
+};
 let currentFlightTrail = [];
 let currentFlightTrailPlanKey = "";
 let lastCurrentFlightTrailAt = 0;
@@ -536,13 +543,18 @@ function renderAircraftSurvey(report) {
     }
     for (const aircraft of items) {
       const row = el("div", "aircraft-survey-item");
+      const visual = aircraftVisual({
+        aircraft: aircraft.icao || "",
+        aircraft_name: aircraft.label || "",
+      });
+      visual.classList.add("aircraft-survey-photo");
       const copy = el("span");
       copy.append(el("strong", "", aircraft.label));
       const detail = missingAircraft
         ? [aircraft.icao, aircraft.has_checklist ? t("aircraft_checklist") : t("aircraft_no_checklist")].filter(Boolean).join(" · ")
         : [aircraft.icao, aircraft.aircraft, t(`aircraft_maturity_${aircraft.maturity}`)].filter(Boolean).join(" · ");
       copy.append(el("small", "", detail));
-      row.append(copy);
+      row.append(visual, copy);
       if (missingAircraft) {
         const button = el("button", "icon-btn", t("aircraft_scaffold"));
         button.type = "button";
@@ -663,6 +675,7 @@ async function openSettings() {
     $("settings-theme").value = window.THEME.getPreference();
     $("settings-dialog").showModal();
     loadAircraftSurvey();
+    loadChartFoxStatus();
   } catch (error) {
     showBanner("error", t("err_settings_open"), [String(error)]);
   }
@@ -1324,6 +1337,10 @@ function renderPlan(plan) {
   // y compris les points de SID, STAR et d'approche.
   flightGeometry = buildFlightGeometry(plan);
   flightRouteTotalNm = routeLengthNm(flightGeometry);
+  climbGuidanceState = {
+    gradientFtPerNm: 450,
+    topOfClimbDistanceNm: null,
+  };
   renderStrip(plan);
   renderTerminal(plan);
   renderConstraints(plan);
@@ -1774,6 +1791,103 @@ function routeLengthNm(geometry) {
   return total;
 }
 
+function renderChartFoxStatus(payload = {}) {
+  const connected = Boolean(payload.connected);
+  const status = $("chartfox-settings-status");
+  latestStatus = { ...(latestStatus || {}), chartfox_connected: connected };
+  status.textContent = connected
+    ? (payload.user_name
+      ? tf("chartfox_connected_as", { name: payload.user_name })
+      : t("chartfox_connected"))
+    : t("chartfox_disconnected");
+  status.className = `badge${connected ? " ok" : ""}`;
+  show($("chartfox-connect"), !connected);
+  show($("chartfox-disconnect"), connected);
+}
+
+async function loadChartFoxStatus() {
+  try {
+    const response = await fetch("/api/chartfox/status");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("chartfox_status_failed"));
+    renderChartFoxStatus(payload);
+    return payload;
+  } catch (error) {
+    const status = $("chartfox-settings-status");
+    status.textContent = t("chartfox_status_failed");
+    status.className = "badge warn";
+    return { connected: false, error: String(error) };
+  }
+}
+
+async function connectChartFox() {
+  const button = $("chartfox-connect");
+  button.disabled = true;
+  button.textContent = t("chartfox_waiting");
+  try {
+    const response = await fetch("/api/chartfox/connect", {
+      method: "POST",
+      headers: { "X-NaviXav-ChartFox": "connect" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("chartfox_connect_failed"));
+    const deadline = Date.now() + 120000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      const status = await loadChartFoxStatus();
+      if (status.connected) {
+        officialAirportRequests.clear();
+        if (currentPlan) renderOfficialCharts(currentPlan);
+        return;
+      }
+    }
+    throw new Error(t("chartfox_connect_timeout"));
+  } catch (error) {
+    const status = $("chartfox-settings-status");
+    status.textContent = String(error.message || error);
+    status.className = "badge warn";
+  } finally {
+    button.disabled = false;
+    button.textContent = t("chartfox_connect");
+  }
+}
+
+async function disconnectChartFox() {
+  const response = await fetch("/api/chartfox/disconnect", {
+    method: "POST",
+    headers: { "X-NaviXav-ChartFox": "disconnect" },
+  });
+  if (!response.ok) return;
+  officialAirportRequests.clear();
+  renderChartFoxStatus({ connected: false });
+  if (currentPlan) renderOfficialCharts(currentPlan);
+}
+
+/** Position sur la route à une distance donnée de son origine. */
+function routePositionAtDistance(distanceNm) {
+  if (flightGeometry.length < 2 || !Number.isFinite(distanceNm)) return null;
+  let remaining = Math.max(0, Math.min(flightRouteTotalNm, distanceNm));
+  for (let index = 0; index < flightGeometry.length - 1; index += 1) {
+    const start = flightGeometry[index];
+    const end = flightGeometry[index + 1];
+    const segmentNm = haversineNm(start, end);
+    if (remaining > segmentNm && index < flightGeometry.length - 2) {
+      remaining -= segmentNm;
+      continue;
+    }
+    const ratio = segmentNm > 0 ? Math.max(0, Math.min(1, remaining / segmentNm)) : 0;
+    // Le plus court écart de longitude garde l'interpolation correcte autour
+    // de l'antiméridien.
+    const longitudeDelta = ((end.lon - start.lon + 540) % 360) - 180;
+    const longitude = ((start.lon + longitudeDelta * ratio + 540) % 360) - 180;
+    return {
+      lat: start.lat + (end.lat - start.lat) * ratio,
+      lon: longitude,
+    };
+  }
+  return { ...flightGeometry.at(-1) };
+}
+
 function distanceFromProjectionToIndex(projection, targetIndex) {
   if (!projection || targetIndex <= projection.segmentIndex) return 0;
   let distance = haversineNm(
@@ -1982,6 +2096,7 @@ function descentGuidance(plan, aircraft, projection) {
   );
 
   return {
+    anchorFromDestination,
     targetAltitude,
     todInNm,
     requiredVsFpm,
@@ -1989,6 +2104,66 @@ function descentGuidance(plan, aircraft, projection) {
     leftCruise,
     profileDeltaFt: Math.round(currentAltitude - expectedAltitude),
   };
+}
+
+/*
+ * Estimation du TOC propre à NaviXav. Le gradient initial donne un repère dès
+ * le départ ; en montée, le couple vario/vitesse sol l'affine progressivement.
+ * Une fois le niveau de croisière atteint, le repère est figé sur la route.
+ */
+function climbGuidance(plan, aircraft, projection, phaseKey) {
+  if (!aircraft || !projection) return null;
+  const cruiseAltitude = finiteOr(plan.enroute?.cruise_altitude_ft);
+  const currentAltitude = finiteOr(standardAltitude(aircraft));
+  if (cruiseAltitude === null || currentAltitude === null) return null;
+
+  const travelledNm = Math.max(0, flightRouteTotalNm - projection.remainingNm);
+  const verticalSpeed = finiteOr(aircraft.vertical_speed_fpm, 0);
+  const groundSpeed = finiteOr(aircraft.ground_speed_kt, 0);
+  if (
+    climbGuidanceState.topOfClimbDistanceNm === null
+    && (phaseKey === "phase_descent" || phaseKey === "phase_approach")
+  ) {
+    return null;
+  }
+  if (!aircraft.on_ground && verticalSpeed >= 300 && groundSpeed >= 80) {
+    const observedGradient = Math.max(180, Math.min(900, verticalSpeed * 60 / groundSpeed));
+    climbGuidanceState.gradientFtPerNm = (
+      climbGuidanceState.gradientFtPerNm * 0.88 + observedGradient * 0.12
+    );
+  }
+
+  let topOfClimbDistanceNm = climbGuidanceState.topOfClimbDistanceNm;
+  if (topOfClimbDistanceNm === null) {
+    const altitudeRemaining = Math.max(0, cruiseAltitude - currentAltitude);
+    topOfClimbDistanceNm = Math.min(
+      flightRouteTotalNm,
+      travelledNm + altitudeRemaining / climbGuidanceState.gradientFtPerNm
+    );
+    if (!aircraft.on_ground && currentAltitude >= cruiseAltitude - 500) {
+      climbGuidanceState.topOfClimbDistanceNm = topOfClimbDistanceNm;
+    }
+  }
+
+  return {
+    tocInNm: topOfClimbDistanceNm - travelledNm,
+    topOfClimbDistanceNm,
+  };
+}
+
+function updateCalculatedMapPoints(climb, descent) {
+  const points = [];
+  const add = (ident, distanceNm, kind) => {
+    const position = routePositionAtDistance(distanceNm);
+    if (!position) return;
+    const projected = projectToChart(position.lat, position.lon);
+    points.push({ ...projected, ident, kind });
+  };
+  if (climb) add("TOC", climb.topOfClimbDistanceNm, "toc");
+  if (descent) {
+    add("TOD", flightRouteTotalNm - descent.anchorFromDestination, "tod");
+  }
+  MAP.setCalculatedPoints(points);
 }
 
 /* --------------------------------------------- configuration avion et alarmes */
@@ -4228,7 +4403,9 @@ function updateFlightPanel(aircraft) {
   const phaseKey = detectFlightPhaseKey(aircraft, projection);
   const phase = t(phaseKey);
   const constraint = nextFlightConstraint(currentPlan, projection, aircraft || {});
+  const climb = climbGuidance(currentPlan, aircraft, projection, phaseKey);
   const descent = descentGuidance(currentPlan, aircraft, projection);
+  updateCalculatedMapPoints(climb, descent);
 
   updateConfigurationBlock(aircraft);
   updateFlightEvents(aircraft, phaseKey);
@@ -4305,6 +4482,17 @@ function updateFlightPanel(aircraft) {
     "flight-required-vs",
     requiredVs !== null ? `${requiredVs > 0 ? "+" : ""}${requiredVs} ft/min` : "—"
   );
+
+  if (climb) {
+    const tocText = climb.tocInNm > 2
+      ? tf("toc_in", { distance: climb.tocInNm.toFixed(0) })
+      : climb.tocInNm >= -2
+        ? t("toc_now")
+        : tf("toc_passed", { distance: Math.abs(climb.tocInNm).toFixed(0) });
+    liveValue("flight-toc", tocText, climb.tocInNm > -2 ? "good" : "");
+  } else {
+    liveValue("flight-toc", "—");
+  }
 
   if (descent) {
     const todText = descent.todInNm > 2
@@ -4487,7 +4675,8 @@ function renderFlightPanel(plan) {
   item(t("flight_next_constraint"), "flight-next-constraint");
   item(t("flight_constraint_distance"), "flight-constraint-distance");
   item(t("flight_required_rate"), "flight-required-vs", t("flight_required_rate_note"));
-  item("Top of Descent", "flight-tod");
+  item(t("flight_top_of_climb"), "flight-toc", t("flight_calculated_point_note"));
+  item(t("flight_top_of_descent"), "flight-tod", t("flight_calculated_point_note"));
   item(t("flight_vertical_profile"), "flight-vertical-profile", t("flight_vertical_profile_note"));
   item(t("flight_descent_rate"), "flight-descent-vs", t("flight_descent_rate_note"));
   panel.append(grid);
@@ -5445,6 +5634,101 @@ function renderDispatch(plan) {
 
 /* --------------------------------------------------------------- aircraft */
 
+const AIRCRAFT_PHOTO_RULES = [
+  { asset: "airbus-a319", codes: ["A319", "A19N"], names: ["A319"] },
+  { asset: "airbus-a321", codes: ["A321", "A21N"], names: ["A321"] },
+  { asset: "airbus-a320", codes: ["A318", "A320", "A20N"], names: ["A318", "A320", "A32NX"] },
+  { asset: "airbus-a330", codes: ["A332", "A333", "A337", "A338", "A339"], names: ["A330"] },
+  { asset: "airbus-a340", codes: ["A342", "A343", "A345", "A346"], names: ["A340"] },
+  { asset: "airbus-a350", codes: ["A359", "A35K"], names: ["A350"] },
+  { asset: "airbus-a380", codes: ["A388"], names: ["A380"] },
+  { asset: "piper-aerostar", codes: ["AEST"], names: ["AEROSTAR"] },
+  { asset: "boeing-b737", codes: ["B736", "B737", "B738", "B739", "B37M", "B38M", "B39M", "B3XM"], names: ["737"] },
+  { asset: "boeing-b777", codes: ["B772", "B773", "B77L", "B77W", "B778", "B779"], names: ["777"] },
+  { asset: "beech-king-air", codes: ["BE20", "B350"], names: ["KING AIR", "B350"] },
+  { asset: "beech-sierra", codes: ["BE24"], names: ["SIERRA", "C24R"] },
+  { asset: "beech-bonanza", codes: ["BE36"], names: ["BONANZA"] },
+  { asset: "beech-baron", codes: ["BE58"], names: ["BARON"] },
+  { asset: "beech-duke", codes: ["BE60"], names: ["DUKE"] },
+  { asset: "britten-norman-bn2", codes: ["BN2A", "BN2P"], names: ["BN-2", "ISLANDER"] },
+  { asset: "cessna-c172", codes: ["C172"], names: ["C172", "SKYHAWK"] },
+  { asset: "cessna-cj4", codes: ["C25C"], names: ["CJ4", "525C"] },
+  { asset: "cessna-c414", codes: ["C414"], names: ["C414", "CHANCELLOR"] },
+  { asset: "diamond-da42", codes: ["DA42"], names: ["DA42"] },
+  { asset: "diamond-da62", codes: ["DA62"], names: ["DA62"] },
+  { asset: "fokker-f28", codes: ["F28"], names: ["F28", "FELLOWSHIP"] },
+  { asset: "focke-wulf-fw190", codes: ["FW19"], names: ["FW190", "FW 190"] },
+  { asset: "bombardier-learjet35", codes: ["LJ35"], names: ["LEARJET 35", "LEAR 35"] },
+  { asset: "north-american-p51", codes: ["P51"], names: ["P-51", "MUSTANG"] },
+  { asset: "piper-pa24", codes: ["PA24"], names: ["PA-24", "COMANCHE"] },
+  { asset: "pilatus-pc12", codes: ["PC12"], names: ["PC-12", "PC12"] },
+  { asset: "pilatus-pc6", codes: ["PC6T"], names: ["PC-6", "PORTER"] },
+  { asset: "bae-avro-rj", codes: ["B461", "B462", "B463", "RJ70", "RJ85", "RJ1H"], names: ["AVRO RJ", "BAE 146"] },
+  { asset: "cirrus-sf50", codes: ["SF50"], names: ["VISION JET", "SF50"] },
+  { asset: "daher-tbm930", codes: ["TBM9"], names: ["TBM 930", "TBM930", "TBM 900"] },
+];
+
+function aircraftPhotoAsset(plan) {
+  const code = String(plan.aircraft || "").trim().toUpperCase();
+  const name = String(plan.aircraft_name || "").trim().toUpperCase();
+  return AIRCRAFT_PHOTO_RULES.find(rule => (
+    rule.codes.includes(code) || rule.names.some(token => name.includes(token))
+  ))?.asset || "";
+}
+
+let aircraftPhotoReturnFocus = null;
+
+function openAircraftPhoto(photo, label, returnFocus) {
+  const dialog = $("aircraft-photo-dialog");
+  const large = $("aircraft-photo-large");
+  large.src = photo.currentSrc || photo.src;
+  large.alt = label;
+  $("aircraft-photo-caption").textContent = label;
+  aircraftPhotoReturnFocus = returnFocus;
+  dialog.showModal();
+  $("aircraft-photo-close").focus();
+}
+
+function aircraftVisual(plan) {
+  const visual = el("div", "aircraft-photo");
+  const mark = el("div", "aircraft-mark", plan.aircraft || "—");
+  const photo = document.createElement("img");
+  photo.alt = "";
+  photo.loading = "eager";
+  photo.decoding = "async";
+  photo.classList.add("hidden");
+  visual.append(mark, photo);
+
+  const community = `/api/aircraft/photo?icao=${encodeURIComponent(plan.aircraft || "")}`
+    + `&name=${encodeURIComponent(plan.aircraft_name || "")}`;
+  const asset = aircraftPhotoAsset(plan);
+  const sources = [asset ? `/static/aircraft/${asset}.jpg` : "", community].filter(Boolean);
+  const loadNext = () => {
+    const source = sources.shift();
+    if (!source) return;
+    photo.src = source;
+  };
+  photo.addEventListener("load", () => {
+    photo.classList.remove("hidden");
+    mark.classList.add("hidden");
+    const label = plan.aircraft_name || plan.aircraft || t("acf_unknown_type");
+    visual.classList.add("has-photo");
+    visual.tabIndex = 0;
+    visual.setAttribute("role", "button");
+    visual.setAttribute("aria-label", `${t("zoom_in")} · ${label}`);
+    const enlarge = () => openAircraftPhoto(photo, label, visual);
+    visual.addEventListener("click", enlarge);
+    visual.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      enlarge();
+    });
+  });
+  photo.addEventListener("error", loadNext);
+  loadNext();
+  return visual;
+}
+
 function renderAircraft(plan) {
   const panel = $("panel-aircraft");
   panel.innerHTML = "";
@@ -5452,7 +5736,6 @@ function renderAircraft(plan) {
   const unit = { KGS: "kg", LBS: "lb", kgs: "kg", lbs: "lb" }[d.units] || d.units || "";
 
   const identity = el("div", "aircraft-identity");
-  const mark = el("div", "aircraft-mark", plan.aircraft || "—");
   const title = el("div");
   title.append(el("div", "card-kicker", t("acf_kicker")));
   title.append(el("h2", null, plan.aircraft_name || plan.aircraft || t("acf_unknown_type")));
@@ -5460,7 +5743,7 @@ function renderAircraft(plan) {
   if (plan.callsign) badges.append(el("span", "badge", t("acf_flight").replace("{value}", plan.callsign)));
   if (d.registration) badges.append(el("span", "badge", d.registration));
   title.append(badges);
-  identity.append(mark, title);
+  identity.append(aircraftVisual(plan), title);
   panel.append(identity);
 
   const blocks = [
@@ -5574,6 +5857,7 @@ function officialProviderName(data) {
   if (data?.provider === "faa") return "FAA";
   if (data?.provider === "enaire") return "ENAIRE";
   if (data?.provider === "lvnl") return "LVNL";
+  if (data?.provider === "chartfox") return "ChartFox";
   return String(data?.provider || "AIS").toUpperCase();
 }
 
@@ -5689,10 +5973,13 @@ function siaApproachCard(plan) {
   return wrapper;
 }
 
-function fetchOfficialAirport(icao) {
-  const key = String(icao || "").toUpperCase();
+function fetchOfficialAirport(icao, source = "auto") {
+  const airport = String(icao || "").toUpperCase();
+  const key = `${airport}:${source}`;
   if (officialAirportRequests.has(key)) return officialAirportRequests.get(key);
-  const request = fetch(`/api/charts/airport/${encodeURIComponent(key)}`).then(async (response) => {
+  const request = fetch(
+    `/api/charts/airport/${encodeURIComponent(airport)}?source=${encodeURIComponent(source)}`
+  ).then(async (response) => {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || t("chart_catalogue_unavailable"));
     return payload;
@@ -5754,20 +6041,45 @@ function preferredOfficialChartIndex(charts, role, airport) {
   );
 }
 
-function officialAirportLibrary(icao, role, airport, plan) {
+function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
   const roleLabel = t(role === "departure" ? "departure" : "arrival");
   const card = el("article", "sia-airport-library");
   const head = el("div", "sia-library-head");
   const heading = el("div");
   heading.append(el("div", "card-kicker", roleLabel), el("h2", null, icao));
   const status = el("span", "badge", t("chart_loading"));
-  head.append(heading, status);
+  const sourceField = el("label", "field chart-source-field");
+  sourceField.append(el("span", null, t("chart_source")));
+  const sourceSelect = el("select");
+  for (const [value, label] of [
+    ["auto", t("chartfox_source_auto")],
+    ["official", t("chartfox_source_official")],
+    ["chartfox", t("chartfox_source_chartfox")],
+  ]) {
+    const option = el("option", null, label);
+    option.value = value;
+    option.disabled = value === "chartfox" && !latestStatus?.chartfox_connected;
+    sourceSelect.append(option);
+  }
+  sourceSelect.value = source;
+  sourceSelect.addEventListener("change", () => {
+    card.replaceWith(officialAirportLibrary(
+      icao, role, airport, plan, sourceSelect.value
+    ));
+  });
+  sourceField.append(sourceSelect);
+  head.append(heading, sourceField, status);
   card.append(head, el("p", "stat-note", t("chart_searching")));
 
-  fetchOfficialAirport(icao).then((data) => {
+  fetchOfficialAirport(icao, source).then((data) => {
     if (currentPlan !== plan) return;
     card.replaceChildren(head);
-    status.textContent = `${officialProviderName(data)} · AIRAC ${data.effective_date}`;
+    status.textContent = data.effective_date
+      ? `${officialProviderName(data)} · AIRAC ${data.effective_date}`
+      : officialProviderName(data);
+    if (data.provider === "chartfox") {
+      card.append(el("p", "chartfox-credit", t("chartfox_credit")));
+    }
     if (!data.charts.length) {
       card.append(el("p", "stat-note", t("chart_none")));
       return;
@@ -5793,21 +6105,40 @@ function officialAirportLibrary(icao, role, airport, plan) {
     field.append(select);
 
     const actions = el("div", "sia-document-actions");
+    const officialFallback = el("button", "btn-primary hidden", t("chartfox_use_official"));
+    officialFallback.type = "button";
     const display = el("button", "btn-primary", t("chart_show_pdf"));
     display.type = "button";
     const external = el("a", "icon-btn", t("chart_open_tab"));
     external.target = "_blank";
     external.rel = "noopener";
-    actions.append(display, external);
+    actions.append(officialFallback, display, external);
     controls.append(field, actions);
 
     const availability = el("p", "stat-note");
     const frame = el("iframe", "sia-document-frame hidden");
     frame.loading = "lazy";
+    let accessGeneration = 0;
+    let frameObjectUrl = "";
 
-    const updateSelection = () => {
+    const closeFrame = () => {
+      frame.classList.add("hidden");
+      frame.removeAttribute("src");
+      card.classList.remove("pdf-open");
+      if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
+      frameObjectUrl = "";
+    };
+
+    const updateSelection = async () => {
+      const generation = ++accessGeneration;
       const chart = data.charts[Number(select.value)];
-      external.href = chart.pdf_url;
+      external.href = chart.external_url || chart.pdf_url;
+      external.textContent = t("chart_open_tab");
+      external.className = "icon-btn";
+      show(officialFallback, false);
+      show(display, true);
+      display.disabled = false;
+      closeFrame();
       setSiaMapCandidate(role, icao, {
         provider: data.provider,
         source: data.source,
@@ -5817,19 +6148,93 @@ function officialAirportLibrary(icao, role, airport, plan) {
       availability.textContent = chart.georeferenced
         ? tf("chart_overlay_available", { role: roleLabel.toLowerCase(), icao })
         : tf("chart_overlay_missing", { provider: officialProviderName(data) });
-      if (!frame.classList.contains("hidden")) {
-        frame.src = chart.pdf_url;
-        frame.title = tf("chart_frame_title", {
-          provider: officialProviderName(data),
-          title: chart.title,
+
+      if (data.provider !== "chartfox") return;
+      display.disabled = true;
+      availability.textContent = t("chartfox_checking_access");
+      try {
+        const query = new URLSearchParams({
+          provider: "chartfox",
+          icao,
+          chart: chart.id,
         });
+        const response = await fetch(`/api/charts/access?${query}`);
+        const access = await response.json();
+        if (!response.ok) {
+          throw new Error(access.detail || t("chartfox_access_unavailable"));
+        }
+        if (generation !== accessGeneration) return;
+        if (!access.can_embed) {
+          show(display, false);
+          external.textContent = t("chartfox_open_external");
+          if (data.official_available) {
+            officialFallback.textContent = tf("chartfox_use_official_provider", {
+              provider: officialProviderName({ provider: data.official_provider }),
+            });
+            show(officialFallback, true);
+            availability.textContent = access.requires_preauth
+              ? t("chartfox_preauth_official_available")
+              : t("chartfox_iframe_official_available");
+          } else {
+            external.className = "btn-primary";
+            availability.textContent = access.requires_preauth
+              ? t("chartfox_preauth_required")
+              : t("chartfox_iframe_blocked");
+          }
+          return;
+        }
+        availability.textContent = chart.georeferenced
+          ? tf("chart_overlay_available", { role: roleLabel.toLowerCase(), icao })
+          : tf("chart_overlay_missing", { provider: officialProviderName(data) });
+      } catch (error) {
+        if (generation !== accessGeneration) return;
+        show(display, false);
+        external.textContent = t("chartfox_open_external");
+        external.className = "btn-primary";
+        availability.textContent = String(error.message || error);
+      } finally {
+        if (generation === accessGeneration) display.disabled = false;
       }
     };
+    officialFallback.addEventListener("click", () => {
+      card.replaceWith(officialAirportLibrary(icao, role, airport, plan, "official"));
+    });
     select.addEventListener("change", updateSelection);
-    display.addEventListener("click", () => {
+    display.addEventListener("click", async () => {
       const chart = data.charts[Number(select.value)];
+      display.disabled = true;
+      display.textContent = t("chart_loading");
+      if (data.provider === "chartfox") {
+        try {
+          const response = await fetch(chart.pdf_url);
+          if (!response.ok) {
+            let message = t("chart_unavailable");
+            try {
+              const payload = await response.json();
+              message = payload.detail || message;
+            } catch (_error) {
+              // Une réponse non JSON garde le message générique localisé.
+            }
+            throw new Error(message);
+          }
+          if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
+          frameObjectUrl = URL.createObjectURL(await response.blob());
+          frame.src = frameObjectUrl;
+        } catch (error) {
+          closeFrame();
+          availability.textContent = String(error.message || error);
+          external.textContent = t("chartfox_open_external");
+          return;
+        } finally {
+          display.disabled = false;
+          display.textContent = t("chart_show_pdf");
+        }
+      } else {
+        frame.src = chart.pdf_url;
+        display.disabled = false;
+        display.textContent = t("chart_show_pdf");
+      }
       card.classList.add("pdf-open");
-      frame.src = chart.pdf_url;
       frame.title = tf("chart_frame_title", {
         provider: officialProviderName(data),
         title: chart.title,
@@ -5855,7 +6260,19 @@ function renderOfficialCharts(plan) {
     el("h2", null, t("chart_title"))
   );
   intro.append(title);
-  panel.append(intro, el("p", "stat-note", t("chart_intro")));
+  const chartfoxAccountNote = el("p", "stat-note chartfox-account-note");
+  const chartfoxSettingsLink = el("button", "chartfox-settings-link", t("settings"));
+  chartfoxSettingsLink.type = "button";
+  chartfoxSettingsLink.addEventListener("click", openSettings);
+  chartfoxAccountNote.append(
+    document.createTextNode(`${t("chartfox_account_required")} `),
+    chartfoxSettingsLink
+  );
+  panel.append(
+    intro,
+    el("p", "stat-note", t("chart_intro")),
+    chartfoxAccountNote
+  );
   const grid = el("div", "sia-library-grid");
   for (const [role, airport] of [
     ["departure", plan.departure],
@@ -7059,7 +7476,7 @@ function weatherAirport(report, kicker) {
     for (const item of report.phenomena) {
       const chip = el("span", "wx-phenomenon");
       chip.append(el("strong", null, item.code));
-      chip.append(document.createTextNode(` ${item.label}`));
+      chip.append(document.createTextNode(` ${phenomenonLabel(item)}`));
       row.append(chip);
     }
     card.append(row);
@@ -7067,7 +7484,7 @@ function weatherAirport(report, kicker) {
 
   if (report.notes?.length) {
     const list = el("ul", "wx-notes");
-    for (const note of report.notes) list.append(el("li", null, note));
+    for (const note of report.notes) list.append(el("li", null, weatherNote(note)));
     card.append(list);
   }
 
@@ -7146,7 +7563,7 @@ function weatherEnroute(enroute) {
 
   if (enroute.notes?.length) {
     const list = el("ul", "wx-notes");
-    for (const note of enroute.notes) list.append(el("li", null, note));
+    for (const note of enroute.notes) list.append(el("li", null, weatherNote(note)));
     card.append(list);
   }
   return card;
@@ -7398,9 +7815,19 @@ $("ground-alarm").addEventListener("click", () => toggleTaxiAlarmSound());
 $("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
 $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
+$("chartfox-connect").addEventListener("click", connectChartFox);
+$("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);
 $("changelog-open").addEventListener("click", openChangelog);
 $("changelog-close").addEventListener("click", () => $("changelog-dialog").close());
+$("aircraft-photo-close").addEventListener("click", () => $("aircraft-photo-dialog").close());
+$("aircraft-photo-dialog").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
+$("aircraft-photo-dialog").addEventListener("close", () => {
+  aircraftPhotoReturnFocus?.focus();
+  aircraftPhotoReturnFocus = null;
+});
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);

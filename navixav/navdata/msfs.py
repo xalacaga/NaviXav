@@ -163,8 +163,8 @@ class MsfsProvider:
             # consultation coûterait plus cher que les noms de voies manquants.
             self._stale_ground.add(key)
             LOGGER.info(
-                "Simulateur injoignable : le tracé au sol d'un aérodrome reste "
-                "celui d'une version antérieure"
+                "Simulateur injoignable : les données d'un aérodrome restent "
+                "celles d'une version antérieure"
             )
             return False
         msfs_store.store_airport(self._conn, extracted)
@@ -188,11 +188,12 @@ class MsfsProvider:
         return row is not None
 
     def _ground_is_stale(self, icao: str) -> bool:
-        """Le terrain a-t-il été importé avant la géométrie du sol actuelle ?
+        """Le terrain a-t-il été importé par une extraction antérieure ?
 
         Un terrain périmé est repris dès que le simulateur est joignable ; sans
-        lui, il resterait dépourvu des noms de voies jusqu'à un import manuel.
-        Une seule reprise suffit : elle inscrit la version courante.
+        lui, il garderait les manques de la version qui l'a importé — noms de
+        voies absents, SID sans tracé — jusqu'à un import manuel. Une seule
+        reprise suffit : elle inscrit la version courante.
         """
         row = self._conn.execute(
             "SELECT ground_version FROM airport WHERE icao = ?", (icao,)
@@ -293,6 +294,23 @@ class MsfsProvider:
                 (row["id"], *wanted),
             ).fetchall()
         )
+
+        # Les branches de piste restent hors de `transitions` pour la raison
+        # ci-dessus, mais le moteur connaît la piste retenue et doit pouvoir
+        # les relire : sans elles, une SID dont tout le tracé est réparti par
+        # piste n'aurait aucun segment.
+        runway_transitions = tuple(
+            Transition(
+                ident=entry["ident"],
+                transition_type=entry["kind"],
+                legs=self._legs(row["id"], transition_id=entry["id"]),
+            )
+            for entry in self._conn.execute(
+                "SELECT * FROM transition WHERE procedure_id = ? "
+                "AND kind = 'RUNWAY' ORDER BY ident",
+                (row["id"],),
+            ).fetchall()
+        )
         runways = tuple(
             normalise_runway(name) for name in json.loads(row["runways"] or "[]")
         )
@@ -307,6 +325,7 @@ class MsfsProvider:
             runways=runways or tuple(r.name for r in self.runways(row["icao"])),
             legs=legs,
             transitions=transitions,
+            runway_transitions=runway_transitions,
             requires_rnp=bool(row["requires_rnp"]),
             missed_altitude_ft=row["missed_altitude_ft"],
         )

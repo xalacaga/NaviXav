@@ -13,6 +13,7 @@ Copy-Item -LiteralPath (Join-Path $ProjectRoot "LICENSE") -Destination $Destinat
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "COMMERCIAL_LICENSE.md") -Destination $Destination -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "NOTICE") -Destination $Destination -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES") -Destination $Destination -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "AIRCRAFT_PHOTO_CREDITS.md") -Destination $Destination -Force
 
 $Distributions = @(
     "annotated_doc", "annotated_types", "anyio", "bottle", "certifi", "cffi",

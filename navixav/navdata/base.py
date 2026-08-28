@@ -101,6 +101,7 @@ class Procedure:
     runways: tuple[str, ...]
     legs: tuple[ProcedureLeg, ...] = ()
     transitions: tuple[Transition, ...] = ()
+    runway_transitions: tuple[Transition, ...] = ()
     has_gps_overlay: bool = False
     ils_ident: str | None = None
     requires_rnp: bool = False
@@ -179,6 +180,22 @@ class Procedure:
     def find_transition(self, ident: str) -> Transition | None:
         for transition in self.transitions:
             if transition.ident == ident:
+                return transition
+        return None
+
+    def find_runway_transition(self, runway_name: str | None) -> Transition | None:
+        """Branche propre à une piste, hors des transitions du plan de vol.
+
+        Une SID diverge par piste avant de rejoindre une fin commune, une STAR
+        fait l'inverse : cette branche porte les segments que le tronc commun
+        ne peut pas décrire. Elle se nomme d'après la piste, jamais d'après un
+        repère, et reste donc en dehors de `transitions`.
+        """
+        if not runway_name:
+            return None
+        wanted = _normalise_runway(runway_name)
+        for transition in self.runway_transitions:
+            if _normalise_runway(transition.ident) == wanted:
                 return transition
         return None
 

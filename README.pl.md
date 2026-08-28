@@ -214,6 +214,19 @@ Kraj jest dodawany do listy automatycznej dopiero po zatwierdzeniu
 bezpośredniego i stabilnego dostępu do jego oficjalnych plików PDF. Brakujące
 źródło nigdy nie jest więc po cichu zastępowane agregatorem zewnętrznym.
 
+ChartFox jest dostępny jako opcjonalne źródło na tej samej karcie **Mapy**.
+Połącz konto ChartFox/VATSIM w **Ustawieniach**, a następnie wybierz ChartFox dla
+lotniska odlotu lub przylotu. Logowanie odbywa się w przeglądarce systemowej
+przez OAuth 2.0 z PKCE; NaviXav nigdy nie prosi o dane logowania VATSIM i chroni
+token użytkownika lokalnie za pomocą Windows DPAPI. Dokumenty są pobierane na
+żądanie, nie są zapisywane na dysku, służą wyłącznie do symulacji i zachowują
+oznaczenie „Chart data powered by ChartFox”. Warstwy ChartFox pozostają
+wyłączone, dopóki NaviXav nie otrzyma zakresu `charts:geos`.
+Gdy źródło zabrania osadzania, NaviXav wyjaśnia ograniczenie i udostępnia stronę
+mapy w ChartFox zamiast wyświetlać pusty podgląd.
+Jeśli lotnisko obsługuje krajowy łącznik, NaviXav najpierw proponuje przełączenie
+karty na oficjalny katalog i pozostanie w aplikacji.
+
 ## Wymagania
 
 - Windows 10 lub Windows 11 w wersji 64-bitowej;

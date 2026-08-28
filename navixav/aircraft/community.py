@@ -160,6 +160,28 @@ class InstalledAircraft:
         parts = [p for p in (self.manufacturer, self.model) if p]
         return " ".join(parts) or (self.titles[0] if self.titles else self.directory.name)
 
+    @property
+    def thumbnail(self) -> Path | None:
+        """Vignette fournie par le paquet MSFS, sans sortir de son dossier avion."""
+        folders = [self.directory]
+        try:
+            folders.extend(
+                child for child in self.directory.iterdir()
+                if child.is_dir() and child.name.lower().startswith("texture")
+            )
+        except OSError:
+            pass
+        for folder in folders:
+            try:
+                files = {item.name.lower(): item for item in folder.iterdir() if item.is_file()}
+            except OSError:
+                continue
+            for name in ("thumbnail.jpg", "thumbnail.jpeg", "thumbnail.png"):
+                candidate = files.get(name)
+                if candidate is not None:
+                    return candidate
+        return None
+
 
 def _read_config(path: Path) -> dict[str, list[str]]:
     """Valeurs qui nous intéressent, toutes occurrences gardées."""

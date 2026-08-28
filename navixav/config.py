@@ -25,7 +25,7 @@ DEFAULT_APPROACH_PREFERENCE = (
 )
 DEFAULT_MAP_BASEMAP = "osm"
 DEFAULT_MAP_TRAIL_COLOR = "#22d3ee"
-MAP_BASEMAPS = {"osm", "opentopo", "carto_light", "carto_dark"}
+MAP_BASEMAPS = {"osm", "opentopo"}
 
 # Vitesses de roulage. Aucun règlement n'en fixe une valeur universelle : les
 # consignes d'exploitation tournent autour de 25 kt en ligne droite et de 10 kt

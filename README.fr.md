@@ -179,9 +179,8 @@ La carte comprend :
 - le zoom, le déplacement et l’ajustement au terrain ou à la route ;
 - la trace complète réellement parcourue, conservée du départ à l’arrivée ;
 - une couleur de trace personnalisable ;
-- le choix entre OpenStreetMap Standard, OpenTopoMap, CartoDB Positron (clair)
-  et CartoDB Dark Matter (sombre, cockpit), directement depuis la barre de la
-  carte ou depuis les paramètres.
+- le choix entre OpenStreetMap Standard et OpenTopoMap, directement depuis la
+  barre de la carte ou depuis les paramètres.
 
 ### Roulage au sol
 
@@ -255,6 +254,20 @@ direct et stable à ses PDF officiels. Une source absente n’est donc jamais
 remplacée silencieusement par un agrégateur tiers.
 Le portail skeyes peut répondre `HTTP 403` aux accès automatisés : dans ce cas,
 NaviXav signale simplement l’indisponibilité et ne cherche aucune autre source.
+
+ChartFox est disponible comme source facultative dans le même onglet **Cartes**.
+Reliez votre compte ChartFox/VATSIM depuis les **Paramètres**, puis choisissez
+ChartFox pour l’aérodrome de départ ou d’arrivée. L’identification utilise le
+navigateur système et OAuth 2.0 avec PKCE : NaviXav ne demande jamais les
+identifiants VATSIM et protège localement le jeton utilisateur avec Windows
+DPAPI. Les documents ChartFox sont chargés à la demande, ne sont pas conservés
+sur disque, restent réservés à la simulation et affichent l’attribution requise
+« Chart data powered by ChartFox ». Les calques ChartFox resteront désactivés
+tant que NaviXav ne disposera pas du scope `charts:geos`.
+Lorsqu’une source interdit l’affichage intégré, NaviXav explique la restriction
+et propose la page ChartFox de la carte au lieu d’afficher un lecteur vide.
+Si un connecteur national couvre cet aérodrome, NaviXav propose d’abord de
+basculer la fiche vers le catalogue officiel et de rester dans l’application.
 
 ## Prérequis
 
@@ -438,8 +451,7 @@ après avoir généré ou modifié un vol dans SimBrief.
 
 - **Fond carte** : affiche ou masque le fond libre sélectionné.
 - **Sélecteur de fond** : bascule directement sur la carte entre OpenStreetMap
-  Standard, OpenTopoMap, CartoDB Positron (clair) et CartoDB Dark Matter
-  (sombre, cockpit). Le choix est enregistré dans les paramètres.
+  Standard et OpenTopoMap. Le choix est enregistré dans les paramètres.
 - **Paramètres** : reprend le même choix de fond et la couleur de la trace
   complète du vol.
 - **Calque officiel** : apparaît uniquement pour la fiche géoréférencée de

@@ -213,6 +213,19 @@ Een land wordt pas aan de automatische lijst toegevoegd nadat directe en
 stabiele toegang tot zijn officiële PDF's is gevalideerd. Een ontbrekende bron
 wordt dus nooit stilzwijgend vervangen door een externe aggregator.
 
+ChartFox is als optionele bron beschikbaar in hetzelfde tabblad **Kaarten**.
+Koppel je ChartFox-/VATSIM-account via **Instellingen** en kies daarna ChartFox
+voor vertrek of aankomst. De aanmelding gebruikt de systeembrowser en OAuth 2.0
+met PKCE; NaviXav vraagt nooit om VATSIM-inloggegevens en beschermt het
+gebruikerstoken lokaal met Windows DPAPI. Documenten worden alleen op verzoek
+geladen, niet op schijf bewaard, zijn uitsluitend voor vluchtsimulatie en
+behouden de vermelding “Chart data powered by ChartFox”. ChartFox-lagen blijven
+uitgeschakeld totdat NaviXav de scope `charts:geos` krijgt.
+Wanneer een bron insluiting verbiedt, legt NaviXav de beperking uit en biedt het
+de ChartFox-pagina van de kaart aan in plaats van een lege viewer.
+Als een nationale connector de luchthaven dekt, biedt NaviXav eerst aan om de
+kaart naar de officiële catalogus om te schakelen en in de toepassing te blijven.
+
 ## Vereisten
 
 - Windows 10 of Windows 11, 64-bit;

@@ -174,9 +174,8 @@ The map includes:
 - zoom, panning and fitting to the airport or the route;
 - the complete track actually flown from departure to arrival;
 - a customisable flight-track colour;
-- a choice between OpenStreetMap Standard, OpenTopoMap, CartoDB Positron
-  (light) and CartoDB Dark Matter (dark, cockpit), straight from the map bar or
-  from Settings.
+- a choice between OpenStreetMap Standard and OpenTopoMap, straight from the map
+  bar or from Settings.
 
 ### Ground taxiing
 
@@ -245,6 +244,19 @@ its official PDFs has been validated. A missing source is therefore never
 silently replaced by a third-party aggregator.
 The skeyes portal may return `HTTP 403` to automated access. In that case,
 NaviXav reports the source as unavailable and does not try another provider.
+
+ChartFox is available as an optional source in the same **Charts** tab. Connect
+your ChartFox/VATSIM account from **Settings**, then choose ChartFox for the
+departure or arrival airport. Authentication uses the system browser and OAuth
+2.0 with PKCE; NaviXav never asks for VATSIM credentials and protects the user
+token locally with Windows DPAPI. ChartFox documents are retrieved on demand,
+are not stored on disk, are for flight simulation only and retain the required
+“Chart data powered by ChartFox” attribution. ChartFox overlays remain disabled
+until NaviXav is granted the `charts:geos` scope.
+When a publication source forbids embedding, NaviXav explains the restriction
+and opens the chart through its ChartFox page instead of showing a blank viewer.
+If a national connector covers that airport, NaviXav first offers to switch the
+card to the official catalogue and keep reading entirely inside the application.
 
 ## Requirements
 
@@ -426,8 +438,7 @@ generating or modifying a flight in SimBrief.
 
 - **Map background**: shows or hides the selected open-source map.
 - **Base-map picker**: switches straight from the map between OpenStreetMap
-  Standard, OpenTopoMap, CartoDB Positron (light) and CartoDB Dark Matter
-  (dark, cockpit). The choice is saved into the settings.
+  Standard and OpenTopoMap. The choice is saved into the settings.
 - **Settings**: offers the same base-map choice and the colour of the complete
   flight track.
 - **Official overlay**: appears only for the georeferenced chart of the

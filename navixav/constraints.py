@@ -178,23 +178,38 @@ def procedure_constraints(
     procedure: Procedure,
     transition_ident: str | None = None,
     transition_first: bool = False,
+    runway_ident: str | None = None,
 ) -> list[ConstraintRow]:
     """Contraintes d'une procédure, transition publiée incluse.
 
     `transition_first` place les segments de la transition avant ceux de la
     procédure : c'est l'ordre de survol d'une STAR ou d'une approche, alors
     qu'une transition de SID se parcourt après.
+
+    `runway_ident` ajoute la branche propre à la piste retenue, du côté où la
+    procédure diverge : au début pour une SID, en finale pour une STAR.
     """
+    legs = _ordered_legs(procedure, transition_ident, transition_first, runway_ident)
+    return rows_from_legs(legs)
+
+
+def _ordered_legs(
+    procedure: Procedure,
+    transition_ident: str | None,
+    transition_first: bool,
+    runway_ident: str | None,
+) -> list[ProcedureLeg]:
+    """Segments d'une procédure dans l'ordre de survol."""
     transition: Transition | None = (
         procedure.find_transition(transition_ident) if transition_ident else None
     )
     transition_legs: Sequence[ProcedureLeg] = transition.legs if transition else ()
+    runway = procedure.find_runway_transition(runway_ident)
+    runway_legs: Sequence[ProcedureLeg] = runway.legs if runway else ()
 
     if transition_first:
-        legs = [*transition_legs, *procedure.legs]
-    else:
-        legs = [*procedure.legs, *transition_legs]
-    return rows_from_legs(legs)
+        return [*transition_legs, *procedure.legs, *runway_legs]
+    return [*runway_legs, *procedure.legs, *transition_legs]
 
 
 def procedure_path(
@@ -202,16 +217,10 @@ def procedure_path(
     transition_ident: str | None = None,
     transition_first: bool = False,
     position_lookup: Callable[[str], tuple[float, float] | None] | None = None,
+    runway_ident: str | None = None,
 ) -> list[dict[str, object]]:
     """Points géographiques ordonnés d'une procédure et de sa transition."""
-    transition: Transition | None = (
-        procedure.find_transition(transition_ident) if transition_ident else None
-    )
-    transition_legs: Sequence[ProcedureLeg] = transition.legs if transition else ()
-    if transition_first:
-        legs = [*transition_legs, *procedure.legs]
-    else:
-        legs = [*procedure.legs, *transition_legs]
+    legs = _ordered_legs(procedure, transition_ident, transition_first, runway_ident)
 
     path: list[dict[str, object]] = []
     for leg in legs:

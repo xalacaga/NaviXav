@@ -384,15 +384,20 @@ class CompletionEngine:
 
         selected = _find_by_ident(sids, block.sid.value) if block.sid.value else None
         if selected is not None:
-            # La transition d'une SID se parcourt après la procédure.
+            # La transition d'une SID se parcourt après la procédure ; la
+            # branche de la piste retenue, elle, la précède.
             block.sid_constraints = procedure_constraints(
-                selected, block.sid_transition.value, transition_first=False
+                selected,
+                block.sid_transition.value,
+                transition_first=False,
+                runway_ident=runway_name,
             )
             block.sid_path = procedure_path(
                 selected,
                 block.sid_transition.value,
                 transition_first=False,
                 position_lookup=self._airport_lookup(icao),
+                runway_ident=runway_name,
             )
         return block
 
@@ -596,15 +601,20 @@ class CompletionEngine:
                 _find_by_ident(stars, block.star.value) if block.star.value else None
             )
             if selected_star is not None:
-                # Une transition de STAR précède la procédure.
+                # Une transition de STAR précède la procédure ; la branche de
+                # la piste retenue la termine.
                 block.star_constraints = procedure_constraints(
-                    selected_star, block.star_transition.value, transition_first=True
+                    selected_star,
+                    block.star_transition.value,
+                    transition_first=True,
+                    runway_ident=runway_name,
                 )
                 block.star_path = procedure_path(
                     selected_star,
                     block.star_transition.value,
                     transition_first=True,
                     position_lookup=self._airport_lookup(icao),
+                    runway_ident=runway_name,
                 )
         else:
             self._warn(f"Aucune STAR publiée pour {icao} dans la base.")

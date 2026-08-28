@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import html
 import ipaddress
 import logging
 import math
+import re
 import socket
 import time
 from contextlib import asynccontextmanager
@@ -20,17 +22,18 @@ from typing import Any, AsyncIterator
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from navixav import __version__
 from navixav.aircraft import AircraftMatcher
-from navixav.aircraft.community import community_folders, survey
+from navixav.aircraft.community import community_folders, scan, survey
 from navixav.aircraft.scaffold import write_entry
 from navixav.aircraft.procedures import procedure_payload
 from navixav.changelog import load_changelog
 from navixav.chart import EARTH_RADIUS_M, build_chart
+from navixav.chartfox import ChartFoxClient, ChartFoxError
 from navixav.ground import (
     DEPARTURE,
     GroundError,
@@ -119,9 +122,7 @@ class SettingsRequest(BaseModel):
     max_crosswind_kt: int = Field(default=35, ge=0, le=100)
     min_runway_length_ft: int = Field(default=0, ge=0, le=30000)
     aircraft_rnp_capable: bool = True
-    map_basemap: str = Field(
-        default="osm", pattern="^(osm|opentopo|carto_light|carto_dark)$"
-    )
+    map_basemap: str = Field(default="osm", pattern="^(osm|opentopo)$")
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
     taxi_speed_limit_kt: int = Field(default=25, ge=1, le=60)
     taxi_turn_speed_limit_kt: int = Field(default=10, ge=1, le=60)
@@ -166,7 +167,10 @@ def _local_ipv4() -> str | None:
     return None
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    chartfox_client: ChartFoxClient | None = None,
+) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
     tracker = LiveTracker()
@@ -176,6 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         source.provider: NationalAipClient(source)
         for source in NATIONAL_AIP_SOURCES
     }
+    chartfox = chartfox_client or ChartFoxClient()
     demo_state: dict[str, Any] = {}
     current_plan_state: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
@@ -192,6 +197,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tracker.close()
         sia.session.close()
         faa.session.close()
+        chartfox.close()
         for client in national_aip.values():
             client.session.close()
 
@@ -228,7 +234,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "sur le PC.",
                     status_code=403,
                 )
-            if request.url.path in {
+            chartfox_chart_request = request.url.path.startswith("/api/charts/") and (
+                request.query_params.get("source") == "chartfox"
+                or request.query_params.get("provider") == "chartfox"
+            )
+            if request.url.path.startswith("/api/chartfox/") or chartfox_chart_request or request.url.path == (
+                "/oauth/chartfox/callback"
+            ) or request.url.path in {
                 "/api/settings",
                 "/api/aircraft/survey",
                 "/api/aircraft/select-folder",
@@ -337,6 +349,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "taxi_speed_limit_kt": settings.taxi_speed_limit_kt,
             "taxi_turn_speed_limit_kt": settings.taxi_turn_speed_limit_kt,
             "taxi_speed_alarm_sound": settings.taxi_speed_alarm_sound,
+            "chartfox_connected": bool(chartfox.status().get("connected")),
             "navdata": navdata,
         }
 
@@ -344,6 +357,61 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_settings() -> dict[str, object]:
         values = settings.user_values()
         return values
+
+    @app.get("/api/chartfox/status")
+    def chartfox_status() -> dict[str, Any]:
+        return chartfox.status()
+
+    @app.post("/api/chartfox/connect")
+    def chartfox_connect(request: Request) -> dict[str, Any]:
+        if request.headers.get("X-NaviXav-ChartFox") != "connect":
+            raise HTTPException(403, "Confirmation de connexion absente.")
+        port = request.url.port or 8765
+        if port < 8765 or port > 8775:
+            raise HTTPException(409, "Port de callback ChartFox non enregistré.")
+        redirect_uri = f"http://127.0.0.1:{port}/oauth/chartfox/callback"
+        authorization_url = chartfox.begin_authorization(redirect_uri)
+        callback = getattr(app.state, "request_open_chartfox_auth", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "La connexion ChartFox est disponible dans l'application Windows.",
+            )
+        callback(authorization_url)
+        return {"opened": True}
+
+    @app.get("/oauth/chartfox/callback")
+    def chartfox_callback(
+        code: str = "",
+        state: str = "",
+        error: str = "",
+        error_description: str = "",
+    ) -> HTMLResponse:
+        try:
+            if error:
+                raise ChartFoxError(error_description or error)
+            chartfox.complete_authorization(code, state)
+            title = "ChartFox connecté"
+            body = "Tu peux fermer cette page et revenir dans NaviXav."
+        except ChartFoxError as exc:
+            title = "Connexion ChartFox impossible"
+            body = str(exc)
+        return HTMLResponse(
+            "<!doctype html><html lang='fr'><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{html.escape(title)}</title>"
+            "<body style='font:16px system-ui;background:#07111f;color:#e5edf7;"
+            "padding:3rem;max-width:42rem;margin:auto'>"
+            f"<h1>{html.escape(title)}</h1><p>{html.escape(body)}</p></body></html>",
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
+
+    @app.post("/api/chartfox/disconnect")
+    def chartfox_disconnect(request: Request) -> dict[str, bool]:
+        if request.headers.get("X-NaviXav-ChartFox") != "disconnect":
+            raise HTTPException(403, "Confirmation de déconnexion absente.")
+        chartfox.disconnect()
+        return {"connected": False}
 
     def aircraft_folders(explicit_path: str = "") -> list[Path]:
         raw = explicit_path.strip()
@@ -415,6 +483,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/aircraft/procedures")
     def aircraft_procedures(title: str = "") -> dict[str, object]:
         return procedure_payload(aircraft_matcher.match(title))
+
+    @app.get("/api/aircraft/photo")
+    def aircraft_photo(icao: str = "", name: str = "") -> FileResponse:
+        """Sert uniquement la vignette d'un appareil recensé dans Community."""
+        wanted_icao = icao.strip().upper()
+        wanted_words = {
+            word for word in re.findall(r"[a-z0-9]+", name.lower()) if len(word) >= 3
+        }
+        candidates: list[tuple[int, Path]] = []
+        for aircraft in scan(aircraft_folders()):
+            thumbnail = aircraft.thumbnail
+            if thumbnail is None:
+                continue
+            labels = " ".join((aircraft.label, *aircraft.titles)).lower()
+            label_words = set(re.findall(r"[a-z0-9]+", labels))
+            score = len(wanted_words & label_words)
+            if wanted_icao and aircraft.icao == wanted_icao:
+                score += 10
+            if score:
+                candidates.append((score, thumbnail))
+        if not candidates:
+            raise HTTPException(404, "Aucune vignette locale pour cet appareil.")
+        path = max(candidates, key=lambda item: item[0])[1]
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
 
     @app.get("/api/update/check")
     def check_update() -> dict[str, object]:
@@ -867,9 +959,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "charts": documents,
         }
 
-    @app.get("/api/charts/airport/{icao}")
-    def official_airport_charts(icao: str) -> dict[str, Any]:
-        airport = icao.strip().upper()
+    def official_airport_documents(airport: str) -> dict[str, Any]:
         provider, source, client, error_type = official_chart_backend(airport)
 
         try:
@@ -898,12 +988,80 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "charts": documents,
         }
 
+    def chartfox_airport_documents(airport: str) -> dict[str, Any]:
+        try:
+            charts = chartfox.list_airport_charts(airport)
+        except ChartFoxError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        documents = []
+        for chart_data in charts:
+            document = chart_data.to_dict()
+            document["provider"] = "chartfox"
+            document["pdf_url"] = "/api/charts/document?" + urlencode({
+                "provider": "chartfox",
+                "icao": airport,
+                "chart": chart_data.id,
+            })
+            documents.append(document)
+        try:
+            official_provider = official_chart_backend(airport)[0]
+        except HTTPException:
+            official_provider = ""
+        return {
+            "icao": airport,
+            "provider": "chartfox",
+            "source": "Chart data powered by ChartFox · simulation uniquement",
+            "effective_date": "",
+            "official_available": bool(official_provider),
+            "official_provider": official_provider,
+            "charts": documents,
+        }
+
+    @app.get("/api/charts/airport/{icao}")
+    def airport_charts(icao: str, source: str = "auto") -> dict[str, Any]:
+        airport = icao.strip().upper()
+        if len(airport) != 4 or not airport.isalnum():
+            raise HTTPException(400, "Code OACI invalide.")
+        selected = source.strip().lower()
+        if selected not in {"auto", "official", "chartfox"}:
+            raise HTTPException(400, "Source de cartes inconnue.")
+        if selected == "chartfox":
+            return chartfox_airport_documents(airport)
+        return official_airport_documents(airport)
+
+    @app.get("/api/charts/access")
+    def chart_access(provider: str, icao: str, chart: str) -> dict[str, bool]:
+        if provider != "chartfox":
+            return {
+                "requires_preauth": False,
+                "allows_iframe": True,
+                "can_embed": True,
+            }
+        try:
+            return chartfox.chart_access(chart, icao)
+        except ChartFoxError as exc:
+            raise HTTPException(502, str(exc)) from exc
+
     @app.get("/api/charts/document")
     def official_chart_document(
         provider: str,
         icao: str,
         chart: str,
-    ) -> FileResponse:
+    ) -> Response:
+        if provider == "chartfox":
+            try:
+                content, media_type, filename = chartfox.document(chart, icao)
+            except ChartFoxError as exc:
+                raise HTTPException(502, str(exc)) from exc
+            return Response(
+                content,
+                media_type=media_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "private, no-store",
+                    "X-Chart-Attribution": "Chart data powered by ChartFox",
+                },
+            )
         if provider == "sia":
             client = sia
             error_type = SiaError

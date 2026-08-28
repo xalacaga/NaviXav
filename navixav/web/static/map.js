@@ -24,6 +24,7 @@ const MAP = (() => {
   let trail = [];
   let route = [];
   let routeSegments = [];
+  let calculatedPoints = [];
   let dragging = null;
   let basemapVisible = true;
   let constraintsVisible = true;
@@ -43,9 +44,10 @@ const MAP = (() => {
   const MAX_TILE_CACHE = 320;
   const MAX_TILE_RADIUS = 8;
   let fitPending = false;
-  // Les tuiles CARTO sont réparties sur quatre sous-domaines pour paralléliser
-  // les téléchargements, comme le recommande leur documentation.
-  const cartoSubdomain = (x, y) => "abcd"[(Math.abs(x) + Math.abs(y)) % 4];
+  // Les fonds CARTO Positron et Dark Matter ont été retirés : leur service
+  // gratuit sans clé renvoie désormais des tuiles tatouées « API KEY
+  // REQUIRED ». Le tatouage étant peint dans une image servie en HTTP 200,
+  // aucune détection d'erreur ne pouvait le rattraper.
   const BASEMAPS = {
     osm: {
       url: (zoom, x, y) => `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`,
@@ -60,24 +62,6 @@ const MAP = (() => {
       alpha: 0.78,
       attribution: "© OpenStreetMap contributors · SRTM · OpenTopoMap",
       attributionUrl: "https://opentopomap.org/about",
-    },
-    carto_light: {
-      url: (zoom, x, y) =>
-        `https://${cartoSubdomain(x, y)}.basemaps.cartocdn.com/light_all/${zoom}/${x}/${y}.png`,
-      maxZoom: 19,
-      // Fond très clair et peu contrasté : il supporte une opacité plus forte
-      // sans masquer les pistes ni la route.
-      alpha: 0.9,
-      attribution: "© OpenStreetMap contributors © CARTO",
-      attributionUrl: "https://carto.com/attributions",
-    },
-    carto_dark: {
-      url: (zoom, x, y) =>
-        `https://${cartoSubdomain(x, y)}.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}.png`,
-      maxZoom: 19,
-      alpha: 0.92,
-      attribution: "© OpenStreetMap contributors © CARTO",
-      attributionUrl: "https://carto.com/attributions",
     },
   };
 
@@ -527,7 +511,31 @@ const MAP = (() => {
       border: css("--label-border"),
       text: css("--label-text"),
     };
+    const calculatedLabels = [];
+    for (const point of calculatedPoints) {
+      const [x, y] = toScreen(nearestX(point.x, view.centerX), point.y);
+      if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) {
+        continue;
+      }
+      const colour = css(point.kind === "tod" ? "--route-tod" : "--route-toc");
+      context.fillStyle = css("--label-bg");
+      context.strokeStyle = colour;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(x, y - 7);
+      context.lineTo(x + 7, y);
+      context.lineTo(x, y + 7);
+      context.lineTo(x - 7, y);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      calculatedLabels.push({ x, y, point, colour, constraint: null, calculated: true });
+    }
+
     const boxes = [];
+    // Les points calculés restent lisibles même lorsqu'ils tombent près d'un
+    // waypoint : leurs étiquettes réservent leur place en premier.
+    for (const label of calculatedLabels) drawRouteLabel(label, boxes, palette);
     for (const label of labels) if (label.constraint) drawRouteLabel(label, boxes, palette);
     for (const label of labels) if (!label.constraint) drawRouteLabel(label, boxes, palette);
     context.restore();
@@ -560,7 +568,7 @@ const MAP = (() => {
    * altitude lue en face du mauvais point est pire qu'une altitude absente.
    */
   function drawRouteLabel(label, boxes, palette) {
-    const { x, y, point, colour, constraint } = label;
+    const { x, y, point, colour, constraint, calculated = false } = label;
     const identFont = "650 11px 'Inter', system-ui, sans-serif";
     const constraintFont = "700 11px 'Inter', system-ui, sans-serif";
     const padding = 5;
@@ -580,7 +588,7 @@ const MAP = (() => {
     boxes.push(box);
 
     context.fillStyle = palette.background;
-    context.strokeStyle = palette.border;
+    context.strokeStyle = calculated ? colour : palette.border;
     context.lineWidth = 1;
     context.globalAlpha = 0.92;
     roundRect(box.x, box.y, width, height, 5);
@@ -591,7 +599,7 @@ const MAP = (() => {
     context.textAlign = "center";
     context.textBaseline = "top";
     context.font = identFont;
-    context.fillStyle = palette.text;
+    context.fillStyle = calculated ? colour : palette.text;
     context.fillText(point.ident, x, box.y + padding - 2);
     if (constraint) {
       context.font = constraintFont;
@@ -783,6 +791,7 @@ const MAP = (() => {
       chart = prepareChart(data);
       aircraft = null;
       routeSegments = [];
+      calculatedPoints = [];
       fitPending = true;
       fit();
     },
@@ -822,6 +831,12 @@ const MAP = (() => {
     setRouteSegments(segments) {
       routeSegments = (segments || []).filter((segment) => segment.points?.length);
       route = routeSegments.flatMap((segment) => segment.points);
+      draw();
+    },
+    setCalculatedPoints(points) {
+      calculatedPoints = (points || []).filter((point) => (
+        Number.isFinite(point?.x) && Number.isFinite(point?.y) && point.ident
+      ));
       draw();
     },
     fitRoute() {

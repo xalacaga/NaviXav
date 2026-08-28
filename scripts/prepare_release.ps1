@@ -169,6 +169,112 @@ $InstallerFooter = @{
     pl = "Instalator jest weryfikowany za pomocą sumy kontrolnej SHA-256 przed każdą automatyczną aktualizacją."
 }
 
+# Journal pour la fiche Flightsim.to.
+#
+# Le site n'accepte ni Markdown ni HTML : ses puces sont des lignes indentées,
+# et ses titres se reconnaissent à leur émoji. Le fichier reprend donc tout
+# l'historique de CHANGELOG.md dans cette présentation, prêt à être collé d'un
+# bloc — recopier une seule version obligerait à fusionner à la main, et c'est
+# là que les journaux divergent.
+#
+# Les émojis sont assemblés depuis leur point de code : Windows PowerShell 5.1
+# lit le script en Windows-1252 si le BOM venait à disparaître, et des paires
+# de substitution écrites en clair y deviendraient illisibles.
+$FsEmoji = @{
+    Log      = [char]::ConvertFromUtf32(0x1F4D1)
+    Lock     = [char]::ConvertFromUtf32(0x1F512)
+    Release  = [char]::ConvertFromUtf32(0x1F680)
+    Added    = [char]::ConvertFromUtf32(0x2728)
+    Changed  = [char]::ConvertFromUtf32(0x1F504)
+    Fixed    = [char]::ConvertFromUtf32(0x1F6E0) + [char]0xFE0F
+}
+
+# La vérification du programme d'installation vaut pour toutes les versions
+# depuis la 1.4.11 : elle est annoncée une fois en tête plutôt que répétée sous
+# chaque version, où elle noierait les nouveautés.
+$FsSecurityNote = "Security Note: Starting from version 1.4.11, the installer is systematically verified against its SHA-256 checksum before any automatic update."
+
+# Indentation qui fait une puce sur Flightsim.to.
+$FsBullet = "    "
+
+function ConvertTo-FlightsimToChangelog([string]$Markdown) {
+    $Lines = [System.Collections.Generic.List[string]]::new()
+    $Lines.Add("$($FsEmoji.Log) Changelog | NaviXav")
+    $Lines.Add("")
+    $Lines.Add("$FsBullet$($FsEmoji.Lock) $FsSecurityNote")
+
+    # La version en cours est mise de côté avant d'être écrite : une version
+    # dont il ne reste rien après filtrage ne doit pas laisser un titre seul.
+    $Block = [System.Collections.Generic.List[string]]::new()
+    $Bullets = 0
+    $Skipping = $false
+
+    foreach ($Line in ($Markdown -split "`r?`n")) {
+        $Text = $Line.TrimEnd()
+
+        if ($Text -match '^##\s+\[(?<version>[^\]]+)\]\s*-\s*(?<date>.+)$') {
+            if ($Bullets -gt 0) {
+                $Lines.Add("")
+                $Lines.AddRange($Block)
+            }
+            $Block.Clear()
+            $Bullets = 0
+            $Skipping = $false
+            $Block.Add(
+                "$($FsEmoji.Release) [$($Matches.version)] - $($Matches.date.Trim())"
+            )
+            continue
+        }
+
+        # Les versions 1.4.8 et 1.4.9 titrent leurs rubriques au niveau 2, avant
+        # que le format ne se fixe. Les deux niveaux sont donc acceptés : s'en
+        # tenir au niveau 3 rattacherait leurs puces à la version précédente.
+        if ($Text -match '^#{2,3}\s+(?<title>[A-Za-z].*)$') {
+            $Title = $Matches.title.Trim()
+            # « Changed » ne recueille que les sujets de commit, faute de texte
+            # rédigé : du vocabulaire de dépôt, parfois en français et parfois
+            # tronqué. Cela a sa place dans l'historique du dépôt, pas sur une
+            # fiche publique lue en anglais.
+            if ($Title -eq "Changed") {
+                $Skipping = $true
+                continue
+            }
+            $Skipping = $false
+            $Icon = switch ($Title) {
+                "Added" { $FsEmoji.Added }
+                "Fixed" { $FsEmoji.Fixed }
+                default { $FsEmoji.Changed }
+            }
+            # Une rubrique se détache de ce qui précède, sauf quand elle suit
+            # immédiatement le numéro de version : là, les deux lignes forment
+            # le titre du bloc.
+            $Previous = if ($Block.Count -gt 0) { $Block[$Block.Count - 1] } else { "" }
+            if ($Previous -and -not $Previous.StartsWith($FsEmoji.Release)) {
+                $Block.Add("")
+            }
+            $Block.Add("$Icon $Title")
+            continue
+        }
+
+        if (-not $Skipping -and $Text -match '^-\s+(?<item>.+)$') {
+            $Block.Add("")
+            $Block.Add("$FsBullet$($Matches.item.Trim())")
+            $Bullets += 1
+            continue
+        }
+        # Le reste — titre du fichier, lignes vides, et la phrase sur la somme
+        # de contrôle répétée sous chaque version — n'a pas sa place ici : la
+        # note de sécurité est déjà donnée une fois en tête.
+    }
+
+    if ($Bullets -gt 0) {
+        $Lines.Add("")
+        $Lines.AddRange($Block)
+    }
+    $Lines.Add("")
+    return ($Lines -join "`n")
+}
+
 # Phrase de note de version : majuscule initiale, point final et espaces
 # insécables. L'espace n'est ajoutée devant « : » que si l'auteur en a déjà
 # mis une, sinon les URL et les heures seraient déformées.
@@ -469,6 +575,18 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
     )
 }
 
+# Journal de la fiche Flightsim.to, reconstruit depuis le journal qui vient
+# d'être écrit : il porte donc toujours l'historique complet et à jour, sans
+# rien à fusionner à la main avant de le coller.
+$FlightsimToPath = Join-Path $ProjectRoot "publishing\flightsim-to-changelog.txt"
+[System.IO.File]::WriteAllText(
+    $FlightsimToPath,
+    (ConvertTo-FlightsimToChangelog (
+        Get-Content -LiteralPath (Join-Path $ProjectRoot "CHANGELOG.md") -Raw -Encoding UTF8
+    )),
+    [System.Text.UTF8Encoding]::new($false)
+)
+
 # Le fichier repart vide : les nouveautés d'une version ne doivent jamais
 # réapparaître dans la suivante.
 [System.IO.File]::WriteAllText(
@@ -479,4 +597,5 @@ if (Test-Path -LiteralPath "CHANGELOG.md") {
 
 Write-Host "Version prepared: $Current -> $Next ($EffectiveBump)" -ForegroundColor Green
 Write-Host "Notes: $ProjectRoot\RELEASE_NOTES.md ($($Locales -join ', '))"
+Write-Host "Flightsim.to: $FlightsimToPath"
 Write-Output $Next

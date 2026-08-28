@@ -614,12 +614,16 @@ def test_wide_desktop_module_navigation_uses_a_left_side_rail_and_scrolls():
     assert 'show($("terminal"), name === "terminal");' in javascript
 
 
-def test_an_open_official_pdf_uses_the_full_content_width():
+def test_an_open_official_pdf_keeps_the_other_airport_reachable():
     static = Path(desktop.__file__).parent / "web" / "static"
     css = (static / "app.css").read_text(encoding="utf-8")
     javascript = (static / "app.js").read_text(encoding="utf-8")
 
-    assert ".sia-airport-library.pdf-open { grid-column: 1 / -1; }" in css
+    library_grid = css[css.index(".sia-library-grid {"):]
+    library_grid = library_grid[: library_grid.index("}")]
+    assert "align-items: start;" in library_grid
+    assert ".sia-airport-library.pdf-open { grid-column: 1 / -1; }" not in css
+    assert ".sia-airport-library.pdf-open { order: 2; }" in css
     display_pdf = javascript[javascript.index('display.addEventListener("click"'):]
     display_pdf = display_pdf[: display_pdf.index("});")]
     assert 'card.classList.add("pdf-open");' in display_pdf
@@ -679,6 +683,52 @@ def test_the_top_of_descent_honours_the_published_ceilings():
     assert 'String(row.altitude).trim().startsWith("≥")' in ceilings
     assert "star_constraints" in ceilings
     assert "approach_constraints" in ceilings
+
+
+def test_top_of_climb_uses_live_climb_data_and_latches_at_cruise():
+    """Le TOC part d'un gradient stable, s'affine en montée et cesse de suivre
+    l'avion une fois le niveau de croisière atteint."""
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    guidance = javascript[javascript.index("function climbGuidance(") :]
+    guidance = guidance[: guidance.index("\n}\n")]
+
+    assert "verticalSpeed * 60 / groundSpeed" in guidance
+    assert "gradientFtPerNm * 0.88 + observedGradient * 0.12" in guidance
+    assert "currentAltitude >= cruiseAltitude - 500" in guidance
+    assert "topOfClimbDistanceNm - travelledNm" in guidance
+    assert 'phaseKey === "phase_descent" || phaseKey === "phase_approach"' in guidance
+
+
+def test_calculated_toc_and_tod_are_map_markers_not_route_waypoints():
+    """Les repères verticaux ne doivent changer ni la route ni le prochain fix."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    application = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    stylesheet = (static / "app.css").read_text(encoding="utf-8")
+
+    assert 'add("TOC", climb.topOfClimbDistanceNm, "toc")' in application
+    assert 'add("TOD", flightRouteTotalNm - descent.anchorFromDestination, "tod")' in application
+    assert "MAP.setCalculatedPoints(points);" in application
+    assert "let calculatedPoints = [];" in map_javascript
+    assert "setCalculatedPoints(points)" in map_javascript
+    assert "route = routeSegments.flatMap" in map_javascript
+    assert "calculatedLabels) drawRouteLabel" in map_javascript
+    assert 'point.kind === "tod" ? "--route-tod" : "--route-toc"' in map_javascript
+    assert "--route-toc:" in stylesheet
+    assert "--route-tod:" in stylesheet
+
+
+def test_calculated_route_position_uses_the_short_antimeridian_arc():
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    position = javascript[javascript.index("function routePositionAtDistance(") :]
+    position = position[: position.index("\n}\n")]
+
+    assert "((end.lon - start.lon + 540) % 360) - 180" in position
+    assert "Math.min(flightRouteTotalNm, distanceNm)" in position
 
 
 def test_a_level_off_below_cruise_still_reports_the_vertical_profile():

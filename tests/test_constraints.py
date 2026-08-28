@@ -8,10 +8,11 @@ from navixav.constraints import (
     compact_speed,
     format_altitude,
     format_speed,
+    procedure_constraints,
     procedure_path,
     rows_from_legs,
 )
-from navixav.navdata.base import Procedure, ProcedureKind, ProcedureLeg
+from navixav.navdata.base import Procedure, ProcedureKind, ProcedureLeg, Transition
 from navixav.planner.engine import CompletionEngine
 from navixav.preferences import AirportPreferences
 
@@ -177,6 +178,78 @@ def _path(*legs: ProcedureLeg) -> list[dict]:
     return procedure_path(
         _procedure(*legs), position_lookup=lambda ident: (43.6, 1.4)
     )
+
+
+def _with_runway_branch(kind: ProcedureKind, *branch: ProcedureLeg) -> Procedure:
+    """Procédure dont le tronc est « TRUNK », avec une branche pour la 32R."""
+    return Procedure(
+        provider_id=1,
+        kind=kind,
+        ident="TESTS",
+        arinc_name=None,
+        proc_type=None,
+        suffix=None,
+        runway_name=None,
+        runways=("32R",),
+        legs=(_leg(fix="TRUNK"),),
+        runway_transitions=(
+            Transition(ident="32R", transition_type="RUNWAY", legs=tuple(branch)),
+        ),
+    )
+
+
+def test_a_sid_runway_branch_precedes_the_trunk():
+    """Une SID diverge au décollage : sa branche de piste ouvre le tracé."""
+    procedure = _with_runway_branch(ProcedureKind.SID, _leg(fix="BO322"))
+    path = procedure_path(
+        procedure,
+        position_lookup=lambda ident: (43.6, 1.4),
+        runway_ident="32R",
+    )
+    assert [point["ident"] for point in path] == ["BO322", "TRUNK"]
+
+
+def test_a_star_runway_branch_follows_the_trunk():
+    """Une STAR diverge en finale : sa branche de piste ferme le tracé."""
+    procedure = _with_runway_branch(ProcedureKind.STAR, _leg(fix="FI32R"))
+    path = procedure_path(
+        procedure,
+        transition_first=True,
+        position_lookup=lambda ident: (43.6, 1.4),
+        runway_ident="32R",
+    )
+    assert [point["ident"] for point in path] == ["TRUNK", "FI32R"]
+
+
+def test_a_runway_branch_is_matched_on_its_normalised_name():
+    """« RW32R » et « 32R » désignent le même seuil."""
+    procedure = _with_runway_branch(ProcedureKind.SID, _leg(fix="BO322"))
+    path = procedure_path(
+        procedure,
+        position_lookup=lambda ident: (43.6, 1.4),
+        runway_ident="RW32R",
+    )
+    assert [point["ident"] for point in path] == ["BO322", "TRUNK"]
+
+
+def test_an_unknown_runway_leaves_the_path_untouched():
+    procedure = _with_runway_branch(ProcedureKind.SID, _leg(fix="BO322"))
+    path = procedure_path(
+        procedure,
+        position_lookup=lambda ident: (43.6, 1.4),
+        runway_ident="14L",
+    )
+    assert [point["ident"] for point in path] == ["TRUNK"]
+
+
+def test_a_runway_branch_carries_its_constraints():
+    """Les contraintes de la branche entrent dans le tableau, en tête."""
+    procedure = _with_runway_branch(
+        ProcedureKind.SID, _leg("+", 3000, fix="BO322")
+    )
+    rows = procedure_constraints(procedure, runway_ident="32R")
+    assert [row.label for row in rows] == ["BO322"]
+    assert rows[0].altitude == "≥ 3000 ft"
 
 
 def test_path_points_carry_their_constraint():

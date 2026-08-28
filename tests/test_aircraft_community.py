@@ -175,6 +175,16 @@ def test_les_livrees_sont_fusionnees_en_un_seul_appareil(community: Path):
     assert widget.checklist is not None
 
 
+def test_la_vignette_de_l_appareil_ou_de_sa_texture_est_reutilisee(community: Path):
+    widget = next(a for a in scan([community]) if a.model == "Widget 500")
+    texture = widget.directory / "texture.blue"
+    texture.mkdir()
+    thumbnail = texture / "thumbnail.JPG"
+    thumbnail.write_bytes(b"photo")
+
+    assert widget.thumbnail == thumbnail
+
+
 def test_la_survey_separe_le_couvert_du_reste(community: Path):
     report = survey(AircraftMatcher(DB_ROOT), [community])
     assert report.total == 3

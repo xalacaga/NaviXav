@@ -38,56 +38,34 @@ _CAVOK_RE = re.compile(r"\bCAVOK\b")
 _NOSIG_RE = re.compile(r"\bNOSIG\b")
 _AUTO_RE = re.compile(r"\bAUTO\b")
 
+_PHENOMENON = "DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS"
+
 # Phénomènes significatifs. L'intensité (« + », « - », « VC ») est conservée.
+#
+# Un descripteur peut se présenter sans phénomène : « TS » annonce un orage sans
+# précipitation observée et « VCSH » des averses au voisinage du terrain. Le
+# groupe est donc soit un descripteur suivi d'un phénomène facultatif, soit un
+# phénomène seul — jamais rien, sans quoi le motif filerait sur tout le METAR.
+# La limite de mot finale reste indispensable : sans elle « TSNO » et « PROB40 »
+# des remarques passeraient pour un orage et un brouillard partiel. Le groupe
+# doit aussi commencer un mot, faute de quoi le « PO » de « TEMPO » se lit comme
+# des tourbillons de poussière. Une limite de mot ne convient pas à cette
+# extrémité : « + » n'est pas un caractère de mot et « +TSRA » ne serait jamais
+# reconnu.
 _PHENOMENA_RE = re.compile(
+    r"(?<![A-Z0-9])"
     r"(?P<intensity>[+-]|VC)?"
-    r"(?P<descriptor>MI|BC|PR|DR|BL|SH|TS|FZ)?"
-    r"(?P<phenomenon>DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS)"
+    r"(?:"
+    rf"(?P<descriptor>MI|BC|PR|DR|BL|SH|TS|FZ)(?P<qualified>{_PHENOMENON})?"
+    rf"|(?P<phenomenon>{_PHENOMENON})"
+    r")"
     r"(?P<extra>DZ|RA|SN|SG|PL|GR|GS)?\b"
 )
 
-_INTENSITY_LABELS = {"+": "forte", "-": "faible", "VC": "à proximité"}
-_DESCRIPTOR_LABELS = {
-    "MI": "mince",
-    "BC": "en bancs",
-    "PR": "partiel",
-    "DR": "chasse-poussière basse",
-    "BL": "chasse-poussière élevée",
-    "SH": "averse de",
-    "TS": "orage",
-    "FZ": "verglaçant",
-}
-_PHENOMENON_LABELS = {
-    "DZ": "bruine",
-    "RA": "pluie",
-    "SN": "neige",
-    "SG": "neige en grains",
-    "IC": "cristaux de glace",
-    "PL": "granules de glace",
-    "GR": "grêle",
-    "GS": "grésil",
-    "UP": "précipitation inconnue",
-    "BR": "brume",
-    "FG": "brouillard",
-    "FU": "fumée",
-    "VA": "cendres volcaniques",
-    "DU": "poussière",
-    "SA": "sable",
-    "HZ": "brume sèche",
-    "PY": "embruns",
-    "PO": "tourbillons de poussière",
-    "SQ": "grain",
-    "FC": "tornade",
-    "SS": "tempête de sable",
-    "DS": "tempête de poussière",
-}
-_COVER_LABELS = {
-    "FEW": "peu",
-    "SCT": "épars",
-    "BKN": "fragmenté",
-    "OVC": "couvert",
-    "VV": "ciel invisible",
-}
+# Le décodage ne produit aucun libellé : il rend les composants du groupe METAR
+# tels que la norme les définit. La mise en mots appartient à l'interface, qui
+# seule connaît la langue affichée — un libellé fabriqué ici arriverait en
+# français dans une interface anglaise.
 
 # Les couches à partir desquelles on parle de plafond.
 _CEILING_COVERS = frozenset({"BKN", "OVC", "VV"})
@@ -245,7 +223,6 @@ def parse_clouds(metar: str) -> list[dict[str, object]]:
         layers.append(
             {
                 "cover": cover,
-                "cover_label": _COVER_LABELS.get(cover, cover),
                 "height_ft": height_ft,
                 "convective": match.group("type") or None,
             }
@@ -268,42 +245,25 @@ def parse_phenomena(metar: str) -> list[dict[str, str]]:
     body = _WIND_GROUP_RE.sub(" ", body)
     body = CLOUD_RE.sub(" ", body)
 
-    found: list[dict[str, str]] = []
+    found: list[dict[str, str | None]] = []
     seen: set[str] = set()
     for match in _PHENOMENA_RE.finditer(body):
         code = match.group(0)
         if code in seen:
             continue
         seen.add(code)
-        found.append({"code": code, "label": _phenomenon_label(match)})
+        found.append(
+            {
+                "code": code,
+                "intensity": match.group("intensity"),
+                "descriptor": match.group("descriptor"),
+                # Le phénomène vient de l'une ou l'autre branche du motif selon
+                # qu'un descripteur le précède ; il reste absent pour « TS ».
+                "phenomenon": match.group("qualified") or match.group("phenomenon"),
+                "extra": match.group("extra"),
+            }
+        )
     return found
-
-
-def _phenomenon_label(match: re.Match[str]) -> str:
-    descriptor = match.group("descriptor")
-    phenomenon = _PHENOMENON_LABELS.get(match.group("phenomenon"), match.group("phenomenon"))
-    extra = match.group("extra")
-
-    if descriptor == "TS":
-        label = f"orage avec {phenomenon}" if match.group("phenomenon") else "orage"
-    elif descriptor == "SH":
-        label = f"averse de {phenomenon}"
-    elif descriptor == "FZ":
-        label = f"{phenomenon} verglaçante"
-    elif descriptor:
-        label = f"{phenomenon} {_DESCRIPTOR_LABELS[descriptor]}"
-    else:
-        label = phenomenon
-
-    if extra:
-        label = f"{label} et {_PHENOMENON_LABELS.get(extra, extra)}"
-
-    intensity = match.group("intensity")
-    if intensity == "VC":
-        return f"{label} à proximité"
-    if intensity:
-        return f"{label} {_INTENSITY_LABELS[intensity]}"
-    return label
 
 
 def flight_category(

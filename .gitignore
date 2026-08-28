@@ -2,6 +2,7 @@
 .env
 data/user_settings.json
 data/user_settings.tmp
+data/credentials/
 
 # Claude
 .claude/

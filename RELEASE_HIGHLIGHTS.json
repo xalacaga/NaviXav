@@ -15,6 +15,158 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [],
-  "fixed": []
+  "added": [
+    {
+      "fr": "un clic sur une photo d’appareil l’ouvre maintenant en grand dans NaviXav ; l’aperçu se ferme avec son bouton, un clic extérieur ou la touche Échap",
+      "en": "clicking an aircraft photo now opens a large preview inside NaviXav; it closes with its button, an outside click or the Escape key",
+      "de": "ein Klick auf ein Flugzeugfoto öffnet nun eine große Vorschau in NaviXav; sie lässt sich über die Schaltfläche, einen Klick außerhalb oder die Escape-Taste schließen",
+      "es": "al hacer clic en la foto de una aeronave, ahora se abre una vista ampliada dentro de NaviXav; se cierra con su botón, un clic fuera o la tecla Escape",
+      "it": "facendo clic sulla foto di un aeromobile si apre ora un’anteprima ingrandita in NaviXav; si chiude con il pulsante, un clic all’esterno o il tasto Esc",
+      "pt": "clicar na fotografia de uma aeronave abre agora uma pré-visualização ampliada no NaviXav; fecha-se com o botão, um clique no exterior ou a tecla Escape",
+      "nl": "een klik op een vliegtuigfoto opent nu een grote voorvertoning in NaviXav; deze sluit met de knop, een klik erbuiten of de Escape-toets",
+      "pl": "kliknięcie zdjęcia samolotu otwiera teraz duży podgląd w NaviXav; można go zamknąć przyciskiem, kliknięciem poza nim lub klawiszem Escape"
+    },
+    {
+      "fr": "la fiche et l’inventaire Aircraft affichent maintenant une vraie photo libre à côté du nom pour chaque famille d’appareil prise en charge ; les avions supplémentaires installés dans Community utilisent automatiquement leur vignette locale lorsqu’elle existe",
+      "en": "the Aircraft card and inventory now show a real freely licensed photo beside the name for every supported aircraft family; additional aircraft installed in Community automatically use their local thumbnail when available",
+      "de": "die Aircraft-Karte und das Inventar zeigen nun für jede unterstützte Flugzeugfamilie ein echtes frei lizenziertes Foto neben dem Namen; zusätzliche in Community installierte Flugzeuge verwenden automatisch ihr lokales Vorschaubild, sofern vorhanden",
+      "es": "la ficha y el inventario Aircraft muestran ahora una foto real con licencia libre junto al nombre de cada familia de aeronaves compatible; los aviones adicionales instalados en Community utilizan automáticamente su miniatura local cuando está disponible",
+      "it": "la scheda e l’inventario Aircraft ora mostrano una vera foto con licenza libera accanto al nome di ogni famiglia di aeromobili supportata; gli aerei aggiuntivi installati in Community usano automaticamente la loro miniatura locale quando disponibile",
+      "pt": "o cartão e o inventário Aircraft mostram agora uma fotografia real com licença livre ao lado do nome de cada família de aeronaves suportada; os aviões adicionais instalados em Community usam automaticamente a respetiva miniatura local quando disponível",
+      "nl": "de Aircraft-kaart en inventaris tonen nu naast de naam van elke ondersteunde vliegtuigfamilie een echte vrij gelicentieerde foto; extra vliegtuigen in Community gebruiken automatisch hun lokale miniatuur wanneer die beschikbaar is",
+      "pl": "karta i inwentarz Aircraft wyświetlają teraz obok nazwy każdej obsługiwanej rodziny samolotów prawdziwe zdjęcie na wolnej licencji; dodatkowe samoloty zainstalowane w Community automatycznie używają lokalnej miniatury, jeśli jest dostępna"
+    },
+    {
+      "fr": "lorsqu’une carte ChartFox ne peut pas être intégrée, NaviXav propose maintenant le catalogue national officiel dans la même fiche quand l’aérodrome est couvert",
+      "en": "when a ChartFox chart cannot be embedded, NaviXav now offers the official national catalogue in the same card whenever the airport is covered",
+      "de": "wenn eine ChartFox-Karte nicht eingebettet werden kann, bietet NaviXav nun den amtlichen nationalen Katalog in derselben Karte an, sofern der Flugplatz abgedeckt ist",
+      "es": "cuando una carta ChartFox no se puede integrar, NaviXav ofrece ahora el catálogo nacional oficial en la misma ficha cuando el aeropuerto está cubierto",
+      "it": "quando una carta ChartFox non può essere integrata, NaviXav ora propone il catalogo nazionale ufficiale nella stessa scheda se l'aeroporto è coperto",
+      "pt": "quando uma carta ChartFox não pode ser integrada, o NaviXav passa a propor o catálogo nacional oficial no mesmo cartão quando o aeródromo é abrangido",
+      "nl": "wanneer een ChartFox-kaart niet kan worden ingesloten, biedt NaviXav nu de officiële nationale catalogus in dezelfde kaart aan als de luchthaven wordt gedekt",
+      "pl": "gdy mapy ChartFox nie można osadzić, NaviXav proponuje teraz oficjalny katalog krajowy na tej samej karcie, jeśli lotnisko jest obsługiwane"
+    },
+    {
+      "fr": "le suivi du vol estime désormais le Top of Climb à partir du niveau de croisière, du vario et de la vitesse sol ; les points calculés TOC et TOD apparaissent sur la carte comme des repères distincts",
+      "en": "flight tracking now estimates the Top of Climb from the cruise level, vertical speed and ground speed; the calculated TOC and TOD points appear on the map as distinct fixes",
+      "de": "die Flugverfolgung schätzt nun den Top of Climb aus Reiseflughöhe, Vertikalgeschwindigkeit und Geschwindigkeit über Grund; die berechneten Punkte TOC und TOD erscheinen als eigene Wegpunkte auf der Karte",
+      "es": "el seguimiento del vuelo estima ahora el Top of Climb a partir del nivel de crucero, la velocidad vertical y la velocidad respecto al suelo; los puntos calculados TOC y TOD aparecen como puntos distintos en el mapa",
+      "it": "il monitoraggio del volo ora stima il Top of Climb in base al livello di crociera, alla velocità verticale e alla velocità al suolo; i punti calcolati TOC e TOD compaiono sulla mappa come punti distinti",
+      "pt": "o acompanhamento do voo estima agora o Top of Climb a partir do nível de cruzeiro, da velocidade vertical e da velocidade no solo; os pontos calculados TOC e TOD aparecem no mapa como pontos distintos",
+      "nl": "de vluchtvolging schat nu de Top of Climb aan de hand van het kruisniveau, de verticale snelheid en de grondsnelheid; de berekende punten TOC en TOD verschijnen als afzonderlijke routepunten op de kaart",
+      "pl": "śledzenie lotu szacuje teraz Top of Climb na podstawie poziomu przelotowego, prędkości pionowej i prędkości względem ziemi; obliczone punkty TOC i TOD są widoczne na mapie jako osobne punkty trasy"
+    },
+    {
+      "fr": "ChartFox peut désormais être relié depuis les paramètres avec un compte VATSIM ; ses cartes à la demande sont proposées comme source facultative pour les aérodromes de départ et d’arrivée",
+      "en": "ChartFox can now be linked from Settings with a VATSIM account; its on-demand charts are offered as an optional source for the departure and arrival airports",
+      "de": "ChartFox kann jetzt in den Einstellungen mit einem VATSIM-Konto verknüpft werden; seine Karten auf Abruf stehen als optionale Quelle für Abflug und Ankunft bereit",
+      "es": "ChartFox ahora se puede vincular desde Ajustes con una cuenta VATSIM; sus cartas bajo demanda se ofrecen como fuente opcional para los aeropuertos de salida y llegada",
+      "it": "ChartFox ora può essere collegato dalle Impostazioni con un account VATSIM; le sue carte su richiesta sono disponibili come fonte facoltativa per gli aeroporti di partenza e arrivo",
+      "pt": "O ChartFox pode agora ser ligado nas Definições com uma conta VATSIM; as suas cartas a pedido estão disponíveis como fonte opcional para os aeródromos de partida e chegada",
+      "nl": "ChartFox kan nu via Instellingen aan een VATSIM-account worden gekoppeld; de kaarten op aanvraag zijn beschikbaar als optionele bron voor vertrek en aankomst",
+      "pl": "ChartFox można teraz połączyć w Ustawieniach z kontem VATSIM; jego mapy na żądanie są dostępne jako opcjonalne źródło dla lotniska odlotu i przylotu"
+    },
+    {
+      "fr": "le menu Charts indique maintenant qu’un compte ChartFox/VATSIM est requis pour accéder aux cartes AIRAC ChartFox et propose un lien direct vers les paramètres",
+      "en": "the Charts menu now states that a ChartFox/VATSIM account is required to access ChartFox AIRAC charts and provides a direct link to Settings",
+      "de": "das Menü Charts weist nun darauf hin, dass für den Zugriff auf ChartFox-AIRAC-Karten ein ChartFox-/VATSIM-Konto erforderlich ist, und bietet einen direkten Link zu den Einstellungen",
+      "es": "el menú Charts indica ahora que se necesita una cuenta de ChartFox/VATSIM para acceder a las cartas AIRAC de ChartFox y ofrece un enlace directo a Ajustes",
+      "it": "il menu Charts ora indica che per accedere alle carte AIRAC di ChartFox è necessario un account ChartFox/VATSIM e offre un collegamento diretto alle Impostazioni",
+      "pt": "o menu Charts indica agora que é necessária uma conta ChartFox/VATSIM para aceder às cartas AIRAC do ChartFox e disponibiliza uma ligação direta às Definições",
+      "nl": "het menu Charts vermeldt nu dat een ChartFox-/VATSIM-account vereist is voor toegang tot de AIRAC-kaarten van ChartFox en biedt een rechtstreekse link naar Instellingen",
+      "pl": "menu Charts informuje teraz, że dostęp do map AIRAC ChartFox wymaga konta ChartFox/VATSIM, i zawiera bezpośredni link do Ustawień"
+    }
+  ],
+  "fixed": [
+    {
+      "fr": "les photos d’appareils ne restent plus masquées derrière le cartouche du type ICAO dans la fiche et l’inventaire Aircraft",
+      "en": "aircraft photos are no longer hidden behind the ICAO type tile in the Aircraft card and inventory",
+      "de": "Flugzeugfotos werden in der Aircraft-Karte und im Inventar nicht mehr von der ICAO-Typkachel verdeckt",
+      "es": "las fotos de las aeronaves ya no quedan ocultas detrás de la ficha del tipo OACI en la tarjeta y el inventario Aircraft",
+      "it": "le foto degli aeromobili non restano più nascoste dietro il riquadro del tipo ICAO nella scheda e nell’inventario Aircraft",
+      "pt": "as fotografias das aeronaves deixam de ficar ocultas atrás do cartão do tipo ICAO no cartão e no inventário Aircraft",
+      "nl": "vliegtuigfoto’s blijven niet langer verborgen achter het ICAO-typevlak in de Aircraft-kaart en inventaris",
+      "pl": "zdjęcia samolotów nie są już zasłaniane przez kafelek typu ICAO na karcie i w inwentarzu Aircraft"
+    },
+    {
+      "fr": "l’ouverture du PDF d’un aérodrome dans Charts ne repousse plus l’autre aérodrome sous le document : Départ et Arrivée restent côte à côte sur écran large, et la fiche non ouverte reste prioritaire en fenêtre compacte",
+      "en": "opening an airport PDF in Charts no longer pushes the other airport below the document: Departure and Arrival stay side by side on wide screens, and the unopened card stays first in compact windows",
+      "de": "beim Öffnen eines Flugplatz-PDFs in Charts wird der andere Flugplatz nicht mehr unter das Dokument verschoben: Abflug und Ankunft bleiben auf breiten Bildschirmen nebeneinander, und die nicht geöffnete Karte bleibt in kompakten Fenstern zuerst sichtbar",
+      "es": "al abrir el PDF de un aeropuerto en Charts, el otro aeropuerto ya no queda debajo del documento: Salida y Llegada permanecen lado a lado en pantallas anchas, y la ficha no abierta aparece primero en ventanas compactas",
+      "it": "l’apertura del PDF di un aeroporto in Charts non sposta più l’altro aeroporto sotto il documento: Partenza e Arrivo restano affiancati sugli schermi ampi e la scheda non aperta rimane per prima nelle finestre compatte",
+      "pt": "abrir o PDF de um aeródromo em Charts deixa de empurrar o outro aeródromo para baixo do documento: Partida e Chegada permanecem lado a lado em ecrãs largos, e o cartão não aberto fica em primeiro lugar nas janelas compactas",
+      "nl": "bij het openen van een luchthaven-pdf in Charts wordt de andere luchthaven niet meer onder het document geduwd: Vertrek en Aankomst blijven naast elkaar op brede schermen en de ongeopende kaart blijft bovenaan in compacte vensters",
+      "pl": "otwarcie pliku PDF lotniska w Charts nie przesuwa już drugiego lotniska pod dokument: Odlot i Przylot pozostają obok siebie na szerokich ekranach, a nieotwarta karta jest wyświetlana jako pierwsza w kompaktowym oknie"
+    },
+    {
+      "fr": "la mention « simulation uniquement » de ChartFox dans les paramètres suit maintenant la langue de l’interface",
+      "en": "the ChartFox “simulation only” notice in Settings now follows the interface language",
+      "de": "der ChartFox-Hinweis „nur für Simulation“ in den Einstellungen folgt nun der Sprache der Benutzeroberfläche",
+      "es": "la indicación «solo simulación» de ChartFox en Ajustes ahora sigue el idioma de la interfaz",
+      "it": "la dicitura «solo simulazione» di ChartFox nelle Impostazioni ora segue la lingua dell'interfaccia",
+      "pt": "a indicação «apenas simulação» do ChartFox nas Definições passa a seguir o idioma da interface",
+      "nl": "de ChartFox-vermelding ‘alleen simulatie’ in Instellingen volgt nu de taal van de interface",
+      "pl": "informacja ChartFox „tylko do symulacji” w Ustawieniach jest teraz wyświetlana w języku interfejsu"
+    },
+    {
+      "fr": "les cartes ChartFox dont la source interdit l’intégration n’affichent plus une zone blanche : NaviXav explique la restriction et propose de les ouvrir directement sur ChartFox",
+      "en": "ChartFox charts whose source forbids embedding no longer show a blank area: NaviXav explains the restriction and offers to open them directly on ChartFox",
+      "de": "ChartFox-Karten, deren Quelle das Einbetten verbietet, zeigen keinen leeren Bereich mehr: NaviXav erklärt die Einschränkung und bietet an, sie direkt auf ChartFox zu öffnen",
+      "es": "las cartas ChartFox cuya fuente prohíbe la integración ya no muestran una zona en blanco: NaviXav explica la restricción y permite abrirlas directamente en ChartFox",
+      "it": "le carte ChartFox la cui fonte vieta l'integrazione non mostrano più un'area vuota: NaviXav spiega la restrizione e propone di aprirle direttamente su ChartFox",
+      "pt": "as cartas ChartFox cuja fonte proíbe a integração deixam de mostrar uma área em branco: o NaviXav explica a restrição e permite abri-las diretamente no ChartFox",
+      "nl": "ChartFox-kaarten waarvan de bron insluiting verbiedt tonen geen leeg vlak meer: NaviXav legt de beperking uit en biedt aan ze rechtstreeks op ChartFox te openen",
+      "pl": "mapy ChartFox, których źródło zabrania osadzania, nie pokazują już pustego obszaru: NaviXav wyjaśnia ograniczenie i umożliwia otwarcie ich bezpośrednio w ChartFox"
+    },
+    {
+      "fr": "les repères calculés TOC et TOD utilisent maintenant leurs propres couleurs magenta et rouge, distinctes de tous les waypoints de la route",
+      "en": "the calculated TOC and TOD fixes now use their own magenta and red colours, distinct from every route waypoint",
+      "de": "die berechneten Punkte TOC und TOD verwenden nun eigene Farben in Magenta und Rot, die sich von allen Wegpunkten der Route unterscheiden",
+      "es": "los puntos calculados TOC y TOD usan ahora colores propios magenta y rojo, distintos de todos los puntos de la ruta",
+      "it": "i punti calcolati TOC e TOD ora usano colori propri magenta e rosso, distinti da tutti i punti della rotta",
+      "pt": "os pontos calculados TOC e TOD usam agora cores próprias magenta e vermelha, distintas de todos os pontos da rota",
+      "nl": "de berekende TOC- en TOD-punten gebruiken nu eigen magenta en rode kleuren, anders dan alle routepunten",
+      "pl": "obliczone punkty TOC i TOD mają teraz własne kolory magenta i czerwony, odróżniające je od wszystkich punktów trasy"
+    },
+    {
+      "fr": "les fonds de carte CartoDB Positron et Dark Matter sont retirés : leur service gratuit tatoue désormais chaque tuile de la mention « API key required ». Le choix se fait entre OpenStreetMap Standard et OpenTopoMap, et un réglage devenu invalide revient automatiquement sur OpenStreetMap",
+      "en": "the CartoDB Positron and Dark Matter base maps have been removed: their free service now watermarks every tile with \"API key required\". The choice is between OpenStreetMap Standard and OpenTopoMap, and a setting that has become invalid falls back to OpenStreetMap automatically",
+      "de": "die Kartenhintergründe CartoDB Positron und Dark Matter wurden entfernt: Ihr kostenloser Dienst versieht jede Kachel nun mit dem Wasserzeichen „API key required“. Die Wahl besteht zwischen OpenStreetMap Standard und OpenTopoMap; eine ungültig gewordene Einstellung fällt automatisch auf OpenStreetMap zurück",
+      "es": "se han retirado los fondos de mapa CartoDB Positron y Dark Matter: su servicio gratuito ahora marca cada tesela con la mención «API key required». La elección es entre OpenStreetMap Standard y OpenTopoMap, y un ajuste que ha dejado de ser válido vuelve automáticamente a OpenStreetMap",
+      "it": "gli sfondi cartografici CartoDB Positron e Dark Matter sono stati rimossi: il loro servizio gratuito ora applica a ogni tassello la filigrana «API key required». La scelta è tra OpenStreetMap Standard e OpenTopoMap e un'impostazione non più valida torna automaticamente a OpenStreetMap",
+      "pt": "os fundos cartográficos CartoDB Positron e Dark Matter foram removidos: o seu serviço gratuito passou a marcar cada mosaico com a menção «API key required». A escolha é entre OpenStreetMap Standard e OpenTopoMap, e uma definição que deixou de ser válida volta automaticamente a OpenStreetMap",
+      "nl": "de kaartachtergronden CartoDB Positron en Dark Matter zijn verwijderd: hun gratis dienst voorziet elke tegel nu van het watermerk \"API key required\". De keuze gaat tussen OpenStreetMap Standard en OpenTopoMap, en een ongeldig geworden instelling valt automatisch terug op OpenStreetMap",
+      "pl": "podkłady mapowe CartoDB Positron i Dark Matter zostały usunięte: ich bezpłatna usługa oznacza teraz każdy kafelek znakiem wodnym „API key required”. Wybór obejmuje OpenStreetMap Standard i OpenTopoMap, a ustawienie, które utraciło ważność, automatycznie wraca do OpenStreetMap"
+    },
+    {
+      "fr": "le briefing météo ne s’affiche plus partiellement en français dans une interface d’une autre langue : les points d’attention et les phénomènes METAR suivent désormais la langue choisie",
+      "en": "the weather briefing no longer appears partly in French when the interface is set to another language: the operational notes and the METAR phenomena now follow the selected language",
+      "de": "das Wetterbriefing erscheint nicht mehr teilweise auf Französisch, wenn die Oberfläche auf eine andere Sprache eingestellt ist: Hinweise und METAR-Erscheinungen folgen nun der gewählten Sprache",
+      "es": "el briefing meteorológico ya no aparece parcialmente en francés cuando la interfaz está en otro idioma: los puntos de atención y los fenómenos METAR siguen ahora el idioma seleccionado",
+      "it": "il briefing meteo non appare più parzialmente in francese quando l'interfaccia è impostata su un'altra lingua: le note operative e i fenomeni METAR seguono ora la lingua selezionata",
+      "pt": "o briefing meteorológico deixa de aparecer parcialmente em francês quando a interface está noutro idioma: as notas operacionais e os fenómenos METAR seguem agora o idioma selecionado",
+      "nl": "de weerbriefing verschijnt niet langer gedeeltelijk in het Frans wanneer de interface op een andere taal staat: de aandachtspunten en de METAR-verschijnselen volgen nu de gekozen taal",
+      "pl": "briefing pogodowy nie wyświetla się już częściowo po francusku, gdy interfejs jest ustawiony na inny język: uwagi operacyjne i zjawiska METAR podążają teraz za wybranym językiem"
+    },
+    {
+      "fr": "les orages sans précipitation observée sont désormais signalés : les groupes TS, VCTS et VCSH étaient ignorés par le décodage du METAR. Au passage, le « PO » de « TEMPO » n’est plus lu comme des tourbillons de poussière",
+      "en": "thunderstorms with no observed precipitation are now reported: the TS, VCTS and VCSH groups were ignored by the METAR decoding. The \"PO\" in \"TEMPO\" is no longer read as dust whirls either",
+      "de": "Gewitter ohne beobachteten Niederschlag werden nun gemeldet: Die Gruppen TS, VCTS und VCSH wurden bei der METAR-Auswertung übergangen. Zudem wird das „PO“ in „TEMPO“ nicht mehr als Staubwirbel gelesen",
+      "es": "las tormentas sin precipitación observada ahora se señalan: los grupos TS, VCTS y VCSH eran ignorados al decodificar el METAR. Además, el «PO» de «TEMPO» ya no se lee como remolinos de polvo",
+      "it": "i temporali senza precipitazione osservata vengono ora segnalati: i gruppi TS, VCTS e VCSH erano ignorati dalla decodifica del METAR. Inoltre il «PO» di «TEMPO» non viene più letto come turbini di polvere",
+      "pt": "as trovoadas sem precipitação observada passam a ser assinaladas: os grupos TS, VCTS e VCSH eram ignorados na descodificação do METAR. Além disso, o «PO» de «TEMPO» deixa de ser lido como remoinhos de poeira",
+      "nl": "onweer zonder waargenomen neerslag wordt nu gemeld: de groepen TS, VCTS en VCSH werden bij het decoderen van de METAR overgeslagen. Ook wordt de „PO” in „TEMPO” niet langer als stofhozen gelezen",
+      "pl": "burze bez obserwowanych opadów są teraz sygnalizowane: grupy TS, VCTS i VCSH były pomijane przy dekodowaniu METAR. Ponadto „PO” w „TEMPO” nie jest już odczytywane jako wiry pyłowe"
+    },
+    {
+      "fr": "les SID s’affichent enfin sur la carte : leur tracé, leurs repères et leurs contraintes publiées manquaient dès qu’une même procédure desservait deux seuils, ce qui est le cas de presque tous les grands terrains. Le départ se réduisait alors à une ligne droite jusqu’au premier point de la route. Les STAR retrouvent au passage leur partie finale, propre à la piste d’atterrissage. La base de navigation est reprise automatiquement au simulateur à la prochaine ouverture",
+      "en": "SIDs finally appear on the map: their path, fixes and published constraints were missing whenever one procedure served two runway ends, which is the case at almost every major airport. The departure was reduced to a straight line to the first en route fix. STARs also regain their final portion, specific to the landing runway. The navigation database is refreshed from the simulator automatically at the next start",
+      "de": "SID werden endlich auf der Karte dargestellt: Verlauf, Wegpunkte und veröffentlichte Beschränkungen fehlten, sobald eine Prozedur zwei Pistenrichtungen bediente, was auf nahezu allen großen Flugplätzen der Fall ist. Der Abflug schrumpfte damit auf eine gerade Linie bis zum ersten Streckenpunkt. STAR erhalten zudem ihren pistenabhängigen Endteil zurück. Die Navigationsdatenbank wird beim nächsten Start automatisch neu aus dem Simulator übernommen",
+      "es": "las SID aparecen por fin en el mapa: su trazado, sus puntos y sus restricciones publicadas faltaban en cuanto un mismo procedimiento servía a dos cabeceras, lo que ocurre en casi todos los grandes aeropuertos. La salida quedaba reducida a una línea recta hasta el primer punto en ruta. Las STAR recuperan además su tramo final, propio de la pista de aterrizaje. La base de navegación se vuelve a importar automáticamente del simulador en el siguiente arranque",
+      "it": "le SID compaiono finalmente sulla mappa: il loro tracciato, i loro punti e i vincoli pubblicati mancavano non appena una stessa procedura serviva due testate, come accade in quasi tutti i grandi aeroporti. La partenza si riduceva a una linea retta fino al primo punto in rotta. Le STAR recuperano inoltre la loro parte finale, propria della pista di atterraggio. Il database di navigazione viene reimportato automaticamente dal simulatore al prossimo avvio",
+      "pt": "as SID aparecem finalmente no mapa: o seu traçado, os seus pontos e as suas restrições publicadas faltavam assim que um mesmo procedimento servia duas cabeceiras, o que acontece em quase todos os grandes aeródromos. A partida ficava reduzida a uma linha reta até ao primeiro ponto em rota. As STAR recuperam também a sua parte final, própria da pista de aterragem. A base de navegação é reimportada automaticamente do simulador no arranque seguinte",
+      "nl": "SID’s verschijnen eindelijk op de kaart: hun tracé, hun punten en hun gepubliceerde beperkingen ontbraken zodra één procedure twee baankoppen bediende, wat op vrijwel elke grote luchthaven het geval is. Het vertrek werd daardoor een rechte lijn naar het eerste routepunt. STAR’s krijgen bovendien hun laatste deel terug, eigen aan de landingsbaan. De navigatiedatabase wordt bij de volgende start automatisch opnieuw uit de simulator ingelezen",
+      "pl": "SID-y wreszcie pojawiają się na mapie: ich przebieg, punkty i opublikowane ograniczenia znikały, gdy jedna procedura obsługiwała dwa progi, co zdarza się na niemal każdym dużym lotnisku. Odlot sprowadzał się wtedy do linii prostej do pierwszego punktu trasy. STAR-y odzyskują ponadto swoją końcową część, właściwą dla pasa lądowania. Baza nawigacyjna jest automatycznie wczytywana ponownie z symulatora przy następnym uruchomieniu"
+    }
+  ]
 }

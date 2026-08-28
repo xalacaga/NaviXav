@@ -215,6 +215,20 @@ Un país solo se añade a la lista automática tras validar un acceso directo y
 estable a sus PDF oficiales. Por tanto, una fuente ausente nunca se sustituye
 en silencio por un agregador de terceros.
 
+ChartFox está disponible como fuente opcional en la misma pestaña **Cartas**.
+Vincula tu cuenta de ChartFox/VATSIM desde **Ajustes** y elige ChartFox para el
+aeropuerto de salida o llegada. La identificación utiliza el navegador del
+sistema y OAuth 2.0 con PKCE; NaviXav nunca solicita credenciales de VATSIM y
+protege localmente el token del usuario mediante Windows DPAPI. Los documentos
+se cargan bajo demanda, no se guardan en disco, son exclusivamente para
+simulación y conservan la atribución «Chart data powered by ChartFox». Las capas
+ChartFox permanecen desactivadas hasta que NaviXav obtenga el scope
+`charts:geos`.
+Cuando una fuente prohíbe la visualización integrada, NaviXav explica la
+restricción y ofrece la página ChartFox de la carta en lugar de un visor vacío.
+Si un conector nacional cubre el aeropuerto, NaviXav propone primero cambiar la
+ficha al catálogo oficial y continuar dentro de la aplicación.
+
 ## Requisitos
 
 - Windows 10 o Windows 11 de 64 bits;

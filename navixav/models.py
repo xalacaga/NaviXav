@@ -121,7 +121,9 @@ class AirportWeather:
     auto: bool = False
     no_significant_change: bool = False
     taf_periods: list[TafPeriod] = field(default_factory=list)
-    notes: list[str] = field(default_factory=list)
+    # Une note est un code de traduction et ses valeurs, jamais une phrase :
+    # la mise en mots appartient à l'interface, qui seule connaît la langue.
+    notes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def stale(self) -> bool:
@@ -169,7 +171,8 @@ class EnrouteWeather:
     temperature_dev_c: int | None = None
     outside_air_temperature_c: int | None = None
     tropopause_ft: int | None = None
-    notes: list[str] = field(default_factory=list)
+    # Même contrat que AirportWeather.notes : un code et ses valeurs.
+    notes: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -48,3 +48,106 @@ def test_release_version_check_ignores_license_and_historical_tag_versions():
     assert "$Content[$Match.Index - 1] -eq 'v'" in prepare
     assert "PolyForm\\s+Noncommercial(?:\\s+License)?\\s*$" in prepare
     assert "if ($Match.Value -ne $Next)" not in prepare
+
+
+def test_windows_distribution_includes_aircraft_photo_credits():
+    collect = (PROJECT_ROOT / "scripts" / "collect_licenses.ps1").read_text(
+        encoding="utf-8"
+    )
+    credits = (PROJECT_ROOT / "AIRCRAFT_PHOTO_CREDITS.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"AIRCRAFT_PHOTO_CREDITS.md"' in collect
+    assert "GFDL" not in credits
+    assert credits.count("commons.wikimedia.org/wiki/File:") == 31
+
+
+def test_prepare_release_produces_the_flightsim_to_changelog():
+    prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "function ConvertTo-FlightsimToChangelog" in prepare
+    # Les émojis sont assemblés depuis leur point de code : écrits en clair,
+    # ils ne survivraient pas à un script relu en Windows-1252.
+    assert "[char]::ConvertFromUtf32(0x1F4D1)" in prepare
+    assert r"publishing\flightsim-to-changelog.txt" in prepare
+    # Le journal est reconstruit après l'écriture de CHANGELOG.md : la version
+    # qui vient d'être publiée doit y figurer.
+    assert prepare.index("CHANGELOG.md") < prepare.index(
+        "ConvertTo-FlightsimToChangelog ("
+    )
+
+
+def test_publish_release_commits_the_flightsim_to_changelog():
+    """Un journal régénéré mais non commité repartirait sur l'ancien texte."""
+    publish = (PROJECT_ROOT / "scripts" / "publish_release.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"publishing/flightsim-to-changelog.txt"' in publish
+
+
+def _changelog_versions() -> dict[str, dict[str, int]]:
+    """Versions du journal et nombre de puces par rubrique.
+
+    Les titres de rubrique sont acceptés aux niveaux 2 et 3 : les versions
+    1.4.8 et 1.4.9 datent d'avant que le format ne se fixe.
+    """
+    versions: dict[str, dict[str, int]] = {}
+    current: dict[str, int] | None = None
+    section: str | None = None
+    for line in (PROJECT_ROOT / "CHANGELOG.md").read_text(
+        encoding="utf-8"
+    ).splitlines():
+        if line.startswith("## ["):
+            current = versions.setdefault(line[4:].split("]")[0], {})
+            section = None
+        elif line.startswith(("## ", "### ")) and current is not None:
+            section = line.lstrip("#").strip()
+            current.setdefault(section, 0)
+        elif line.startswith("- ") and current is not None and section:
+            current[section] += 1
+    return versions
+
+
+def test_the_flightsim_to_changelog_carries_every_publishable_version():
+    """Le fichier collé sur la fiche doit porter tout l'historique publiable.
+
+    Il est régénéré par prepare_release.ps1 ; un CHANGELOG.md retouché à la
+    main sans régénération laisserait la fiche en arrière d'une version. Une
+    version dont il ne reste rien une fois « Changed » écarté est la seule à
+    pouvoir manquer : un titre seul n'apprendrait rien.
+    """
+    listing = (PROJECT_ROOT / "publishing" / "flightsim-to-changelog.txt").read_text(
+        encoding="utf-8"
+    )
+    versions = _changelog_versions()
+    assert versions, "aucune version dans CHANGELOG.md"
+
+    missing = [
+        version
+        for version, sections in versions.items()
+        if sum(n for name, n in sections.items() if name != "Changed") > 0
+        and f"[{version}]" not in listing
+    ]
+    assert not missing, f"versions absentes de la fiche Flightsim.to : {missing}"
+
+
+def test_the_flightsim_to_changelog_leaves_out_repository_vocabulary():
+    """« Changed » ne contient que des sujets de commit, parfois en français."""
+    listing = (PROJECT_ROOT / "publishing" / "flightsim-to-changelog.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Changed" not in listing
+    assert "Ajout fonctionnalites" not in listing
+    # Une version réduite à « Changed » ne laisse pas de titre orphelin.
+    empty = [
+        version
+        for version, sections in _changelog_versions().items()
+        if sum(n for name, n in sections.items() if name != "Changed") == 0
+    ]
+    for version in empty:
+        assert f"[{version}]" not in listing, f"{version} n'a rien à publier"
