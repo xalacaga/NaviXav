@@ -1,13 +1,17 @@
-# NaviXav 1.5.1
+# NaviXav 1.5.2
 
 Uitgebracht op 2026-08-28.
 
+## Nieuw
+
+- De MSFS-volgfunctie onderscheidt nu expliciet STD van QNH, toont baanrand- en baanasverlichting en kan waarschuwen voor een riskant geopende deur, klep of cockpitkap.
+
 ## Opgelost
 
-- PDF’s in Charts passen zich nu aan de beschikbare breedte aan in plaats van te groot te openen, met knoppen om uit of in te zoomen en de passende weergave te herstellen.
+- ChartFox-kaarten die als afbeelding worden geleverd, passen nu in de breedte van het Charts-paneel en volgen de zoomknoppen; ze openden te groot en de knoppen deden niets.
 
 ## Gewijzigd
 
-- Bug mineur.
+- Mise a jout varsim.
 
 Het installatieprogramma wordt vóór elke automatische update geverifieerd aan de hand van zijn SHA-256-controlesom.

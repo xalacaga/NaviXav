@@ -1,13 +1,17 @@
-# NaviXav 1.5.1
+# NaviXav 1.5.2
 
 Publié le 2026-08-28.
 
+## Nouveautés
+
+- Le suivi MSFS distingue désormais explicitement le calage STD du QNH, affiche les feux de bord et d’axe des pistes, et peut signaler une porte, trappe ou verrière ouverte présentant un risque.
+
 ## Corrections
 
-- Les PDF de Charts s’ajustent maintenant à la largeur disponible au lieu de s’ouvrir surdimensionnés, avec des commandes pour réduire, agrandir ou rétablir l’ajustement.
+- Les cartes ChartFox fournies sous forme d’image s’ajustent maintenant à la largeur du panneau Charts et suivent les boutons de zoom ; elles s’ouvraient trop grandes et les commandes restaient sans effet.
 
 ## Modifications
 
-- Bug mineur.
+- Mise a jout varsim.
 
 L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique.
