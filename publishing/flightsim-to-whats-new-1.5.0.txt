@@ -1,0 +1,42 @@
+🚀 [1.5.0] - 2026-08-28
+✨ Added
+
+    The Aircraft menu now displays a real freely licensed photo beside every
+    supported aircraft family. Additional aircraft found in the Community
+    folder use their own local thumbnail when available, and every photo can
+    be clicked to open a larger preview inside NaviXav.
+
+    The Charts menu now clearly states that a ChartFox/VATSIM account is
+    required for ChartFox AIRAC charts and includes a direct link to Settings.
+    When a ChartFox chart cannot be embedded, NaviXav offers either the chart
+    on ChartFox or the official national catalogue when one is available.
+
+    Flight tracking now calculates the Top of Climb and Top of Descent from
+    the flight data. TOC and TOD appear on the map as distinct fixes with their
+    own colours.
+
+🛠️ Fixed
+
+    Opening a PDF in Charts no longer pushes the other airport to the bottom
+    of the page. Departure and Arrival remain side by side on wide screens,
+    while the unopened airport stays easy to reach in compact windows.
+
+    SIDs now display their complete path, fixes and published constraints when
+    a procedure serves several runway ends. STARs also recover the final part
+    specific to the landing runway. NaviXav refreshes the simulator navigation
+    database automatically at the next start.
+
+    Aircraft photos are no longer hidden behind the ICAO type tile in the
+    current-aircraft card or the installed-aircraft inventory.
+
+    The ChartFox "simulation only" notice and the weather briefing now follow
+    the selected interface language. ChartFox pages that forbid embedding also
+    show a clear explanation instead of a blank area.
+
+    METAR decoding now reports TS, VCTS and VCSH groups even when no
+    precipitation is observed, and no longer mistakes the "PO" in "TEMPO" for
+    dust whirls.
+
+    CartoDB Positron and Dark Matter were removed after their free tiles began
+    displaying an API-key watermark. Invalid saved choices now fall back to
+    OpenStreetMap Standard automatically; OpenTopoMap remains available.

@@ -50,6 +50,22 @@ def test_release_version_check_ignores_license_and_historical_tag_versions():
     assert "if ($Match.Value -ne $Next)" not in prepare
 
 
+def test_release_version_check_skips_the_regenerated_flightsim_to_changelog():
+    """Le journal de la fiche porte l'historique, pas la version préparée.
+
+    Il est reconstruit depuis CHANGELOG.md à la fin de la préparation : l'y
+    aligner réécrirait le titre de la version précédente, et le garde-fou y
+    verrait autant de publications oubliées qu'il existe de versions.
+    """
+    prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '$Generated = @("flightsim-to-changelog.txt")' in prepare
+    assert "$Generated -notcontains $_.Name" in prepare
+    assert prepare.count("foreach ($File in $Files) {") == 2
+
+
 def test_windows_distribution_includes_aircraft_photo_credits():
     collect = (PROJECT_ROOT / "scripts" / "collect_licenses.ps1").read_text(
         encoding="utf-8"

@@ -71,12 +71,23 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
     $Root = Join-Path $ProjectRoot "publishing"
     if (-not (Test-Path -LiteralPath $Root)) { return }
 
+    # Le journal de la fiche Flightsim.to est reconstruit plus bas depuis
+    # CHANGELOG.md : il porte l'historique complet, donc le numéro de chaque
+    # version déjà publiée. L'aligner transformerait le titre de la version
+    # précédente en celui de la version préparée, et le garde-fou y verrait
+    # autant de publications oubliées qu'il existe de versions.
+    $Generated = @("flightsim-to-changelog.txt")
+    $Files = @(
+        Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt" |
+            Where-Object { $Generated -notcontains $_.Name }
+    )
+
     # Une version précédée de « v » décrit une borne historique immuable
     # (par exemple la dernière Release encore disponible sous une ancienne
     # licence), pas la Release en cours de préparation.
     $Pattern = "(?<!v)" + [regex]::Escape($Current)
     $Touched = @()
-    foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
+    foreach ($File in $Files) {
         $Content = [System.IO.File]::ReadAllText($File.FullName)
         $Updated = [regex]::Replace($Content, $Pattern, $Next)
         if ($Updated -ne $Content) {
@@ -91,7 +102,7 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
 
     # Garde-fou : toute version résiduelle signale une publication oubliée.
     $Stale = @()
-    foreach ($File in Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.txt") {
+    foreach ($File in $Files) {
         $Content = [System.IO.File]::ReadAllText($File.FullName)
         foreach ($Match in [regex]::Matches($Content, '\d+\.\d+\.\d+')) {
             if ($Match.Value -eq $Next) { continue }
