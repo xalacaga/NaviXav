@@ -6,10 +6,13 @@
     folder use their own local thumbnail when available, and every photo can
     be clicked to open a larger preview inside NaviXav.
 
-    The Charts menu now clearly states that a ChartFox/VATSIM account is
-    required for ChartFox AIRAC charts and includes a direct link to Settings.
-    When a ChartFox chart cannot be embedded, NaviXav offers either the chart
-    on ChartFox or the official national catalogue when one is available.
+    ChartFox is now integrated into NaviXav as an optional chart source. Link
+    your VATSIM account once from Settings, then access ChartFox AIRAC charts
+    directly for your departure and arrival airports. The Charts menu clearly
+    indicates when an account is required and provides a shortcut to the
+    connection setting. If a chart provider prevents embedded viewing,
+    NaviXav offers to open the chart on ChartFox or use the official national
+    catalogue when one is available.
 
     Flight tracking now calculates the Top of Climb and Top of Descent from
     the flight data. TOC and TOD appear on the map as distinct fixes with their
