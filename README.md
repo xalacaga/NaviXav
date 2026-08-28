@@ -148,7 +148,10 @@ NaviXav uses SimConnect to:
 - show a green or red indicator in the top bar;
 - track the aircraft position in real time;
 - read altitude, height above ground, heading, ground speed and vertical speed;
-- retrieve airports, runways, procedures, waypoints and radio navigation aids;
+- distinguish STD from the QNH kept on the altimeter and optionally warn about
+  an unsafe open door, hatch or canopy;
+- retrieve airports, runways and their edge/centreline lighting, procedures,
+  waypoints and radio navigation aids;
 - progressively build a local database in `data/navixav.sqlite`.
 
 The simulator must be running with a flight loaded in order to retrieve new

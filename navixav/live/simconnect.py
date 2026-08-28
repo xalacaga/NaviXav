@@ -100,6 +100,15 @@ _CONFIGURATION_VARIABLES = (
     ("SIMULATION RATE", "Number"),
 )
 
+# SimVars ajoutées aux versions récentes de MSFS. Elles restent dans une
+# définition indépendante : si un simulateur plus ancien refuse l'une d'elles,
+# le reste de la configuration avion continue d'être lu normalement.
+_MODERN_CONFIGURATION_VARIABLES = (
+    ("KOHLSMAN SETTING STD:1", "Bool"),
+    ("KOHLSMAN SETTING MB EX1:1", "Millibars"),
+    ("IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH", "Bool"),
+)
+
 # Bloc de capacités : lu une seule fois par avion chargé.
 _CAPABILITY_VARIABLES = (
     ("IS GEAR RETRACTABLE", "Bool"),
@@ -142,6 +151,7 @@ class SimConnectSource:
         self._last_failure = 0.0
         self._failure_reason = ""
         self._configuration_disabled_until = 0.0
+        self._modern_configuration_disabled_until = 0.0
         self._pause_disabled_until = 0.0
         self._capabilities: AircraftCapabilities | None = None
         self._capabilities_disabled_until = 0.0
@@ -258,6 +268,7 @@ class SimConnectSource:
                     self._capabilities = None
                     self._capabilities_disabled_until = 0.0
                     self._configuration_disabled_until = 0.0
+                    self._modern_configuration_disabled_until = 0.0
                     self._parking_brake_raw = None
                     self._parking_brake_state = None
                     self._flaps_raw = None
@@ -346,6 +357,7 @@ class SimConnectSource:
                 spoilers_pct = max(0.0, (speedbrake - 1.0) * 50.0)
                 parking_brake = bool(fenix["L:S_MIP_PARKING_BRAKE"])
 
+        modern = self._read_modern_configuration(client)
         return AircraftConfiguration(
             gear_handle_down=bool(values["GEAR HANDLE POSITION"]),
             gear_extended_pct=min(gear_positions),
@@ -371,7 +383,14 @@ class SimConnectSource:
                 "logo": bool(values["LIGHT LOGO"]),
                 "wing": bool(values["LIGHT WING"]),
             },
-            altimeter_hpa=values["KOHLSMAN SETTING MB"],
+            altimeter_hpa=modern.get(
+                "KOHLSMAN SETTING MB EX1:1", values["KOHLSMAN SETTING MB"]
+            ),
+            altimeter_std=(
+                bool(modern["KOHLSMAN SETTING STD:1"])
+                if "KOHLSMAN SETTING STD:1" in modern
+                else None
+            ),
             indicated_altitude_ft=values["INDICATED ALTITUDE"],
             pressure_altitude_ft=values["PRESSURE ALTITUDE"],
             autopilot_master=bool(values["AUTOPILOT MASTER"]),
@@ -395,11 +414,38 @@ class SimConnectSource:
             stall_warning=bool(values["STALL WARNING"]),
             overspeed_warning=bool(values["OVERSPEED WARNING"]),
             flap_speed_exceeded=bool(values["FLAP SPEED EXCEEDED"]),
+            interactive_points_crash_risk=(
+                bool(modern["IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH"])
+                if "IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH" in modern
+                else None
+            ),
             barber_pole_kt=values["AIRSPEED BARBER POLE"],
             mach=values["AIRSPEED MACH"],
             simulation_rate=values["SIMULATION RATE"],
             capabilities=self._read_capabilities(client),
         )
+
+    def _read_modern_configuration(
+        self, client: SimConnectClient
+    ) -> dict[str, float]:
+        """Lit les SimVars récentes sans rendre le bloc historique fragile."""
+        now = time.monotonic()
+        if now < self._modern_configuration_disabled_until:
+            return {}
+        try:
+            return client.read_simvars(
+                _MODERN_CONFIGURATION_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+            )
+        except SimConnectError as exc:
+            self._modern_configuration_disabled_until = (
+                now + _OPTIONAL_RETRY_DELAY_S
+            )
+            logger.info(
+                "SimVars MSFS récentes indisponibles, nouvelle tentative dans %.0f s (%s)",
+                _OPTIONAL_RETRY_DELAY_S,
+                exc,
+            )
+            return {}
 
     def _resolve_parking_brake(self, position: float, indicator: float) -> bool:
         """Suit celle des deux SimVars de frein qui change réellement.
@@ -510,6 +556,7 @@ class SimConnectSource:
         self._capabilities = None
         self._capabilities_disabled_until = 0.0
         self._configuration_disabled_until = 0.0
+        self._modern_configuration_disabled_until = 0.0
         self._pause_disabled_until = 0.0
         self._parking_brake_raw = None
         self._parking_brake_state = None

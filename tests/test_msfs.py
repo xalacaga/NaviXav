@@ -366,6 +366,14 @@ def test_the_names_block_can_be_left_out_of_the_definition():
     assert "OPEN TAXI_NAME" not in extract.airport_definition(False).tokens
 
 
+def test_runway_lights_can_be_left_out_for_an_older_simulator():
+    assert "EDGE_LIGHTS" in extract.airport_definition().tokens
+    assert "CENTER_LIGHTS" in extract.airport_definition().tokens
+    legacy = extract.airport_definition(with_runway_lights=False)
+    assert "EDGE_LIGHTS" not in legacy.tokens
+    assert "CENTER_LIGHTS" not in legacy.tokens
+
+
 class _NameRefusingClient:
     """Simulateur qui refuse la définition dès qu'elle demande les noms.
 
@@ -390,6 +398,28 @@ def test_a_refused_names_block_does_not_cost_the_whole_airport():
     assert client.attempts == [True, False]
     assert airport["icao"] == "LFST"
     assert airport["taxi_names"] == []
+
+
+class _LightsRefusingClient:
+    def __init__(self) -> None:
+        self.attempts: list[tuple[bool, bool]] = []
+
+    def request(self, definition, _icao):
+        asked_names = "OPEN TAXI_NAME" in definition.tokens
+        asked_lights = "EDGE_LIGHTS" in definition.tokens
+        self.attempts.append((asked_names, asked_lights))
+        if asked_lights:
+            raise SimConnectRefused("refus", [1])
+        return []
+
+
+def test_refused_runway_lights_fall_back_to_the_legacy_airport_definition():
+    client = _LightsRefusingClient()
+    airport = extract.extract_airport(client, "lfst")
+    assert client.attempts == [
+        (True, True), (False, True), (True, False)
+    ]
+    assert airport["icao"] == "LFST"
 
 
 RUNWAY_PATH = F.TAXI_PATH_TYPE_RUNWAY
@@ -485,6 +515,19 @@ def test_a_stored_airport_records_its_ground_version(tmp_path):
         "SELECT ground_version FROM airport WHERE icao = 'TEST'"
     ).fetchone()[0]
     assert version == msfs_store.GROUND_VERSION
+    connection.close()
+
+
+def test_runway_lights_survive_the_local_cache(tmp_path):
+    airport = _minimal_airport()
+    airport["runways"][0].update(edge_lights=3, center_lights=2)
+    connection = msfs_store.connect(tmp_path / "navixav.sqlite")
+    msfs_store.store_airport(connection, airport)
+    row = connection.execute(
+        "SELECT edge_lights, center_lights FROM runway "
+        "WHERE icao = 'TEST' AND name = '05'"
+    ).fetchone()
+    assert tuple(row) == (3, 2)
     connection.close()
 
 

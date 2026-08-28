@@ -47,6 +47,8 @@ class Runway:
     is_takeoff: bool
     lat: float
     lon: float
+    edge_lights: int | None = None
+    center_lights: int | None = None
 
     @property
     def has_ils(self) -> bool:

@@ -156,8 +156,10 @@ NaviXav nutzt SimConnect, um:
 - die Flugzeugposition in Echtzeit zu verfolgen;
 - Höhe, Höhe über Grund, Steuerkurs, Geschwindigkeit über Grund und
   Vertikalgeschwindigkeit auszulesen;
-- Flughäfen, Bahnen, Verfahren, Wegpunkte und Funknavigationsanlagen
-  abzurufen;
+- STD von dem am Höhenmesser gespeicherten QNH zu unterscheiden und optional
+  vor einer gefährlich geöffneten Tür, Luke oder Haube zu warnen;
+- Flughäfen, Bahnen samt Rand- und Mittellinienbefeuerung, Verfahren,
+  Wegpunkte und Funknavigationsanlagen abzurufen;
 - schrittweise eine lokale Datenbank in `data/navixav.sqlite` aufzubauen.
 
 Der Simulator muss mit geladenem Flug laufen, um neue Daten abzurufen. Bereits

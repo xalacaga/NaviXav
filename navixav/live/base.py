@@ -65,6 +65,7 @@ class AircraftConfiguration:
     # hPa. Seule cette dernière donne le niveau de vol : en air chaud,
     # l'altitude vraie la dépasse de plus de mille pieds en croisière.
     altimeter_hpa: float | None = None
+    altimeter_std: bool | None = None
     indicated_altitude_ft: float | None = None
     pressure_altitude_ft: float | None = None
 
@@ -98,6 +99,7 @@ class AircraftConfiguration:
     stall_warning: bool | None = None
     overspeed_warning: bool | None = None
     flap_speed_exceeded: bool | None = None
+    interactive_points_crash_risk: bool | None = None
     barber_pole_kt: float | None = None
     mach: float | None = None
 

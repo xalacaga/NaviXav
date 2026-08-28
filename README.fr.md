@@ -151,7 +151,10 @@ NaviXav utilise SimConnect pour :
 - suivre la position de l’avion en temps réel ;
 - lire l’altitude, la hauteur sol, le cap, la vitesse sol et la vitesse
   verticale ;
-- récupérer les aéroports, pistes, procédures, repères et installations radio ;
+- distinguer le calage STD du QNH conservé sur l’altimètre et, si les alertes
+  sont activées, signaler une porte, trappe ou verrière ouverte dangereuse ;
+- récupérer les aéroports, pistes et leurs feux de bord et d’axe, procédures,
+  repères et installations radio ;
 - constituer progressivement une base locale dans `data/navixav.sqlite`.
 
 Le simulateur doit être lancé avec un vol chargé pour récupérer de nouvelles

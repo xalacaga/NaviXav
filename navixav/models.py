@@ -205,6 +205,8 @@ class RunwayChoice:
     crosswind_kt: float | None = None
     length_ft: float | None = None
     ils_ident: str | None = None
+    edge_lights: int | None = None
+    center_lights: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -213,6 +215,8 @@ class RunwayChoice:
             "crosswind_kt": self.crosswind_kt,
             "length_ft": self.length_ft,
             "ils_ident": self.ils_ident,
+            "edge_lights": self.edge_lights,
+            "center_lights": self.center_lights,
         }
 
 

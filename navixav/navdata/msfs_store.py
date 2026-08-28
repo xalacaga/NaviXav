@@ -22,7 +22,7 @@ from navixav.paths import user_data_path
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_STORE = user_data_path("navixav.sqlite")
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Version de l'extraction enregistrée pour un terrain — géométrie du sol à
 # l'origine, découpage des procédures depuis. Elle est portée par l'aéroport
@@ -33,7 +33,8 @@ SCHEMA_VERSION = 2
 #   2 : les branches de piste d'une SID rejoignent le tronc commun. Avant, une
 #       SID desservant deux seuils laissait tous ses segments dans ses branches
 #       et se retrouvait sans tracé ni contrainte.
-GROUND_VERSION = 2
+#   3 : intensités des feux de bord et d'axe de piste issues de Facilities.
+GROUND_VERSION = 3
 
 EARTH_RADIUS_M = 6378137.0
 METRES_TO_FEET = 3.280839895
@@ -65,6 +66,8 @@ CREATE TABLE IF NOT EXISTS runway (
     width_ft REAL,
     surface TEXT,
     ils_ident TEXT,
+    edge_lights INTEGER,
+    center_lights INTEGER,
     lat REAL NOT NULL,
     lon REAL NOT NULL,
     PRIMARY KEY (icao, name)
@@ -258,6 +261,8 @@ _ADDED_COLUMNS = (
     (2, "taxi_path", "kind", "TEXT"),
     (2, "taxi_path", "name", "TEXT"),
     (2, "taxi_path", "runway_name", "TEXT"),
+    (3, "runway", "edge_lights", "INTEGER"),
+    (3, "runway", "center_lights", "INTEGER"),
 )
 
 
@@ -406,12 +411,13 @@ def _store_runways(connection: sqlite3.Connection, extracted: dict[str, Any]) ->
                 """
                 INSERT OR REPLACE INTO runway
                     (icao, name, heading_true, length_ft, width_ft, surface,
-                     ils_ident, lat, lon)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ils_ident, edge_lights, center_lights, lat, lon)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     icao, name, end_heading, runway["length_ft"],
                     runway.get("width_ft"), runway.get("surface"), ils,
+                    runway.get("edge_lights"), runway.get("center_lights"),
                     position[0], position[1],
                 ),
             )

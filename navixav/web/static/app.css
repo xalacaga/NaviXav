@@ -2679,6 +2679,12 @@ pre {
   margin-top: 8px; border: 1px solid var(--border); border-radius: 8px;
   background: #fff;
 }
+.sia-document-image-frame {
+  display: block; width: 100%; height: min(72vh, 780px); overflow: auto;
+  margin-top: 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff;
+}
+.sia-document-image { display: block; width: 100%; height: auto; }
 @media (max-width: 620px) {
   .sia-library-grid { grid-template-columns: 1fr; }
   .sia-library-head { flex-wrap: wrap; }
@@ -3164,7 +3170,7 @@ pre {
   .ground-speed-value { font-size: 1.3rem; }
   .sia-library-grid { grid-template-columns: minmax(0, 1fr); }
   .sia-airport-library.pdf-open { order: 2; }
-  .sia-chart-preview iframe, .sia-document-frame {
+  .sia-chart-preview iframe, .sia-document-frame, .sia-document-image-frame {
     height: min(68dvh, 620px);
   }
   .mcdu-line { grid-template-columns: 94px minmax(0, 1fr); }

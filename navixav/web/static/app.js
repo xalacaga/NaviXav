@@ -2244,6 +2244,12 @@ function flightContext(aircraft, projection, phase, constraint) {
 
 const ALERT_RULES = [
   {
+    id: "interactive_points_crash_risk",
+    severity: "danger",
+    armed: () => true,
+    when: (c) => c.configuration.interactive_points_crash_risk === true,
+  },
+  {
     id: "parking_brake",
     severity: "danger",
     armed: (c) => !c.onGround || c.groundSpeed > 5,
@@ -2355,6 +2361,10 @@ const ALERT_RULES = [
       );
     },
     when: (c) => {
+      if (c.configuration.altimeter_std !== null
+          && c.configuration.altimeter_std !== undefined) {
+        return c.configuration.altimeter_std === false;
+      }
       const setting = finiteOr(c.configuration.altimeter_hpa);
       return setting !== null && Math.abs(setting - STD_PRESSURE_HPA) > 0.5;
     },
@@ -2372,6 +2382,10 @@ const ALERT_RULES = [
       );
     },
     when: (c) => {
+      if (c.configuration.altimeter_std !== null
+          && c.configuration.altimeter_std !== undefined) {
+        return c.configuration.altimeter_std === true;
+      }
       const setting = finiteOr(c.configuration.altimeter_hpa);
       return setting !== null && Math.abs(setting - STD_PRESSURE_HPA) <= 0.5;
     },
@@ -3570,10 +3584,15 @@ function describeParkingBrake(configuration) {
 
 function describeAltimeter(configuration) {
   const setting = finiteOr(configuration.altimeter_hpa);
-  if (setting === null) return { text: "—", status: "" };
-  const standard = Math.abs(setting - STD_PRESSURE_HPA) <= 0.5;
+  const explicitStd = configuration.altimeter_std;
+  if (setting === null && explicitStd !== true) return { text: "—", status: "" };
+  const standard = explicitStd === true || (
+    explicitStd !== false && setting !== null
+    && Math.abs(setting - STD_PRESSURE_HPA) <= 0.5
+  );
+  const qnh = setting !== null ? ` · QNH ${Math.round(setting)} hPa` : "";
   return {
-    text: standard ? "STD · 1013 hPa" : `QNH ${Math.round(setting)} hPa`,
+    text: standard ? `STD${qnh}` : `QNH ${Math.round(setting)} hPa`,
     status: "",
   };
 }
@@ -4927,6 +4946,11 @@ function runwayNote(runway) {
   }
   if (runway.length_ft) bits.push(`${Math.round(runway.length_ft).toLocaleString(displayLocale())} ft`);
   if (runway.ils_ident) bits.push(`ILS ${runway.ils_ident}`);
+  const lightLevel = (value) => ["OFF", "LOW", "MED", "HIGH"][Number(value)] || null;
+  const edgeLights = lightLevel(runway.edge_lights);
+  const centerLights = lightLevel(runway.center_lights);
+  if (edgeLights) bits.push(`EDGE ${edgeLights}`);
+  if (centerLights) bits.push(`CL ${centerLights}`);
   return bits.join(" · ");
 }
 
@@ -6118,6 +6142,12 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
     const availability = el("p", "stat-note");
     const frame = el("iframe", "sia-document-frame hidden");
     frame.loading = "lazy";
+    // Une carte ChartFox est souvent une image : la visionneuse du navigateur
+    // l'afficherait à sa taille naturelle, sans paramètre d'ouverture.
+    const imageFrame = el("div", "sia-document-image-frame hidden");
+    const image = el("img", "sia-document-image");
+    image.loading = "lazy";
+    imageFrame.append(image);
     const zoomControls = el("div", "sia-pdf-zoom hidden");
     const zoomOut = el("button", "icon-btn sia-pdf-zoom-button", "−");
     zoomOut.type = "button";
@@ -6136,13 +6166,27 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
     let accessGeneration = 0;
     let frameObjectUrl = "";
     let frameBaseUrl = "";
+    let frameIsImage = false;
     let zoomPercent = 100;
     let zoomIsFit = true;
 
-    const applyPdfZoom = () => {
+    const applyChartZoom = () => {
       if (!frameBaseUrl) return;
-      const parameters = zoomIsFit ? "view=FitH" : `zoom=${zoomPercent}`;
-      frame.src = `${frameBaseUrl.split("#", 1)[0]}#${parameters}`;
+      if (frameIsImage) {
+        // Une image n'a pas de paramètres d'ouverture : le zoom est appliqué
+        // ici, en largeur relative au cadre, qui défile au-delà de 100 %.
+        image.style.width = zoomIsFit ? "100%" : `${zoomPercent}%`;
+      } else {
+        // La visionneuse PDF ne lit ses paramètres d'ouverture qu'au
+        // chargement : un changement limité au fragment ne recharge rien et
+        // laisserait le zoom sans effet.
+        const parameters = zoomIsFit ? "view=FitH" : `zoom=${zoomPercent}`;
+        const target = `${frameBaseUrl.split("#", 1)[0]}#${parameters}`;
+        frame.src = "about:blank";
+        requestAnimationFrame(() => {
+          if (frameBaseUrl) frame.src = target;
+        });
+      }
       zoomLevel.textContent = zoomIsFit
         ? t("chart_zoom_fit")
         : tf("chart_zoom_level", { level: zoomPercent });
@@ -6153,7 +6197,7 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
     const setNumericZoom = (change) => {
       zoomPercent = Math.min(200, Math.max(50, zoomPercent + change));
       zoomIsFit = false;
-      applyPdfZoom();
+      applyChartZoom();
     };
 
     zoomOut.addEventListener("click", () => setNumericZoom(-25));
@@ -6161,14 +6205,17 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
     zoomFit.addEventListener("click", () => {
       zoomPercent = 100;
       zoomIsFit = true;
-      applyPdfZoom();
+      applyChartZoom();
     });
 
     const closeFrame = () => {
       frame.classList.add("hidden");
+      imageFrame.classList.add("hidden");
       zoomControls.classList.add("hidden");
       frame.removeAttribute("src");
+      image.removeAttribute("src");
       frameBaseUrl = "";
+      frameIsImage = false;
       card.classList.remove("pdf-open");
       if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
       frameObjectUrl = "";
@@ -6262,9 +6309,11 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
             }
             throw new Error(message);
           }
+          const document_ = await response.blob();
           if (frameObjectUrl) URL.revokeObjectURL(frameObjectUrl);
-          frameObjectUrl = URL.createObjectURL(await response.blob());
+          frameObjectUrl = URL.createObjectURL(document_);
           frameBaseUrl = frameObjectUrl;
+          frameIsImage = String(document_.type || "").startsWith("image/");
         } catch (error) {
           closeFrame();
           availability.textContent = String(error.message || error);
@@ -6276,21 +6325,29 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
         }
       } else {
         frameBaseUrl = chart.pdf_url;
+        frameIsImage = false;
         display.disabled = false;
         display.textContent = t("chart_show_pdf");
       }
       zoomPercent = 100;
       zoomIsFit = true;
-      applyPdfZoom();
+      applyChartZoom();
       card.classList.add("pdf-open");
-      frame.title = tf("chart_frame_title", {
+      const documentTitle = tf("chart_frame_title", {
         provider: officialProviderName(data),
         title: chart.title,
       });
+      frame.title = documentTitle;
+      image.alt = documentTitle;
       zoomControls.classList.remove("hidden");
-      frame.classList.remove("hidden");
+      if (frameIsImage) {
+        image.src = frameBaseUrl;
+        imageFrame.classList.remove("hidden");
+      } else {
+        frame.classList.remove("hidden");
+      }
     });
-    card.append(controls, availability, zoomControls, frame);
+    card.append(controls, availability, zoomControls, frame, imageFrame);
     updateSelection();
   }).catch((error) => {
     status.textContent = t("chart_unavailable");

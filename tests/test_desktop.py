@@ -776,6 +776,20 @@ def test_corrected_alert_is_acknowledged_and_rearmed_automatically():
     assert "state.acknowledged = false;" in javascript
 
 
+def test_recent_msfs_safety_alert_and_explicit_std_setting_are_used():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id: "interactive_points_crash_risk"' in javascript
+    assert "configuration.interactive_points_crash_risk === true" in javascript
+    assert "configuration.altimeter_std === true" in javascript
+    assert "configuration.altimeter_std === false" in javascript
+    assert translations.count("alert_interactive_points_crash_risk:") == 8
+    assert "EDGE ${edgeLights}" in javascript
+    assert "CL ${centerLights}" in javascript
+
+
 def test_flap_detents_adapt_to_known_aircraft_families():
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")

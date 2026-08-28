@@ -253,6 +253,8 @@ class MsfsProvider:
                 width_ft=row["width_ft"],
                 surface=row["surface"],
                 ils_ident=row["ils_ident"],
+                edge_lights=row["edge_lights"],
+                center_lights=row["center_lights"],
                 is_landing=True,
                 is_takeoff=True,
                 lat=row["lat"],

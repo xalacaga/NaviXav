@@ -735,6 +735,8 @@ def create_app(
                         "heading": round(r.heading_true_deg),
                         "length_ft": round(r.length_ft),
                         "ils": r.ils_ident,
+                        "edge_lights": r.edge_lights,
+                        "center_lights": r.center_lights,
                     }
                     for r in provider.runways(icao)
                 ],

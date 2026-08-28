@@ -22,16 +22,21 @@ LOGGER = logging.getLogger(__name__)
 METRES_TO_FEET = 3.280839895
 
 
-def airport_definition(with_taxi_names: bool = True) -> FacilityDefinition:
+def airport_definition(
+    with_taxi_names: bool = True, with_runway_lights: bool = True
+) -> FacilityDefinition:
     """Définition couvrant tout ce dont NaviXav a besoin d'un aéroport.
 
-    `with_taxi_names` permet de retirer le seul bloc que les versions plus
+    Les deux options permettent de retirer les champs que les versions plus
     anciennes du simulateur peuvent refuser ; voir `extract_airport`.
     """
     definition = FacilityDefinition()
     definition.open("AIRPORT", F.TYPE_AIRPORT, F.AIRPORT_FIELDS)
 
-    definition.open("RUNWAY", F.TYPE_RUNWAY, F.RUNWAY_FIELDS).close()
+    runway_fields = F.RUNWAY_FIELDS + (
+        F.RUNWAY_LIGHT_FIELDS if with_runway_lights else ()
+    )
+    definition.open("RUNWAY", F.TYPE_RUNWAY, runway_fields).close()
     definition.open("FREQUENCY", F.TYPE_FREQUENCY, F.FREQUENCY_FIELDS).close()
 
     definition.open("APPROACH", F.TYPE_APPROACH, F.APPROACH_FIELDS)
@@ -87,19 +92,44 @@ def extract_airport(client: SimConnectClient, icao: str) -> dict[str, Any]:
     plan de terrain sans noms qu'aucune donnée du tout.
     """
     try:
-        return _extract_airport(client, icao, with_taxi_names=True)
+        return _extract_airport(
+            client, icao, with_taxi_names=True, with_runway_lights=True
+        )
     except SimConnectRefused:
         LOGGER.warning(
             "Noms de voies de circulation refusés par le simulateur : "
             "nouvel essai sans eux"
         )
-        return _extract_airport(client, icao, with_taxi_names=False)
+    try:
+        return _extract_airport(
+            client, icao, with_taxi_names=False, with_runway_lights=True
+        )
+    except SimConnectRefused:
+        LOGGER.warning(
+            "Éclairage des pistes refusé par le simulateur : "
+            "nouvel essai sans lui, avec les noms de voies"
+        )
+    try:
+        return _extract_airport(
+            client, icao, with_taxi_names=True, with_runway_lights=False
+        )
+    except SimConnectRefused:
+        LOGGER.warning(
+            "Noms de voies et éclairage indisponibles : dernier essai "
+            "avec la définition historique minimale"
+        )
+        return _extract_airport(
+            client, icao, with_taxi_names=False, with_runway_lights=False
+        )
 
 
 def _extract_airport(
-    client: SimConnectClient, icao: str, with_taxi_names: bool
+    client: SimConnectClient,
+    icao: str,
+    with_taxi_names: bool,
+    with_runway_lights: bool,
 ) -> dict[str, Any]:
-    definition = airport_definition(with_taxi_names)
+    definition = airport_definition(with_taxi_names, with_runway_lights)
     blocks = client.request(definition, icao)
 
     airport: dict[str, Any] = {
@@ -289,6 +319,8 @@ def _runway(values: dict[str, Any]) -> dict[str, Any]:
         "surface": F.SURFACES.get(values["SURFACE"], str(values["SURFACE"])),
         "primary_ils": values.get("PRIMARY_ILS_ICAO") or None,
         "secondary_ils": values.get("SECONDARY_ILS_ICAO") or None,
+        "edge_lights": values.get("EDGE_LIGHTS"),
+        "center_lights": values.get("CENTER_LIGHTS"),
     }
 
 

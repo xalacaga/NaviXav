@@ -11,6 +11,7 @@ from navixav.live.simconnect import (
     _CAPABILITY_VARIABLES,
     _CONFIGURATION_VARIABLES,
     _FENIX_CONTROL_VARIABLES,
+    _MODERN_CONFIGURATION_VARIABLES,
     _PAUSE_VARIABLES,
     _VARIABLES,
     SimConnectSource,
@@ -51,7 +52,11 @@ def test_position_and_speed_units():
 
 
 def test_configuration_variables_declare_their_units():
-    for name, unit in _CONFIGURATION_VARIABLES + _CAPABILITY_VARIABLES:
+    for name, unit in (
+        _CONFIGURATION_VARIABLES
+        + _MODERN_CONFIGURATION_VARIABLES
+        + _CAPABILITY_VARIABLES
+    ):
         assert name and unit, f"unité manquante pour {name}"
 
 
@@ -143,6 +148,14 @@ class FakeClient:
             if "pause" in self.failing:
                 raise SimConnectError("état de pause indisponible")
             return {"MOTION SIMULATION": 1.0}
+        if variables == _MODERN_CONFIGURATION_VARIABLES:
+            if "modern_configuration" in self.failing:
+                raise SimConnectError("SimVars récentes indisponibles")
+            return {
+                "KOHLSMAN SETTING STD:1": 1.0,
+                "KOHLSMAN SETTING MB EX1:1": 1008.0,
+                "IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH": 1.0,
+            }
         if variables == _CAPABILITY_VARIABLES:
             if "capabilities" in self.failing:
                 raise SimConnectError("capacités indisponibles")
@@ -227,7 +240,9 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.spoilers_armed is True
     assert configuration.lights["landing"] is True
     assert configuration.lights["taxi"] is False
-    assert configuration.altimeter_hpa == 1013.25
+    assert configuration.altimeter_hpa == 1008.0
+    assert configuration.altimeter_std is True
+    assert configuration.interactive_points_crash_risk is True
     assert configuration.selected_altitude_ft == 6000.0
     assert configuration.nav1_frequency_mhz == pytest.approx(110.30)
     assert configuration.fuel_total_kg == 4200.0
@@ -235,6 +250,20 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.selected_heading_deg == 1.0
     assert configuration.nav1_course_deg == 253.0
     assert configuration.wind_direction_deg == 40.0
+
+
+def test_recent_simvars_can_fail_without_hiding_historical_configuration(monkeypatch):
+    source = SimConnectSource()
+    monkeypatch.setattr(
+        source, "_connect", lambda: FakeClient(failing=("modern_configuration",))
+    )
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.altimeter_hpa == 1013.25
+    assert configuration.altimeter_std is None
+    assert configuration.interactive_points_crash_risk is None
 
 
 def test_stale_control_simvars_fall_back_to_the_values_that_move(monkeypatch):

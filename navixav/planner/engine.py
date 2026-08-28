@@ -1118,6 +1118,8 @@ class CompletionEngine:
                 crosswind_kt=round(entry.crosswind_kt, 1),
                 length_ft=entry.runway.length_ft,
                 ils_ident=entry.runway.ils_ident,
+                edge_lights=entry.runway.edge_lights,
+                center_lights=entry.runway.center_lights,
             )
 
         if forced:

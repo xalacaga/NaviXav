@@ -15,6 +15,28 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [],
-  "fixed": []
+  "added": [
+    {
+      "fr": "Le suivi MSFS distingue désormais explicitement le calage STD du QNH, affiche les feux de bord et d’axe des pistes, et peut signaler une porte, trappe ou verrière ouverte présentant un risque.",
+      "en": "MSFS tracking now explicitly distinguishes STD from QNH, shows runway edge and centreline lighting, and can warn about an open door, hatch or canopy that presents a risk.",
+      "de": "Die MSFS-Verfolgung unterscheidet jetzt ausdrücklich zwischen STD und QNH, zeigt Rand- und Mittellinienbefeuerung der Pisten an und kann vor einer riskant geöffneten Tür, Luke oder Haube warnen.",
+      "es": "El seguimiento de MSFS ahora distingue explícitamente STD de QNH, muestra las luces de borde y eje de pista y puede avisar de una puerta, escotilla o cúpula abierta que suponga un riesgo.",
+      "it": "Il monitoraggio MSFS ora distingue esplicitamente STD da QNH, mostra le luci di bordo e asse pista e può segnalare una porta, un portello o un tettuccio aperto che rappresenta un rischio.",
+      "pt": "O acompanhamento do MSFS distingue agora explicitamente STD de QNH, mostra as luzes de borda e de eixo da pista e pode alertar para uma porta, escotilha ou cobertura aberta que represente um risco.",
+      "nl": "De MSFS-volgfunctie onderscheidt nu expliciet STD van QNH, toont baanrand- en baanasverlichting en kan waarschuwen voor een riskant geopende deur, klep of cockpitkap.",
+      "pl": "Śledzenie MSFS rozróżnia teraz bezpośrednio STD i QNH, pokazuje oświetlenie krawędzi oraz osi pasa i może ostrzegać o niebezpiecznie otwartych drzwiach, luku lub osłonie kabiny."
+    }
+  ],
+  "fixed": [
+    {
+      "fr": "les cartes ChartFox fournies sous forme d’image s’ajustent maintenant à la largeur du panneau Charts et suivent les boutons de zoom ; elles s’ouvraient trop grandes et les commandes restaient sans effet",
+      "en": "ChartFox charts delivered as images now fit the width of the Charts panel and follow the zoom buttons; they opened oversized and the controls had no effect",
+      "de": "als Bild gelieferte ChartFox-Karten passen sich nun der Breite des Charts-Bereichs an und folgen den Zoom-Schaltflächen; sie wurden zu groß geöffnet und die Bedienelemente blieben wirkungslos",
+      "es": "las cartas de ChartFox entregadas como imagen se ajustan ahora al ancho del panel Charts y siguen los botones de zoom; se abrían demasiado grandes y los controles no tenían efecto",
+      "it": "le carte ChartFox fornite come immagine si adattano ora alla larghezza del pannello Charts e seguono i pulsanti di zoom; si aprivano troppo grandi e i comandi non avevano effetto",
+      "pt": "as cartas ChartFox fornecidas como imagem ajustam-se agora à largura do painel Charts e seguem os botões de zoom; abriam demasiado grandes e os controlos não tinham efeito",
+      "nl": "ChartFox-kaarten die als afbeelding worden geleverd, passen nu in de breedte van het Charts-paneel en volgen de zoomknoppen; ze openden te groot en de knoppen deden niets",
+      "pl": "mapy ChartFox dostarczane jako obraz dopasowują się teraz do szerokości panelu Charts i reagują na przyciski powiększenia; otwierały się za duże, a przyciski nie działały"
+    }
+  ]
 }

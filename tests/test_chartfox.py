@@ -292,5 +292,16 @@ def test_chartfox_controls_are_present_in_settings_and_flight_charts():
     assert 'zoomOut.addEventListener("click"' in javascript
     assert 'zoomIn.addEventListener("click"' in javascript
     assert 'zoomFit.addEventListener("click"' in javascript
+    # Une carte ChartFox est souvent une image : elle a son propre cadre, dont
+    # le zoom passe par la largeur et non par des paramètres d'ouverture PDF.
+    assert 'frameIsImage = String(document_.type || "").startsWith("image/")' in javascript
+    assert 'image.style.width = zoomIsFit ? "100%" : `${zoomPercent}%`' in javascript
+    assert 'imageFrame.classList.remove("hidden")' in javascript
+    # Le fragment seul ne recharge pas la visionneuse : le zoom PDF resterait
+    # sans effet après le premier affichage.
+    assert 'frame.src = "about:blank"' in javascript
+    styles = (static / "app.css").read_text(encoding="utf-8")
+    assert ".sia-document-image-frame {" in styles
+    assert "overflow: auto" in styles
     gitignore = (static.parents[2] / ".gitignore").read_text(encoding="utf-8")
     assert "data/credentials/" in gitignore

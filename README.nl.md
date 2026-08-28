@@ -120,8 +120,10 @@ NaviXav gebruikt SimConnect om:
 - de positie van het vliegtuig in realtime te volgen;
 - hoogte, hoogte boven de grond, koers, grondsnelheid en verticale snelheid uit
   te lezen;
-- luchthavens, banen, procedures, waypoints en radionavigatiemiddelen op te
-  halen;
+- STD te onderscheiden van de QNH die op de hoogtemeter blijft ingesteld en
+  optioneel te waarschuwen voor een gevaarlijk geopende deur, klep of cockpitkap;
+- luchthavens, banen met baanrand- en baanasverlichting, procedures, waypoints
+  en radionavigatiemiddelen op te halen;
 - geleidelijk een lokale database op te bouwen in `data/navixav.sqlite`.
 
 De simulator moet draaien met een geladen vlucht om nieuwe gegevens op te

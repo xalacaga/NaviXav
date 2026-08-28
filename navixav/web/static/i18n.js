@@ -690,10 +690,10 @@
       chart_document: "Document",
       chart_show_pdf: "Afficher le PDF",
       chart_open_tab: "Ouvrir dans un nouvel onglet",
-      chart_zoom_out: "Réduire le PDF",
-      chart_zoom_in: "Agrandir le PDF",
+      chart_zoom_out: "Réduire la carte",
+      chart_zoom_in: "Agrandir la carte",
       chart_zoom_fit: "Largeur",
-      chart_zoom_fit_title: "Ajuster le PDF à la largeur disponible",
+      chart_zoom_fit_title: "Ajuster la carte à la largeur disponible",
       chart_zoom_level: "{level} %",
       chart_overlay: "Calque {provider}",
       chart_overlay_title: "Afficher la carte {provider} géoréférencée de cet aérodrome",
@@ -1410,10 +1410,10 @@
       chart_document: "Document",
       chart_show_pdf: "Show the PDF",
       chart_open_tab: "Open in a new tab",
-      chart_zoom_out: "Zoom out of the PDF",
-      chart_zoom_in: "Zoom into the PDF",
+      chart_zoom_out: "Zoom out of the chart",
+      chart_zoom_in: "Zoom into the chart",
       chart_zoom_fit: "Fit width",
-      chart_zoom_fit_title: "Fit the PDF to the available width",
+      chart_zoom_fit_title: "Fit the chart to the available width",
       chart_zoom_level: "{level}%",
       chart_overlay: "{provider} overlay",
       chart_overlay_title: "Show the georeferenced {provider} chart of this airport",
@@ -2560,46 +2560,79 @@
   });
 
   Object.assign(TRANSLATIONS.de, {
-    chart_zoom_out: "PDF verkleinern", chart_zoom_in: "PDF vergrößern", chart_zoom_fit: "Breite", chart_zoom_fit_title: "PDF an die verfügbare Breite anpassen", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Karte verkleinern", chart_zoom_in: "Karte vergrößern", chart_zoom_fit: "Breite", chart_zoom_fit_title: "Karte an die verfügbare Breite anpassen", chart_zoom_level: "{level} %",
     chart_source: "Quelle", chartfox_source_auto: "Automatisch", chartfox_source_official: "Offizielle Quelle", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Für den Zugriff auf ChartFox-AIRAC-Karten ist ein ChartFox-/VATSIM-Konto erforderlich.",
     chartfox_settings_help: "Verknüpfe dein ChartFox-/VATSIM-Konto, um Karten für die Flugplätze des Fluges hinzuzufügen.", chartfox_disconnected: "Nicht verbunden", chartfox_connected: "Verbunden", chartfox_connected_as: "Verbunden · {name}", chartfox_connect: "ChartFox verbinden", chartfox_disconnect: "Trennen", chartfox_waiting: "Verbindung im Browser…", chartfox_connect_failed: "ChartFox konnte nicht verbunden werden.", chartfox_connect_timeout: "Die ChartFox-Verbindung ist abgelaufen.", chartfox_status_failed: "ChartFox-Status nicht verfügbar", chartfox_credit: "Chart data powered by ChartFox · nur für Simulation", chartfox_simulation_only: "nur für Simulation",
     chartfox_checking_access: "Anzeigerechte werden geprüft…", chartfox_iframe_blocked: "Diese Quelle erlaubt keine eingebettete Anzeige. Öffne die Karte direkt auf ChartFox.", chartfox_preauth_required: "Diese Veröffentlichung erfordert eine vorherige Genehmigung. Öffne sie auf ChartFox.", chartfox_open_external: "Auf ChartFox öffnen", chartfox_access_unavailable: "ChartFox-Anzeigerechte konnten nicht geprüft werden.",
     chartfox_use_official: "Amtliche Quelle verwenden", chartfox_use_official_provider: "Mit {provider} in NaviXav anzeigen", chartfox_iframe_official_available: "Diese Quelle erlaubt keine eingebettete Anzeige, aber der amtliche Flugplatzkatalog ist direkt in NaviXav verfügbar.", chartfox_preauth_official_available: "Diese Veröffentlichung erfordert eine vorherige Genehmigung, aber der amtliche Flugplatzkatalog ist direkt in NaviXav verfügbar.",
   });
   Object.assign(TRANSLATIONS.es, {
-    chart_zoom_out: "Reducir el PDF", chart_zoom_in: "Ampliar el PDF", chart_zoom_fit: "Anchura", chart_zoom_fit_title: "Ajustar el PDF al ancho disponible", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Reducir la carta", chart_zoom_in: "Ampliar la carta", chart_zoom_fit: "Anchura", chart_zoom_fit_title: "Ajustar la carta al ancho disponible", chart_zoom_level: "{level} %",
     chart_source: "Fuente", chartfox_source_auto: "Automática", chartfox_source_official: "Fuente oficial", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Se necesita una cuenta de ChartFox/VATSIM para acceder a las cartas AIRAC de ChartFox.",
     chartfox_settings_help: "Vincula tu cuenta de ChartFox/VATSIM para añadir sus cartas a los aeropuertos del vuelo.", chartfox_disconnected: "Sin conexión", chartfox_connected: "Conectado", chartfox_connected_as: "Conectado · {name}", chartfox_connect: "Conectar ChartFox", chartfox_disconnect: "Desconectar", chartfox_waiting: "Conectando en el navegador…", chartfox_connect_failed: "No se pudo conectar ChartFox.", chartfox_connect_timeout: "La conexión con ChartFox ha caducado.", chartfox_status_failed: "Estado de ChartFox no disponible", chartfox_credit: "Chart data powered by ChartFox · solo simulación", chartfox_simulation_only: "solo simulación",
     chartfox_checking_access: "Comprobando los permisos de visualización…", chartfox_iframe_blocked: "Esta fuente no permite la visualización integrada. Abre la carta directamente en ChartFox.", chartfox_preauth_required: "Esta publicación requiere autorización previa. Ábrela en ChartFox.", chartfox_open_external: "Abrir en ChartFox", chartfox_access_unavailable: "No se pudieron comprobar los permisos de ChartFox.",
     chartfox_use_official: "Usar la fuente oficial", chartfox_use_official_provider: "Mostrar con {provider} en NaviXav", chartfox_iframe_official_available: "Esta fuente no permite la visualización integrada, pero el catálogo oficial del aeropuerto está disponible directamente en NaviXav.", chartfox_preauth_official_available: "Esta publicación requiere autorización previa, pero el catálogo oficial del aeropuerto está disponible directamente en NaviXav.",
   });
   Object.assign(TRANSLATIONS.it, {
-    chart_zoom_out: "Riduci il PDF", chart_zoom_in: "Ingrandisci il PDF", chart_zoom_fit: "Larghezza", chart_zoom_fit_title: "Adatta il PDF alla larghezza disponibile", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Riduci la carta", chart_zoom_in: "Ingrandisci la carta", chart_zoom_fit: "Larghezza", chart_zoom_fit_title: "Adatta la carta alla larghezza disponibile", chart_zoom_level: "{level} %",
     chart_source: "Fonte", chartfox_source_auto: "Automatica", chartfox_source_official: "Fonte ufficiale", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Per accedere alle carte AIRAC di ChartFox è necessario un account ChartFox/VATSIM.",
     chartfox_settings_help: "Collega il tuo account ChartFox/VATSIM per aggiungere le sue carte agli aeroporti del volo.", chartfox_disconnected: "Non connesso", chartfox_connected: "Connesso", chartfox_connected_as: "Connesso · {name}", chartfox_connect: "Connetti ChartFox", chartfox_disconnect: "Disconnetti", chartfox_waiting: "Connessione nel browser…", chartfox_connect_failed: "Impossibile connettere ChartFox.", chartfox_connect_timeout: "La connessione ChartFox è scaduta.", chartfox_status_failed: "Stato ChartFox non disponibile", chartfox_credit: "Chart data powered by ChartFox · solo simulazione", chartfox_simulation_only: "solo simulazione",
     chartfox_checking_access: "Verifica dei permessi di visualizzazione…", chartfox_iframe_blocked: "Questa fonte non consente la visualizzazione integrata. Apri la carta direttamente su ChartFox.", chartfox_preauth_required: "Questa pubblicazione richiede un'autorizzazione preventiva. Aprila su ChartFox.", chartfox_open_external: "Apri su ChartFox", chartfox_access_unavailable: "Impossibile verificare i permessi di ChartFox.",
     chartfox_use_official: "Usa la fonte ufficiale", chartfox_use_official_provider: "Mostra con {provider} in NaviXav", chartfox_iframe_official_available: "Questa fonte non consente la visualizzazione integrata, ma il catalogo ufficiale dell'aeroporto è disponibile direttamente in NaviXav.", chartfox_preauth_official_available: "Questa pubblicazione richiede un'autorizzazione preventiva, ma il catalogo ufficiale dell'aeroporto è disponibile direttamente in NaviXav.",
   });
   Object.assign(TRANSLATIONS.pt, {
-    chart_zoom_out: "Reduzir o PDF", chart_zoom_in: "Ampliar o PDF", chart_zoom_fit: "Largura", chart_zoom_fit_title: "Ajustar o PDF à largura disponível", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Reduzir a carta", chart_zoom_in: "Ampliar a carta", chart_zoom_fit: "Largura", chart_zoom_fit_title: "Ajustar a carta à largura disponível", chart_zoom_level: "{level} %",
     chart_source: "Fonte", chartfox_source_auto: "Automática", chartfox_source_official: "Fonte oficial", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "É necessária uma conta ChartFox/VATSIM para aceder às cartas AIRAC do ChartFox.",
     chartfox_settings_help: "Liga a tua conta ChartFox/VATSIM para adicionar as cartas aos aeroportos do voo.", chartfox_disconnected: "Não ligado", chartfox_connected: "Ligado", chartfox_connected_as: "Ligado · {name}", chartfox_connect: "Ligar ChartFox", chartfox_disconnect: "Desligar", chartfox_waiting: "A ligar no navegador…", chartfox_connect_failed: "Não foi possível ligar o ChartFox.", chartfox_connect_timeout: "A ligação ChartFox expirou.", chartfox_status_failed: "Estado ChartFox indisponível", chartfox_credit: "Chart data powered by ChartFox · apenas simulação", chartfox_simulation_only: "apenas simulação",
     chartfox_checking_access: "A verificar as permissões de visualização…", chartfox_iframe_blocked: "Esta fonte não permite visualização integrada. Abre a carta diretamente no ChartFox.", chartfox_preauth_required: "Esta publicação requer autorização prévia. Abre-a no ChartFox.", chartfox_open_external: "Abrir no ChartFox", chartfox_access_unavailable: "Não foi possível verificar as permissões do ChartFox.",
     chartfox_use_official: "Usar a fonte oficial", chartfox_use_official_provider: "Mostrar com {provider} no NaviXav", chartfox_iframe_official_available: "Esta fonte não permite visualização integrada, mas o catálogo oficial do aeródromo está disponível diretamente no NaviXav.", chartfox_preauth_official_available: "Esta publicação requer autorização prévia, mas o catálogo oficial do aeródromo está disponível diretamente no NaviXav.",
   });
   Object.assign(TRANSLATIONS.nl, {
-    chart_zoom_out: "PDF verkleinen", chart_zoom_in: "PDF vergroten", chart_zoom_fit: "Breedte", chart_zoom_fit_title: "PDF aan de beschikbare breedte aanpassen", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Kaart verkleinen", chart_zoom_in: "Kaart vergroten", chart_zoom_fit: "Breedte", chart_zoom_fit_title: "Kaart aan de beschikbare breedte aanpassen", chart_zoom_level: "{level} %",
     chart_source: "Bron", chartfox_source_auto: "Automatisch", chartfox_source_official: "Officiële bron", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Een ChartFox-/VATSIM-account is vereist voor toegang tot de AIRAC-kaarten van ChartFox.",
     chartfox_settings_help: "Koppel je ChartFox-/VATSIM-account om kaarten voor de luchthavens van de vlucht toe te voegen.", chartfox_disconnected: "Niet verbonden", chartfox_connected: "Verbonden", chartfox_connected_as: "Verbonden · {name}", chartfox_connect: "ChartFox verbinden", chartfox_disconnect: "Verbinding verbreken", chartfox_waiting: "Verbinden in de browser…", chartfox_connect_failed: "Kan ChartFox niet verbinden.", chartfox_connect_timeout: "De ChartFox-verbinding is verlopen.", chartfox_status_failed: "ChartFox-status niet beschikbaar", chartfox_credit: "Chart data powered by ChartFox · alleen simulatie", chartfox_simulation_only: "alleen simulatie",
     chartfox_checking_access: "Weergaverechten controleren…", chartfox_iframe_blocked: "Deze bron staat geen ingebedde weergave toe. Open de kaart rechtstreeks op ChartFox.", chartfox_preauth_required: "Deze publicatie vereist voorafgaande toestemming. Open haar op ChartFox.", chartfox_open_external: "Openen op ChartFox", chartfox_access_unavailable: "De ChartFox-weergaverechten konden niet worden gecontroleerd.",
     chartfox_use_official: "Officiële bron gebruiken", chartfox_use_official_provider: "Met {provider} in NaviXav tonen", chartfox_iframe_official_available: "Deze bron staat geen ingebedde weergave toe, maar de officiële luchthavencatalogus is rechtstreeks in NaviXav beschikbaar.", chartfox_preauth_official_available: "Deze publicatie vereist voorafgaande toestemming, maar de officiële luchthavencatalogus is rechtstreeks in NaviXav beschikbaar.",
   });
   Object.assign(TRANSLATIONS.pl, {
-    chart_zoom_out: "Pomniejsz PDF", chart_zoom_in: "Powiększ PDF", chart_zoom_fit: "Szerokość", chart_zoom_fit_title: "Dopasuj PDF do dostępnej szerokości", chart_zoom_level: "{level} %",
+    chart_zoom_out: "Pomniejsz mapę", chart_zoom_in: "Powiększ mapę", chart_zoom_fit: "Szerokość", chart_zoom_fit_title: "Dopasuj mapę do dostępnej szerokości", chart_zoom_level: "{level} %",
     chart_source: "Źródło", chartfox_source_auto: "Automatycznie", chartfox_source_official: "Źródło oficjalne", chartfox_source_chartfox: "ChartFox", chartfox_account_required: "Dostęp do map AIRAC ChartFox wymaga konta ChartFox/VATSIM.",
     chartfox_settings_help: "Połącz konto ChartFox/VATSIM, aby dodać mapy lotnisk dla bieżącego lotu.", chartfox_disconnected: "Nie połączono", chartfox_connected: "Połączono", chartfox_connected_as: "Połączono · {name}", chartfox_connect: "Połącz ChartFox", chartfox_disconnect: "Rozłącz", chartfox_waiting: "Łączenie w przeglądarce…", chartfox_connect_failed: "Nie udało się połączyć z ChartFox.", chartfox_connect_timeout: "Połączenie ChartFox wygasło.", chartfox_status_failed: "Stan ChartFox niedostępny", chartfox_credit: "Chart data powered by ChartFox · tylko do symulacji", chartfox_simulation_only: "tylko do symulacji",
     chartfox_checking_access: "Sprawdzanie uprawnień do wyświetlania…", chartfox_iframe_blocked: "To źródło nie zezwala na osadzone wyświetlanie. Otwórz mapę bezpośrednio w ChartFox.", chartfox_preauth_required: "Ta publikacja wymaga wcześniejszej zgody. Otwórz ją w ChartFox.", chartfox_open_external: "Otwórz w ChartFox", chartfox_access_unavailable: "Nie udało się sprawdzić uprawnień ChartFox.",
     chartfox_use_official: "Użyj źródła oficjalnego", chartfox_use_official_provider: "Pokaż przez {provider} w NaviXav", chartfox_iframe_official_available: "To źródło nie zezwala na osadzone wyświetlanie, ale oficjalny katalog lotniska jest dostępny bezpośrednio w NaviXav.", chartfox_preauth_official_available: "Ta publikacja wymaga wcześniejszej zgody, ale oficjalny katalog lotniska jest dostępny bezpośrednio w NaviXav.",
+  });
+
+  Object.assign(TRANSLATIONS.fr, {
+    alert_interactive_points_crash_risk: "Ouverture dangereuse détectée",
+    alert_interactive_points_crash_risk_action: "Fermer la porte, trappe ou verrière concernée",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    alert_interactive_points_crash_risk: "Unsafe opening detected",
+    alert_interactive_points_crash_risk_action: "Close the affected door, hatch or canopy",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    alert_interactive_points_crash_risk: "Gefährliche Öffnung erkannt",
+    alert_interactive_points_crash_risk_action: "Betroffene Tür, Luke oder Haube schließen",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    alert_interactive_points_crash_risk: "Apertura peligrosa detectada",
+    alert_interactive_points_crash_risk_action: "Cierra la puerta, escotilla o cúpula afectada",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    alert_interactive_points_crash_risk: "Apertura pericolosa rilevata",
+    alert_interactive_points_crash_risk_action: "Chiudi la porta, il portello o il tettuccio interessato",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    alert_interactive_points_crash_risk: "Abertura perigosa detetada",
+    alert_interactive_points_crash_risk_action: "Fecha a porta, escotilha ou cobertura afetada",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    alert_interactive_points_crash_risk: "Gevaarlijke opening gedetecteerd",
+    alert_interactive_points_crash_risk_action: "Sluit de betreffende deur, klep of cockpitkap",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    alert_interactive_points_crash_risk: "Wykryto niebezpieczne otwarcie",
+    alert_interactive_points_crash_risk_action: "Zamknij odpowiednie drzwi, luk lub osłonę kabiny",
   });
 
   const ELEMENTS = {
