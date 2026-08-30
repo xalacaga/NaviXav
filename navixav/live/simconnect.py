@@ -22,6 +22,7 @@ from navixav.live.base import (
     AircraftConfiguration,
     AircraftState,
     PositionUnavailable,
+    TrafficReport,
 )
 from navixav.msfs.client import SimConnectClient, SimConnectError
 
@@ -40,6 +41,29 @@ _VARIABLES = (
     ("VERTICAL SPEED", "Feet per minute"),
     ("SIM ON GROUND", "Bool"),
 )
+
+# Trafic voisin. Le bloc est volontairement court : il est lu pour chaque
+# appareil des environs, et chaque variable de plus se paie autant de fois.
+_TRAFFIC_VARIABLES = (
+    ("PLANE LATITUDE", "Degrees"),
+    ("PLANE LONGITUDE", "Degrees"),
+    ("PLANE ALTITUDE", "Feet"),
+    ("PLANE ALT ABOVE GROUND", "Feet"),
+    ("PLANE HEADING DEGREES TRUE", "Degrees"),
+    ("GROUND VELOCITY", "Knots"),
+    ("SIM ON GROUND", "Bool"),
+)
+
+# L'indicatif que le client réseau donne à l'appareil qu'il injecte. Une IA du
+# simulateur en porte un aussi, celui de son vol programmé.
+_TRAFFIC_CALLSIGN = "ATC ID"
+
+# Rayon d'énumération. Au sol on regarde son terrain, pas sa région : dix
+# kilomètres couvrent le plus vaste aérodrome et ses abords immédiats.
+_TRAFFIC_RADIUS_M = 10000
+
+# Un simulateur qui refuse l'énumération la refusera encore dans la seconde.
+_TRAFFIC_RETRY_DELAY_S = 60.0
 
 # État de session facultatif. Il reste séparé du bloc vital afin qu'un ancien
 # simulateur qui ne connaît pas cette SimVar ne fasse jamais tomber le suivi.
@@ -81,6 +105,7 @@ _CONFIGURATION_VARIABLES = (
     ("AUTOTHROTTLE ACTIVE", "Bool"),
     ("AUTOPILOT ALTITUDE LOCK VAR", "Feet"),
     ("AUTOPILOT HEADING LOCK DIR", "Degrees"),
+    ("COM ACTIVE FREQUENCY:1", "MHz"),
     ("NAV ACTIVE FREQUENCY:1", "MHz"),
     ("NAV LOCALIZER:1", "Degrees"),
     ("NAV HAS LOCALIZER:1", "Bool"),
@@ -108,6 +133,22 @@ _MODERN_CONFIGURATION_VARIABLES = (
     ("KOHLSMAN SETTING MB EX1:1", "Millibars"),
     ("IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH", "Bool"),
 )
+
+# État agrégé officiel des feux extérieurs. Certains avions complexes animent
+# correctement ce masque tout en laissant une ou plusieurs SimVars LIGHT ...
+# individuelles à zéro. La lecture reste indépendante : son refus ne doit pas
+# masquer toute la configuration avion.
+_LIGHT_STATE_VARIABLES = (("LIGHT STATES", "Mask"),)
+
+_LIGHT_STATE_BITS = {
+    "nav": 0x0001,
+    "beacon": 0x0002,
+    "landing": 0x0004,
+    "taxi": 0x0008,
+    "strobe": 0x0010,
+    "wing": 0x0080,
+    "logo": 0x0100,
+}
 
 # Bloc de capacités : lu une seule fois par avion chargé.
 _CAPABILITY_VARIABLES = (
@@ -141,6 +182,12 @@ _OPTIONAL_TIMEOUT_S = 1.5
 # ajouter une requête SimConnect à chaque rafraîchissement de l'interface.
 _AIRCRAFT_TITLE_REFRESH_S = 5.0
 
+# Quelques avions tiers laissent TITLE vide tout en publiant correctement leur
+# modèle ATC. TITLE reste prioritaire car il est plus descriptif ; ATC MODEL
+# fournit une identité minimale issue du simulateur au lieu de retomber sur
+# l'appareil du plan SimBrief.
+_AIRCRAFT_TITLE_VARIABLES = ("TITLE", "ATC MODEL")
+
 
 class SimConnectSource:
     """Lecture directe dans le simulateur, sans application intermédiaire."""
@@ -152,6 +199,7 @@ class SimConnectSource:
         self._failure_reason = ""
         self._configuration_disabled_until = 0.0
         self._modern_configuration_disabled_until = 0.0
+        self._light_states_disabled_until = 0.0
         self._pause_disabled_until = 0.0
         self._capabilities: AircraftCapabilities | None = None
         self._capabilities_disabled_until = 0.0
@@ -165,6 +213,7 @@ class SimConnectSource:
         self._aircraft_title = ""
         self._aircraft_title_checked_at = 0.0
         self._aircraft_title_disabled_until = 0.0
+        self._traffic_disabled_until = 0.0
 
     @property
     def name(self) -> str:
@@ -235,6 +284,52 @@ class SimConnectSource:
                 configuration=self._read_configuration(client),
             )
 
+    def traffic(self, radius_m: int = _TRAFFIC_RADIUS_M) -> list[TrafficReport]:
+        """Appareils présents autour de l'avion du joueur.
+
+        Le simulateur inclut le joueur dans sa propre énumération : il est
+        écarté par son identifiant d'objet, appris lors du dernier relevé de
+        position. Le comparer par la distance ferait disparaître un appareil
+        stationné au poste voisin.
+
+        Un refus met la lecture en sommeil au lieu de la retenter chaque
+        seconde : le trafic est un confort, jamais une raison de peser sur le
+        simulateur.
+        """
+        if time.monotonic() < self._traffic_disabled_until:
+            return []
+
+        with self._lock:
+            client = self._connect()
+            try:
+                rows = client.read_objects(
+                    _TRAFFIC_VARIABLES, radius_m, text_variable=_TRAFFIC_CALLSIGN
+                )
+            except SimConnectError as exc:
+                self._traffic_disabled_until = time.monotonic() + _TRAFFIC_RETRY_DELAY_S
+                logger.info("Trafic du simulateur indisponible : %s", exc)
+                return []
+
+            own = client.user_object_id
+            reports: list[TrafficReport] = []
+            for row in rows:
+                if own is not None and row.get("object_id") == own:
+                    continue
+                reports.append(
+                    TrafficReport(
+                        object_id=int(row.get("object_id", 0)),
+                        latitude=row["PLANE LATITUDE"],
+                        longitude=row["PLANE LONGITUDE"],
+                        callsign=str(row.get(_TRAFFIC_CALLSIGN, "")).strip().upper(),
+                        altitude_ft=row["PLANE ALTITUDE"],
+                        height_above_ground_ft=row["PLANE ALT ABOVE GROUND"],
+                        heading_true_deg=row["PLANE HEADING DEGREES TRUE"] % 360,
+                        ground_speed_kt=row["GROUND VELOCITY"],
+                        on_ground=bool(row["SIM ON GROUND"]),
+                    )
+                )
+            return reports
+
     # ------------------------------------------------------------------ #
 
     def _read_aircraft_title(self, client: SimConnectClient) -> str:
@@ -251,14 +346,25 @@ class SimConnectSource:
         reader = getattr(client, "read_string_simvar", None)
         if not callable(reader):
             return self._aircraft_title
-        try:
-            title = str(reader("TITLE", timeout_s=_OPTIONAL_TIMEOUT_S)).strip()
-        except SimConnectError as exc:
+        errors: list[SimConnectError] = []
+        title = ""
+        for variable in _AIRCRAFT_TITLE_VARIABLES:
+            try:
+                title = str(
+                    reader(variable, timeout_s=_OPTIONAL_TIMEOUT_S)
+                ).strip()
+            except SimConnectError as exc:
+                errors.append(exc)
+                continue
+            if title:
+                break
+
+        if not title and len(errors) == len(_AIRCRAFT_TITLE_VARIABLES):
             self._aircraft_title_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
             logger.info(
                 "Titre avion indisponible, nouvelle tentative dans %.0f s (%s)",
                 _OPTIONAL_RETRY_DELAY_S,
-                exc,
+                errors[-1],
             )
         else:
             self._aircraft_title_checked_at = now
@@ -269,6 +375,7 @@ class SimConnectSource:
                     self._capabilities_disabled_until = 0.0
                     self._configuration_disabled_until = 0.0
                     self._modern_configuration_disabled_until = 0.0
+                    self._light_states_disabled_until = 0.0
                     self._parking_brake_raw = None
                     self._parking_brake_state = None
                     self._flaps_raw = None
@@ -358,6 +465,7 @@ class SimConnectSource:
                 parking_brake = bool(fenix["L:S_MIP_PARKING_BRAKE"])
 
         modern = self._read_modern_configuration(client)
+        lights = self._read_lights(client, values)
         return AircraftConfiguration(
             gear_handle_down=bool(values["GEAR HANDLE POSITION"]),
             gear_extended_pct=min(gear_positions),
@@ -374,15 +482,7 @@ class SimConnectSource:
             ),
             spoilers_armed=spoilers_armed,
             parking_brake=parking_brake,
-            lights={
-                "landing": bool(values["LIGHT LANDING"]),
-                "taxi": bool(values["LIGHT TAXI"]),
-                "strobe": bool(values["LIGHT STROBE"]),
-                "nav": bool(values["LIGHT NAV"]),
-                "beacon": bool(values["LIGHT BEACON"]),
-                "logo": bool(values["LIGHT LOGO"]),
-                "wing": bool(values["LIGHT WING"]),
-            },
+            lights=lights,
             altimeter_hpa=modern.get(
                 "KOHLSMAN SETTING MB EX1:1", values["KOHLSMAN SETTING MB"]
             ),
@@ -400,6 +500,7 @@ class SimConnectSource:
             autothrottle_active=bool(values["AUTOTHROTTLE ACTIVE"]),
             selected_altitude_ft=values["AUTOPILOT ALTITUDE LOCK VAR"],
             selected_heading_deg=values["AUTOPILOT HEADING LOCK DIR"] % 360,
+            com1_frequency_mhz=values["COM ACTIVE FREQUENCY:1"],
             nav1_frequency_mhz=values["NAV ACTIVE FREQUENCY:1"],
             nav1_course_deg=values["NAV LOCALIZER:1"] % 360,
             nav1_has_localizer=bool(values["NAV HAS LOCALIZER:1"]),
@@ -446,6 +547,44 @@ class SimConnectSource:
                 exc,
             )
             return {}
+
+    def _read_lights(
+        self, client: SimConnectClient, values: dict[str, float]
+    ) -> dict[str, bool]:
+        """Recoupe les interrupteurs individuels avec le masque officiel.
+
+        Plusieurs avions tiers publient seulement l'une des deux formes. Un
+        feu est donc actif dès qu'au moins une source officielle le confirme.
+        """
+        lights = {
+            "landing": bool(values["LIGHT LANDING"]),
+            "taxi": bool(values["LIGHT TAXI"]),
+            "strobe": bool(values["LIGHT STROBE"]),
+            "nav": bool(values["LIGHT NAV"]),
+            "beacon": bool(values["LIGHT BEACON"]),
+            "logo": bool(values["LIGHT LOGO"]),
+            "wing": bool(values["LIGHT WING"]),
+        }
+        now = time.monotonic()
+        if now < self._light_states_disabled_until:
+            return lights
+        try:
+            aggregate = client.read_simvars(
+                _LIGHT_STATE_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+            )
+        except SimConnectError as exc:
+            self._light_states_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info(
+                "Masque des feux indisponible, nouvelle tentative dans %.0f s (%s)",
+                _OPTIONAL_RETRY_DELAY_S,
+                exc,
+            )
+            return lights
+
+        mask = int(round(aggregate["LIGHT STATES"]))
+        for name, bit in _LIGHT_STATE_BITS.items():
+            lights[name] = lights[name] or bool(mask & bit)
+        return lights
 
     def _resolve_parking_brake(self, position: float, indicator: float) -> bool:
         """Suit celle des deux SimVars de frein qui change réellement.
@@ -544,6 +683,8 @@ class SimConnectSource:
         )
         return self._capabilities
 
+    # ------------------------------------------------------------------ #
+
     def _reset(self) -> None:
         if self._client is not None:
             try:
@@ -557,6 +698,7 @@ class SimConnectSource:
         self._capabilities_disabled_until = 0.0
         self._configuration_disabled_until = 0.0
         self._modern_configuration_disabled_until = 0.0
+        self._light_states_disabled_until = 0.0
         self._pause_disabled_until = 0.0
         self._parking_brake_raw = None
         self._parking_brake_state = None
@@ -567,6 +709,7 @@ class SimConnectSource:
         self._aircraft_title = ""
         self._aircraft_title_checked_at = 0.0
         self._aircraft_title_disabled_until = 0.0
+        self._traffic_disabled_until = 0.0
 
     def close(self) -> None:
         with self._lock:

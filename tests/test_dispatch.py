@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from navixav.format import clock, duration, mass, ratio
+from navixav.format import clock, duration, mass, percentage, ratio
 from navixav.planner.engine import CompletionEngine
 from navixav.preferences import AirportPreferences
 from navixav.simbrief.parser import parse_ofp
@@ -12,6 +12,7 @@ def test_units_and_weights(ofp):
     d = ofp.dispatch
     assert d.unit_label == "kg"
     assert d.zfw == 60340
+    assert d.zfwcg == 25.4
     assert d.max_zfw == 64300
     assert d.takeoff_weight == 66077
     assert d.landing_weight == 62937
@@ -75,6 +76,7 @@ def test_dispatch_is_serialised_without_empty_fields(provider, settings, ofp):
     plan = CompletionEngine(provider, settings, AirportPreferences.load()).complete(ofp)
     payload = plan.to_dict()["dispatch"]
     assert payload["block_fuel"] == 5737
+    assert payload["zfwcg"] == 25.4
     # Zéro est une valeur réelle (« pas de carburant supplémentaire ») et doit
     # être conservée ; seuls les champs absents de l'OFP sont omis.
     assert payload["extra_fuel"] == 0
@@ -89,6 +91,11 @@ def test_dispatch_is_serialised_without_empty_fields(provider, settings, ofp):
 
 def test_mass_uses_thin_separators():
     assert mass(60340, "kg") == "60 340 kg"
+
+
+def test_percentage_omits_an_unnecessary_decimal():
+    assert percentage(25.0) == "25%"
+    assert percentage(25.4) == "25.4%"
 
 
 def test_ratio_shows_the_remaining_margin():

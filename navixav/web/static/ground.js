@@ -26,10 +26,16 @@ const GROUND = (() => {
 
   const EARTH_RADIUS_M = 6378137;
 
+  /* Hauteur au-dessus du terrain au-delà de laquelle un appareil ne regarde
+     plus le roulage. Mille pieds laissent la courte finale visible, qui
+     commande la traversée de piste, et écartent le survol. */
+  const TRAFFIC_CEILING_FT = 1000;
+
   const view = { scale: 0.35, centerX: 0, centerY: 0, follow: true };
   let chart = null;
   let plan = null;
   let aircraft = null;
+  let traffic = [];
   let travelled = 0;
   let dragging = null;
   let fitPending = false;
@@ -160,6 +166,7 @@ const GROUND = (() => {
     drawParkings();
     drawRoute();
     drawRouteLabels();
+    drawTraffic();
     drawAircraft();
     drawScaleBar();
     drawNorthArrow();
@@ -382,12 +389,14 @@ const GROUND = (() => {
     const points = [];
     for (const leg of plan.legs) {
       // Chaque point retient d'où vient le tronçon qui y mène : c'est ce qui
-      // permet de tracer autrement ce que NaviXav a ajouté à la clairance.
+      // permet de tracer autrement ce que NaviXav a ajouté à la clairance, et
+      // la portion que l'avion ne roule pas mais se fait repousser.
       const cleared = leg.from_clearance !== false;
+      const push = leg.kind === "pushback";
       for (const point of leg.points || []) {
         const last = points[points.length - 1];
         if (last && last.x === point.x && last.y === point.y) continue;
-        points.push({ x: point.x, y: point.y, cleared });
+        points.push({ x: point.x, y: point.y, cleared, push });
       }
     }
     return points;
@@ -431,6 +440,9 @@ const GROUND = (() => {
       // Ce que le contrôleur n'a pas dit se trace en pointillé : le pilote doit
       // pouvoir lire sur le tracé où s'arrête sa clairance.
       const cleared = to.cleared !== false;
+      // Le repoussage se parcourt en marche arrière, derrière un tracteur : sa
+      // couleur et son pointillé serré le distinguent du roulage.
+      const push = to.push === true;
       for (const [a, b, done] of pieces) {
         const [x1, y1] = toScreen(a.x, a.y);
         const [x2, y2] = toScreen(b.x, b.y);
@@ -446,7 +458,10 @@ const GROUND = (() => {
 
         const width = Math.max(3, Math.min(8, 12 * view.scale));
         if (!cleared) context.setLineDash([width * 2.2, width * 1.8]);
-        context.strokeStyle = css(done ? "--taxi-done" : "--taxi-ahead");
+        else if (push) context.setLineDash([width * 0.9, width * 1.1]);
+        context.strokeStyle = css(
+          done ? "--taxi-done" : push ? "--taxi-push" : "--taxi-ahead"
+        );
         context.globalAlpha = done ? 0.5 : cleared ? 1 : 0.75;
         context.lineWidth = width;
         context.beginPath();
@@ -508,7 +523,7 @@ const GROUND = (() => {
     const placed = new Set();
     const occupied = [];
     for (const leg of plan.legs) {
-      if (!leg.name || leg.kind === "stand" || leg.kind === "join") continue;
+      if (!leg.name || ["stand", "pushback", "join"].includes(leg.kind)) continue;
       if (placed.has(leg.name)) continue;
       const points = leg.points || [];
       if (points.length < 2) continue;
@@ -541,6 +556,66 @@ const GROUND = (() => {
     context.restore();
   }
 
+  /**
+   * Trafic voisin, lu dans le simulateur.
+   *
+   * Le relevé vient du simulateur et non du réseau : au roulage, quinze
+   * secondes de vieillissement valent cent cinquante mètres, et l'appareil
+   * apparaîtrait sur la voie d'à côté.
+   *
+   * Ce qui survole le terrain haut est écarté — un avion à trois mille pieds
+   * ne concerne pas celui qui roule — mais l'arrivée en courte finale reste
+   * dessinée, creuse, car elle décide de la traversée de piste.
+   */
+  function drawTraffic() {
+    if (!traffic.length) return;
+    const labelled = view.scale >= 0.9;
+
+    context.save();
+    for (const entry of traffic) {
+      if ((entry.height_above_ground_ft ?? 0) > TRAFFIC_CEILING_FT) continue;
+      const position = toLocal(entry.latitude, entry.longitude);
+      if (!position) continue;
+      const [x, y] = toScreen(position.x, position.y);
+      if (
+        x < -40 || y < -40
+        || x > canvas.clientWidth + 40 || y > canvas.clientHeight + 40
+      ) continue;
+
+      const airborne = !entry.on_ground;
+      context.save();
+      context.translate(x, y);
+      context.rotate(((entry.heading_true_deg ?? 0) * Math.PI) / 180);
+      context.scale(0.72, 0.72);
+      context.strokeStyle = css("--ground-traffic");
+      context.lineWidth = airborne ? 2.2 : 1.8;
+      aircraftPath();
+      if (airborne) {
+        context.stroke();
+      } else {
+        context.fillStyle = css("--ground-traffic");
+        context.fill();
+        context.strokeStyle = css("--ground-bg");
+        context.stroke();
+      }
+      context.restore();
+
+      if (!labelled || !entry.callsign) continue;
+      context.save();
+      context.font = "600 10px 'Inter', system-ui, sans-serif";
+      context.textAlign = "left";
+      context.textBaseline = "middle";
+      context.lineWidth = 3;
+      context.lineJoin = "round";
+      context.strokeStyle = css("--ground-bg");
+      context.fillStyle = css("--ground-traffic");
+      context.strokeText(entry.callsign, x + 12, y - 10);
+      context.fillText(entry.callsign, x + 12, y - 10);
+      context.restore();
+    }
+    context.restore();
+  }
+
   function drawAircraft() {
     if (!aircraft) return;
     const position = toLocal(aircraft.latitude, aircraft.longitude);
@@ -555,7 +630,14 @@ const GROUND = (() => {
     context.strokeStyle = css("--ground-bg");
     context.lineWidth = 1.5;
 
-    // Silhouette simple : fuselage, ailes et empennage.
+    aircraftPath();
+    context.fill();
+    context.stroke();
+    context.restore();
+  }
+
+  /** Silhouette simple : fuselage, ailes et empennage. */
+  function aircraftPath() {
     context.beginPath();
     context.moveTo(0, -13);
     context.lineTo(2.6, -4);
@@ -574,9 +656,6 @@ const GROUND = (() => {
     context.lineTo(-14, 3);
     context.lineTo(-2.6, -4);
     context.closePath();
-    context.fill();
-    context.stroke();
-    context.restore();
   }
 
   function drawScaleBar() {
@@ -737,6 +816,17 @@ const GROUND = (() => {
      */
     setProgress(metres) {
       travelled = Number.isFinite(metres) ? metres : 0;
+      draw();
+    },
+    /** Trafic voisin, en latitude/longitude, tel que le simulateur le voit. */
+    setTraffic(list) {
+      traffic = (Array.isArray(list) ? list : []).filter((entry) => (
+        Number.isFinite(entry?.latitude) && Number.isFinite(entry?.longitude)
+      ));
+      draw();
+    },
+    clearTraffic() {
+      traffic = [];
       draw();
     },
     setAircraft(state) {

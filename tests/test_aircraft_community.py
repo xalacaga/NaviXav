@@ -185,6 +185,29 @@ def test_la_vignette_de_l_appareil_ou_de_sa_texture_est_reutilisee(community: Pa
     assert widget.thumbnail == thumbnail
 
 
+def test_un_addon_pilotable_reste_visible_si_isairtraffic_est_mal_renseigne(
+    community: Path,
+):
+    directory = make_package(
+        community, "vendor-rafale", "rafale",
+        titles=["Rafale M", "Rafale M Camo"],
+        manufacturer="Dassault", ui_type="Rafale M", icao="RFAL",
+        engines=2, engine_type=1,
+    )
+    config = directory / "aircraft.cfg"
+    config.write_text(
+        config.read_text(encoding="cp1252").replace(
+            'ui_type = "Rafale M"', 'ui_type = "Rafale M"\nisAirTraffic = 1'
+        ),
+        encoding="cp1252",
+    )
+    (directory / "cockpit.cfg").write_text("[VIEWS]", encoding="utf-8")
+
+    rafale = next(a for a in scan([community]) if a.icao == "RFAL")
+
+    assert rafale.titles == ("Rafale M", "Rafale M Camo")
+
+
 def test_la_survey_separe_le_couvert_du_reste(community: Path):
     report = survey(AircraftMatcher(DB_ROOT), [community])
     assert report.total == 3

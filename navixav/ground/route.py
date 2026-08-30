@@ -133,6 +133,7 @@ def find_route(
     costs: TaxiCosts = DEFAULT_COSTS,
     *,
     require_kinds: bool = True,
+    initial_heading: float | None = None,
 ) -> TaxiRoute:
     """Meilleur itinéraire de `start` vers `goal`, chacun pouvant être multiple.
 
@@ -202,6 +203,14 @@ def find_route(
             if not costs.allows(edge):
                 continue
             following = edge.other(node)
+            # Après l'atterrissage, le premier tronçon de piste ne peut pas
+            # repartir vers le seuil déjà franchi. Une sortie latérale reste
+            # permise ; seul un départ à plus de 90° du cap piste est écarté.
+            if arrived_by is None and initial_heading is not None and edge.is_runway:
+                bearing = _bearing(graph, node, following)
+                difference = (bearing - initial_heading + 180.0) % 360.0 - 180.0
+                if abs(difference) > 90.0:
+                    continue
             # Un demi-tour sur place n'est pas manœuvrable par un aéronef.
             if arrived_by is not None and following == _origin(arrived_by, node):
                 continue
@@ -506,6 +515,7 @@ def _build_route(
     nodes = tuple(state[0] for state in states)
     edges = tuple(state[1] for state in states[1:] if state[1] is not None)
     legs = _split_into_legs(graph, nodes, edges, tuple(cleared))
+    _validate_runway_crossings(graph, nodes, edges, legs)
     return TaxiRoute(
         icao=graph.icao,
         nodes=nodes,
@@ -545,7 +555,11 @@ def _split_into_legs(
 
     for position, edge in enumerate(edges):
         changes_origin = bool(current) and origins[position] != current_origin
-        opens_leg = changes_origin or (
+        enters_runway = bool(current) and edge.is_runway and not current[-1].is_runway
+        crosses_runway = bool(current) and bool(_crossing_runways_at_node(
+            graph, nodes[position], current[-1], edge
+        ))
+        opens_leg = changes_origin or enters_runway or crosses_runway or (
             bool(edge.name) and current and edge.name != current_name
         )
         if opens_leg:
@@ -571,6 +585,96 @@ def _split_into_legs(
         from_clearance=current_origin,
     ))
     return tuple(legs)
+
+
+def _crossing_runways_at_node(
+    graph: TaxiGraph,
+    node: int,
+    incoming: TaxiEdge,
+    outgoing: TaxiEdge,
+) -> tuple[str, ...]:
+    """Pistes réellement traversées par deux segments de taxiway.
+
+    Toucher un nœud de piste ne suffit pas : deux raccordements peuvent rester
+    du même côté de la ligne médiane. Les extrémités doivent se trouver de part
+    et d'autre de l'axe publié par MSFS. Cette distinction évite de créer une
+    fausse attente lors d'un virage effectué entièrement avant la piste.
+    """
+    if incoming.is_runway or outgoing.is_runway:
+        return ()
+    centre = graph.nodes[node]
+    before = graph.nodes[incoming.other(node)]
+    after = graph.nodes[outgoing.other(node)]
+    crossed: set[str] = set()
+    for runway_edge in graph.neighbours(node):
+        if not runway_edge.is_runway or not runway_edge.runway:
+            continue
+        runway_point = graph.nodes[runway_edge.other(node)]
+        axis_x = runway_point.x - centre.x
+        axis_y = runway_point.y - centre.y
+        before_side = axis_x * (before.y - centre.y) - axis_y * (before.x - centre.x)
+        after_side = axis_x * (after.y - centre.y) - axis_y * (after.x - centre.x)
+        if before_side * after_side < -1e-6:
+            crossed.add(runway_edge.runway)
+    return tuple(sorted(crossed))
+
+
+def _validate_runway_crossings(
+    graph: TaxiGraph,
+    nodes: tuple[int, ...],
+    edges: tuple[TaxiEdge, ...],
+    legs: tuple[RouteLeg, ...],
+) -> None:
+    """Refuse toute traversée de piste qui ne porte pas une attente explicite.
+
+    Le découpage normal sait annoncer les entrées par un segment de piste et
+    les croisements topologiques. Le contrôle final reste volontairement
+    indépendant : une future modification du regroupement des portions ne doit
+    jamais pouvoir rendre une traversée silencieuse.
+    """
+    if not edges:
+        return
+
+    announced = {
+        (leg.points[-1], leg.hold_short)
+        for leg in legs
+        if leg.points and leg.hold_short
+    }
+    required: set[tuple[tuple[float, float], str]] = set()
+
+    for position in range(1, len(nodes) - 1):
+        for runway in _crossing_runways_at_node(
+            graph, nodes[position], edges[position - 1], edges[position]
+        ):
+            point = graph.nodes[nodes[position]]
+            required.add(((point.x, point.y), runway))
+
+    for position, edge in enumerate(edges):
+        if not edge.is_runway or position == 0 or edges[position - 1].is_runway:
+            continue
+        point = graph.nodes[nodes[position]]
+        if edge.runway:
+            required.add(((point.x, point.y), edge.runway))
+
+    # Un départ s'arrête au raccordement avec sa piste sans parcourir le
+    # segment de piste lui-même : cette limite doit elle aussi être annoncée.
+    if not edges[-1].is_runway:
+        final = graph.nodes[nodes[-1]]
+        for edge in graph.neighbours(nodes[-1]):
+            if edge.is_runway and edge.runway:
+                required.add(((final.x, final.y), edge.runway))
+
+    missing = sorted(required - announced, key=lambda item: item[1])
+    if missing:
+        runway = missing[0][1]
+        raise GroundError(
+            f"Le tracé calculé à {graph.icao} traverse la piste {runway} "
+            "sans point d'attente exploitable ; route refusée.",
+            code="ground_unsafe_runway_crossing",
+            icao=graph.icao,
+            runway=runway,
+        )
+
 
 
 def _leg(

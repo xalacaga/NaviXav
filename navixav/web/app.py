@@ -11,9 +11,9 @@ import copy
 import html
 import ipaddress
 import logging
-import math
 import re
 import socket
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -32,7 +32,7 @@ from navixav.aircraft.community import community_folders, scan, survey
 from navixav.aircraft.scaffold import write_entry
 from navixav.aircraft.procedures import procedure_payload
 from navixav.changelog import load_changelog
-from navixav.chart import EARTH_RADIUS_M, build_chart
+from navixav.chart import build_chart
 from navixav.chartfox import ChartFoxClient, ChartFoxError
 from navixav.ground import (
     DEPARTURE,
@@ -44,6 +44,7 @@ from navixav.ground import (
     replan,
     replan_needed,
 )
+
 from navixav.config import (
     Settings,
     load_user_settings,
@@ -51,8 +52,6 @@ from navixav.config import (
 )
 from navixav.faa import FaaClient, FaaError
 from navixav.live import LiveTracker, PositionUnavailable
-from navixav.live.demo import DemoSource
-from navixav.live.demo_flight import DemoFlightSource
 from navixav.national_aip import (
     NATIONAL_AIP_SOURCES,
     NationalAipClient,
@@ -67,11 +66,16 @@ from navixav.preferences import AirportPreferences
 from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 from navixav.sia import SiaClient, SiaError
+from navixav.traffic.base import is_own_position
+from navixav.traffic.fsltl import detect_fsltl
+from navixav.traffic.ivao import IvaoClient, IvaoError
+from navixav.traffic.opensky import OpenSkyClient, OpenSkyError
+from navixav.traffic.service import TrafficService
+from navixav.vatsim import VatsimClient, VatsimError
 from navixav.updater import GitHubUpdater, UpdateError
 from navixav.weather.briefing import build_briefing
 
 STATIC_DIR = resource_path("navixav", "web", "static")
-DEMO_OFP = resource_path("tests", "data", "ofp_lcph_eham.json")
 FAA_ICAO_PREFIXES = {
     "PA", "PF", "PG", "PH", "PJ", "PM", "PO", "PW",
     "NS", "TI", "TJ",
@@ -81,7 +85,6 @@ WEATHER_REFRESH_SECONDS = 300
 
 
 class PlanRequest(BaseModel):
-    demo: bool = False
     departure_runway: str | None = None
     sid: str | None = None
     sid_transition: str | None = None
@@ -127,6 +130,11 @@ class SettingsRequest(BaseModel):
     taxi_speed_limit_kt: int = Field(default=25, ge=1, le=60)
     taxi_turn_speed_limit_kt: int = Field(default=10, ge=1, le=60)
     taxi_speed_alarm_sound: bool = True
+    vatsim_enabled: bool = False
+    traffic_enabled: bool = False
+    traffic_source: str = Field(default="vatsim", pattern="^(vatsim|ivao|opensky)$")
+    aircraft_models: str = Field(default="fsltl", pattern="^fsltl$")
+    fsltl_path: str = Field(default="", max_length=1000)
     aircraft_community_path: str = Field(default="", max_length=1000)
     lan_enabled: bool = False
 
@@ -170,6 +178,9 @@ def _local_ipv4() -> str | None:
 def create_app(
     settings: Settings | None = None,
     chartfox_client: ChartFoxClient | None = None,
+    vatsim_client: VatsimClient | None = None,
+    ivao_client: IvaoClient | None = None,
+    opensky_client: OpenSkyClient | None = None,
 ) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
@@ -181,11 +192,52 @@ def create_app(
         for source in NATIONAL_AIP_SOURCES
     }
     chartfox = chartfox_client or ChartFoxClient()
-    demo_state: dict[str, Any] = {}
+    vatsim = vatsim_client or VatsimClient()
+    ivao = ivao_client or IvaoClient()
+    opensky = opensky_client or OpenSkyClient(
+        lambda: (lambda state: (state.latitude, state.longitude))(tracker.read())
+    )
     current_plan_state: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
     aircraft_matcher = AircraftMatcher()
+
+    def detect_configured_fsltl():
+        folders = (
+            community_folders(explicit=[settings.aircraft_community_path])
+            if settings.aircraft_community_path
+            else None
+        )
+        return detect_fsltl(folders, explicit_path=settings.fsltl_path)
+
     resources_closed = False
+
+    def selected_traffic_provider():
+        if settings.traffic_source == "ivao":
+            return ivao
+        if settings.traffic_source == "opensky":
+            return opensky
+        return vatsim
+
+    def player_position() -> tuple[float, float]:
+        state = tracker.read()
+        return state.latitude, state.longitude
+
+    def player_altitude() -> float | None:
+        return tracker.read().altitude_ft
+
+    # L'injection possède son état plutôt que de le partager par fermeture :
+    # son fil, son gestionnaire et sa détection FSLTL restent interrogeables,
+    # au lieu d'être invisibles depuis l'extérieur de create_app.
+    traffic = TrafficService(detect_configured_fsltl, player_position, player_altitude)
+
+    def configure_traffic_injection() -> None:
+        # Choisir une source de trafic, c'est demander à la voir voler : le
+        # calque de la carte est le seul interrupteur, et ce qu'il montre entre
+        # dans le simulateur. Aucun second réglage ne vient le contredire.
+        traffic.configure(
+            enabled=settings.traffic_enabled,
+            provider=selected_traffic_provider(),
+        )
 
     def close_resources() -> None:
         """Ferme une seule fois toutes les connexions détenues par l'API."""
@@ -194,7 +246,11 @@ def create_app(
             return
         resources_closed = True
         LOGGER.info("Fermeture des connexions et sessions NaviXav")
+        traffic.close()
         tracker.close()
+        vatsim.close()
+        ivao.close()
+        opensky.close()
         sia.session.close()
         faa.session.close()
         chartfox.close()
@@ -218,6 +274,7 @@ def create_app(
     # démarrer un serveur ASGI. Ils doivent néanmoins emprunter le même chemin
     # de fermeture que le cycle de vie FastAPI.
     app.state.close_resources = close_resources
+    configure_traffic_injection()
 
     @app.middleware("http")
     async def log_relevant_requests(request: Request, call_next):
@@ -247,8 +304,8 @@ def create_app(
                 "/api/aircraft/scaffold",
                 "/api/simbrief/new",
                 "/api/support/open",
+                "/api/fsltl/download",
                 "/api/update/install",
-                "/api/demo/restart",
                 "/api/shutdown",
             } or (
                 request.url.path == "/api/plan" and request.method == "POST"
@@ -337,7 +394,6 @@ def create_app(
             "simbrief_target": settings.describe_simbrief_target(),
             "metar_source": settings.metar_source,
             "rnp_capable": settings.aircraft_rnp_capable,
-            "demo_available": DEMO_OFP.is_file(),
             "remote_client": remote_client,
             "lan_active": lan_active,
             "lan_url": f"http://{address}:{port}/" if address else "",
@@ -349,6 +405,12 @@ def create_app(
             "taxi_speed_limit_kt": settings.taxi_speed_limit_kt,
             "taxi_turn_speed_limit_kt": settings.taxi_turn_speed_limit_kt,
             "taxi_speed_alarm_sound": settings.taxi_speed_alarm_sound,
+            "vatsim_enabled": settings.vatsim_enabled,
+            "traffic_enabled": settings.traffic_enabled,
+            "traffic_injection_active": traffic.active,
+            "traffic_source": settings.traffic_source,
+            "aircraft_models": settings.aircraft_models,
+            "fsltl": traffic.fsltl.to_dict(),
             "chartfox_connected": bool(chartfox.status().get("connected")),
             "navdata": navdata,
         }
@@ -485,14 +547,16 @@ def create_app(
         return procedure_payload(aircraft_matcher.match(title))
 
     @app.get("/api/aircraft/photo")
-    def aircraft_photo(icao: str = "", name: str = "") -> FileResponse:
+    def aircraft_photo(
+        icao: str = "", name: str = "", community: str = ""
+    ) -> FileResponse:
         """Sert uniquement la vignette d'un appareil recensé dans Community."""
         wanted_icao = icao.strip().upper()
         wanted_words = {
             word for word in re.findall(r"[a-z0-9]+", name.lower()) if len(word) >= 3
         }
         candidates: list[tuple[int, Path]] = []
-        for aircraft in scan(aircraft_folders()):
+        for aircraft in scan(aircraft_folders(community)):
             thumbnail = aircraft.thumbnail
             if thumbnail is None:
                 continue
@@ -563,6 +627,7 @@ def create_app(
             bool(settings.simbrief_pilot_id or settings.simbrief_username),
             settings.metar_source,
         )
+        configure_traffic_injection()
         values = settings.user_values()
         values["lan_restart_required"] = settings.lan_enabled != lan_active
         return values
@@ -570,38 +635,30 @@ def create_app(
     @app.post("/api/plan")
     def build_plan(request: PlanRequest) -> dict[str, Any]:
         total_started = time.monotonic()
-        LOGGER.info("Calcul du plan démarré (démo=%s)", request.demo)
-        if request.demo:
-            if not DEMO_OFP.is_file():
-                raise HTTPException(404, "Jeu de démonstration introuvable.")
-            raw = SimBriefClient.from_file(DEMO_OFP)
-        else:
-            simbrief_started = time.monotonic()
-            try:
-                raw = SimBriefClient(
-                    pilot_id=settings.simbrief_pilot_id,
-                    username=settings.simbrief_username,
-                ).fetch_latest()
-            except SimBriefError as exc:
-                LOGGER.warning(
-                    "Récupération SimBrief refusée après %.2f s (%s)",
-                    time.monotonic() - simbrief_started,
-                    type(exc).__name__,
-                )
-                raise HTTPException(status_code=502, detail=str(exc)) from exc
-            LOGGER.info(
-                "OFP SimBrief reçu en %.2f s",
+        LOGGER.info("Calcul du plan démarré")
+        simbrief_started = time.monotonic()
+        try:
+            raw = SimBriefClient(
+                pilot_id=settings.simbrief_pilot_id,
+                username=settings.simbrief_username,
+            ).fetch_latest()
+        except SimBriefError as exc:
+            LOGGER.warning(
+                "Récupération SimBrief refusée après %.2f s (%s)",
                 time.monotonic() - simbrief_started,
+                type(exc).__name__,
             )
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        LOGGER.info(
+            "OFP SimBrief reçu en %.2f s",
+            time.monotonic() - simbrief_started,
+        )
 
         ofp = parse_ofp(raw)
         if not ofp.origin_icao or not ofp.destination_icao:
             raise HTTPException(422, "OFP inexploitable : origine ou destination absente.")
 
-        # La démo embarquée est autonome : même avec un cache vierge, elle ne
-        # doit jamais tenter d'ouvrir SimConnect. Les coordonnées de son OFP
-        # suffisent au tracé et à DemoFlightSource.
-        provider = open_provider(allow_fetch=not request.demo)
+        provider = open_provider()
         try:
             cache_before = provider.stats()
             completion_started = time.monotonic()
@@ -611,27 +668,10 @@ def create_app(
                 )
             )
             plan = engine.complete(ofp, request.to_overrides())
-            if request.demo:
-                # Le jeu embarqué porte ses propres coordonnées LCPH/EHAM afin
-                # que son animation reste disponible avant le premier import
-                # MSFS. L'absence éventuelle de ces deux terrains dans le cache
-                # est donc attendue et ne doit pas inquiéter pendant la démo.
-                expected_missing = {
-                    f"{ofp.origin_icao} absent de la base de navigation.",
-                    f"{ofp.destination_icao} absent de la base de navigation.",
-                }
-                plan.warnings = [
-                    warning for warning in plan.warnings
-                    if warning not in expected_missing
-                ]
             payload = plan.to_dict()
             payload["atc_route"] = plan.atc_route()
-            payload["demo"] = request.demo
             current_plan_state["payload"] = copy.deepcopy(payload)
             current_plan_state["ofp"] = ofp
-            # Chaque import relance la démonstration au parking de départ,
-            # même si la route calculée est identique à la précédente.
-            demo_state.pop("key", None)
             LOGGER.info(
                 "Complétion MSFS terminée en %.2f s "
                 "(cache avant: %s terrain(s), %s procédure(s); total %.2f s)",
@@ -740,6 +780,10 @@ def create_app(
                     }
                     for r in provider.runways(icao)
                 ],
+                "frequencies": [
+                    {"code": f.code, "mhz": f.mhz, "name": f.name}
+                    for f in provider.frequencies(icao)
+                ],
                 "procedures": {
                     kind.value.lower(): [
                         {
@@ -783,6 +827,8 @@ def create_app(
         runway: str,
         direction: str = DEPARTURE,
         via: str = "",
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> dict[str, Any]:
         """Itinéraire de roulage entre un poste de stationnement et une piste.
 
@@ -792,12 +838,17 @@ def create_app(
         provider = open_provider()
         try:
             graph = build_graph(provider, icao)
+            position = (
+                graph.to_local(latitude, longitude)
+                if latitude is not None and longitude is not None else None
+            )
             return plan_taxi(
                 graph,
                 parking=parking,
                 runway=runway,
                 direction=direction,
                 via=parse_taxiways(via),
+                position=position,
             ).to_dict()
         except GroundError as exc:
             # Le détail part structuré : la langue d'affichage n'est connue
@@ -1133,16 +1184,11 @@ def create_app(
 
     @app.get("/api/live")
     def live(
-        demo: bool = False,
-        icao: str | None = None,
-        runway: str | None = None,
         aircraft: str | None = None,
     ) -> dict[str, Any]:
-        if demo:
-            _ensure_demo_source(icao, runway)
         tracker.set_aircraft_hint(aircraft)
         try:
-            state = tracker.read(allow_demo=demo)
+            state = tracker.read()
         except PositionUnavailable as exc:
             return {"connected": False, "reason": str(exc)}
         match = aircraft_matcher.match(state.title)
@@ -1154,23 +1200,168 @@ def create_app(
             "procedures": procedure_payload(match, state),
         }
 
-    @app.post("/api/demo/restart")
-    def restart_demo() -> dict[str, object]:
-        """Relance la simulation au départ du plan actuellement chargé."""
-        payload = current_plan_state.get("payload") or {}
-        if len(_demo_flight_path(payload)) < 2:
-            raise HTTPException(
-                409,
-                "Le plan actuellement chargé ne contient pas de route exploitable.",
-            )
-        demo_state.pop("key", None)
-        _ensure_demo_source(None, None)
-        departure = (payload.get("departure") or {}).get("icao")
-        arrival = (payload.get("arrival") or {}).get("icao")
+    @app.get("/api/live/traffic")
+    def live_traffic() -> dict[str, Any]:
+        """Trafic voisin, lu dans le simulateur.
+
+        C'est la source du plan de roulage, et la seule qui convienne : les
+        clients réseau injectent leurs appareils dans le simulateur, qui les
+        rend à leur position courante. Le relevé VATSIM, vieux de quinze
+        secondes, poserait un avion en dehors de la voie qu'il roule.
+        """
+        if not settings.traffic_enabled:
+            return {"enabled": False, "traffic": []}
         return {
-            "started": True,
-            "departure": departure,
-            "arrival": arrival,
+            "enabled": True,
+            "traffic": [report.to_dict() for report in tracker.traffic()],
+        }
+
+    @app.get("/api/vatsim/aircraft/{callsign}")
+    def vatsim_aircraft(callsign: str) -> dict[str, Any]:
+        """Fiche d'un appareil ouvert sur la carte.
+
+        Les terrains sont nommés depuis la base MSFS quand elle les connaît :
+        « EHAM » dit peu, « Amsterdam Schiphol » dit tout. Un terrain absent
+        garde son code plutôt que de faire échouer la fiche.
+        """
+        return traffic_aircraft_detail(vatsim, callsign)
+
+    @app.get("/api/traffic/aircraft/{callsign}")
+    def selected_traffic_aircraft(callsign: str) -> dict[str, Any]:
+        return traffic_aircraft_detail(selected_traffic_provider(), callsign)
+
+    def traffic_aircraft_detail(provider, callsign: str) -> dict[str, Any]:
+        if not settings.traffic_enabled:
+            raise HTTPException(404, "Le trafic est éteint.")
+        try:
+            found = provider.detail(callsign)
+        except (VatsimError, IvaoError, OpenSkyError) as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if found is None:
+            raise HTTPException(
+                404, f"{callsign.upper()} n'est plus en ligne sur le réseau."
+            )
+
+        names = _airport_labels(found.departure, found.arrival)
+        payload = found.to_dict()
+        payload["departure_name"] = names.get(found.departure, "")
+        payload["arrival_name"] = names.get(found.arrival, "")
+        return payload
+
+    def _airport_labels(*icaos: str) -> dict[str, str]:
+        """Noms lisibles des terrains déjà connus de la base.
+
+        La lecture est volontairement limitée au cache : ouvrir une fiche ne
+        doit pas déclencher une extraction MSFS pour un aérodrome que le
+        pilote ne fait que survoler du regard.
+        """
+        wanted = [icao for icao in icaos if icao]
+        if not wanted:
+            return {}
+        try:
+            provider = open_provider()
+        except Exception:  # base absente : le code OACI suffit
+            return {}
+        try:
+            lookup = getattr(provider, "airport_name", None)
+            if not callable(lookup):
+                return {}
+            return {icao: lookup(icao) for icao in wanted}
+        except Exception:
+            return {}
+        finally:
+            provider.close()
+
+    @app.get("/api/vatsim/traffic")
+    def vatsim_traffic() -> dict[str, Any]:
+        """Appareils connectés au réseau, pour la carte en route.
+
+        Le relevé est rendu entier : la carte se déplace où le pilote veut, et
+        c'est elle qui écarte ce qui sort du cadre.
+        """
+        return traffic_payload(vatsim)
+
+    @app.get("/api/traffic")
+    def selected_traffic() -> dict[str, Any]:
+        return traffic_payload(selected_traffic_provider())
+
+    def own_aircraft_position() -> tuple[tuple[float, float] | None, float | None]:
+        """Place du joueur, quand le simulateur la donne.
+
+        Elle sert à écarter la silhouette que le réseau rend de son propre
+        appareil : sans simulateur, il n'y a rien à confondre.
+        """
+        try:
+            state = tracker.read()
+        except (PositionUnavailable, OSError, RuntimeError):
+            return None, None
+        return (state.latitude, state.longitude), state.altitude_ft
+
+    def traffic_payload(provider) -> dict[str, Any]:
+        if not settings.traffic_enabled:
+            return {"enabled": False, "available": False, "traffic": []}
+
+        try:
+            aircraft = provider.traffic()
+            updated_at = provider.updated_at()
+        except (VatsimError, IvaoError, OpenSkyError) as exc:
+            LOGGER.info("Trafic %s indisponible : %s", provider.name, exc)
+            return {
+                "enabled": True,
+                "available": False,
+                "reason": str(exc),
+                "traffic": [],
+            }
+
+        centre, own_altitude = own_aircraft_position()
+        return {
+            "enabled": True,
+            "available": True,
+            "source": provider.name,
+            "updated_at": updated_at,
+            "traffic": [
+                entry.to_dict() for entry in aircraft
+                if not is_own_position(entry, centre, own_altitude)
+            ],
+        }
+
+    @app.get("/api/vatsim")
+    def vatsim_positions(icao: str = "") -> dict[str, Any]:
+        """Postes de contrôle en ligne pour les terrains demandés.
+
+        Rien n'est interrogé tant que le réglage est désactivé : l'appel
+        réseau n'apprend rien à qui ne vole pas sur le réseau, et le silence
+        est ici la bonne valeur par défaut.
+        """
+        if not settings.vatsim_enabled:
+            return {"enabled": False, "available": False, "positions": {}}
+
+        wanted = [part.strip().upper() for part in icao.split(",") if part.strip()]
+        if not wanted:
+            return {"enabled": True, "available": True, "positions": {}}
+
+        try:
+            found = vatsim.positions(wanted)
+            updated_at = vatsim.updated_at()
+        except VatsimError as exc:
+            # Le réseau indisponible ne doit pas teinter la rangée de
+            # fréquences : sans réponse, aucun poste n'est marqué en ligne.
+            LOGGER.info("Postes VATSIM indisponibles : %s", exc)
+            return {
+                "enabled": True,
+                "available": False,
+                "reason": str(exc),
+                "positions": {},
+            }
+
+        return {
+            "enabled": True,
+            "available": True,
+            "updated_at": updated_at,
+            "positions": {
+                key: [position.to_dict() for position in entries]
+                for key, entries in found.items()
+            },
         }
 
     @app.get("/api/changelog")
@@ -1229,95 +1420,18 @@ def create_app(
         callback()
         return {"opened": True}
 
-    def _airport_elevation_ft(
-        icao: str | None, *, allow_fetch: bool = True,
-    ) -> float:
-        """Altitude du terrain, ou 0 ft si la base ne la fournit pas."""
-        if not icao:
-            return 0.0
-        try:
-            provider = open_provider(allow_fetch=allow_fetch)
-        except HTTPException:
-            # Sans base de navigation la démonstration reste possible : le
-            # terrain est alors supposé au niveau de la mer.
-            return 0.0
-        try:
-            airport = provider.airport(icao)
-        except (NavdataError, LookupError):
-            return 0.0
-        finally:
-            provider.close()
-        return float(getattr(airport, "altitude_ft", None) or 0.0)
-
-    def _ensure_demo_source(icao: str | None, runway: str | None) -> None:
-        """Prépare la démonstration : vol complet du plan, sinon simple roulage.
-
-        La clé du vol complet ne dépend que du plan : changer d'aéroport sur la
-        carte ne doit pas relancer la démonstration au parking de départ.
-        """
-        payload = current_plan_state.get("payload") or {}
-        path = _demo_flight_path(payload)
-        if len(path) >= 2:
-            key = ("flight", _demo_plan_key(payload), len(path))
-            if demo_state.get("key") == key:
-                return
-            departure = payload.get("departure") or {}
-            arrival = payload.get("arrival") or {}
-            try:
-                tracker.set_demo(
-                    DemoFlightSource(
-                        path=path,
-                        cruise_altitude_ft=(payload.get("enroute") or {}).get(
-                            "cruise_altitude_ft"
-                        ),
-                        departure_elevation_ft=_airport_elevation_ft(
-                            departure.get("icao"), allow_fetch=False,
-                        ),
-                        arrival_elevation_ft=_airport_elevation_ft(
-                            arrival.get("icao"), allow_fetch=False,
-                        ),
-                        ils_frequency_mhz=arrival.get("ils_frequency_mhz"),
-                    )
-                )
-            except ValueError:
-                LOGGER.info("Route de démonstration inexploitable, roulage simulé.")
-                tracker.set_demo(None)
-            demo_state["key"] = key
-            return
-
-        key = ("taxi", icao or "", runway or "")
-        if demo_state.get("key") == key:
-            return
-
-        if not icao:
-            tracker.set_demo(None)
-            return
-
-        provider = open_provider()
-        try:
-            data = build_chart(provider, icao, runway)
-        except LookupError:
-            tracker.set_demo(None)
-            return
-        finally:
-            provider.close()
-
-        origin = data["origin"]
-        threshold = _threshold_for(data, runway)
-        parking = data["parkings"][0]["position"] if data["parkings"] else None
-        if threshold is None or parking is None:
-            tracker.set_demo(None)
-            return
-
-        # Pas de cap imposé : l'avion doit pointer dans le sens du roulage,
-        # pas dans l'axe de la piste qu'il rejoint.
-        tracker.set_demo(
-            DemoSource(
-                start=_to_latlon(origin, parking),
-                end=_to_latlon(origin, threshold["point"]),
+    @app.post("/api/fsltl/download")
+    def open_fsltl_download(request: Request) -> dict[str, bool]:
+        if request.headers.get("X-NaviXav-External") != "fsltl":
+            raise HTTPException(403, "Confirmation d’ouverture absente.")
+        callback = getattr(app.state, "request_open_fsltl_download", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "Le téléchargement FSLTL est disponible dans l’application Windows.",
             )
-        )
-        demo_state["key"] = key
+        callback()
+        return {"opened": True}
 
     @app.get("/")
     def index() -> HTMLResponse:
@@ -1329,69 +1443,6 @@ def create_app(
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
-
-
-def _demo_flight_path(payload: dict[str, Any]) -> list[tuple[float, float]]:
-    """Route opérationnelle complète du plan, prête pour la démonstration.
-
-    Même assemblage que le tracé de la carte : départ, SID, route, STAR,
-    approche puis arrivée, sans les extrémités déjà fournies par les
-    procédures.
-    """
-    departure = payload.get("departure") or {}
-    arrival = payload.get("arrival") or {}
-    route = (payload.get("enroute") or {}).get("route_path") or []
-
-    segments: list[dict[str, Any]] = []
-    if route:
-        segments.append(route[0])
-    segments.extend(departure.get("sid_path") or [])
-    segments.extend(route[1:-1] if len(route) > 2 else [])
-    segments.extend(arrival.get("star_path") or [])
-    segments.extend(arrival.get("approach_path") or [])
-    if len(route) > 1:
-        segments.append(route[-1])
-
-    points: list[tuple[float, float]] = []
-    for entry in segments:
-        if not isinstance(entry, dict):
-            continue
-        latitude = entry.get("lat")
-        longitude = entry.get("lon")
-        if latitude is None or longitude is None:
-            continue
-        points.append((float(latitude), float(longitude)))
-    return points
-
-
-def _demo_plan_key(payload: dict[str, Any]) -> str:
-    departure = (payload.get("departure") or {}).get("icao") or "----"
-    arrival = (payload.get("arrival") or {}).get("icao") or "----"
-    route = (payload.get("enroute") or {}).get("raw_simbrief_route") or ""
-    return f"{departure}-{arrival}-{hash(route)}"
-
-
-def _threshold_for(chart: dict[str, Any], runway: str | None) -> dict[str, Any] | None:
-    """Seuil de la piste demandée, ou de la première piste disponible."""
-    target = (runway or "").strip().upper()
-    fallback: dict[str, Any] | None = None
-    for entry in chart["runways"]:
-        for end in entry["ends"]:
-            candidate = {"point": end["threshold"], "heading": end["heading"]}
-            if fallback is None:
-                fallback = candidate
-            if target and end["name"].upper() == target:
-                return candidate
-    return fallback
-
-
-def _to_latlon(origin: dict[str, float], point: dict[str, float]) -> tuple[float, float]:
-    """Inverse de la projection locale du plan de terrain."""
-    latitude = origin["lat"] + math.degrees(point["y"] / EARTH_RADIUS_M)
-    longitude = origin["lon"] + math.degrees(
-        point["x"] / (EARTH_RADIUS_M * math.cos(math.radians(origin["lat"])))
-    )
-    return (latitude, longitude)
 
 
 def create_server(

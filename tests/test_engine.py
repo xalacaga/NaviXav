@@ -9,7 +9,8 @@ from __future__ import annotations
 from copy import deepcopy
 
 from navixav.geo import distance_nm
-from navixav.models import Confidence
+from navixav.models import Confidence, RadioStation
+from navixav.navdata.base import AirportFrequency
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.preferences import AirportPreferences
 
@@ -71,6 +72,20 @@ def test_atc_route_is_rebuilt(provider, settings, ofp):
     assert plan.enroute.route_path[-1]["ident"] == "LFBO"
 
 
+def test_simbrief_tod_is_forwarded_to_the_operational_plan(provider, settings, ofp):
+    positioned = deepcopy(ofp)
+    positioned.simbrief_tod_lat = 45.125
+    positioned.simbrief_tod_lon = 2.75
+
+    plan = _plan(provider, settings, positioned)
+
+    assert plan.enroute.simbrief_tod == {"lat": 45.125, "lon": 2.75}
+    assert plan.to_dict()["enroute"]["simbrief_tod"] == {
+        "lat": 45.125,
+        "lon": 2.75,
+    }
+
+
 class _RecordingProvider:
     def __init__(self, inner) -> None:
         self._inner = inner
@@ -104,6 +119,207 @@ def test_simbrief_coordinates_skip_enroute_simconnect_lookups(provider, settings
         (leg["lat"], leg["lon"])
         for leg in plan.enroute.route_legs
     ] == list(expected.values())
+
+
+class _FrequencyProvider:
+    """Fournisseur réel, complété des fréquences que la base d'essai n'a pas."""
+
+    def __init__(self, inner, frequencies) -> None:
+        self._inner = inner
+        self._frequencies = frequencies
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def frequencies(self, icao):
+        return list(self._frequencies.get(icao.upper(), ()))
+
+
+class _ProviderWithoutFrequencies:
+    """Fournisseur antérieur à cette lecture : il ne connaît pas `frequencies`."""
+
+    def __init__(self, inner) -> None:
+        self._inner = inner
+
+    def __getattr__(self, name):
+        if name == "frequencies":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
+
+def _with_frequencies(provider, departure=(), arrival=()):
+    return _FrequencyProvider(
+        provider,
+        {
+            "LFST": [AirportFrequency(*entry) for entry in departure],
+            "LFBO": [AirportFrequency(*entry) for entry in arrival],
+        },
+    )
+
+
+def test_the_frequencies_follow_the_order_in_which_they_are_used(
+    provider, settings, ofp
+):
+    """ATIS, clairance, sol, tour au départ ; ATIS, approche, tour, sol à l'arrivée.
+
+    La base les rend dans l'ordre du simulateur, qui n'est pas celui du vol.
+    C'est le moteur qui les remet dans l'ordre où le pilote les compose.
+    """
+    complete = _with_frequencies(
+        provider,
+        departure=[
+            ("TWR", 118.5, "TOWER"),
+            ("GND", 121.855, "GROUND"),
+            ("ATIS", 128.075, "ATIS"),
+            ("DEL", 121.975, "DELIVERY"),
+            ("DEP", 127.575, "DEPARTURE"),
+        ],
+        arrival=[
+            ("GND", 121.605, "GROUND"),
+            ("TWR", 119.25, "TOWER"),
+            ("APP", 121.155, "APPROACH"),
+            ("ATIS", 127.115, "ATIS"),
+        ],
+    )
+    plan = _plan(complete, settings, ofp)
+
+    assert [f.code for f in plan.departure.frequencies] == [
+        "ATIS", "DEL", "GND", "TWR", "DEP"
+    ]
+    assert [f.code for f in plan.arrival.frequencies] == ["ATIS", "APP", "TWR", "GND"]
+    assert plan.departure.frequencies[0].stations[0].mhz == 128.075
+
+
+def test_the_name_separates_what_the_type_confuses(provider, settings, ofp):
+    """Roissy type « sol » son contrôle sol, ses aires et sa rampe cargo.
+
+    Les confondre proposerait une aire de stationnement comme fréquence de
+    roulage. Seul le poste cité en premier tient la rangée ; les autres
+    gardent leur nom en réserve.
+    """
+    complete = _with_frequencies(
+        provider,
+        departure=[
+            ("GND", 121.610, "DE GAULLE"),
+            ("GND", 121.580, "DE GAULLE APRON"),
+            ("GND", 121.780, "DE GAULLE"),
+            ("GND", 131.605, "FEDEX RAMP CONTROL"),
+        ],
+    )
+    row = _plan(complete, settings, ofp).departure.frequencies[0]
+
+    assert row.code == "GND"
+    assert row.name == "DE GAULLE"
+    assert row.stations == [
+        RadioStation(mhz=121.610, name="DE GAULLE"),
+        RadioStation(mhz=121.780, name="DE GAULLE"),
+    ]
+    assert row.alternates == [
+        RadioStation(mhz=121.580, name="DE GAULLE APRON"),
+        RadioStation(mhz=131.605, name="FEDEX RAMP CONTROL"),
+    ]
+
+
+def test_the_control_facility_wins_over_the_station_cited_first(
+    provider, settings, ofp
+):
+    """À Roissy, le simulateur cite une aire de stationnement avant le sol.
+
+    S'en remettre à cet ordre ferait proposer « DE GAULLE APRON » comme
+    fréquence de roulage. Le poste retenu est celui qui tient le plus de rôles
+    du terrain : l'organisme de contrôle tient la clairance, le sol et la
+    tour, l'aire ne tient que le sol.
+    """
+    complete = _with_frequencies(
+        provider,
+        departure=[
+            ("DEL", 121.730, "DE GAULLE"),
+            ("GND", 121.580, "DE GAULLE APRON"),
+            ("GND", 121.610, "DE GAULLE"),
+            ("TWR", 118.655, "DE GAULLE"),
+        ],
+    )
+    ground = next(
+        row
+        for row in _plan(complete, settings, ofp).departure.frequencies
+        if row.code == "GND"
+    )
+
+    assert ground.name == "DE GAULLE"
+    assert ground.stations == [RadioStation(mhz=121.610, name="DE GAULLE")]
+    assert ground.alternates == [
+        RadioStation(mhz=121.580, name="DE GAULLE APRON")
+    ]
+
+
+def test_every_frequency_of_the_leading_station_is_kept(provider, settings, ofp):
+    """Le simulateur ne dit pas laquelle des quatre tours tient la piste.
+
+    NaviXav ne peut donc pas en désigner une. Il les garde toutes, et c'est
+    l'affichage qui annonce leur nombre.
+    """
+    complete = _with_frequencies(
+        provider,
+        departure=[
+            ("TWR", 118.655, "DE GAULLE"),
+            ("TWR", 119.255, "DE GAULLE"),
+            ("TWR", 120.905, "DE GAULLE"),
+            ("TWR", 123.605, "DE GAULLE"),
+        ],
+    )
+    row = _plan(complete, settings, ofp).departure.frequencies[0]
+
+    assert [station.mhz for station in row.stations] == [
+        118.655, 119.255, 120.905, 123.605
+    ]
+    assert row.alternates == []
+
+
+def test_an_uncontrolled_field_falls_back_to_its_air_to_air_frequency(
+    provider, settings, ofp
+):
+    """Ni tour ni sol : sans ce repli, le terrain sortirait sans rien."""
+    complete = _with_frequencies(
+        provider, departure=[("CTAF", 123.5, "CTAF"), ("AWOS", 135.075, "AWOS")]
+    )
+    plan = _plan(complete, settings, ofp)
+
+    assert [f.code for f in plan.departure.frequencies] == ["CTAF", "AWOS"]
+
+
+def test_a_provider_without_frequencies_still_produces_a_plan(
+    provider, settings, ofp
+):
+    """La complétion ne dépend pas de cette lecture : elle s'en passe."""
+    plan = _plan(_ProviderWithoutFrequencies(provider), settings, ofp)
+
+    assert plan.departure.frequencies == []
+    assert plan.departure.sid.value == "EPIK8M"
+
+
+def test_the_frequencies_reach_the_web_payload(provider, settings, ofp):
+    """Les postes secondaires sortent nommés, pas réduits à un nombre.
+
+    C'est ce qui permet à l'interface de nommer la fréquence composée même
+    lorsque ce n'est pas le poste principal du rôle.
+    """
+    complete = _with_frequencies(
+        provider,
+        departure=[
+            ("TWR", 118.5, "TOWER"),
+            ("TWR", 118.35, "TOWER 23"),
+        ],
+    )
+    payload = _plan(complete, settings, ofp).to_dict()
+
+    assert payload["departure"]["frequencies"] == [
+        {
+            "code": "TWR",
+            "name": "TOWER",
+            "stations": [{"mhz": 118.5, "name": "TOWER"}],
+            "alternates": [{"mhz": 118.35, "name": "TOWER 23"}],
+        }
+    ]
 
 
 def test_route_path_starts_and_ends_on_the_selected_runways(provider, settings, ofp):

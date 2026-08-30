@@ -136,7 +136,7 @@ begin
   if MsfsDetected() then
     AddCheckLine('Microsoft Flight Simulator détecté', True)
   else
-    AddCheckLine('MSFS non détecté : le mode Démo restera utilisable', False);
+    AddCheckLine('Microsoft Flight Simulator non détecté', False);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

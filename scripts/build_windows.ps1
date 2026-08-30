@@ -13,7 +13,7 @@ if ($VersionSource -notmatch '__version__\s*=\s*"(?<version>\d+\.\d+\.\d+)"') {
 $Version = $Matches.version
 $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $ReleaseDir = Join-Path $ProjectRoot "release"
-$ModernSimConnect = "C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"
+$ModernSimConnect = "C:\MSFS 2024 SDK\SimConnect SDK\lib\SimConnect.dll"
 $WebViewBootstrapper = Join-Path $ProjectRoot "installer\assets\MicrosoftEdgeWebView2Setup.exe"
 $WebViewBootstrapperUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 $AppIcon = Join-Path $ProjectRoot "assets\navixav.ico"
@@ -40,6 +40,19 @@ function Test-PythonImports([string]$Imports) {
     $Succeeded = $LASTEXITCODE -eq 0
     $ErrorActionPreference = $PreviousPreference
     return $Succeeded
+}
+
+function Test-Msfs2024SimConnect([string]$DllPath) {
+    & $VenvPython -c (
+        "import ctypes as c, sys; d=c.WinDLL(sys.argv[1]); " +
+        "required=('SimConnect_AICreateNonATCAircraft_EX1'," +
+        "'SimConnect_EnumerateSimObjectsAndLiveries'); " +
+        "missing=[name for name in required if not hasattr(d,name)]; " +
+        "sys.exit('API MSFS 2024 absentes: '+', '.join(missing)) if missing else None"
+    ) $DllPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "La DLL SimConnect du SDK n'est pas compatible avec MSFS 2024. Mets le SDK à jour."
+    }
 }
 
 function New-PortableArchive([string]$Source, [string]$Destination) {
@@ -102,6 +115,7 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
 }
 
 & $VenvPython -c "import sys; assert sys.version_info >= (3, 11), sys.version"
+Test-Msfs2024SimConnect $ModernSimConnect
 
 Write-Step "Contrôle des bibliothèques du projet"
 if (-not (Test-PythonImports "fastapi, requests, uvicorn, pydantic, pypdf")) {

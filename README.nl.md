@@ -77,7 +77,9 @@ tonen:
 - de resterende afstand;
 - de volgende hoogte- of snelheidsbeperking;
 - de verticale snelheid die nodig is om die beperking te halen;
-- het Top of Descent en een indicatieve daalsnelheid op een helling van 3°;
+- het Top of Descent uit het prestatieprofiel van het nieuwste SimBrief-OFP na
+  controle tegen de actieve route, met een 3°-schatting als terugval en behoud
+  van de gepubliceerde STAR- en naderingsplafonds;
 - de afwijking ten opzichte van het geplande verticale profiel.
 
 Na de landing bewaart het lokale logboek een beknopte vluchtsamenvatting en een
@@ -87,6 +89,23 @@ verlichting en stuurautomaatmodi. Gebeurtenissen worden als gegevens opgeslagen
 en afgespeeld in de taal die dan is geselecteerd. Alle samenvattingen kunnen
 via de interface worden gewist en er worden geen vluchtgegevens naar externe
 diensten verzonden.
+
+In de begeleide interface verschijnen deze waarden als een cockpitsynoptiek met
+evenwichtige instrumenttegels, duidelijke statusaccenten en lichtindicatoren.
+De klassieke interface behoudt de oorspronkelijke compacte tegels.
+De Aircraft-pagina gebruikt de live door MSFS gemelde titel als primaire
+identiteit en wordt automatisch bijgewerkt wanneer een ander toestel wordt
+geladen. Het SimBrief-toestel blijft afzonderlijk zichtbaar, omdat de gewichten
+en prestaties van de dispatch bij het geïmporteerde OFP blijven horen.
+Als een toestel van derden `TITLE` leeg laat, gebruikt NaviXav automatisch de
+officiële waarde `ATC MODEL`.
+Voor de buitenverlichting vergelijkt NaviXav ook de SimVars van de afzonderlijke
+schakelaars met het officiële MSFS-masker `LIGHT STATES`. Complexe toestellen
+die alleen de gezamenlijke status publiceren, laten daardoor niet langer alle
+indicatoren en waarschuwingen ten onrechte uit staan.
+Vanaf 50 NM vóór de TOD vraagt het normale waarschuwingssysteem om de daling
+voor te bereiden; op 10 NM verschijnt een afzonderlijke TOD-waarschuwing die
+actief blijft totdat de daling is ingezet.
 
 Voor flaps, spoilers en parkeerrem vergelijkt NaviXav de officiële SimVars voor
 hendel, effectieve stand, klepstand en cockpitindicator. Vliegtuigconfiguratie
@@ -104,7 +123,7 @@ automatiseren startprestaties worden niet aangeboden:
 
 - `FROM/TO`, vluchtnummer en uitwijkhaven;
 - Cost Index en kruisniveau;
-- ZFW, blok-, taxi-, traject- en reservebrandstof;
+- ZFW, ZFWCG, aantal passagiers, blok-, taxi-, traject- en reservebrandstof;
 - baan, SID, transitie en transitiehoogte;
 - route `VIA/TO`;
 - STAR, transitie, nadering en VIA;
@@ -125,6 +144,25 @@ NaviXav gebruikt SimConnect om:
 - luchthavens, banen met baanrand- en baanasverlichting, procedures, waypoints
   en radionavigatiemiddelen op te halen;
 - geleidelijk een lokale database op te bouwen in `data/navixav.sqlite`.
+
+De optionele instelling **VATSIM-verkeer in MSFS injecteren** detecteert
+**FSLTL Base Models** in de MSFS Community-map en gebruikt de modellen voor
+netwerkverkeer in de buurt. NaviXav leest alleen de `aircraft.cfg`- en
+VMR-bestanden van FSLTL; het installeert, actualiseert of wijzigt FSLTL niet.
+De instelling staat standaard uit, begrenst aantal en straal van de
+geïnjecteerde vliegtuigen en verwijdert bij uitschakelen of afsluiten alleen de
+SimConnect-objecten die NaviXav zelf heeft gemaakt.
+Als gratis openbare netwerkbron kan VATSIM of IVAO worden gekozen. FSLTL wordt
+automatisch gedetecteerd, maar het pakket- of Community-pad kan ook handmatig
+worden ingevuld. Als FSLTL ontbreekt, openen de instellingen de
+[officiële FlyByWire Installer](https://flybywiresim.com/downloads/). Installeer
+alleen **FSLTL Traffic Base Models**, niet FSLTL Injector.
+Voor een echte wereldweergave toont **OpenSky echt verkeer** anonieme
+ADS-B-statussen binnen 100 NM rond het vliegtuig en injecteert die via FSLTL.
+Als het ADS-B-type eerst onbekend is, verschijnt een veilig algemeen model dat
+wordt vervangen zodra het vliegtuigregister het exacte type heeft gevonden.
+De actieve bron kan rechtstreeks vanuit de kaart- of taxibalk worden gewijzigd;
+beide keuzelijsten blijven gesynchroniseerd en de keuze wordt lokaal bewaard.
 
 De simulator moet draaien met een geladen vlucht om nieuwe gegevens op te
 halen. Reeds gecachete informatie blijft offline beschikbaar.
@@ -164,10 +202,14 @@ vluchtkaart en uitsluitend opgebouwd uit native MSFS-faciliteiten:
   **Secundair** op verzoek getoond;
 - bij vertrek stelt NaviXav, wanneer het vliegtuig binnen 180 m van een stand
   aan de grond staat, automatisch een route naar de gekozen baan voor;
+- de vertrektoegang is de voor vliegtuigen bereikbare aansluiting die het dichtst
+  bij de gekozen baandrempel ligt, ook als MSFS een verder wachtpunt markeert;
 - een klik op een andere stand vervangt het voorstel onmiddellijk; bij aankomst
   blijft de bestemmingsstand een handmatige keuze;
 - afgelegd en resterend traject, nuttige namen, wachtpunten, volgende manoeuvre
   en resterende afstand worden duidelijk weergegeven;
+- elke door het MSFS-netwerk bevestigde baankruising splitst de route bij een
+  expliciet wachtpunt; de route wordt geweigerd als die instructie niet kan worden weergegeven;
 - na een afwijking wordt de route vanaf de werkelijke vliegtuigpositie herberekend;
 - de grondsnelheid verschijnt live op de kaart, met een waarschuwing bij het
   naderen van de maximale taxisnelheid en een knipperend alarm met pieptoon
@@ -241,8 +283,8 @@ kaart naar de officiële catalogus om te schakelen en in de toepassing te blijve
 Het installatieprogramma bevat Python, de bibliotheken, pywebview, de zelfstandige
 SimConnect-connector van NaviXav en de ondertekende Microsoft
 WebView2-bootstrapper. Geen van deze onderdelen hoeft afzonderlijk te worden
-geïnstalleerd. MSFS is niet verplicht om de Demo-modus uit te proberen of om
-reeds opgeslagen gegevens te raadplegen.
+geïnstalleerd. MSFS is niet verplicht om reeds opgeslagen gegevens te
+raadplegen.
 
 SimConnect wordt door NaviXav nooit in Windows geïnstalleerd of opnieuw
 geïnstalleerd. De applicatie draagt een privékopie van de moderne DLL in haar
@@ -305,7 +347,7 @@ Vanuit PowerShell, in de projectmap:
 
 Het script:
 
-1. controleert 64-bits Windows, Python en de SimConnect-SDK;
+1. controleert 64-bits Windows, Python en de SimConnect-SDK van MSFS 2024;
 2. installeert ontbrekende bouwgereedschappen;
 3. haalt de officiële WebView2-bootstrapper op en verifieert de
    Microsoft-handtekening;
@@ -313,8 +355,10 @@ Het script:
 5. levert het installatieprogramma, het draagbare archief en hun
    SHA-256-controlesommen in `release\`.
 
-De in stap 1 genoemde SimConnect-SDK betreft alleen de machine die NaviXav
-bouwt. Ze wordt niet op gebruikersmachines geïnstalleerd.
+De in stap 1 genoemde MSFS 2024 SimConnect-SDK betreft alleen de machine die
+NaviXav bouwt. De actuele DLL wordt privé met NaviXav meegeleverd en wordt niet
+op gebruikersmachines geïnstalleerd of geregistreerd. Een oude MSFS 2020-DLL
+wordt geweigerd.
 
 ### Distributiebestanden
 
@@ -376,6 +420,9 @@ De interface laat ook toe om in te stellen:
 - de maximale zijwindcomponent;
 - de minimale baanlengte;
 - de weergave van de interface: automatisch, licht of donker;
+- de interface-indeling: vluchtgestuurd, met een faseafhankelijke contextstrook
+  en voorbereide vertrek-/aankomst-/naderingskaarten, of klassiek om zonder
+  herstart meteen naar de vorige presentatie terug te keren;
 - de MSFS Community-map waarmee de dekking van toestelprocedures wordt geïnventariseerd;
 - de maximale taxisnelheid, de lagere limiet voor bochten en het geluidsalarm
   voor de taxisnelheid;
@@ -465,15 +512,6 @@ NaviXav past de interface automatisch aan bij het schalen:
 De kaart reageert op elke wijziging van de venstergrootte en herberekent haar
 canvas onmiddellijk. De minimale grootte van het native venster is
 720 × 560 pixels.
-
-## Demo-modus
-
-De schakelaar **Demo** laadt een voorbeeldvlucht en simuleert een verplaatsing
-op de grond. Zo kun je de interface verkennen zonder SimBrief-account of
-simulator.
-
-De Demo-modus staat bij het opstarten altijd uit, zodat NaviXav voorrang geeft
-aan het laatste SimBrief-plan.
 
 ## De applicatie afsluiten
 
@@ -580,6 +618,9 @@ Vóór de installatie wacht een losstaande Windows-helper tot het actieve
 NaviXav-proces volledig is afgesloten. Daarna werkt hij de werkelijk gebruikte
 map bij, start de toepassing opnieuw en bewaart een `.install.log` naast het
 gedownloade installatieprogramma.
+
+Bij die eerste herstart opent de **Versiegeschiedenis** automatisch één keer om
+de wijzigingen te tonen; daarna blijft zij via de interface beschikbaar.
 
 De repository is openbaar leesbaar. Een gebruiker kan de code inzien en releases
 downloaden zonder GitHub-account, maar alleen gemachtigde medewerkers kunnen

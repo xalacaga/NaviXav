@@ -76,7 +76,9 @@ The **Flight tracking** tab uses the real-time MSFS position to display:
 - the remaining distance;
 - the next altitude or speed constraint;
 - the vertical rate required to meet that constraint;
-- the Top of Descent and an indicative descent rate on a 3° path;
+- the Top of Descent from the latest SimBrief performance profile after it is
+  validated against the active route, with a 3° estimate as fallback and the
+  published STAR/approach ceilings still applied;
 - the deviation from the planned vertical profile.
 
 #### Aircraft configuration
@@ -86,6 +88,22 @@ speedbrakes, parking brake and the seven exterior lights straight from MSFS,
 together with the altimeter setting, the autopilot modes, the selected
 altitude, the fuel on board and the actual wind. Units are requested from the
 simulator and never recomputed locally.
+For exterior lights, NaviXav also cross-checks the individual switch SimVars
+against MSFS's official `LIGHT STATES` mask, so complex aircraft that publish
+only the aggregate state no longer leave every indicator and alert falsely off.
+
+In the guided interface, these values use a cockpit-style synoptic with balanced
+instrument tiles, explicit status accents and light indicators. The classic
+interface keeps the original compact tiles.
+The Aircraft page uses the title reported live by MSFS as its primary identity
+and refreshes automatically when another aircraft is loaded. The SimBrief
+aircraft remains shown separately because its dispatch weights and performance
+figures still belong to the imported OFP.
+If a third-party aircraft leaves `TITLE` empty, NaviXav automatically uses its
+official `ATC MODEL` value instead.
+From 50 NM before the TOD, the standard alert engine asks the pilot to prepare
+the descent; at 10 NM it raises a separate imminent-TOD caution that remains
+active until the descent is engaged.
 
 For flaps, spoilers and the parking brake, NaviXav cross-checks the official
 handle, effective-position, surface-position and cockpit-indicator SimVars.
@@ -133,7 +151,7 @@ performance values that cannot be automated:
 
 - `FROM/TO`, flight number and alternate;
 - Cost Index and cruise level;
-- ZFW, block, taxi, trip and reserve fuel;
+- ZFW, ZFWCG, passenger count, block, taxi, trip and reserve fuel;
 - runway, SID, transition and transition altitude;
 - `VIA/TO` route;
 - STAR, transition, approach and VIA;
@@ -153,6 +171,24 @@ NaviXav uses SimConnect to:
 - retrieve airports, runways and their edge/centreline lighting, procedures,
   waypoints and radio navigation aids;
 - progressively build a local database in `data/navixav.sqlite`.
+
+The optional **Inject VATSIM traffic into MSFS** setting detects **FSLTL Base
+Models** in the MSFS Community folder and uses its aircraft models for nearby
+network traffic. NaviXav only reads FSLTL's `aircraft.cfg` and VMR files; it
+does not install, update or modify FSLTL. The setting is off by default, limits
+the number and radius of injected aircraft, and removes only the SimConnect
+objects created by NaviXav when it is switched off or closed.
+You can select VATSIM or IVAO as the free public network source. FSLTL is
+detected automatically, but its package or Community path can also be entered
+manually. If it is missing, Settings opens the official
+[FlyByWire Installer download](https://flybywiresim.com/downloads/); install
+**FSLTL Traffic Base Models** only, not FSLTL Injector.
+For a real-world overlay, **OpenSky real traffic** displays anonymous ADS-B
+state vectors within 100 NM of the aircraft and injects them through FSLTL.
+When the ADS-B type is initially unknown, a safe generic model appears first
+and is replaced once the aircraft registry resolves the exact type.
+The active source can be switched immediately from either the Map or Taxi
+toolbar; both selectors stay synchronized and the choice is saved locally.
 
 The simulator must be running with a flight loaded in order to retrieve new
 data. Information already cached remains available offline.
@@ -194,10 +230,14 @@ flight map and built only from native MSFS facilities:
   hidden by default, and the **Secondary** button reveals them on demand;
 - on departure, when the aircraft is on the ground within 180 m of a stand,
   NaviXav automatically proposes a route from that stand to the selected runway;
+- the departure entry is the aircraft-accessible junction nearest the selected
+  threshold, even when MSFS marks a more distant junction as a hold-short point;
 - clicking another stand immediately replaces the proposal; on arrival, the
   destination stand remains a manual choice;
 - the route separates travelled and remaining portions and shows only useful
   names, hold-short points, the next manoeuvre and remaining distance;
+- every runway crossing confirmed by the MSFS network splits the route at an
+  explicit hold-short point; the route is rejected if that instruction cannot be represented;
 - after a deviation, the route is recalculated from the aircraft’s real position;
 - the live ground speed is shown on the diagram, with a warning as it nears
   the maximum taxi speed and a flashing alarm with an audible beep beyond it;
@@ -272,8 +312,8 @@ card to the official catalogue and keep reading entirely inside the application.
 
 The installer includes Python, the libraries, pywebview, NaviXav's standalone
 SimConnect connector and the signed Microsoft WebView2 bootstrapper. None of
-these tools need to be installed separately. MSFS is not required to try the
-Demo mode or to consult data already saved.
+these tools need to be installed separately. MSFS is not required to consult
+data already saved.
 
 SimConnect is never installed or reinstalled into Windows by NaviXav. The
 application ships a private copy of the modern DLL in its own folder. If the
@@ -335,7 +375,7 @@ From PowerShell, in the project folder:
 
 The script:
 
-1. checks 64-bit Windows, Python and the SimConnect SDK;
+1. checks 64-bit Windows, Python and the MSFS 2024 SimConnect SDK;
 2. installs any missing build tools;
 3. downloads the official WebView2 bootstrapper and verifies its Microsoft
    signature;
@@ -343,8 +383,9 @@ The script:
 5. produces the installer, the portable archive and their SHA-256 checksums in
    `release\`.
 
-The SimConnect SDK mentioned in step 1 concerns only the machine that builds
-NaviXav. It is not installed on user machines.
+The MSFS 2024 SimConnect SDK mentioned in step 1 concerns only the machine that
+builds NaviXav. Its current DLL is bundled privately with NaviXav; it is not
+installed or registered on user machines. A legacy MSFS 2020 DLL is rejected.
 
 ### Distribution files
 
@@ -405,6 +446,9 @@ The interface also lets you configure:
 - the maximum crosswind component;
 - the minimum runway length;
 - the interface appearance: automatic, light or dark;
+- the interface layout: flight-guided, with a phase-aware context strip and
+  prepared departure/arrival/approach charts, or classic for an instant return
+  to the previous presentation without restarting;
 - the MSFS Community folder used to inventory aircraft procedure coverage;
 - the maximum taxi speed, the lower limit applied in turns and the audible
   taxi speed alarm;
@@ -494,14 +538,6 @@ NaviXav adapts its interface automatically when resized:
 
 The map listens for every window size change and recomputes its canvas
 immediately. The minimum size of the native window is 720 × 560 pixels.
-
-## Demo mode
-
-The **Demo** switch loads a sample flight and simulates movement on the ground.
-It lets you explore the interface without a SimBrief account or a simulator.
-
-Demo mode is always disabled at startup so that NaviXav gives priority to the
-latest SimBrief plan.
 
 ## Stopping the application
 
@@ -604,6 +640,9 @@ Internet outage blocks neither startup nor the flight functions.
 Before installation, a detached Windows helper waits until the running NaviXav
 process has fully closed. It then updates the directory actually in use, restarts
 the application and keeps an `.install.log` beside the downloaded installer.
+
+On that first restart, **Version history** opens automatically once to show
+what changed; it remains available from the interface afterwards.
 
 The repository is publicly readable. A user can browse the code and download
 Releases without a GitHub account, but only authorised collaborators can write

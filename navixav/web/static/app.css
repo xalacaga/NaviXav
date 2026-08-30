@@ -41,6 +41,12 @@
   --route-toc: #ec4899;
   --route-tod: #ef4444;
 
+  /* Trafic environnant. Une teinte neutre, volontairement plus sourde que
+     l'accent : le seul appareil qui doit sauter aux yeux est celui qu'on
+     pilote. */
+  --traffic: #93a5bd;
+  --traffic-label: #cbd5e1;
+
   /* Roulage au sol.
      Le plan de roulage reste sombre dans les deux thèmes : c'est une carte
      d'aérodrome, lue de nuit comme de jour, et son contraste vient du tracé
@@ -61,13 +67,17 @@
   --ground-label: #e8eef7;
   --ground-label-bg: rgba(19, 26, 38, 0.88);
   --ground-aircraft: #fbbf24;
+  --ground-traffic: #7f96b5;
   --hold-short: #fbbf24;
   --taxi-ahead: #38bdf8;
   --taxi-done: #34d399;
+  --taxi-push: #c084fc;
 
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
+  --topbar-height: 64px;
+  --flight-context-height: 0px;
   --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Code", ui-monospace, "Consolas", monospace;
 }
@@ -107,12 +117,15 @@
     --route-approach: #047857;
     --route-toc: #be185d;
     --route-tod: #b91c1c;
+    --traffic: #5b6b86;
+    --traffic-label: #334155;
 
     /* Le plan de roulage garde son fond sombre en thème clair : seules les
        couleurs de l'itinéraire s'accordent au reste de l'interface. */
     --hold-short: #fbbf24;
     --taxi-ahead: #38bdf8;
     --taxi-done: #34d399;
+    --taxi-push: #c084fc;
 }
 
 * { box-sizing: border-box; }
@@ -165,11 +178,6 @@ p { margin: 0; }
 .brand-sub { margin-top: 2px; font-size: 0.66rem; color: var(--text-faint); }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
-.toolbar-demo { margin-inline: 2px 3px; }
-.toolbar-demo .switch-track { width: 34px; height: 18px; padding: 2px; }
-.toolbar-demo .switch-thumb { width: 12px; height: 12px; }
-.toolbar-demo input:checked + .switch-track .switch-thumb { transform: translateX(16px); }
-.toolbar-demo .switch-label { font-size: 0.74rem; }
 
 .global-flight-alert {
   flex: 1 0 100%;
@@ -323,6 +331,65 @@ main {
 .banner ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-dim); }
 .banner li { margin-bottom: 3px; }
 .banner strong { display: block; margin-bottom: 2px; }
+
+/* Attente du bandeau : un avion parcourt le bas du cadre, sa traînée derrière
+   lui. La progression est volontairement indéterminée — le service ne sait pas
+   combien d'aérodromes il lui reste à lire, et une barre qui remplirait un
+   pourcentage inventé mentirait sur ce qui reste. */
+.banner.is-busy { position: relative; overflow: hidden; padding-bottom: 20px; }
+.banner-body { flex: 1 1 auto; min-width: 0; }
+.banner-progress {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.banner-plane {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  color: var(--accent);
+  animation: banner-plane 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+/* La silhouette est dessinée nez en haut : seule elle pivote, pour regarder sa
+   route. La traînée reste ainsi dans le repère de la page. */
+.banner-plane svg { width: 100%; height: 100%; display: block; transform: rotate(90deg); }
+/* La traînée est portée par l'avion lui-même : animées séparément, les deux
+   dérivaient l'une de l'autre au fil des boucles. */
+.banner-plane::before {
+  content: "";
+  position: absolute;
+  right: 50%;
+  top: 50%;
+  width: 78px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 75%, transparent)
+  );
+}
+@keyframes banner-plane {
+  0% { left: 0; }
+  100% { left: 100%; }
+}
+/* Une animation en boucle n'est pas une information : qui la refuse garde le
+   texte et une piste calme. */
+@media (prefers-reduced-motion: reduce) {
+  .banner-plane { animation: none; left: 100%; }
+  .banner-plane::before { width: 100%; opacity: 0.5; }
+}
+
 .banner-close {
   flex: 0 0 auto;
   margin: -4px -6px 0 auto;
@@ -339,6 +406,83 @@ main {
   line-height: 1;
   cursor: pointer;
 }
+
+/* ----------------------------------------------- contexte de vol guide */
+
+.flight-context {
+  position: sticky;
+  top: calc(var(--topbar-height) + 8px);
+  z-index: 19;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.9fr) minmax(220px, 1.5fr) auto;
+  align-items: stretch;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--border);
+  box-shadow: var(--shadow);
+}
+.flight-context > * { min-width: 0; background: var(--surface-solid); }
+.flight-context-route {
+  appearance: none;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 12px 16px;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.flight-context-route:hover { background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-solid)); }
+.flight-context-route:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.flight-context small {
+  color: var(--text-faint);
+  font-size: 0.59rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.flight-context-route strong {
+  overflow: hidden;
+  font: 750 0.95rem var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flight-context-state,
+.flight-context-next {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 10px 15px;
+}
+.flight-context-state strong { color: var(--accent); font-size: 0.82rem; }
+.flight-context-state span,
+.flight-context-next strong {
+  overflow: hidden;
+  color: var(--text-dim);
+  font: 650 0.72rem var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flight-context-next strong { color: var(--text); font-family: var(--font); }
+.flight-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+}
+.flight-context-actions button { min-height: 38px; white-space: nowrap; }
+body[data-interface="classic"] .flight-context,
+body[data-interface="classic"] .chart-pinboard { display: none !important; }
+
+.tabs button.recommended:not(.active) {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  color: var(--text);
+}
+.tabs button.recommended:not(.active)::after { background: var(--accent); }
 .banner-close:hover { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); }
 .banner-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -609,6 +753,59 @@ main {
 }
 .route-meta { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* Rangée des fréquences du terrain.
+ *
+ * Elle passe à la ligne plutôt que de déborder : la fenêtre native descend à
+ * 720 px et une carte de départ peut porter quatre fréquences. Les chiffres
+ * sont en chasse fixe, comme le METAR au-dessus — c'est ce qui rend deux
+ * fréquences voisines comparables d'un coup d'œil. */
+.freq-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.freq-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.freq-badge { gap: 5px; }
+
+.freq-code {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.freq-mhz {
+  font-family: var(--mono);
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+/* Poste tenu en ligne sur VATSIM. Une pastille, pas une couleur de fond : la
+ * rangée reste celle du simulateur, le réseau ne fait qu'y ajouter un état. */
+.freq-online { border-color: color-mix(in srgb, var(--high) 55%, var(--border)); }
+
+.freq-online-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--high);
+  flex: 0 0 auto;
+}
+
+/* « +3 » : le rôle compte d'autres fréquences que celle affichée. Discret,
+ * mais présent — c'est ce qui empêche de croire qu'il n'y en a qu'une. */
+.freq-more {
+  font-size: 0.58rem;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+
 /* ------------------------------------------------------------------ tabs */
 
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -728,8 +925,13 @@ main {
 .module-menu-toggle,
 .module-menu-backdrop { display: none; }
 
+.strip,
 .grid-terminal,
-.panel { scroll-margin-top: 92px; }
+.panel {
+  scroll-margin-top: calc(
+    var(--topbar-height) + var(--flight-context-height) + 26px
+  );
+}
 
 .panel {
   border-radius: var(--radius);
@@ -887,7 +1089,14 @@ main {
   font: 650 0.44rem var(--mono);
 }
 .procedure-phase strong { overflow: hidden; padding-right: 8px; font-size: 0.59rem; text-overflow: ellipsis; white-space: nowrap; }
-.procedure-phase small { color: var(--text-faint); font: 0.52rem var(--mono); }
+.procedure-phase small {
+  overflow: hidden;
+  padding-right: 8px;
+  color: var(--text-faint);
+  font: 0.52rem var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .procedure-phase.done { color: var(--high); }
 .procedure-phase.done .procedure-phase-mark { border-color: color-mix(in srgb, var(--high) 35%, var(--border)); color: var(--high); }
 .procedure-phase.done .procedure-phase-index { color: var(--high); }
@@ -1169,6 +1378,39 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .map-airports { display: flex; gap: 6px; flex-wrap: wrap; }
 .map-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
+/* Le calque du réseau peut être allumé sans que le simulateur reçoive quoi
+   que ce soit — source réelle, FSLTL absent, injection retirée. Sans ce
+   repère, la carte laisserait croire que les appareils sont dans MSFS. */
+.traffic-map-only {
+  padding: 3px 7px;
+  border: 1px solid var(--warning, #d98324);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  color: var(--warning, #d98324);
+  cursor: help;
+}
+.traffic-source-select {
+  width: auto;
+  max-width: 124px;
+  min-height: 34px;
+  padding: 7px 28px 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-raised);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.traffic-source-select:hover,
+.traffic-source-select:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.traffic-source-select:disabled { cursor: default; opacity: 0.58; }
+
 .icon-btn {
   min-width: 38px;
   padding: 8px 13px;
@@ -1395,6 +1637,16 @@ body.remote-client .mobile-theme {
 .settings-head, .settings-actions {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
 }
+.settings-head {
+  position: sticky;
+  z-index: 4;
+  top: -20px;
+  margin: -20px -20px 10px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  backdrop-filter: blur(10px);
+}
 .settings-head h2 { margin: 0 0 4px; }
 .settings-head p { margin: 0; color: var(--text-dim); font-size: 0.82rem; }
 /* Autant de colonnes que la largeur en autorise : trois dans la fenêtre
@@ -1409,7 +1661,71 @@ body.remote-client .mobile-theme {
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface-raised); color: var(--text); font: inherit;
 }
+.settings-section {
+  margin: 10px 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
+}
+.settings-section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-section-summary::-webkit-details-marker { display: none; }
+.settings-section-summary > span:first-child { display: grid; gap: 2px; }
+.settings-section-summary strong { font-size: 0.82rem; }
+.settings-section-summary small {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+.settings-section-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--text-dim);
+  border-bottom: 1.5px solid var(--text-dim);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 150ms ease;
+}
+.settings-section[open] .settings-section-chevron {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+.settings-section-body {
+  padding: 13px;
+  border-top: 1px solid var(--border);
+}
+.settings-section-body.settings-grid { margin: 0; }
+.settings-wide { grid-column: 1 / -1; }
+.fsltl-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fsltl-status-row .settings-message { margin: 0; }
+.fsltl-status-row button { flex: 0 0 auto; }
+.traffic-source-credit {
+  color: var(--text-faint);
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+.settings-note a { color: var(--accent); }
 .settings-switch { align-self: end; min-height: 38px; }
+/* Une mise en garde tient sous son réglage, sur toute la largeur : la couper
+   en colonne la rendrait illisible juste là où elle compte. */
+.settings-note {
+  grid-column: 1 / -1;
+  margin: -4px 0 2px;
+  color: var(--text-faint);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
 .lan-access {
   grid-column: 1 / -1;
   display: flex;
@@ -1429,7 +1745,7 @@ body.remote-client .mobile-theme {
 .lan-url-row input { min-width: 0; font-family: var(--mono); }
 .lan-access small { color: var(--text-dim); line-height: 1.45; }
 .aircraft-settings {
-  margin: 14px 0 2px;
+  margin: 10px 0 0;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
@@ -1554,7 +1870,7 @@ body.remote-client .mobile-theme {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin: 10px 0 14px;
+  margin: 0;
   padding: 13px 15px;
   border: 1px solid color-mix(in srgb, #f97316 38%, var(--border));
   border-radius: var(--radius-sm);
@@ -1646,7 +1962,17 @@ body.remote-client .mobile-theme {
 
 .settings-message { min-height: 18px; color: var(--high); font-size: 0.8rem; }
 .settings-message.error { color: var(--low); }
-.settings-actions { justify-content: flex-end; margin-top: 8px; }
+.settings-actions {
+  position: sticky;
+  z-index: 4;
+  bottom: -20px;
+  justify-content: flex-end;
+  margin: 10px -20px -20px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+  backdrop-filter: blur(10px);
+}
 @media (max-width: 620px) {
   .settings-grid { grid-template-columns: 1fr; }
   .aircraft-survey-columns { grid-template-columns: 1fr; }
@@ -1655,6 +1981,8 @@ body.remote-client .mobile-theme {
   .chartfox-settings { align-items: stretch; flex-direction: column; }
   .chartfox-settings-actions { justify-content: flex-start; }
   .support-btn { width: 100%; white-space: normal; }
+  .fsltl-status-row { align-items: stretch; flex-direction: column; }
+  .fsltl-status-row button { width: 100%; }
 }
 
 /* Champ couleur : le pastille et la ligne d'aperçu portent la teinte réelle
@@ -1778,6 +2106,60 @@ body.remote-client .mobile-theme {
   height: clamp(420px, 62vh, 780px);
 }
 #chart-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+
+/* Fiche d'un appareil du réseau. Posée près de la silhouette cliquée, elle
+   reste dans la scène : une fenêtre flottante hors du cadre perdrait le lien
+   avec l'appareil qu'elle décrit. */
+.traffic-card {
+  position: absolute;
+  z-index: 6;
+  min-width: 244px;
+  max-width: 320px;
+  padding: 10px 12px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.traffic-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+.traffic-card-callsign { font-size: 0.94rem; font-weight: 700; color: var(--accent); }
+.traffic-card-type { font-family: var(--mono); color: var(--text); }
+.traffic-card-freq {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+.traffic-card-pilot { padding: 7px 0; color: var(--text); border-bottom: 1px solid var(--border); }
+.traffic-card-route {
+  display: flex;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.traffic-card-airport { flex: 1; min-width: 0; }
+.traffic-card-airport.arrival { text-align: right; }
+.traffic-card-airport b { display: block; font-size: 0.86rem; color: var(--text); }
+.traffic-card-airport small {
+  display: block;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.traffic-card-figures { display: flex; gap: 12px; padding-top: 7px; }
+.traffic-card-figure { flex: 1; }
+.traffic-card-figure small { display: block; color: var(--text-dim); }
+.traffic-card-figure b { font-family: var(--mono); font-size: 0.86rem; color: var(--text); }
 .sia-map-overlay {
   position: absolute; inset: 10px 10px 48px; z-index: 3;
   overflow: hidden; border: 1px solid var(--accent);
@@ -1874,6 +2256,7 @@ body.remote-client .mobile-theme {
 .ground-hud .ground-call.is-hold { color: var(--hold-short); }
 .ground-hud .ground-call.is-lost { color: #fb7185; }
 .ground-hud .ground-call.is-done { color: var(--taxi-done); }
+.ground-hud .ground-call.is-push { color: var(--taxi-push); }
 
 /* L'enchaînement des voies passe à la ligne plutôt que d'élargir le bandeau
    au point de couvrir le plan. */
@@ -2069,6 +2452,7 @@ body.remote-client .mobile-theme {
   font-family: var(--mono); font-size: 1.15rem; font-weight: 750;
 }
 .stat {
+  min-width: 0;
   padding: 14px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -2082,6 +2466,7 @@ body.remote-client .mobile-theme {
   font-size: 1.22rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .stat-note { margin-top: 3px; font-size: 0.72rem; color: var(--text-faint); }
 
@@ -2130,6 +2515,39 @@ body.remote-client .mobile-theme {
   background: color-mix(in srgb, var(--high) 12%, var(--surface-raised));
   color: var(--high); font-weight: 700; font-size: 0.78rem;
 }
+/* Pastille radio : ce qui est composé, pas ce qu'il faudrait composer.
+ *
+ * Volontairement plus discrète que la pastille de phase — c'est un constat,
+ * pas une consigne — et les chiffres en chasse fixe, comme partout où NaviXav
+ * affiche une fréquence. */
+.flight-radio-pill {
+  padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  font-family: var(--mono); font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+/* Fréquence attendue à la phase courante. Elle n'apparaît que lorsqu'elle est
+ * certaine, et se marque quand la radio est déjà dessus — un accord constaté,
+ * jamais un reproche. */
+.flight-radio-expected {
+  padding: 7px 12px; border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono); font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.flight-radio-expected[data-tuned="yes"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--high) 55%, var(--border));
+  background: color-mix(in srgb, var(--high) 12%, var(--surface-raised));
+  color: var(--high);
+}
+
 /* ------------------------------------------ progression départ → arrivée */
 
 .flight-progress {
@@ -2256,6 +2674,38 @@ body.remote-client .mobile-theme {
   background: color-mix(in srgb, var(--low) 9%, var(--surface-raised));
 }
 .flight-live-stat[data-status="danger"] .stat-value { color: var(--low); }
+.flight-live-stat[data-status="tod-ready"] {
+  border-color: color-mix(in srgb, var(--medium) 52%, var(--border));
+  background: color-mix(in srgb, var(--medium) 7%, var(--surface-raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--medium) 8%, transparent);
+  animation: tod-ready-pulse 2.4s ease-in-out infinite;
+}
+.flight-live-stat[data-status="tod-ready"] .stat-value { color: var(--medium); }
+.flight-live-stat[data-status="tod-imminent"] {
+  border-color: color-mix(in srgb, var(--medium) 78%, var(--border));
+  background: color-mix(in srgb, var(--medium) 12%, var(--surface-raised));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--medium) 12%, transparent);
+  animation: tod-ready-pulse 1.2s ease-in-out infinite;
+}
+.flight-live-stat[data-status="tod-imminent"] .stat-value { color: var(--medium); }
+.flight-live-stat:has(#flight-tod)[data-status^="tod-"]::before {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  content: "";
+  background: var(--medium);
+  box-shadow: 0 0 9px var(--medium);
+}
+@keyframes tod-ready-pulse {
+  50% { border-color: color-mix(in srgb, var(--medium) 92%, var(--border)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flight-live-stat[data-status="tod-ready"],
+  .flight-live-stat[data-status="tod-imminent"] { animation: none; }
+}
 
 /* ------------------------------------------- configuration avion et alarmes */
 
@@ -2340,7 +2790,12 @@ body.remote-client .mobile-theme {
 .flight-config-head h2 { margin: 4px 0 0; }
 .flight-config-empty { margin: 14px 0 0; font-size: 0.84rem; color: var(--text-muted); }
 .flight-lights-block { margin-top: 14px; }
+.flight-lights-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flight-lights-summary { color: var(--text-faint); font: 650 0.7rem var(--mono); }
 .flight-lights { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.flight-config-heading { display: contents; }
+.flight-config-heading-mark,
+.flight-config-icon { display: none; }
 .light-chip {
   padding: 5px 10px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--surface-raised);
@@ -2356,6 +2811,160 @@ body.remote-client .mobile-theme {
 }
 .light-chip[data-state="off"] { opacity: 0.55; }
 .light-chip[data-state="unknown"] { opacity: 0.35; font-style: italic; }
+
+/* La vue guidée transforme la liste brute en synoptique cockpit. Le mode
+   classique conserve volontairement les anciennes tuiles sans pictogrammes. */
+body[data-interface="guided"] .flight-config {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 20px;
+  border-color: color-mix(in srgb, var(--accent) 19%, var(--border));
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 82% -25%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-raised) 84%, transparent), var(--surface));
+}
+body[data-interface="guided"] .flight-config::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  opacity: 0.18;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(110deg, transparent 22%, #000 100%);
+}
+body[data-interface="guided"] .flight-config-head {
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+body[data-interface="guided"] .flight-config-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+body[data-interface="guided"] .flight-config-heading-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
+  color: var(--accent);
+  font-size: 1.25rem;
+  transform: rotate(-7deg);
+}
+body[data-interface="guided"] .flight-config-head h2 { margin-top: 3px; }
+body[data-interface="guided"] .flight-config .flight-live-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+body[data-interface="guided"] .flight-config .flight-live-stat {
+  position: relative;
+  grid-column: span 3;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  min-height: 100px;
+  padding: 14px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 4%, transparent);
+}
+body[data-interface="guided"] .flight-config .flight-live-stat::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  content: "";
+  background: color-mix(in srgb, var(--text-faint) 28%, transparent);
+}
+body[data-interface="guided"] .flight-config .flight-live-stat[data-config-size="instrument"] { grid-column: span 4; }
+body[data-interface="guided"] .flight-config .flight-live-stat[data-config-size="wide"] { grid-column: span 6; }
+body[data-interface="guided"] .flight-config-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text-dim);
+  font: 750 0.9rem var(--mono);
+}
+body[data-interface="guided"] .flight-config-copy { min-width: 0; }
+body[data-interface="guided"] .flight-config .flight-live-stat .stat-label { line-height: 1.25; }
+body[data-interface="guided"] .flight-config .flight-live-stat .stat-value {
+  margin-top: 7px;
+  font: 720 1.08rem/1.18 var(--font);
+}
+body[data-interface="guided"] .flight-config .flight-live-stat .stat-note { margin-top: 5px; line-height: 1.3; }
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="good"]::after { background: var(--high); }
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="warning"]::after { background: var(--medium); }
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="danger"]::after { background: var(--low); }
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="good"] .flight-config-icon {
+  border-color: color-mix(in srgb, var(--high) 42%, var(--border));
+  background: color-mix(in srgb, var(--high) 10%, var(--surface));
+  color: var(--high);
+}
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="warning"] .flight-config-icon {
+  border-color: color-mix(in srgb, var(--medium) 48%, var(--border));
+  background: color-mix(in srgb, var(--medium) 10%, var(--surface));
+  color: var(--medium);
+}
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="danger"] {
+  background: color-mix(in srgb, var(--low) 9%, var(--surface-raised));
+}
+body[data-interface="guided"] .flight-config .flight-live-stat[data-status="danger"] .flight-config-icon {
+  border-color: color-mix(in srgb, var(--low) 52%, var(--border));
+  background: color-mix(in srgb, var(--low) 11%, var(--surface));
+  color: var(--low);
+}
+body[data-interface="guided"] .flight-lights-block {
+  margin-top: 10px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+}
+body[data-interface="guided"] .flight-lights-summary {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+body[data-interface="guided"] .light-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px 6px 8px;
+}
+body[data-interface="guided"] .light-chip::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  background: transparent;
+}
+body[data-interface="guided"] .light-chip[data-state="on"]::before {
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+@media (max-width: 1100px) {
+  body[data-interface="guided"] .flight-config .flight-live-stat,
+  body[data-interface="guided"] .flight-config .flight-live-stat[data-config-size] { grid-column: span 6; }
+}
 
 /* ---------------------------------------------------- chronologie du vol */
 
@@ -2621,6 +3230,58 @@ pre {
   align-items: start;
   gap: 16px; margin-top: 18px;
 }
+.chart-pinboard {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 66%, transparent);
+}
+.chart-pinboard-label {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0 8px;
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.chart-pin {
+  appearance: none;
+  display: grid;
+  flex: 0 0 min(210px, 52vw);
+  gap: 2px;
+  min-height: 54px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chart-pin:hover { border-color: var(--border-strong); }
+.chart-pin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chart-pin small {
+  color: var(--text-faint);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.chart-pin strong { overflow: hidden; font: 700 0.78rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.chart-pin span { overflow: hidden; color: var(--text-dim); font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
+.chart-pin.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 var(--accent);
+}
 .sia-airport-library {
   min-width: 0; padding: 18px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -2690,6 +3351,7 @@ pre {
   .sia-library-head { flex-wrap: wrap; }
   .chart-source-field { order: 3; width: 100%; }
   .chart-source-field select { width: 100%; }
+  .chart-pinboard-label { display: none; }
 }
 .minima-editor-head h2 { margin: 3px 0 14px; font-size: 1rem; }
 .minima-fields {
@@ -3031,6 +3693,8 @@ pre {
   .map-bar { align-items: flex-start; }
   .map-actions { flex: 1 1 100%; }
   .map-stage { height: clamp(360px, calc(100dvh - 300px), 680px); }
+  .flight-context { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flight-context-actions { justify-content: flex-end; }
 }
 
 @media (max-width: 760px) {
@@ -3057,6 +3721,16 @@ pre {
   #simbrief-create { display: none; }
   .sim-status { white-space: nowrap; }
   main { padding: 12px 12px 32px; }
+  .flight-context {
+    position: static;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+  .strip,
+  .grid-terminal,
+  .panel { scroll-margin-top: calc(var(--topbar-height) + 12px); }
+  .flight-context-next { grid-column: 1 / -1; }
+  .flight-context-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .flight-context-actions button { flex: 1 1 0; }
   .banner, .card, .panel, .sia-airport-library, .minima-editor {
     padding: 13px;
   }
@@ -3149,6 +3823,9 @@ pre {
   }
   .row-value { overflow-wrap: anywhere; }
   .map-stage { height: clamp(320px, calc(100dvh - 260px), 580px); }
+  body[data-interface="guided"] #panel-ground .map-stage {
+    height: clamp(380px, calc(100dvh - 230px), 720px);
+  }
   .map-actions .icon-btn { flex: 1 1 auto; }
   .map-basemap-style { flex: 1 1 100%; max-width: none; }
   .map-hud {
@@ -3210,6 +3887,9 @@ pre {
   .flight-live-grid, .stat-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  body[data-interface="guided"] .flight-config .flight-live-grid { grid-template-columns: minmax(0, 1fr); }
+  body[data-interface="guided"] .flight-config .flight-live-stat,
+  body[data-interface="guided"] .flight-config .flight-live-stat[data-config-size] { grid-column: 1; }
   /* La ligne départ → arrivée reste lisible en passant les aéroports au-dessus
      et en dessous de la trajectoire. */
   .flight-progress {

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import pytest
 
+from navixav.msfs import client as msfs_client
 from navixav.live.base import AircraftState, PositionUnavailable
-from navixav.live.demo import DemoSource, _bearing
 from navixav.live.registry import LiveTracker
 from navixav.live.simconnect import (
     _CAPABILITY_VARIABLES,
     _CONFIGURATION_VARIABLES,
     _FENIX_CONTROL_VARIABLES,
+    _AIRCRAFT_TITLE_VARIABLES,
+    _LIGHT_STATE_VARIABLES,
     _MODERN_CONFIGURATION_VARIABLES,
     _PAUSE_VARIABLES,
     _VARIABLES,
@@ -55,6 +57,7 @@ def test_configuration_variables_declare_their_units():
     for name, unit in (
         _CONFIGURATION_VARIABLES
         + _MODERN_CONFIGURATION_VARIABLES
+        + _LIGHT_STATE_VARIABLES
         + _CAPABILITY_VARIABLES
     ):
         assert name and unit, f"unité manquante pour {name}"
@@ -137,6 +140,7 @@ class FakeClient:
                 "AUTOPILOT MASTER": 1.0,
                 "AUTOPILOT ALTITUDE LOCK VAR": 6000.0,
                 "AUTOPILOT HEADING LOCK DIR": 361.0,
+                "COM ACTIVE FREQUENCY:1": 121.855,
                 "NAV ACTIVE FREQUENCY:1": 110.30,
                 "NAV LOCALIZER:1": -107.0,
                 "FUEL TOTAL QUANTITY WEIGHT": 4200.0,
@@ -156,6 +160,10 @@ class FakeClient:
                 "KOHLSMAN SETTING MB EX1:1": 1008.0,
                 "IS ANY OPEN INTERACTIVE POINTS RISKING TO CAUSE CRASH": 1.0,
             }
+        if variables == _LIGHT_STATE_VARIABLES:
+            if "light_states" in self.failing:
+                raise SimConnectError("masque des feux indisponible")
+            return {"LIGHT STATES": 0.0}
         if variables == _CAPABILITY_VARIABLES:
             if "capabilities" in self.failing:
                 raise SimConnectError("capacités indisponibles")
@@ -244,6 +252,9 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     assert configuration.altimeter_std is True
     assert configuration.interactive_points_crash_risk is True
     assert configuration.selected_altitude_ft == 6000.0
+    # La fréquence composée est rapportée telle quelle : NaviXav constate
+    # le réglage de la radio, il ne le commande pas.
+    assert configuration.com1_frequency_mhz == pytest.approx(121.855)
     assert configuration.nav1_frequency_mhz == pytest.approx(110.30)
     assert configuration.fuel_total_kg == 4200.0
     # Les caps sont ramenés dans [0, 360[ comme ceux de la position.
@@ -264,6 +275,58 @@ def test_recent_simvars_can_fail_without_hiding_historical_configuration(monkeyp
     assert configuration.altimeter_hpa == 1013.25
     assert configuration.altimeter_std is None
     assert configuration.interactive_points_crash_risk is None
+
+
+def test_light_mask_restores_states_missing_from_individual_simvars(monkeypatch):
+    """Les avions complexes peuvent ne renseigner que le masque officiel."""
+
+    class AggregateLightsClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _LIGHT_STATE_VARIABLES:
+                # NAV + BCN + WING + LOGO, comme le panneau de la capture.
+                return {"LIGHT STATES": 0x0001 | 0x0002 | 0x0080 | 0x0100}
+            values = super().read_simvars(variables, timeout_s)
+            if variables == _CONFIGURATION_VARIABLES:
+                for name in (
+                    "LIGHT LANDING",
+                    "LIGHT TAXI",
+                    "LIGHT STROBE",
+                    "LIGHT NAV",
+                    "LIGHT BEACON",
+                    "LIGHT LOGO",
+                    "LIGHT WING",
+                ):
+                    values[name] = 0.0
+            return values
+
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: AggregateLightsClient())
+
+    lights = source.read().configuration.lights
+
+    assert lights == {
+        "landing": False,
+        "taxi": False,
+        "strobe": False,
+        "nav": True,
+        "beacon": True,
+        "logo": True,
+        "wing": True,
+    }
+
+
+def test_light_mask_failure_keeps_individual_light_states(monkeypatch):
+    source = SimConnectSource()
+    monkeypatch.setattr(
+        source, "_connect", lambda: FakeClient(failing=("light_states",))
+    )
+
+    configuration = source.read().configuration
+
+    assert configuration is not None
+    assert configuration.lights["landing"] is True
+    assert configuration.lights["strobe"] is True
+    assert configuration.lights["nav"] is False
 
 
 def test_stale_control_simvars_fall_back_to_the_values_that_move(monkeypatch):
@@ -403,6 +466,20 @@ def test_loaded_msfs_title_selects_fenix_when_simbrief_name_is_generic(monkeypat
     assert state.configuration.spoilers_armed is True
 
 
+def test_atc_model_identifies_an_aircraft_whose_title_is_empty(monkeypatch):
+    class ModelOnlyClient(FakeClient):
+        def read_string_simvar(self, name: str, timeout_s: float = 3.0):
+            assert name in _AIRCRAFT_TITLE_VARIABLES
+            return "" if name == "TITLE" else "A320"
+
+    source = SimConnectSource()
+    monkeypatch.setattr(source, "_connect", lambda: ModelOnlyClient())
+
+    state = source.read()
+
+    assert state.title == "A320"
+
+
 def test_the_three_altitudes_stay_distinct(monkeypatch):
     """Le niveau de vol se lit dans l'atmosphère standard, pas en altitude vraie.
 
@@ -509,17 +586,6 @@ def test_configuration_survives_missing_capabilities(monkeypatch):
     assert configuration.capabilities is None
 
 
-def test_demo_reports_a_configuration():
-    """Le mode démo doit alimenter le panneau, sans déclencher d'alarme."""
-    source = DemoSource(start=(48.545, 7.632), end=(48.535, 7.615))
-    configuration = source.read().configuration
-
-    assert configuration is not None
-    assert configuration.parking_brake is False
-    assert configuration.lights["beacon"] is True
-    assert configuration.simulation_rate == 1.0
-
-
 # --------------------------------------------------------------------------- #
 # Définitions SimConnect
 #
@@ -530,11 +596,13 @@ def test_demo_reports_a_configuration():
 
 class FakeDll:
     def __init__(self) -> None:
-        self.added: list[tuple[int, bytes]] = []
+        self.added: list[tuple[int, bytes, bytes | None]] = []
         self.cleared: list[int] = []
 
-    def SimConnect_AddToDataDefinition(self, _handle, definition_id, name, *_rest):
-        self.added.append((definition_id, name))
+    def SimConnect_AddToDataDefinition(
+        self, _handle, definition_id, name, unit, *_rest
+    ):
+        self.added.append((definition_id, name, unit))
         return 0
 
     def SimConnect_ClearDataDefinition(self, _handle, definition_id):
@@ -580,7 +648,9 @@ def test_aircraft_title_uses_a_reused_string_definition():
     second = client._string_definition_for("TITLE")
 
     assert first == second
-    assert [name for _definition, name in dll.added] == [b"TITLE"]
+    assert [(name, unit) for _definition, name, unit in dll.added] == [
+        (b"TITLE", None)
+    ]
 
 
 def test_forgetting_a_definition_releases_it():
@@ -594,61 +664,48 @@ def test_forgetting_a_definition_releases_it():
     assert client._definition_for(_VARIABLES) != definition
 
 
-# --------------------------------------------------------------------------- #
-# Source de démonstration
-# --------------------------------------------------------------------------- #
+def test_msfs2024_ai_creation_uses_ex1_with_legacy_fsltl_title():
+    class AiDll:
+        def __init__(self):
+            self.args = None
+
+        def SimConnect_AICreateNonATCAircraft_EX1(self, *args):
+            self.args = args
+            return 1
+
+    client = object.__new__(SimConnectClient)
+    client._dll = AiDll()
+    client._handle = None
+    client._next_id = 1
+
+    with pytest.raises(SimConnectError, match="Impossible de créer"):
+        client.create_ai_aircraft(
+            "FSLTL A320 Air France", "AFR123",
+            latitude=48.0, longitude=2.0, altitude_ft=5000,
+            heading_deg=90, airspeed_kt=180, on_ground=False,
+        )
+
+    assert client._dll.args[1:4] == (
+        b"FSLTL A320 Air France", b"", b"AFR123"
+    )
 
 
-def test_demo_starts_at_its_origin():
-    source = DemoSource(start=(48.545, 7.632), end=(48.535, 7.615))
-    state = source.read()
-    assert state.latitude == pytest.approx(48.545, abs=1e-3)
-    assert state.on_ground
-    assert state.source == "Démonstration"
+def test_old_simconnect_dll_is_rejected_for_msfs2024(monkeypatch, tmp_path):
+    old_dll = tmp_path / "SimConnect.dll"
+    old_dll.touch()
+    monkeypatch.setattr(msfs_client.ct, "WinDLL", lambda _path: object())
+
+    with pytest.raises(SimConnectError, match="API EX1 absente"):
+        SimConnectClient(old_dll)
 
 
-def test_demo_points_along_its_travel():
-    """Le cap doit suivre le roulage, pas l'axe de la piste rejointe."""
-    source = DemoSource(start=(48.545, 7.632), end=(48.535, 7.615))
-    heading = source.read().heading_true_deg
-    expected = _bearing((48.545, 7.632), (48.535, 7.615))
-    assert heading == pytest.approx(expected, abs=0.5)
-    assert 180 < heading < 270  # trajet vers le sud-ouest
-
-
-def test_bearing_cardinal_directions():
-    assert _bearing((48.0, 7.0), (49.0, 7.0)) == pytest.approx(0, abs=0.5)
-    assert _bearing((48.0, 7.0), (48.0, 8.0)) == pytest.approx(90, abs=0.5)
-    assert _bearing((48.0, 7.0), (47.0, 7.0)) == pytest.approx(180, abs=0.5)
-
-
-def test_demo_rejects_a_degenerate_path():
-    source = DemoSource(start=(48.545, 7.632), end=(48.545, 7.632))
-    with pytest.raises(PositionUnavailable):
-        source.read()
+def test_msfs2024_local_connection_ignores_legacy_client_configuration():
+    assert msfs_client.SIMCONNECT_OPEN_CONFIGINDEX_LOCAL == 0xFFFFFFFF
 
 
 # --------------------------------------------------------------------------- #
 # Dégradation propre
 # --------------------------------------------------------------------------- #
-
-
-def test_tracker_prefers_its_demo_source():
-    tracker = LiveTracker()
-    tracker.set_demo(DemoSource(start=(48.545, 7.632), end=(48.535, 7.615)))
-    state = tracker.read(allow_demo=True)
-    assert state.source == "Démonstration"
-    tracker.close()
-
-
-def test_tracker_ignores_demo_when_not_requested():
-    """Sans autorisation explicite, la démo ne doit jamais se substituer au réel."""
-    tracker = LiveTracker()
-    tracker.set_demo(DemoSource(start=(48.545, 7.632), end=(48.535, 7.615)))
-    tracker._sources = []  # aucune source réelle disponible
-    with pytest.raises(PositionUnavailable):
-        tracker.read(allow_demo=False)
-    tracker.close()
 
 
 def test_state_serialises():
@@ -660,3 +717,91 @@ def test_state_serialises():
     assert payload["source"] == "Test"
     assert "on_ground" in payload
     assert payload["paused"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Trafic voisin
+#
+# C'est la source du plan de roulage. Elle vient du simulateur parce qu'elle
+# doit être exacte au mètre : un relevé réseau, vieux de quinze secondes,
+# poserait un appareil sur la voie d'à côté.
+# --------------------------------------------------------------------------- #
+
+
+class _TrafficClient:
+    """Client factice qui énumère des objets, avion du joueur compris."""
+
+    def __init__(self, rows, failing: bool = False) -> None:
+        self.rows = rows
+        self.failing = failing
+        self.user_object_id = 1
+        self.calls = 0
+
+    def read_objects(self, variables, radius_m, text_variable=None, **_kwargs):
+        self.calls += 1
+        self.radius_m = radius_m
+        self.text_variable = text_variable
+        if self.failing:
+            raise SimConnectError("énumération refusée")
+        return self.rows
+
+
+def _object(object_id: int, latitude: float, callsign: str, **extra) -> dict:
+    row = {
+        "object_id": object_id,
+        "PLANE LATITUDE": latitude,
+        "PLANE LONGITUDE": 2.379,
+        "PLANE ALTITUDE": 380.0,
+        "PLANE ALT ABOVE GROUND": 0.0,
+        "PLANE HEADING DEGREES TRUE": 361.0,
+        "GROUND VELOCITY": 12.0,
+        "SIM ON GROUND": 1.0,
+        "ATC ID": callsign,
+    }
+    row.update(extra)
+    return row
+
+
+def test_the_traffic_leaves_out_the_player(monkeypatch):
+    """Le simulateur inclut le joueur dans sa propre énumération.
+
+    Le garder dessinerait un second avion exactement sur le sien, et le
+    pilote croirait à un appareil arrêté sur sa position.
+    """
+    source = SimConnectSource()
+    fake = _TrafficClient([
+        _object(1, 48.723, "F-HNAV"),
+        _object(7, 48.730, "AFR23TZ"),
+    ])
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    reports = source.traffic()
+
+    assert [report.callsign for report in reports] == ["AFR23TZ"]
+    assert reports[0].object_id == 7
+    assert reports[0].on_ground is True
+    # Le cap est ramené dans le tour, comme celui de l'avion suivi.
+    assert reports[0].heading_true_deg == 1.0
+    assert fake.text_variable == "ATC ID"
+
+
+def test_a_refused_enumeration_is_put_to_sleep(monkeypatch):
+    """Le trafic est un confort : son refus ne pèse pas sur le simulateur.
+
+    Réessayer à chaque relevé ferait payer deux fois par seconde une demande
+    dont on sait déjà qu'elle échoue.
+    """
+    source = SimConnectSource()
+    fake = _TrafficClient([], failing=True)
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    assert source.traffic() == []
+    assert source.traffic() == []
+    assert fake.calls == 1
+
+
+def test_the_tracker_says_nothing_without_an_established_source():
+    """Le trafic accompagne un suivi : il n'en déclenche jamais la découverte."""
+    tracker = LiveTracker()
+
+    assert tracker.traffic() == []

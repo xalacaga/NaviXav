@@ -45,6 +45,7 @@
     "cargo": "1200",
     "payload": "16040",
     "est_zfw": "60340",
+    "est_zfwcg": "25.4",
     "max_zfw": "64300",
     "est_tow": "66077",
     "max_tow": "79000",

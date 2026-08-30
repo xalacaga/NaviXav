@@ -191,8 +191,8 @@ heuristic warnings some users reported on earlier builds.
 - Gives access to supported official national AIS charts.
 - Stores only a local summary of completed flights, which can be purged at any
   time.
-- Includes a demonstration mode and automatic update checking with SHA-256
-  verification and explicit user confirmation.
+- Includes automatic update checking with SHA-256 verification and explicit
+  user confirmation.
 - Available in English, French, German, Spanish, Italian, Portuguese, Dutch and
   Polish.
 
@@ -374,10 +374,6 @@ write access and run `NaviXav.exe`. WebView2 must already be installed.
 5. Import your latest generated SimBrief plan.
 6. Review the suggested runways and terminal procedures.
 7. Validate all important information before entering it into the aircraft.
-
-A demonstration mode is also available for discovering the interface without an
-active MSFS or SimBrief connection. It replays an entire flight from your plan
-— taxi, take-off, climb, cruise, descent, approach, landing and arrival stand.
 
 ### Local Flight Summaries
 

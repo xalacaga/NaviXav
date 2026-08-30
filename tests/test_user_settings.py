@@ -30,6 +30,9 @@ def test_user_settings_round_trip(tmp_path):
             "map_basemap": "opentopo",
             "map_trail_color": "#ff5500",
             "aircraft_community_path": str(tmp_path / "Community"),
+            "fsltl_path": str(tmp_path / "Community" / "fsltl-traffic-base"),
+            "traffic_source": "vatsim",
+            "aircraft_models": "fsltl",
             "lan_enabled": True,
         }
     )
@@ -44,6 +47,9 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.map_basemap == "opentopo"
     assert restored.map_trail_color == "#ff5500"
     assert restored.aircraft_community_path == tmp_path / "Community"
+    assert restored.fsltl_path == tmp_path / "Community" / "fsltl-traffic-base"
+    assert restored.traffic_source == "vatsim"
+    assert restored.aircraft_models == "fsltl"
     assert restored.lan_enabled is True
     # Aucun jeton n'est généré : l'accès mobile repose sur le seul lien local.
     assert not hasattr(restored, "lan_access_token")
@@ -57,6 +63,8 @@ def test_settings_request_accepts_interface_values():
         map_basemap="opentopo",
         map_trail_color="#AABBCC",
         aircraft_community_path=r"D:\MSFS\Community",
+        fsltl_path=r"D:\MSFS\Community\fsltl-traffic-base",
+        traffic_source="ivao",
         lan_enabled=True,
     )
 
@@ -64,7 +72,23 @@ def test_settings_request_accepts_interface_values():
     assert request.min_runway_length_ft == 4500
     assert request.map_basemap == "opentopo"
     assert request.aircraft_community_path == r"D:\MSFS\Community"
+    assert request.fsltl_path == r"D:\MSFS\Community\fsltl-traffic-base"
+    assert request.traffic_source == "ivao"
     assert request.lan_enabled is True
+
+
+def test_choosing_a_source_is_the_only_traffic_switch():
+    """Le calque commande seul : aucun second réglage ne peut le contredire."""
+    settings = Settings().with_user_values({
+        "traffic_source": "opensky",
+        "traffic_enabled": True,
+    })
+
+    assert settings.traffic_source == "opensky"
+    assert settings.traffic_enabled is True
+    # L'option d'injection a disparu : plus rien ne peut la désaccorder du calque.
+    assert not hasattr(settings, "traffic_injection_enabled")
+    assert "traffic_injection_enabled" not in settings.user_values()
 
 
 @pytest.mark.parametrize("basemap", sorted(MAP_BASEMAPS))
@@ -89,6 +113,10 @@ def test_settings_request_rejects_invalid_limits():
         SettingsRequest(taxi_speed_limit_kt=0)
     with pytest.raises(ValidationError):
         SettingsRequest(taxi_turn_speed_limit_kt=200)
+    with pytest.raises(ValidationError):
+        SettingsRequest(traffic_source="unknown")
+    with pytest.raises(ValidationError):
+        SettingsRequest(aircraft_models="unknown")
 
 
 def test_taxi_speed_limits_survive_both_validation_paths(tmp_path):

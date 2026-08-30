@@ -21,6 +21,9 @@ const MAP = (() => {
   const view = { scale: 0.2, centerX: 0, centerY: 0, follow: true };
   let chart = null;
   let aircraft = null;
+  let traffic = [];
+  let selectedTraffic = "";
+  let trafficListener = null;
   let trail = [];
   let route = [];
   let routeSegments = [];
@@ -43,6 +46,10 @@ const MAP = (() => {
   const MERCATOR_LIMIT_DEG = 85.051129;
   const MAX_TILE_CACHE = 320;
   const MAX_TILE_RADIUS = 8;
+  // La silhouette du trafic est dessinée dans le repère du plan de roulage,
+  // long de vingt-huit pixels. Réduite de moitié, elle reste reconnaissable
+  // tout en laissant l'avion suivi dominer la carte.
+  const TRAFFIC_SCALE = 0.5;
   let fitPending = false;
   // Les fonds CARTO Positron et Dark Matter ont été retirés : leur service
   // gratuit sans clé renvoie désormais des tuiles tatouées « API KEY
@@ -240,6 +247,7 @@ const MAP = (() => {
     drawRunways();
     drawRoute();
     drawTrail();
+    drawTraffic();
     drawAircraft();
     drawScaleBar();
     drawNorth();
@@ -477,7 +485,7 @@ const MAP = (() => {
       context.strokeStyle = css(colours[segment.stage] || "--accent");
       context.lineWidth = segment.stage === "approach" ? 4 : 3;
       context.lineJoin = "round";
-      context.setLineDash(segment.stage === "enroute" ? [10, 5] : []);
+      context.setLineDash([]);
       context.beginPath();
       segment.points.forEach((point, index) => {
         const [x, y] = toScreen(point.x, point.y);
@@ -611,6 +619,129 @@ const MAP = (() => {
     context.textBaseline = "alphabetic";
   }
 
+  /**
+   * Trafic du réseau, en chevrons orientés au cap.
+   *
+   * La silhouette pleine et son halo restent réservés à l'avion suivi : le
+   * pilote doit reconnaître le sien sans le chercher. Les étiquettes
+   * n'apparaissent qu'une fois la vue assez rapprochée pour qu'elles
+   * désignent un appareil et non un paquet ; au-dessus d'une région entière
+   * elles se recouvriraient au point de masquer la route.
+   */
+  function drawTraffic() {
+    if (!traffic.length) return;
+    const perNauticalMile = pixelsPerGroundMetre() * 1852;
+    const labelled = perNauticalMile >= 8;
+    const colour = css("--traffic");
+    const highlight = css("--accent");
+    const margin = 40;
+
+    context.save();
+    context.lineJoin = "round";
+    for (const entry of traffic) {
+      const [x, y] = toScreen(nearestX(entry.x, view.centerX), entry.y);
+      if (
+        x < -margin || y < -margin
+        || x > canvas.clientWidth + margin || y > canvas.clientHeight + margin
+      ) continue;
+
+      const chosen = entry.callsign === selectedTraffic;
+      context.save();
+      context.translate(x, y);
+      context.rotate(((entry.heading_deg ?? 0) * Math.PI) / 180);
+      context.scale(TRAFFIC_SCALE, TRAFFIC_SCALE);
+      context.fillStyle = chosen ? highlight : colour;
+      context.strokeStyle = css("--map-bg");
+      context.lineWidth = 2.5;
+      trafficPath();
+      // Le contour d'abord : tracé après le remplissage, il mangerait la
+      // moitié d'une silhouette déjà petite.
+      context.stroke();
+      context.fill();
+      context.restore();
+
+      // L'appareil ouvert garde son indicatif quelle que soit l'échelle :
+      // c'est celui qu'on est en train de lire.
+      if (labelled || chosen) drawTrafficLabel(entry, x, y, chosen);
+    }
+    context.restore();
+  }
+
+  /**
+   * Silhouette du trafic : fuselage, ailes et empennage.
+   *
+   * La même que celle du plan de roulage, à l'échelle de la carte. Un chevron
+   * de six pixels ne se distinguait pas d'un point de route ; une silhouette
+   * se reconnaît d'emblée, et son cap se lit sans compter les pixels.
+   */
+  function trafficPath() {
+    context.beginPath();
+    context.moveTo(0, -13);
+    context.lineTo(2.6, -4);
+    context.lineTo(14, 3);
+    context.lineTo(14, 6);
+    context.lineTo(2.6, 3.5);
+    context.lineTo(2.2, 10);
+    context.lineTo(6, 13);
+    context.lineTo(6, 15);
+    context.lineTo(0, 13.5);
+    context.lineTo(-6, 15);
+    context.lineTo(-6, 13);
+    context.lineTo(-2.2, 10);
+    context.lineTo(-2.6, 3.5);
+    context.lineTo(-14, 6);
+    context.lineTo(-14, 3);
+    context.lineTo(-2.6, -4);
+    context.closePath();
+  }
+
+  /**
+   * Indicatif sous la silhouette, cerclé de la couleur du fond.
+   *
+   * Sous l'appareil et non à côté : c'est là qu'un radar réseau le pose, et
+   * l'étiquette suit ainsi la silhouette sans la masquer quand deux appareils
+   * se croisent. Le halo remplace un cartouche — au-dessus d'un fond chargé,
+   * un rectangle par appareil couvrirait la ville, alors que le contour suffit
+   * à détacher le texte.
+   *
+   * Le niveau et le reste sont dans la fiche : les empiler ici rendrait
+   * illisible un secteur chargé, pour une information qu'on ne lit que d'un
+   * appareil à la fois.
+   */
+  function drawTrafficLabel(entry, x, y, selected) {
+    if (!entry.callsign) return;
+    context.save();
+    context.font = "600 10px 'Inter', system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    context.lineWidth = 3;
+    context.lineJoin = "round";
+    context.strokeStyle = css("--map-bg");
+    context.fillStyle = selected ? css("--accent") : css("--traffic-label");
+    context.strokeText(entry.callsign, x, y + 9);
+    context.fillText(entry.callsign, x, y + 9);
+    context.restore();
+  }
+
+  /**
+   * Appareil sous le pointeur, ou rien.
+   *
+   * La tolérance est celle du doigt plutôt que celle du pixel : une silhouette
+   * fait quatorze pixels, et exiger le clic en plein dessus rendrait la fiche
+   * inatteignable sur un écran tactile.
+   */
+  function trafficAt(px, py) {
+    let best = null;
+    for (const entry of traffic) {
+      const [x, y] = toScreen(nearestX(entry.x, view.centerX), entry.y);
+      const distance = Math.hypot(px - x, py - y);
+      if (distance <= 16 && (!best || distance < best.distance)) {
+        best = { entry, distance, x, y };
+      }
+    }
+    return best;
+  }
+
   function drawAircraft() {
     if (!aircraft) return;
     const [x, y] = toScreen(nearestX(aircraft.x, view.centerX), aircraft.y);
@@ -726,7 +857,10 @@ const MAP = (() => {
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (event) => {
-    dragging = { x: event.clientX, y: event.clientY };
+    dragging = {
+      x: event.clientX, y: event.clientY,
+      startX: event.clientX, startY: event.clientY,
+    };
     canvas.setPointerCapture(event.pointerId);
     canvas.style.cursor = "grabbing";
   });
@@ -743,7 +877,21 @@ const MAP = (() => {
     draw();
   });
 
-  const endDrag = () => {
+  const endDrag = (event) => {
+    // Un clic est un appui qui n'a pas bougé : au-delà, c'était un déplacement
+    // de la carte, et ouvrir une fiche au relâchement surprendrait.
+    if (dragging && event && trafficListener) {
+      const moved = Math.hypot(
+        event.clientX - dragging.startX, event.clientY - dragging.startY
+      );
+      if (moved <= 4) {
+        const rect = canvas.getBoundingClientRect();
+        const hit = trafficAt(event.clientX - rect.left, event.clientY - rect.top);
+        selectedTraffic = hit ? hit.entry.callsign : "";
+        trafficListener(hit ? hit.entry : null, hit?.x ?? 0, hit?.y ?? 0);
+        draw();
+      }
+    }
     dragging = null;
     canvas.style.cursor = "grab";
   };
@@ -805,6 +953,37 @@ const MAP = (() => {
       }
       draw();
     },
+    /**
+     * Trafic à afficher, en latitude/longitude.
+     *
+     * La projection est faite une fois à la réception : un relevé de plusieurs
+     * centaines d'appareils serait autrement reprojeté à chaque déplacement de
+     * la carte.
+     */
+    setTraffic(list) {
+      traffic = (Array.isArray(list) ? list : [])
+        .filter((entry) => (
+          Number.isFinite(entry?.latitude) && Number.isFinite(entry?.longitude)
+        ))
+        .map((entry) => ({ ...entry, ...project(entry.latitude, entry.longitude) }));
+      draw();
+    },
+    clearTraffic() {
+      traffic = [];
+      selectedTraffic = "";
+      draw();
+    },
+    /** Prévenu du clic sur un appareil, ou sur le vide pour refermer. */
+    onTrafficSelect(callback) {
+      trafficListener = typeof callback === "function" ? callback : null;
+    },
+    /** Referme la sélection sans passer par le clic. */
+    clearTrafficSelection() {
+      if (!selectedTraffic) return;
+      selectedTraffic = "";
+      draw();
+    },
+    get selectedTraffic() { return selectedTraffic; },
     setTrail(points) {
       trail = Array.isArray(points)
         ? points.map((point) => (

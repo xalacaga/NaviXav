@@ -47,11 +47,6 @@
       <option value="light">Clair</option>
       <option value="dark">Sombre</option>
     </select>
-    <label class="switch toolbar-demo" title="Utiliser le vol de démonstration LCPH → EHAM">
-      <input type="checkbox" id="demo-toggle" />
-      <span class="switch-track"><span class="switch-thumb"></span></span>
-      <span class="switch-label">Démo</span>
-    </label>
     <button id="simbrief-create" class="icon-btn toolbar-secondary" type="button"
             title="Créer puis générer un OFP dans SimBrief avant de l’importer">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -110,6 +105,26 @@
 
 <main id="main">
   <section id="banner" class="banner hidden"></section>
+
+  <section id="flight-context" class="flight-context hidden" aria-live="polite">
+    <button id="context-route" class="flight-context-route" type="button" data-context-tab="terminal">
+      <small id="context-route-label">Vol actif</small>
+      <strong id="context-route-value">---- → ----</strong>
+    </button>
+    <div class="flight-context-state">
+      <small id="context-phase-label">Phase</small>
+      <strong id="context-phase-value">Hors connexion</strong>
+      <span id="context-operation-value">—</span>
+    </div>
+    <div class="flight-context-next">
+      <small id="context-next-label">Prochaine action</small>
+      <strong id="context-next-value">—</strong>
+    </div>
+    <div class="flight-context-actions">
+      <button id="context-primary" class="btn-primary" type="button">Plan de vol</button>
+      <button id="context-charts" class="icon-btn" type="button">Cartes</button>
+    </div>
+  </section>
 
   <section id="strip" class="strip hidden" tabindex="0" aria-label="Route du vol"></section>
 
@@ -170,6 +185,18 @@
         </select>
         <button id="map-constraints" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
+        <button id="map-traffic" class="icon-btn" type="button" aria-pressed="false"
+                title="Afficher ou masquer le trafic du réseau VATSIM">Trafic VATSIM</button>
+        <select id="map-traffic-source" class="traffic-source-select"
+                aria-label="Source du trafic réseau"
+                title="Choisir la source affichée sur la carte et utilisée pour l’injection">
+          <option value="vatsim">VATSIM</option>
+          <option value="ivao">IVAO</option>
+          <option value="opensky">Trafic réel · OpenSky</option>
+        </select>
+        <span id="map-traffic-injection" class="traffic-map-only hidden"></span>
+        <a id="map-traffic-source-credit" class="traffic-source-credit hidden"
+           href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
@@ -181,6 +208,9 @@
     </div>
     <div class="map-stage">
       <canvas id="chart-canvas"></canvas>
+      <!-- Fiche de l'appareil ouvert sur la carte. Placée dans la scène pour
+           être posée près de la silhouette cliquée. -->
+      <div id="map-traffic-card" class="traffic-card hidden" role="dialog"></div>
       <div id="sia-map-overlay" class="sia-map-overlay hidden">
         <iframe id="sia-map-frame" title="Calque de la carte officielle"></iframe>
         <div class="sia-overlay-controls">
@@ -233,6 +263,15 @@
         <button id="ground-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
         <button id="ground-secondary" class="icon-btn" type="button"
                 aria-pressed="false" title="Afficher les voies secondaires et les accès aux postes">Secondaires</button>
+        <button id="ground-traffic" class="icon-btn" type="button" aria-pressed="false"
+                title="Afficher ou masquer le trafic lu dans le simulateur">Trafic simulateur</button>
+        <select id="ground-traffic-source" class="traffic-source-select"
+                aria-label="Source du trafic réseau"
+                title="Choisir la source affichée sur la carte et utilisée pour l’injection">
+          <option value="vatsim">VATSIM</option>
+          <option value="ivao">IVAO</option>
+          <option value="opensky">Trafic réel · OpenSky</option>
+        </select>
         <button id="ground-alarm" class="icon-btn active" type="button"
                 aria-pressed="true" title="Alarme sonore de vitesse de roulage">Alarme</button>
         <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
@@ -295,27 +334,12 @@
         <button type="button" id="settings-close" class="icon-btn" aria-label="Fermer">×</button>
       </div>
     </div>
-    <aside class="support-card support-card-top" aria-labelledby="support-title">
-      <div>
-        <h3 id="support-title">Soutenir NaviXav</h3>
-        <p id="support-body">NaviXav reste entièrement gratuit. Si l’outil vous est utile, vous pouvez soutenir son développement avec le montant de votre choix.</p>
-      </div>
-      <button id="support-open" class="icon-btn support-btn" type="button">Soutenir le développement</button>
-      <a class="icon-btn support-btn" href="https://navixav.fr" target="_blank" rel="noreferrer">navixav.fr</a>
-    </aside>
-    <section class="chartfox-settings" aria-labelledby="chartfox-settings-title">
-      <div>
-        <h3 id="chartfox-settings-title">ChartFox</h3>
-        <p id="chartfox-settings-help">Relie ton compte ChartFox/VATSIM pour ajouter ses cartes aux aérodromes du vol.</p>
-        <p class="chartfox-credit">Chart data powered by <a href="https://chartfox.org" target="_blank" rel="noreferrer">ChartFox</a> · <span id="chartfox-settings-simulation">simulation uniquement</span></p>
-      </div>
-      <div class="chartfox-settings-actions">
-        <span id="chartfox-settings-status" class="badge">Non connecté</span>
-        <button id="chartfox-connect" class="btn-primary" type="button">Connecter ChartFox</button>
-        <button id="chartfox-disconnect" class="icon-btn hidden" type="button">Déconnecter</button>
-      </div>
-    </section>
-    <div class="settings-grid">
+    <details class="settings-section" name="settings-group" open>
+      <summary class="settings-section-summary">
+        <span><strong id="settings-section-general">Général &amp; SimBrief</strong></span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
       <label class="field" for="settings-language">
         <span>Langue de l’interface</span>
         <select id="settings-language">
@@ -337,6 +361,13 @@
           <option value="dark">Sombre</option>
         </select>
       </label>
+      <label class="field" for="settings-interface">
+        <span>Organisation de l’interface</span>
+        <select id="settings-interface">
+          <option value="guided">Guidée par le vol</option>
+          <option value="classic">Classique</option>
+        </select>
+      </label>
       <label class="field" for="settings-pilot-id">
         <span>SimBrief Pilot ID</span>
         <input id="settings-pilot-id" autocomplete="off" placeholder="ex. 123456" />
@@ -345,6 +376,14 @@
         <span>SimBrief username</span>
         <input id="settings-username" autocomplete="off" placeholder="alternative au Pilot ID" />
       </label>
+      </div>
+    </details>
+    <details class="settings-section" name="settings-group">
+      <summary class="settings-section-summary">
+        <span><strong id="settings-section-flight">Vol &amp; météo</strong></span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
       <label class="field" for="settings-metar">
         <span>Source METAR</span>
         <select id="settings-metar">
@@ -368,6 +407,19 @@
         <span>Longueur de piste minimale (ft)</span>
         <input id="settings-runway-length" type="number" min="0" max="30000" />
       </label>
+      <label class="switch settings-switch">
+        <input type="checkbox" id="settings-rnp" />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
+      </label>
+      </div>
+    </details>
+    <details class="settings-section" name="settings-group">
+      <summary class="settings-section-summary">
+        <span><strong id="settings-section-display">Carte &amp; roulage</strong></span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
       <label class="field" for="settings-basemap">
         <span>Fond de carte</span>
         <select id="settings-basemap">
@@ -396,11 +448,52 @@
         <span class="switch-track"><span class="switch-thumb"></span></span>
         <span class="switch-label" id="settings-taxi-alarm-label">Alarme sonore de vitesse au roulage</span>
       </label>
+      </div>
+    </details>
+    <details class="settings-section settings-section-traffic" name="settings-group">
+      <summary class="settings-section-summary">
+        <span>
+          <strong id="settings-section-traffic">Trafic &amp; modèles FSLTL</strong>
+          <small id="settings-section-traffic-help">Détection, modèles et injection SimConnect</small>
+        </span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
       <label class="switch settings-switch">
-        <input type="checkbox" id="settings-rnp" />
+        <input type="checkbox" id="settings-vatsim" />
         <span class="switch-track"><span class="switch-thumb"></span></span>
-        <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
+        <span class="switch-label" id="settings-vatsim-label">Signaler les positions VATSIM en ligne</span>
       </label>
+      <label class="field" for="settings-traffic-source">
+        <span id="settings-traffic-source-label">Source du trafic</span>
+        <select id="settings-traffic-source">
+          <option value="vatsim">VATSIM</option>
+          <option value="ivao">IVAO</option>
+          <option value="opensky">Trafic réel · OpenSky</option>
+        </select>
+      </label>
+      <label class="field" for="settings-aircraft-models">
+        <span id="settings-aircraft-models-label">Modèles d’avions</span>
+        <select id="settings-aircraft-models"><option value="fsltl">FSLTL Base Models</option></select>
+      </label>
+      <label class="field settings-wide" for="settings-fsltl-path">
+        <span id="settings-fsltl-path-label">Chemin FSLTL Base Models (facultatif)</span>
+        <input id="settings-fsltl-path" autocomplete="off" placeholder="Détection automatique depuis MSFS" />
+      </label>
+      <div class="fsltl-status-row settings-wide">
+        <p id="settings-fsltl-status" class="settings-message" aria-live="polite">FSLTL Base Models</p>
+        <button id="settings-fsltl-download" class="icon-btn" type="button">Télécharger l’installateur officiel</button>
+      </div>
+      <small id="settings-fsltl-download-help" class="settings-note">Installe uniquement FSLTL Traffic Base Models avec l’installateur FlyByWire ; NaviXav n’utilise pas FSLTL Injector.</small>
+      <small id="settings-real-traffic-note" class="settings-note hidden"><span id="settings-real-traffic-help">Le trafic OpenSky est réel : ce sont les avions effectivement en vol autour de toi. Leur type est résolu depuis le registre OpenSky, puis ils sont injectés dans MSFS comme les réseaux de simulation.</span> <a href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a></small>
+      </div>
+    </details>
+    <details class="settings-section" name="settings-group">
+      <summary class="settings-section-summary">
+        <span><strong id="settings-section-connections">Connexions</strong></span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
       <label class="switch settings-switch lan-switch">
         <input type="checkbox" id="settings-lan-enabled" />
         <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -414,8 +507,21 @@
         </div>
         <small id="settings-lan-help">Même Wi-Fi requis. Redémarre NaviXav puis autorise le réseau privé si Windows le demande.</small>
       </div>
-    </div>
-    <details class="aircraft-settings">
+      <section class="chartfox-settings settings-wide" aria-labelledby="chartfox-settings-title">
+        <div>
+          <h3 id="chartfox-settings-title">ChartFox</h3>
+          <p id="chartfox-settings-help">Relie ton compte ChartFox/VATSIM pour ajouter ses cartes aux aérodromes du vol.</p>
+          <p class="chartfox-credit">Chart data powered by <a href="https://chartfox.org" target="_blank" rel="noreferrer">ChartFox</a> · <span id="chartfox-settings-simulation">simulation uniquement</span></p>
+        </div>
+        <div class="chartfox-settings-actions">
+          <span id="chartfox-settings-status" class="badge">Non connecté</span>
+          <button id="chartfox-connect" class="btn-primary" type="button">Connecter ChartFox</button>
+          <button id="chartfox-disconnect" class="icon-btn hidden" type="button">Déconnecter</button>
+        </div>
+      </section>
+      </div>
+    </details>
+    <details class="aircraft-settings" name="settings-group">
       <summary class="aircraft-settings-summary">
         <span>
           <strong id="aircraft-settings-title">Procédures par appareil</strong>
@@ -446,6 +552,22 @@
             <div id="aircraft-missing-list" class="aircraft-survey-list"></div>
           </section>
         </div>
+      </div>
+    </details>
+    <details class="settings-section" name="settings-group">
+      <summary class="settings-section-summary">
+        <span><strong id="settings-section-about">NaviXav &amp; soutien</strong></span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body">
+        <aside class="support-card" aria-labelledby="support-title">
+          <div>
+            <h3 id="support-title">Soutenir NaviXav</h3>
+            <p id="support-body">NaviXav reste entièrement gratuit. Si l’outil vous est utile, vous pouvez soutenir son développement avec le montant de votre choix.</p>
+          </div>
+          <button id="support-open" class="icon-btn support-btn" type="button">Soutenir le développement</button>
+          <a class="icon-btn support-btn" href="https://navixav.fr" target="_blank" rel="noreferrer">navixav.fr</a>
+        </aside>
       </div>
     </details>
     <p id="settings-message" class="settings-message"></p>
@@ -503,7 +625,6 @@
     </div>
     <p id="welcome-message" class="settings-message"></p>
     <div class="settings-actions">
-      <button type="button" id="welcome-demo" class="icon-btn hidden">Continuer en mode démo</button>
       <button type="submit" id="welcome-submit" class="btn-primary" disabled>Commencer</button>
     </div>
   </form>

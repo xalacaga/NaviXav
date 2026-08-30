@@ -149,15 +149,84 @@ def test_interface_offers_a_persistent_global_theme():
         assert key in translations
 
 
-def test_settings_prioritise_support_and_collapse_aircraft_procedures():
+def test_interface_can_return_to_the_classic_layout_without_restart():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="settings-interface"' in html
+    assert '<option value="guided">' in html
+    assert '<option value="classic">' in html
+    assert 'id="flight-context"' in html
+    assert 'body[data-interface="classic"] .flight-context' in css
+    assert 'const INTERFACE_MODE_KEY = "navixav-interface-mode"' in javascript
+    assert "localStorage.setItem(INTERFACE_MODE_KEY, interfaceMode)" in javascript
+    assert 'applyInterfaceMode($("settings-interface").value)' in javascript
+    for key in ("interface_guided", "interface_classic", "context_next_action"):
+        assert translations.count(f"{key}:") >= 8
+
+
+def test_demo_mode_is_no_longer_exposed_or_accepted():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    app = create_app(Settings())
+
+    try:
+        assert 'id="demo-toggle"' not in html
+        assert 'id="welcome-demo"' not in html
+        assert "/api/demo/" not in javascript
+        assert "demo" not in PlanRequest.model_fields
+        assert not any(route.path.startswith("/api/demo/") for route in app.routes)
+    finally:
+        app.state.close_resources()
+
+
+def test_guided_interface_prepares_phase_aware_context_and_charts():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    for function in (
+        "function contextPrimaryTab(",
+        "function updateGuidedContext(",
+        "function chartPinboard(",
+        "function updateChartPinboardPhase(",
+    ):
+        assert function in javascript
+    for removed_shortcut in ("KeyM", "KeyG", "KeyC", "KeyW", "KeyP", "KeyF"):
+        assert removed_shortcut not in javascript
+    assert '.chart-pin.active {' in css
+    assert 'body[data-interface="guided"] #panel-ground .map-stage' in css
+    context = css[css.index(".flight-context {") : css.index(".flight-context > *")]
+    assert "position: sticky;" in context
+    assert "top: calc(var(--topbar-height) + 8px);" in context
+    compact = css[css.index("@media (max-width: 760px)") :]
+    assert "position: static;" in compact
+    assert "function syncRouteStripVisibility(" in javascript
+    assert 'interfaceMode === "classic" || tabName === "terminal"' in javascript
+    assert "syncRouteStripVisibility(name);" in javascript
+    assert 'body[data-interface="guided"] .flight-config' in css
+    assert 'body[data-interface="guided"] .flight-config .flight-live-stat[data-config-size="wide"]' in css
+    assert 'body[data-interface="guided"] .flight-live-grid {' not in css
+    assert 'body[data-interface="guided"] .flight-live-stat {' not in css
+    assert 'headingMark.setAttribute("aria-hidden", "true")' in javascript
+    assert 'summary.textContent = `${activeCount} / ${knownCount || LIGHT_LABELS.length}`' in javascript
+    assert '.light-chip[data-state="on"]::before' in css
+
+
+def test_settings_collapse_every_configuration_family():
     static = Path(desktop.__file__).parent / "web" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")
 
-    assert '<details class="aircraft-settings">' in html
+    assert '<details class="aircraft-settings" name="settings-group">' in html
     assert '<details class="aircraft-settings" open' not in html
     assert '<summary class="aircraft-settings-summary">' in html
-    assert html.index('class="support-card support-card-top"') < html.index('class="settings-grid"')
-    assert html.index('class="support-card support-card-top"') < html.index('class="aircraft-settings"')
+    assert html.count('name="settings-group"') >= 7
+    assert html.index('id="settings-section-general"') < html.index('class="aircraft-settings"')
+    assert html.index('class="aircraft-settings"') < html.index('id="support-title"')
 
 
 def test_procedure_header_status_and_phase_flow_are_compact():
@@ -195,6 +264,315 @@ def test_flight_tracking_and_local_logbook_follow_the_selected_language():
         "simbrief_create", "simbrief_create_title",
     ):
         assert f'{key}:' in translations
+
+
+def test_the_flight_panel_names_the_station_the_radio_is_tuned_to():
+    """NaviXav constate le réglage de la radio, il ne le dicte pas.
+
+    La recherche part de la fréquence composée, jamais de la phase de vol :
+    aucune piste, aucune procédure n'entre dans ce rapprochement, et une
+    fréquence étrangère au plan ne reçoit pas de nom d'emprunt.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    matcher = javascript.split("function tunedStation(plan, mhz)")[1]
+    matcher = matcher.split("function tunedRadioLabel")[0]
+    # Les deux terrains du plan, postes principaux et secondaires : à CYYZ le
+    # sol de la piste en service n'est pas le premier que MSFS cite.
+    assert "plan?.departure, plan?.arrival" in matcher
+    assert "frequency.alternates" in matcher
+    assert "return null" in matcher
+
+    # « COM1 » est une notation de cockpit : elle ne se traduit pas.
+    label = javascript.split("function tunedRadioLabel(plan, aircraft)")[1]
+    label = label.split("function renderTerminal")[0]
+    assert "com1_frequency_mhz" in label
+    assert "COM1" in label
+
+    assert 'radio.id = "flight-radio"' in javascript
+    assert 'liveValue("flight-radio", tunedRadioLabel(currentPlan, aircraft))' in javascript
+    assert ".flight-radio-pill" in css
+
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        block = translations[translations.index(f"    {language}: {{") :]
+        assert "flight_radio_title:" in block[:500]
+
+
+def test_the_expected_frequency_stays_silent_when_the_role_is_ambiguous():
+    """Quatre tours à Roissy, et rien pour dire laquelle tient la piste.
+
+    Une pastille qui trancherait au hasard donnerait une consigne fausse, et
+    une consigne fausse est pire que pas de consigne. Elle ne parle donc que
+    lorsque le rôle ne compte qu'une seule fréquence.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    expected = javascript.split("function expectedFrequency(plan, phaseKey, aircraft)")[1]
+    expected = expected.split("function renderTerminal")[0]
+    assert "row?.stations?.length !== 1" in expected
+    assert "return null" in expected
+
+    # La croisière et le trajet en route n'ont pas de fréquence honnête : la
+    # table ne les mentionne pas, plutôt que de renvoyer un centre de contrôle.
+    table = javascript.split("const PHASE_FREQUENCIES = {")[1].split("};")[0]
+    assert "phase_cruise" not in table
+    assert "phase_enroute" not in table
+    for phase in ("phase_taxi_out", "phase_takeoff", "phase_approach", "phase_taxi_in"):
+        assert phase in table
+
+    # Accord constaté, jamais reproche : un seul état marqué, pas d'alerte.
+    update = javascript.split("function updateExpectedFrequency(aircraft, phaseKey)")[1]
+    update = update.split("function describeGear")[0]
+    assert "show(pill, Boolean(expected))" in update
+    assert "danger" not in update and "warning" not in update
+    assert '.flight-radio-expected[data-tuned="yes"]' in css
+
+
+def test_the_online_positions_decorate_the_published_frequencies():
+    """Le réseau n'écrase pas la rangée du simulateur, il l'annote.
+
+    Une fréquence marquée dit « ce poste est tenu » ; c'est un état ajouté,
+    pas une source de remplacement. Et sans réponse du réseau, rien n'est
+    marqué : un marquage figé laisserait un contrôleur déconnecté en ligne.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    mark = javascript.split("function markVatsimPositions(scope)")[1]
+    mark = mark.split("async function refreshVatsim")[0]
+    assert 'classList.toggle("freq-online"' in mark
+    assert 'tf("vatsim_online"' in mark
+
+    refresh = javascript.split("async function refreshVatsim()")[1]
+    refresh = refresh.split("function startVatsimLoop")[0]
+    assert "data?.available ? (data.positions || {}) : {}" in refresh
+
+    # Le réglage commande la boucle : fermé, aucun appel ne part du navigateur.
+    loop = javascript.split("function startVatsimLoop()")[1]
+    loop = loop.split("function renderTerminal")[0]
+    assert "latestStatus?.vatsim_enabled" in loop
+
+    assert 'id="settings-vatsim"' in html
+    assert ".freq-online-dot" in css
+    assert '"#settings-vatsim-label": "settings_vatsim"' in translations
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        block = translations[translations.index(f"    {language}: {{") :]
+        assert "settings_vatsim:" in block[:600]
+        assert "vatsim_online:" in block[:600]
+
+
+def test_the_traffic_is_an_option_and_reads_two_sources():
+    """Un interrupteur, deux relevés, et jamais la mauvaise source.
+
+    La carte lit le réseau, qui sait où sont les appareils à trois kilomètres
+    près : en route, cela suffit. Le plan de roulage lit le simulateur, seul
+    exact au mètre. Intervertir les deux poserait un avion hors de sa voie.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    chart = (static / "map.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    # L'affichage du trafic ne se commande que depuis les barres, et ce seul
+    # interrupteur commande aussi l'injection : aucune case des paramètres ne
+    # doit pouvoir le contredire, ni laisser croire qu'un second consentement
+    # reste à donner.
+    assert 'id="settings-traffic"' not in html
+    assert "settings_traffic_enabled" not in translations
+    assert 'id="settings-traffic-injection"' not in html
+    assert "settings_traffic_injection" not in translations
+    assert "traffic_injection_enabled" not in javascript
+
+    # Chaque vue à sa source, et pas l'autre.
+    network = javascript.split("async function refreshTraffic()")[1]
+    network = network.split("async function refreshGroundTraffic")[0]
+    assert "/api/traffic" in network
+    assert "MAP.setTraffic" in network
+
+    simulator = javascript.split("async function refreshGroundTraffic()")[1]
+    simulator = simulator.split("function startTrafficLoop")[0]
+    assert "/api/live/traffic" in simulator
+    assert "GROUND.setTraffic" in simulator
+
+    # Le réglage commande la boucle : fermé, aucun appel ne part du navigateur.
+    loop = javascript.split("function startTrafficLoop()")[1]
+    loop = loop.split("function renderTerminal")[0]
+    assert "latestStatus?.traffic_enabled" in loop
+    assert "MAP.clearTraffic()" in loop
+    assert "GROUND.clearTraffic()" in loop
+
+    assert "--traffic:" in css
+    assert "--ground-traffic:" in css
+    assert "function drawTraffic()" in chart
+    assert "function drawTraffic()" in ground
+    # Au sol, ce qui survole haut n'encombre pas la voie qu'on roule.
+    assert "TRAFFIC_CEILING_FT" in ground
+
+
+def test_the_traffic_button_commands_the_setting_itself():
+    """Le bouton des barres n'est pas un masque d'affichage.
+
+    Un affichage qu'on croirait éteint alors que les relevés continuent de
+    partir mentirait sur ce que fait l'application : le bouton commande donc
+    le réglage lui-même, et il est le seul à le faire.
+
+    Chaque barre nomme en outre sa source. Les deux relevés ne montrent pas la
+    même population — le réseau d'un côté, le contenu du simulateur de
+    l'autre — et un libellé commun aurait laissé croire à un seul trafic.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="map-traffic"' in html
+    assert 'id="ground-traffic"' in html
+    assert 'id="map-traffic-source"' in html
+    assert 'id="ground-traffic-source"' in html
+    assert '"#map-traffic": "map_traffic"' in translations
+    assert '"#ground-traffic": "ground_traffic"' in translations
+    assert '"#map-traffic": "map_traffic_title"' in translations
+    assert '"#ground-traffic": "ground_traffic_title"' in translations
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        block = translations[translations.index(f"    {language}: {{") :]
+        for key in (
+            "map_traffic:", "map_traffic_title:",
+            "ground_traffic:", "ground_traffic_title:",
+        ):
+            assert key in block[:12000], f"{key} manque en {language}"
+        # VATSIM est un nom de réseau : aucune langue ne le traduit.
+        assert "VATSIM" in block[block.index("map_traffic:"):][:60]
+
+    toggle = javascript.split("function toggleTraffic()")[1]
+    toggle = toggle.split("function syncTrafficButtons")[0]
+    assert "latestStatus.traffic_enabled = !latestStatus.traffic_enabled" in toggle
+    assert 'persistSetting({ traffic_enabled: latestStatus.traffic_enabled })' in toggle
+    assert "startTrafficLoop()" in toggle
+    # Les réglages du poste ne se commandent pas depuis un téléphone.
+    assert "remote_client" in toggle
+
+    switcher = javascript.split("async function switchTrafficSource(event)")[1]
+    switcher = switcher.split("function syncTrafficButtons")[0]
+    assert 'persistSetting({ traffic_source: requested })' in switcher
+    assert '$("map-traffic-source")' in switcher
+    assert '$("ground-traffic-source")' in switcher
+    assert "startTrafficLoop()" in switcher
+    assert ".traffic-source-select" in (static / "app.css").read_text(encoding="utf-8")
+    assert translations.count("traffic_source_switch_label:") >= 8
+
+    # Les boutons suivent l'état : la boucle les resynchronise.
+    loop = javascript.split("function startTrafficLoop()")[1]
+    loop = loop.split("function toggleTraffic")[0]
+    assert "syncTrafficButtons()" in loop
+    # La cadence dépend de la source réseau : aucun faux décompte fixe de 15 s
+    # ne doit rester dans la barre ou dans un minuteur JavaScript.
+    assert "renderTrafficCountdown" not in javascript
+    assert "trafficNextAt" not in javascript
+    assert 'id="map-traffic-next"' not in html
+    assert ".traffic-countdown" not in (static / "app.css").read_text(encoding="utf-8")
+    assert '"#map-traffic-next"' not in translations
+
+
+def test_the_traffic_card_reads_like_a_network_radar():
+    """Indicatif sous la silhouette, et la fiche au clic.
+
+    Le relevé porte déjà l'essentiel — indicatif, type, route, vitesse,
+    altitude. La fiche l'affiche sans attendre, puis se complète du nom du
+    pilote, de la fréquence et des noms de terrain : attendre le service pour
+    tout montrer ferait hésiter la carte à chaque clic.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    chart = (static / "map.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id="map-traffic-card"' in html
+    assert ".traffic-card {" in css
+
+    # L'indicatif se pose sous l'appareil, comme sur un radar réseau.
+    label = chart.split("function drawTrafficLabel(")[1]
+    label = label.split("function trafficAt")[0]
+    assert 'context.textAlign = "center"' in label
+    assert "y + 9" in label
+
+    # Le clic ouvre la fiche ; le vide la referme.
+    assert "onTrafficSelect(callback)" in chart
+    assert "function trafficAt(px, py)" in chart
+
+    card = javascript.split("async function showTrafficCard(entry, x, y)")[1]
+    card = card.split("function hideTrafficCard")[0]
+    assert "renderTrafficCard(entry)" in card
+    assert "/api/traffic/aircraft/" in card
+    # Un autre appareil ouvert pendant la réponse ne doit pas écraser la fiche.
+    assert "trafficCardCallsign !== entry.callsign" in card
+
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        block = translations[translations.index(f"    {language}: {{") :]
+        assert "traffic_altitude:" in block[:12000], language
+
+
+def test_the_radio_match_stays_below_the_channel_spacing():
+    """Deux millièmes de MHz : assez large pour le bruit, assez fin pour 8,33.
+
+    Les canaux 8,33 kHz sont espacés de cinq kilohertz à l'affichage. Une
+    tolérance qui les atteindrait ferait nommer 121.905 d'après 121.910.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    declaration = javascript.split("const RADIO_MATCH_MHZ = ")[1].split(";")[0]
+    assert 0 < float(declaration) < 0.0025
+
+
+def test_the_terminal_cards_carry_the_airport_frequencies():
+    """Les sigles radio ne se traduisent pas, le libellé de la rangée si.
+
+    ATIS, DEL, GND, TWR et APP sont des abréviations aéronautiques : elles
+    viennent du plan tel quel, comme la notation METAR au-dessus. Seul le mot
+    qui introduit la rangée suit la langue d'interface.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    row = javascript.split("function frequencyRow(frequencies, icao)")[1]
+    row = row.split("function frequencyTitle")[0]
+    assert 't("frequencies")' in row
+    assert "Fréquences" not in row
+    # Trois décimales : 121.855 et 121.85 ne sont pas la même fréquence.
+    assert "stations[0].mhz.toFixed(3)" in row
+    # Un rôle qui compte plusieurs fréquences le dit : sans ce « +n », le
+    # pilote croirait qu'il n'y en a qu'une là où le contrôle lui en assignera
+    # une parmi quatre.
+    assert "stations.length - 1" in row
+
+    terminal = javascript.split("function renderTerminal(plan)")[1]
+    terminal = terminal.split("function constraintTable")[0]
+    assert "frequencyRow(plan.departure.frequencies, plan.departure.icao)" in terminal
+    assert "frequencyRow(plan.arrival.frequencies, plan.arrival.icao)" in terminal
+
+    # La fenêtre native descend à 720 px : la rangée passe à la ligne.
+    assert ".freq-row {" in css
+    assert "flex-wrap: wrap" in css[css.index(".freq-row {") :][:200]
+
+    for language in ("fr", "en", "de", "es", "it", "pt", "nl", "pl"):
+        block = translations[translations.index(f"    {language}: {{") :]
+        assert "frequencies:" in block[:400]
+        assert "frequency_alternates:" in block[:400]
 
 
 def test_the_flight_timeline_records_keys_and_replays_in_the_selected_language():
@@ -284,6 +662,32 @@ def test_support_button_opens_buy_me_a_coffee_only_after_an_explicit_click():
     assert '"/api/support/open",' in server_source
 
 
+def test_settings_are_compact_and_fsltl_can_be_configured_or_downloaded():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    server_source = (Path(desktop.__file__).parent / "web" / "app.py").read_text(encoding="utf-8")
+    desktop_source = Path(desktop.__file__).read_text(encoding="utf-8")
+
+    assert html.count('name="settings-group"') >= 7
+    assert 'id="settings-fsltl-path"' in html
+    assert 'id="settings-fsltl-download"' in html
+    assert '<option value="ivao">IVAO</option>' in html
+    assert '<option value="opensky">' in html
+    assert html.count("https://opensky-network.org/") >= 2
+    assert "position: sticky" in css
+    assert 'fetch("/api/fsltl/download"' in javascript
+    assert '"X-NaviXav-External": "fsltl"' in javascript
+    assert 'fetch("/api/traffic")' in javascript
+    assert 'value === "opensky"' in javascript
+    assert '"/api/fsltl/download",' in server_source
+    assert "https://flybywiresim.com/downloads/" in desktop_source
+    assert translations.count("settings_fsltl_path:") >= 8
+    assert translations.count("fsltl_download:") >= 8
+
+
 def test_windows_process_uses_stable_navixav_identity(monkeypatch):
     captured = []
     shell32 = SimpleNamespace(
@@ -319,7 +723,7 @@ def test_logging_is_rotating_and_cache_wait_is_explained(tmp_path):
     assert handler.maxBytes == LOG_MAX_BYTES
     assert handler.backupCount == LOG_BACKUP_COUNT
     assert "diagnostic sans identifiant" in log_file.read_text(encoding="utf-8")
-    assert 'showBanner("info", t("cache_title"), [t("cache_body")])' in javascript
+    assert 'showBanner("info", t("cache_title"), [t("cache_body")]' in javascript
     assert "plusieurs dizaines de secondes" in translations
 
     logging.getLogger().removeHandler(handler)
@@ -335,6 +739,28 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert '"X-NaviXav-Update": "install"' in javascript
     assert "checkForUpdates(true)" in javascript
     assert 'class="icon-btn update-btn toolbar-icon"' in html
+
+
+def test_version_history_opens_once_after_an_update():
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    installer = javascript[
+        javascript.index("async function installAvailableUpdate()"):
+        javascript.index("/* ------------------------------------------------------ journal des versions */")
+    ]
+    startup = javascript[
+        javascript.index("async function openVersionHistoryAfterUpdate(status)"):
+        javascript.index("function buildConfigurationSection()")
+    ]
+    assert '"navixav-version-history-pending"' in installer
+    assert '"navixav-version-history-seen"' in startup
+    assert "localStorage.getItem(ONBOARDING_KEY)" in startup
+    assert "pending !== current && !previousInstallation" in startup
+    assert "await openChangelog();" in startup
+    assert "localStorage.removeItem(pendingKey);" in startup
+    assert "await openVersionHistoryAfterUpdate(status);" in javascript
 
 
 def test_topbar_prioritises_flight_actions_and_compacts_utilities():
@@ -508,7 +934,6 @@ def test_mobile_lan_interface_is_protected_and_responsive():
     assert "navixav_lan" not in server
     assert "compare_digest" not in server
     assert '"/api/settings",' in server
-    assert '"/api/demo/restart",' in server
     assert '"/api/shutdown",' in server
     assert '"0.0.0.0" if settings.lan_enabled' in (
         project / "navixav" / "desktop.py"
@@ -604,9 +1029,11 @@ def test_wide_desktop_module_navigation_uses_a_left_side_rail_and_scrolls():
     assert '<button data-tab="terminal" class="active">Plan de vol</button>' in html
     assert '<button data-tab="map">Carte</button>' in html
     assert "selectTab(button.dataset.tab, true);" in javascript
-    assert 'name === "terminal" ? $("terminal") : $(`panel-${name}`)' in javascript
+    assert 'name === "terminal" ? $("strip") : $(`panel-${name}`)' in javascript
     assert "target?.scrollIntoView({" in javascript
-    assert "scroll-margin-top: 92px;" in css
+    assert "var(--topbar-height) + var(--flight-context-height) + 26px" in css
+    assert "function syncStickyLayoutOffsets()" in javascript
+    assert "new ResizeObserver(syncStickyLayoutOffsets)" in javascript
     assert '\'[data-tab="terminal"]\': "tab_terminal"' in translations
     assert 'tab_terminal: "Flight plan"' in translations
     assert 'id="terminal-toggle"' not in html
@@ -685,6 +1112,53 @@ def test_the_top_of_descent_honours_the_published_ceilings():
     assert "approach_constraints" in ceilings
 
 
+def test_the_top_of_descent_prefers_a_valid_simbrief_performance_point():
+    """Le TOD SimBrief porte déjà avion, masse, CI et vents ; un point trop
+    loin de la route doit toutefois laisser place au secours géométrique."""
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    guidance = _descent_guidance_source()
+    simbrief = javascript[javascript.index("function simbriefTodFromDestination(") :]
+    simbrief = simbrief[: simbrief.index("\n}\n")]
+
+    assert "projectPointOnFlightPath(point)" in simbrief
+    assert "projection.crossTrackNm > 5" in simbrief
+    assert 'stages.has("enroute")' in simbrief
+    assert "simbriefTodFromDestination(plan)" in guidance
+    assert "simbriefAnchor ?? geometricAnchor" in guidance
+    assert 'source: simbriefAnchor === null ? "calculated" : "simbrief"' in guidance
+    assert "profileGradientFtPerNm" in guidance
+
+
+def test_the_tod_preparation_uses_the_existing_alert_engine():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'id: "tod_prepare"' in javascript
+    assert 'c.descent.todInNm <= 50 && c.descent.todInNm > 10' in javascript
+    assert 'id: "tod_imminent"' in javascript
+    assert 'c.descent.todInNm <= 10' in javascript
+    assert "flightContext(aircraft, projection, phase, constraint, descent)" in javascript
+    assert '"tod-ready"' in javascript
+    assert '"tod-imminent"' in javascript
+    assert '.flight-live-stat[data-status="tod-ready"]' in css
+    assert '.flight-live-stat[data-status="tod-imminent"]' in css
+    for key in (
+        "tod_prepare",
+        "tod_imminent",
+        "alert_tod_prepare",
+        "alert_tod_prepare_action",
+        "alert_tod_imminent",
+        "alert_tod_imminent_action",
+    ):
+        assert len(re.findall(
+            rf"^\s+{re.escape(key)}:", translations, re.MULTILINE
+        )) == 8
+
+
 def test_top_of_climb_uses_live_climb_data_and_latches_at_cruise():
     """Le TOC part d'un gradient stable, s'affine en montée et cesse de suivre
     l'avion une fois le niveau de croisière atteint."""
@@ -718,6 +1192,18 @@ def test_calculated_toc_and_tod_are_map_markers_not_route_waypoints():
     assert 'point.kind === "tod" ? "--route-tod" : "--route-toc"' in map_javascript
     assert "--route-toc:" in stylesheet
     assert "--route-tod:" in stylesheet
+
+
+def test_the_enroute_flight_plan_uses_a_continuous_violet_line():
+    map_javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "map.js"
+    ).read_text(encoding="utf-8")
+    route = map_javascript[map_javascript.index("function drawRoute()") :]
+    route = route[: route.index("function constraintText(")]
+
+    assert 'enroute: "--route-enroute"' in route
+    assert "context.setLineDash([]);" in route
+    assert 'segment.stage === "enroute" ? [10, 5]' not in route
 
 
 def test_calculated_route_position_uses_the_short_antimeridian_arc():
@@ -756,6 +1242,18 @@ def test_global_alarm_opens_its_details_and_armed_spoilers_take_priority():
     assert "updateGlobalFlightAlert(active);" in javascript
     assert 'selectTab("flight");' in javascript
     assert '#flight-alerts .flight-alert' in javascript
+    assert 'input.id = "flight-alerts-toggle"' in javascript
+    header = javascript[
+        javascript.index("function renderFlightPanel(plan)"):
+        javascript.index("const master = el(\"span\", \"flight-alert-pill\"")
+    ]
+    assert "pills.append(buildFlightAlertsToggle());" in header
+    toggle = javascript[
+        javascript.index("function buildFlightAlertsToggle()"):
+        javascript.index("function buildConfigurationSection()")
+    ]
+    assert "localStorage.setItem(ALERTS_STORAGE_KEY" in toggle
+    assert "if (latestAircraft) updateFlightPanel(latestAircraft);" in toggle
 
     spoilers = javascript[
         javascript.index("function describeSpoilers"):
@@ -1051,6 +1549,8 @@ def test_mcdu_card_adapts_terminology_to_aircraft_type():
     assert "mcduPage(profile.departure" in javascript
     assert "mcduPage(profile.arrival" in javascript
     assert "mcduLine(profile.approachTransition" in javascript
+    assert 'mcduLine("PAX", String(d.passengers))' in javascript
+    assert 'mcduLine("ZFWCG", percentage(d.zfwcg))' in javascript
 
 
 def test_map_breaks_teleports_and_never_invents_a_direct_route():
@@ -1062,7 +1562,7 @@ def test_map_breaks_teleports_and_never_invents_a_direct_route():
     assert "const enroute = cruise.length" in javascript
     assert "function flightTrailPoints(points)" in javascript
     assert "trail.push(null);" in javascript
-    assert 'previous.source === "Démonstration"' in javascript
+    assert 'previous.source === "Démonstration"' not in javascript
     assert "haversineNm(previous, point) > plausibleDistanceNm" in javascript
     assert "if (!point)" in map_javascript
     assert "...trail.filter(Boolean).map" in map_javascript
@@ -1181,7 +1681,7 @@ def test_the_taxi_route_is_split_at_the_aircraft():
     ground = (static / "ground.js").read_text(encoding="utf-8")
 
     assert "const ratio = (travelled - walked) / length;" in ground
-    assert 'css(done ? "--taxi-done" : "--taxi-ahead")' in ground
+    assert 'done ? "--taxi-done" : push ? "--taxi-push" : "--taxi-ahead"' in ground
     assert "function drawHoldBars()" in ground
 
 
@@ -1512,117 +2012,6 @@ def test_basemap_is_composited_once_so_tiles_show_no_seams():
     assert "Math.ceil(screenPixelsPerTile) + 1" not in map_javascript
 
 
-def test_demo_plan_chart_and_live_flow_does_not_crash(monkeypatch, tmp_path):
-    project = Path(desktop.__file__).parent.parent
-    import navixav.web.app as web_app
-
-    # Cette vérification détaillée des cartes et du roulage utilise la base
-    # historique LFST/LFBO, qui contient précisément ces deux aérodromes.
-    monkeypatch.setattr(
-        web_app, "DEMO_OFP", project / "tests" / "data" / "ofp_lfst_lfbo.json",
-    )
-    store = tmp_path / "navdata.sqlite"
-    shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
-    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
-
-    def endpoint(path, method=None):
-        return next(
-            route.endpoint
-            for route in app.routes
-            if route.path == path and (method is None or method in route.methods)
-        )
-
-    try:
-        current_plan = endpoint("/api/plan/current")
-        restart_demo = endpoint("/api/demo/restart", "POST")
-        with pytest.raises(HTTPException) as missing:
-            current_plan()
-        assert missing.value.status_code == 404
-        with pytest.raises(HTTPException) as no_demo_route:
-            restart_demo()
-        assert no_demo_route.value.status_code == 409
-
-        plan = endpoint("/api/plan")(PlanRequest(demo=True))
-        assert current_plan() == plan
-        weather = endpoint("/api/weather/current")()
-        assert weather["enabled"] is False
-        assert weather["live"] is False
-        assert weather["weather"] == plan["weather"]
-        assert weather["refresh_interval_seconds"] == 300
-        departure = plan["departure"]
-        runway = departure["runway"]["value"]
-        chart = endpoint("/api/chart/{icao}")(departure["icao"], runway)
-        live = endpoint("/api/live")(True, departure["icao"], runway)
-
-        assert chart["parkings"]
-        assert live["connected"] is True
-        assert live["aircraft"]["source"] == "Démonstration"
-        # La démonstration doit rejouer le vol complet du plan, pas un roulage.
-        assert live["aircraft"]["title"] == "Démonstration NaviXav"
-
-        restarted = restart_demo()
-        assert restarted == {
-            "started": True,
-            "departure": plan["departure"]["icao"],
-            "arrival": plan["arrival"]["icao"],
-        }
-
-        # Changer d'aéroport sur la carte ne doit pas relancer le vol au départ.
-        arrival = plan["arrival"]["icao"]
-        again = endpoint("/api/live")(True, arrival, None)
-        assert again["aircraft"]["title"] == "Démonstration NaviXav"
-
-        # Les postes servent à demander un itinéraire de roulage.
-        parkings = endpoint("/api/ground/{icao}/parkings")(departure["icao"])
-        assert parkings["parkings"]
-        assert parkings["icao"] == departure["icao"]
-
-        # La base de référence est antérieure aux natures de segment : le
-        # roulage doit le dire plutôt que de tracer une route fausse.
-        if not parkings["routable"]:
-            with pytest.raises(HTTPException) as refused:
-                endpoint("/api/ground/{icao}/route")(
-                    departure["icao"], parkings["parkings"][0]["label"], runway,
-                )
-            assert refused.value.status_code == 404
-    finally:
-        app.state.close_resources()
-
-
-def test_bundled_demo_is_lcph_to_eham_and_keeps_an_offline_flight_path(
-    monkeypatch, tmp_path,
-):
-    import navixav.navdata.msfs as msfs_module
-
-    class _ForbiddenSimConnect:
-        def __init__(self):
-            raise AssertionError("la démo ne doit pas ouvrir SimConnect")
-
-    monkeypatch.setattr(msfs_module, "SimConnectClient", _ForbiddenSimConnect)
-    # Le fichier n'existe pas encore : cela représente une installation qui
-    # n'a jamais lancé MSFS ni importé le moindre aérodrome.
-    store = tmp_path / "empty-navdata.sqlite"
-    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
-    endpoint = next(route.endpoint for route in app.routes if route.path == "/api/plan")
-    live_endpoint = next(route.endpoint for route in app.routes if route.path == "/api/live")
-
-    try:
-        plan = endpoint(PlanRequest(demo=True))
-        assert plan["departure"]["icao"] == "LCPH"
-        assert plan["arrival"]["icao"] == "EHAM"
-        assert plan["enroute"]["route_path"][0]["ident"] == "LCPH"
-        assert plan["enroute"]["route_path"][-1]["ident"] == "EHAM"
-        assert not any(
-            "absent de la base de navigation" in warning
-            for warning in plan["warnings"]
-        )
-        live = live_endpoint(True, "LCPH", None, plan["aircraft"])
-        assert live["connected"] is True
-        assert live["aircraft"]["source"] == "Démonstration"
-    finally:
-        app.state.close_resources()
-
-
 def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
     app_source = (
         Path(desktop.__file__).parent / "web" / "app.py"
@@ -1643,31 +2032,21 @@ def test_mobile_reads_the_pc_current_flight_without_rebuilding_it():
     assert "await loadCurrentPlan();" in javascript
 
 
-def test_demo_toggle_restarts_the_current_plan_instead_of_loading_lfst_lfbo():
-    app_source = (
-        Path(desktop.__file__).parent / "web" / "app.py"
-    ).read_text(encoding="utf-8")
-    static = Path(desktop.__file__).parent / "web" / "static"
-    javascript = (static / "app.js").read_text(encoding="utf-8")
-    translations = (static / "i18n.js").read_text(encoding="utf-8")
-
-    assert '@app.post("/api/demo/restart")' in app_source
-    assert 'fetch("/api/demo/restart", { method: "POST" })' in javascript
-    assert 'if (currentPlan) await restartCurrentPlanDemo();' in javascript
-    assert '$("refresh").addEventListener("click", refreshPlanOrDemo);' in javascript
-    assert '$("demo-toggle").addEventListener("change", toggleDemoMode);' in javascript
-    assert 'demo: useBundledDemo' in javascript
-    assert 'demoOfp ?? (' in javascript
-    assert 'demo_title: "Simuler le plan de vol actuellement chargé"' in translations
-    assert 'demo_title: "Use the LFST → LFBO demonstration flight"' not in translations
-    assert translations.count("demo_restart_failed:") == 8
-
-
 def test_live_weather_refresh_updates_the_cached_plan(monkeypatch, tmp_path):
     project = Path(desktop.__file__).parent.parent
+    import navixav.web.app as web_app
+
+    ofp = web_app.SimBriefClient.from_file(
+        project / "tests" / "data" / "ofp_lfst_lfbo.json"
+    )
+    monkeypatch.setattr(web_app.SimBriefClient, "fetch_latest", lambda _self: ofp)
     store = tmp_path / "navdata.sqlite"
     shutil.copyfile(project / "tests" / "data" / "navdata_test.sqlite", store)
-    app = create_app(Settings(navdata_store=store, metar_source="simbrief"))
+    app = create_app(Settings(
+        navdata_store=store,
+        metar_source="simbrief",
+        simbrief_pilot_id="123456",
+    ))
 
     def endpoint(path, method=None):
         return next(
@@ -1677,7 +2056,7 @@ def test_live_weather_refresh_updates_the_cached_plan(monkeypatch, tmp_path):
         )
 
     try:
-        plan = endpoint("/api/plan")(PlanRequest(demo=True))
+        plan = endpoint("/api/plan")(PlanRequest())
         monkeypatch.setattr(
             "navixav.web.app.save_user_settings",
             lambda _settings: None,
@@ -1749,7 +2128,7 @@ def test_dispatch_panel_tracks_the_flight_in_real_time():
     cells = javascript[javascript.index("function renderDispatchLiveCells(aircraft)"):]
     cells = cells[: cells.index("\nfunction updateDispatchLive(")]
     panel = javascript[javascript.index("function renderDispatch(plan)"):]
-    panel = panel[: panel.index("function renderAircraft(plan)")]
+    panel = panel[: panel.index("function renderAircraft(plan,")]
     # Chaque cellule mise à jour doit exister dans le panneau construit.
     for identifier in (
         "dispatch-live-block", "dispatch-live-onboard", "dispatch-live-burn",
@@ -1784,8 +2163,8 @@ def test_dispatch_and_aircraft_panels_follow_the_selected_language():
     translations = (static / "i18n.js").read_text(encoding="utf-8")
 
     dispatch = javascript[javascript.index("function renderDispatch(plan)"):]
-    dispatch = dispatch[: dispatch.index("function renderAircraft(plan)")]
-    aircraft = javascript[javascript.index("function renderAircraft(plan)"):]
+    dispatch = dispatch[: dispatch.index("function renderAircraft(plan,")]
+    aircraft = javascript[javascript.index("function renderAircraft(plan,"):]
     aircraft = aircraft[: aircraft.index("function mcduLine(")]
 
     for french in (
@@ -1817,6 +2196,37 @@ def test_dispatch_and_aircraft_panels_follow_the_selected_language():
     ):
         assert f"{key}:" in translations
         assert f'"{key}"' in javascript
+
+
+def test_aircraft_panel_follows_the_aircraft_loaded_in_msfs():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    panel = javascript[javascript.index("function aircraftPhotoAsset(plan"):]
+    panel = panel[: panel.index("function mcduLine(")]
+    live = javascript[javascript.index("function applyAircraftState(aircraft)"):]
+    live = live[: live.index("async function pollLive()")]
+
+    assert 'const loadedTitle = String(aircraft?.title || "").trim();' in panel
+    assert 'title.append(el("h2", null, loadedTitle || plannedTitle' in panel
+    assert 'renderAircraft(currentPlan, aircraft);' in live
+    assert 'aircraftPhotoAsset(plan, aircraft)' in panel
+    assert '/^[A-Z0-9]{4}$/.test(token)' in panel
+    assert 'acf_planned_simbrief' in panel
+    assert translations.count("acf_loaded_msfs:") == 8
+    assert translations.count("acf_planned_simbrief:") == 8
+
+
+def test_long_aircraft_equipment_codes_stay_inside_their_card():
+    css = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.css"
+    ).read_text(encoding="utf-8")
+
+    stat = css[css.index(".stat {"):css.index(".stat-label {")]
+    value = css[css.index(".stat-value {"):css.index(".stat-note {")]
+    assert "min-width: 0;" in stat
+    assert "overflow-wrap: anywhere;" in value
 
 
 def test_constraints_charts_and_mcdu_panels_follow_the_selected_language():
@@ -1900,3 +2310,68 @@ def test_the_taxi_labels_of_the_service_are_translated_for_display():
         "gnd_ramp_ga", "gnd_deicing",
     ):
         assert f"{key}:" in translations
+
+
+def test_the_pushback_is_drawn_and_announced_apart_from_the_taxi():
+    """Le repoussage n'est pas un roulage : il se lit comme tel.
+
+    Même ligne de guidage, mais parcourue en marche arrière derrière un
+    tracteur : la tracer et l'annoncer comme une voie de circulation ferait
+    croire au pilote qu'il doit avancer.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    ground = (static / "ground.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    # Couleur et pointillé propres, et aucun nom de voie sur ce tronçon.
+    assert 'const push = leg.kind === "pushback";' in ground
+    assert 'push ? "--taxi-push" : "--taxi-ahead"' in ground
+    assert '["stand", "pushback", "join"].includes(leg.kind)' in ground
+    assert "--taxi-push:" in css
+    assert ".ground-hud .ground-call.is-push" in css
+
+    # Le bandeau l'annonce tant que l'avion n'a pas quitté la ligne de guidage.
+    hud = javascript[javascript.index("function updateGroundHud"):]
+    hud = hud[: hud.index("\n}\n")]
+    assert "const pushback = currentTaxiPlan.pushback;" in hud
+    assert "!(travelled >= pushback.distance_m)" in hud
+
+    # Le cap suffit et se dit dans les huit langues ; le côté du mouvement,
+    # lui, n'existe pas dans la phraséologie française.
+    for key in ("taxi_pushback", "taxi_pushback_heading"):
+        assert translations.count(f"{key}:") == 8
+    assert "taxi_pushback_left" not in translations
+    assert "taxi_pushback_right" not in translations
+    # L'étape de l'enchaînement se traduit comme les autres libellés de roulage.
+    assert '["repoussage", "gnd_pushback"]' in translations
+
+
+def test_the_cache_notice_shows_that_something_is_happening():
+    """Remplir le cache MSFS dure des dizaines de secondes.
+
+    Un texte immobile pendant tout ce temps laisse croire que l'application a
+    lâché. La piste animée dit le contraire — sans prétendre savoir où en est
+    la lecture, ce que le service ignore lui-même.
+    """
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    assert 'showBanner("info", t("cache_title"), [t("cache_body")], { busy: true });' in javascript
+    assert "function bannerProgress()" in javascript
+    assert 'banner.setAttribute("aria-busy", String(busy));' in javascript
+
+    # Aucune barre de pourcentage : la progression est indéterminée, et en
+    # inventer une mentirait sur ce qui reste à lire.
+    progress = javascript[javascript.index("function bannerProgress"):][:400]
+    assert "%" not in progress
+
+    assert ".banner.is-busy" in css
+    assert "@keyframes banner-plane" in css
+    # La traînée est portée par l'avion : animées à part, les deux dérivaient.
+    assert ".banner-plane::before" in css
+    # Une animation en boucle n'est pas une information.
+    reduced = css[css.index("@media (prefers-reduced-motion: reduce)"):]
+    assert ".banner-plane { animation: none;" in reduced

@@ -50,6 +50,24 @@ def test_enroute_fixes_exclude_procedures_and_pseudo_points(ofp: OfpSummary):
     assert "LFBO" not in ofp.enroute_fixes
 
 
+def test_simbrief_tod_coordinates_are_kept_outside_the_navigable_route():
+    summary = parse_ofp(
+        {
+            "navlog": {"fix": [
+                {
+                    "ident": "T/D",
+                    "name": "TOP OF DESCENT",
+                    "pos_lat": "45.125",
+                    "pos_long": "2.75",
+                },
+            ]},
+        }
+    )
+
+    assert (summary.simbrief_tod_lat, summary.simbrief_tod_lon) == (45.125, 2.75)
+    assert summary.enroute_fixes == []
+
+
 def test_enroute_route_keeps_via_to_pairs(ofp: OfpSummary):
     assert ofp.enroute_route == [
         {"via": "DCT", "to": "LIRKO", "stage": "CRZ"},

@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import ctypes
 import re
 from pathlib import Path
 
@@ -50,11 +51,24 @@ version_resource.write_text(
     encoding="utf-8",
 )
 webview_datas, webview_binaries, webview_hidden = collect_all("webview")
-sdk_simconnect = Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll")
+sdk_simconnect = Path(r"C:\MSFS 2024 SDK\SimConnect SDK\lib\SimConnect.dll")
 if not sdk_simconnect.is_file():
     raise SystemExit(
         "SimConnect.dll moderne introuvable. Installe le SDK MSFS avant de "
         "construire la distribution."
+    )
+sdk_dll = ctypes.WinDLL(str(sdk_simconnect))
+required_msfs2024_exports = (
+    "SimConnect_AICreateNonATCAircraft_EX1",
+    "SimConnect_EnumerateSimObjectsAndLiveries",
+)
+missing_exports = [
+    name for name in required_msfs2024_exports if not hasattr(sdk_dll, name)
+]
+if missing_exports:
+    raise SystemExit(
+        "La DLL du SDK installé n'est pas celle de MSFS 2024 : API absentes : "
+        + ", ".join(missing_exports)
     )
 
 # NaviXav utilise son propre client ctypes et la DLL officielle du SDK MSFS.
@@ -73,7 +87,6 @@ datas = [
     # base, pas à l'application, et la distribution n'a pas à les porter.
     (str(project_root / "aircraft_db" / "aircraft"), "aircraft_db/aircraft"),
     (str(project_root / "aircraft_db" / "VERSION.json"), "aircraft_db"),
-    (str(project_root / "tests" / "data" / "ofp_lcph_eham.json"), "tests/data"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),
 ]
 datas += webview_datas

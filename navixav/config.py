@@ -104,6 +104,22 @@ class Settings:
     taxi_speed_limit_kt: int = DEFAULT_TAXI_SPEED_LIMIT_KT
     taxi_turn_speed_limit_kt: int = DEFAULT_TAXI_TURN_SPEED_LIMIT_KT
     taxi_speed_alarm_sound: bool = True
+    # Postes de contrôle en ligne sur VATSIM, marqués sur les fréquences du
+    # terrain. Désactivé par défaut : c'est un appel réseau qui n'apprend rien
+    # à qui ne vole pas sur le réseau.
+    vatsim_enabled: bool = False
+    # Trafic environnant : le réseau VATSIM sur la carte en route, le
+    # simulateur sur le plan de roulage. Deux sources pour un même réglage,
+    # parce que c'est une même question pour le pilote — qui d'autre est là ?
+    # Désactivé par défaut : le réglage commande un appel réseau.
+    traffic_enabled: bool = False
+    # L'affichage et l'injection restent deux consentements distincts : activer
+    # la carte ne doit jamais créer silencieusement des objets dans MSFS.
+    traffic_source: str = "vatsim"
+    aircraft_models: str = "fsltl"
+    # Dossier FSLTL Base Models imposé depuis l'interface. Il peut désigner
+    # directement le paquet ou son dossier Community ; None garde la détection.
+    fsltl_path: Path | None = None
     # Dossier Community imposé depuis l'interface. None conserve la détection
     # automatique via les UserCfg.opt de MSFS.
     aircraft_community_path: Path | None = None
@@ -149,6 +165,11 @@ class Settings:
                 "TAXI_TURN_SPEED_LIMIT_KT", DEFAULT_TAXI_TURN_SPEED_LIMIT_KT
             ),
             taxi_speed_alarm_sound=_env_bool("TAXI_SPEED_ALARM_SOUND", True),
+            vatsim_enabled=_env_bool("VATSIM_ENABLED", False),
+            traffic_enabled=_env_bool("TRAFFIC_ENABLED", False),
+            traffic_source="vatsim",
+            aircraft_models="fsltl",
+            fsltl_path=None,
             aircraft_community_path=None,
             lan_enabled=False,
         )
@@ -212,6 +233,12 @@ class Settings:
             values.get("aircraft_community_path", self.aircraft_community_path or "")
             or ""
         ).strip()
+        raw_fsltl = str(values.get("fsltl_path", self.fsltl_path or "") or "").strip()
+        raw_traffic_source = str(
+            values.get("traffic_source", self.traffic_source) or self.traffic_source
+        ).strip().lower()
+        if raw_traffic_source not in {"vatsim", "ivao", "opensky"}:
+            raw_traffic_source = self.traffic_source
         return Settings(
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
             simbrief_username=str(values.get("simbrief_username", "") or "").strip(),
@@ -236,6 +263,17 @@ class Settings:
             taxi_speed_alarm_sound=bool(
                 values.get("taxi_speed_alarm_sound", self.taxi_speed_alarm_sound)
             ),
+            vatsim_enabled=bool(values.get("vatsim_enabled", self.vatsim_enabled)),
+            traffic_enabled=bool(
+                values.get("traffic_enabled", self.traffic_enabled)
+            ),
+            traffic_source=raw_traffic_source,
+            aircraft_models=(
+                str(values.get("aircraft_models", self.aircraft_models)).strip().lower()
+                if str(values.get("aircraft_models", self.aircraft_models)).strip().lower()
+                in {"fsltl"} else self.aircraft_models
+            ),
+            fsltl_path=Path(raw_fsltl).expanduser() if raw_fsltl else None,
             aircraft_community_path=(
                 Path(raw_community).expanduser() if raw_community else None
             ),
@@ -258,6 +296,11 @@ class Settings:
             "taxi_speed_limit_kt": self.taxi_speed_limit_kt,
             "taxi_turn_speed_limit_kt": self.taxi_turn_speed_limit_kt,
             "taxi_speed_alarm_sound": self.taxi_speed_alarm_sound,
+            "vatsim_enabled": self.vatsim_enabled,
+            "traffic_enabled": self.traffic_enabled,
+            "traffic_source": self.traffic_source,
+            "aircraft_models": self.aircraft_models,
+            "fsltl_path": str(self.fsltl_path) if self.fsltl_path else "",
             "aircraft_community_path": (
                 str(self.aircraft_community_path) if self.aircraft_community_path else ""
             ),

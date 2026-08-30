@@ -221,6 +221,48 @@ class RunwayChoice:
 
 
 @dataclass
+class RadioStation:
+    """Un poste et sa fréquence, tels que le terrain les publie."""
+
+    mhz: float
+    name: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"mhz": self.mhz, "name": self.name}
+
+
+@dataclass
+class FrequencyRow:
+    """Un rôle radio du terrain, et les postes qui le tiennent.
+
+    Le type que donne le simulateur ne suffit pas à distinguer les postes : à
+    Roissy, dix fréquences sont typées « sol », dont cinq d'aire de
+    stationnement et une de rampe cargo. C'est le **nom** qui les sépare.
+    `stations` ne porte donc que les fréquences du poste principal — celui que
+    le simulateur cite en premier — et `alternates` les autres postes du même
+    rôle, chacun avec son nom.
+
+    Un grand terrain en aligne plusieurs pour un même poste, et le simulateur
+    ne dit pas laquelle dessert quelle piste : cette information n'existe pas
+    dans les Facilities. NaviXav ne peut donc pas en désigner une ; il montre
+    la première et annonce combien il y en a.
+    """
+
+    code: str
+    name: str = ""
+    stations: list[RadioStation] = field(default_factory=list)
+    alternates: list[RadioStation] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "code": self.code,
+            "name": self.name,
+            "stations": [station.to_dict() for station in self.stations],
+            "alternates": [station.to_dict() for station in self.alternates],
+        }
+
+
+@dataclass
 class DepartureBlock:
     icao: str
     name: str = ""
@@ -231,6 +273,7 @@ class DepartureBlock:
     transition_altitude_ft: int | None = None
     sid_constraints: list[ConstraintRow] = field(default_factory=list)
     sid_path: list[dict[str, Any]] = field(default_factory=list)
+    frequencies: list[FrequencyRow] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -243,6 +286,7 @@ class DepartureBlock:
             "transition_altitude_ft": self.transition_altitude_ft,
             "sid_constraints": [c.to_dict() for c in self.sid_constraints],
             "sid_path": self.sid_path,
+            "frequencies": [f.to_dict() for f in self.frequencies],
         }
 
 
@@ -269,6 +313,7 @@ class ArrivalBlock:
     star_path: list[dict[str, Any]] = field(default_factory=list)
     approach_path: list[dict[str, Any]] = field(default_factory=list)
     missed_approach_altitude_ft: int | None = None
+    frequencies: list[FrequencyRow] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -293,6 +338,7 @@ class ArrivalBlock:
             "star_path": self.star_path,
             "approach_path": self.approach_path,
             "missed_approach_altitude_ft": self.missed_approach_altitude_ft,
+            "frequencies": [f.to_dict() for f in self.frequencies],
         }
 
 
@@ -305,6 +351,7 @@ class EnrouteBlock:
     route_legs: list[dict[str, Any]] = field(default_factory=list)
     route_path: list[dict[str, Any]] = field(default_factory=list)
     cruise_altitude_ft: int | None = None
+    simbrief_tod: dict[str, float] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

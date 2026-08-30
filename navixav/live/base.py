@@ -78,6 +78,10 @@ class AircraftConfiguration:
     selected_altitude_ft: float | None = None
     selected_heading_deg: float | None = None
 
+    # Radiocommunication. La fréquence sur laquelle l'avion est réglé, pas
+    # celle qu'il devrait composer : NaviXav la rapporte, il ne la commande pas.
+    com1_frequency_mhz: float | None = None
+
     # Radionavigation
     nav1_frequency_mhz: float | None = None
     nav1_course_deg: float | None = None
@@ -128,6 +132,29 @@ class AircraftState:
     title: str = ""
     source: str = ""
     configuration: AircraftConfiguration | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TrafficReport:
+    """Un appareil voisin, tel que le simulateur le voit.
+
+    C'est la seule vérité utilisable au sol : les clients réseau injectent le
+    trafic dans le simulateur, qui le rend à sa position courante plutôt qu'à
+    celle d'un relevé vieux de quinze secondes.
+    """
+
+    object_id: int
+    latitude: float
+    longitude: float
+    callsign: str = ""
+    altitude_ft: float | None = None
+    height_above_ground_ft: float | None = None
+    heading_true_deg: float | None = None
+    ground_speed_kt: float | None = None
+    on_ground: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

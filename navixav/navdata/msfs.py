@@ -19,6 +19,7 @@ from navixav.msfs.extract import extract_airport, extract_navaid, extract_waypoi
 from navixav.navdata import msfs_store
 from navixav.navdata.base import (
     Airport,
+    AirportFrequency,
     NavdataError,
     Procedure,
     ProcedureKind,
@@ -214,6 +215,19 @@ class MsfsProvider:
     # Protocole NavdataProvider
     # ------------------------------------------------------------------ #
 
+    def airport_name(self, icao: str) -> str:
+        """Nom du terrain s'il est déjà en base, sans rien demander au simulateur.
+
+        Nommer un terrain est un confort d'affichage : cela ne justifie pas une
+        extraction MSFS, qui prendrait plusieurs secondes et mettrait en cache
+        un aérodrome où le pilote ne se posera jamais. Absent de la base, le
+        code OACI reste la réponse — il dit déjà quelque chose.
+        """
+        row = self._conn.execute(
+            "SELECT name FROM airport WHERE icao = ?", (icao.strip().upper(),)
+        ).fetchone()
+        return str(row["name"] or "").strip() if row is not None else ""
+
     def airport(self, icao: str) -> Airport | None:
         key = icao.strip().upper()
         try:
@@ -268,6 +282,40 @@ class MsfsProvider:
             )
             for row in rows
         ]
+
+    def frequencies(
+        self, icao: str, include_unknown: bool = False
+    ) -> list[AirportFrequency]:
+        """Fréquences du terrain, dans l'ordre publié par le simulateur.
+
+        Un type que la table de sigles ne connaît pas est écarté : mieux vaut
+        une fréquence de moins qu'un sigle inventé, qu'un pilote afficherait
+        puis composerait.
+
+        `include_unknown` le garde au contraire, sigle vide, et sert au seul
+        diagnostic : c'est ainsi qu'on voit qu'une fréquence existe et que
+        c'est la table de sigles, non le simulateur, qui manque à l'appel.
+        """
+        key = icao.strip().upper()
+        rows = self._conn.execute(
+            "SELECT * FROM frequency WHERE icao = ? ORDER BY rank", (key,)
+        ).fetchall()
+        found = []
+        for row in rows:
+            code = msfs_store.FREQUENCY_CODES.get(row["type"])
+            if code is None:
+                if not include_unknown:
+                    continue
+                code = ""
+            found.append(
+                AirportFrequency(
+                    code=code,
+                    mhz=row["mhz"],
+                    name=row["name"] or "",
+                    type_id=row["type"],
+                )
+            )
+        return found
 
     def procedures(self, icao: str, kind: ProcedureKind) -> list[Procedure]:
         key = icao.strip().upper()

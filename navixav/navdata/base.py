@@ -202,6 +202,29 @@ class Procedure:
         return None
 
 
+@dataclass(frozen=True)
+class AirportFrequency:
+    """Une fréquence publiée du terrain, ramenée à son sigle radio.
+
+    `type_id` conserve le nombre par lequel le simulateur a désigné le rôle.
+    Il ne sert pas à l'affichage courant mais au diagnostic : c'est lui qui dit
+    quelle entrée corriger lorsqu'un sigle tombe à côté. Un `code` vide signale
+    justement un rôle que la table de sigles ne traduit pas.
+    """
+
+    code: str
+    mhz: float
+    name: str = ""
+    type_id: int = 0
+
+    @property
+    def label(self) -> str:
+        """Ce qui se lit sur la carte : « TWR 118.500 »."""
+        if not self.code:
+            return f"{self.mhz:.3f}"
+        return f"{self.code} {self.mhz:.3f}"
+
+
 class NavdataProvider(Protocol):
     """Interface minimale attendue par le moteur de complétion."""
 
@@ -221,6 +244,10 @@ class NavdataProvider(Protocol):
     def procedures(self, icao: str, kind: ProcedureKind) -> list[Procedure]: ...
 
     def ils_frequency(self, icao: str, runway_name: str) -> float | None: ...
+
+    def frequencies(
+        self, icao: str, include_unknown: bool = False
+    ) -> list[AirportFrequency]: ...
 
     def is_airway(self, name: str) -> bool: ...
 

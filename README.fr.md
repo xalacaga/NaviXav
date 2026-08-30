@@ -76,7 +76,9 @@ L’onglet **Suivi du vol** exploite la position MSFS en temps réel pour affich
 - la distance restante ;
 - la prochaine contrainte d’altitude ou de vitesse ;
 - le taux vertical nécessaire pour atteindre cette contrainte ;
-- le Top of Descent et un taux de descente indicatif sur une pente de 3° ;
+- le Top of Descent issu du profil de performances du dernier OFP SimBrief
+  après validation sur la route active, avec une estimation à 3° en secours et
+  le maintien des plafonds publiés de la STAR et de l’approche ;
 - l’écart par rapport au profil vertical prévu.
 
 #### Configuration avion
@@ -86,6 +88,23 @@ volets, des aérofreins, du frein de parc et des sept feux extérieurs, ainsi qu
 le calage altimétrique, les modes du pilote automatique, l’altitude
 sélectionnée, le carburant à bord et le vent réel. Les unités sont demandées au
 simulateur, jamais recalculées.
+Pour les feux extérieurs, NaviXav recoupe aussi les SimVars de chaque
+interrupteur avec le masque officiel `LIGHT STATES` de MSFS : les avions
+complexes qui ne publient que l’état agrégé ne laissent donc plus tous les
+voyants et alarmes faussement éteints.
+
+Dans l’interface guidée, ces valeurs prennent la forme d’un synoptique cockpit
+avec des instruments équilibrés, des états explicites et de véritables voyants
+pour les feux. L’interface classique conserve les tuiles compactes d’origine.
+La page Aircraft utilise comme identité principale le titre transmis en direct
+par MSFS et s’actualise automatiquement lorsqu’un autre avion est chargé.
+L’appareil SimBrief reste affiché séparément, car les masses et performances du
+dispatch appartiennent toujours à l’OFP importé.
+Si un avion tiers laisse `TITLE` vide, NaviXav utilise automatiquement sa valeur
+officielle `ATC MODEL` à la place.
+À partir de 50 NM avant le TOD, le moteur d’alarmes standard demande de préparer
+la descente ; à 10 NM, une alarme TOD imminent distincte reste active jusqu’à
+l’engagement de la descente.
 
 Pour les volets, les aérofreins et le frein de parc, NaviXav recoupe les SimVars
 officielles de poignée, de position effective, de surface et d’indicateur
@@ -135,7 +154,7 @@ propose pas de performances de décollage qui ne peuvent pas être automatisées
 
 - `FROM/TO`, numéro de vol et dégagement ;
 - Cost Index et niveau de croisière ;
-- ZFW, carburant bloc, roulage, trajet et réserves ;
+- ZFW, ZFWCG, nombre de passagers, carburant bloc, roulage, trajet et réserves ;
 - piste, SID, transition et altitude de transition ;
 - route `VIA/TO` ;
 - STAR, transition, approche et VIA ;
@@ -156,6 +175,26 @@ NaviXav utilise SimConnect pour :
 - récupérer les aéroports, pistes et leurs feux de bord et d’axe, procédures,
   repères et installations radio ;
 - constituer progressivement une base locale dans `data/navixav.sqlite`.
+
+Le réglage optionnel **Injecter le trafic VATSIM dans MSFS** détecte **FSLTL
+Base Models** dans le dossier Community de MSFS et emploie ses modèles pour le
+trafic réseau proche. NaviXav lit seulement les fichiers `aircraft.cfg` et VMR
+de FSLTL : il ne l’installe pas, ne le met pas à jour et ne le modifie pas. Le
+réglage est désactivé par défaut, borne le nombre et le rayon des appareils
+injectés, puis retire uniquement les objets SimConnect créés par NaviXav à sa
+désactivation ou à la fermeture.
+La source réseau publique et gratuite peut être VATSIM ou IVAO. FSLTL est
+détecté automatiquement, mais le chemin du paquet ou de son dossier Community
+peut aussi être saisi manuellement. S’il manque, les paramètres ouvrent le
+[téléchargement officiel de l’installateur FlyByWire](https://flybywiresim.com/downloads/) :
+installez uniquement **FSLTL Traffic Base Models**, pas FSLTL Injector.
+Pour une vue du monde réel, **Trafic réel OpenSky** affiche les vecteurs ADS-B
+anonymes dans un rayon de 100 NM autour de l’avion et les injecte via FSLTL.
+Lorsque le type ADS-B est d’abord inconnu, un modèle générique sûr apparaît,
+puis il est remplacé dès que le registre des appareils résout le type exact.
+La source active peut être changée directement depuis la barre de la Carte ou
+du Taxi ; les deux sélecteurs restent synchronisés et le choix est enregistré
+localement.
 
 Le simulateur doit être lancé avec un vol chargé pour récupérer de nouvelles
 données. Les informations déjà mises en cache restent disponibles hors ligne.
@@ -201,11 +240,15 @@ de vol et construit uniquement avec les installations natives de MSFS :
   à la demande ;
 - au départ, si l’avion est au sol à moins de 180 m d’un poste, NaviXav propose
   automatiquement le roulage de ce poste vers la piste retenue ;
+- l’entrée de départ est la jonction accessible aux avions la plus proche du
+  seuil retenu, même si MSFS marque une jonction plus éloignée comme point d’attente ;
 - un clic sur un autre poste remplace immédiatement cette proposition ; à
   l’arrivée, le poste reste un choix manuel ;
 - l’itinéraire distingue la partie parcourue de la partie restante, affiche
   uniquement les noms utiles, les points d’attente, la prochaine manœuvre et
   la distance restante ;
+- chaque traversée de piste confirmée par le réseau MSFS coupe l’itinéraire sur
+  un point d’attente explicite ; la route est refusée si cette consigne ne peut être représentée ;
 - en cas d’écart, le trajet est recalculé depuis la position réelle de l’avion ;
 - la vitesse sol s’affiche en direct sur le plan, avec un avertissement à
   l’approche de la vitesse de roulage maximale et une alarme clignotante
@@ -283,8 +326,8 @@ basculer la fiche vers le catalogue officiel et de rester dans l’application.
 
 L’installateur inclut Python, les bibliothèques, pywebview, le connecteur
 SimConnect autonome de NaviXav et le bootstrapper Microsoft WebView2 signé. Aucun de ces outils
-n’est à installer séparément. MSFS n’est pas obligatoire pour essayer le mode
-Démo ou consulter les données déjà enregistrées.
+n’est à installer séparément. MSFS n’est pas obligatoire pour consulter les
+données déjà enregistrées.
 
 SimConnect n’est jamais installé ni réinstallé dans Windows par NaviXav.
 L’application embarque une copie privée de la DLL moderne dans son propre
@@ -346,7 +389,7 @@ Depuis PowerShell, dans le dossier du projet :
 
 Le script :
 
-1. contrôle Windows 64 bits, Python et le SDK SimConnect ;
+1. contrôle Windows 64 bits, Python et le SDK SimConnect de MSFS 2024 ;
 2. installe les outils de construction manquants ;
 3. récupère le bootstrapper WebView2 officiel et vérifie sa signature
    Microsoft ;
@@ -354,8 +397,10 @@ Le script :
 5. produit l’installateur, l’archive portable et leurs sommes SHA-256 dans
    `release\`.
 
-Le SDK SimConnect mentionné à l’étape 1 concerne uniquement la machine qui
-construit NaviXav. Il n’est pas installé sur les machines des utilisateurs.
+Le SDK SimConnect MSFS 2024 mentionné à l’étape 1 concerne uniquement la
+machine qui construit NaviXav. Sa DLL actuelle est embarquée de façon privée
+avec NaviXav : elle n’est ni installée ni enregistrée sur les machines des
+utilisateurs. Une ancienne DLL MSFS 2020 est refusée.
 
 ### Fichiers de distribution
 
@@ -418,6 +463,10 @@ L’interface permet également de configurer :
 - la composante maximale de vent traversier ;
 - la longueur minimale de piste ;
 - l’apparence de l’interface : automatique, claire ou sombre ;
+- l’organisation de l’interface : guidée par le vol, avec bandeau contextuel
+  adapté à la phase et cartes de départ/arrivée/approche préparées, ou
+  classique pour retrouver instantanément la présentation précédente sans
+  redémarrer ;
 - le dossier Community de MSFS utilisé pour inventorier les procédures par appareil ;
 - la vitesse de roulage maximale, la limite plus basse appliquée en virage et
   l’alarme sonore de vitesse au roulage ;
@@ -510,15 +559,6 @@ NaviXav adapte automatiquement son interface au redimensionnement :
 La carte écoute chaque changement de taille de la fenêtre et recalcule
 immédiatement son canevas. La taille minimale de la fenêtre native est
 720 × 560 pixels.
-
-## Mode Démo
-
-Le commutateur **Démo** charge un vol d’exemple et simule un déplacement au
-sol. Il permet de découvrir l’interface sans compte SimBrief ou sans
-simulateur.
-
-Le mode Démo est toujours désactivé au démarrage afin que NaviXav privilégie le
-dernier plan SimBrief.
 
 ## Arrêt de l’application
 
@@ -626,6 +666,10 @@ Avant l’installation, un assistant Windows détaché attend la fermeture compl
 du processus NaviXav. Il met ensuite à jour le dossier réellement utilisé,
 redémarre l’application et conserve un fichier `.install.log` à côté de
 l’installateur téléchargé.
+
+Lors de ce premier redémarrage, le **Journal des versions** s’ouvre
+automatiquement une seule fois pour présenter les changements ; il reste
+ensuite accessible depuis l’interface.
 
 Le dépôt est public en lecture. Un utilisateur peut consulter le code et
 télécharger les Releases sans compte GitHub, mais seuls les collaborateurs

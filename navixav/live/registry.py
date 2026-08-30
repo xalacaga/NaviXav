@@ -5,7 +5,12 @@ from __future__ import annotations
 import threading
 import time
 
-from navixav.live.base import AircraftState, PositionSource, PositionUnavailable
+from navixav.live.base import (
+    AircraftState,
+    PositionSource,
+    PositionUnavailable,
+    TrafficReport,
+)
 from navixav.live.simconnect import SimConnectSource
 
 # Intervalle minimal entre deux redécouvertes complètes.
@@ -19,15 +24,10 @@ class LiveTracker:
         self._lock = threading.Lock()
         self._sources: list[PositionSource] = [SimConnectSource()]
         self._active: PositionSource | None = None
-        self._demo: PositionSource | None = None
         self._last_attempt = 0.0
         self._last_reason = "Recherche du simulateur…"
 
     # ------------------------------------------------------------------ #
-
-    def set_demo(self, source: PositionSource | None) -> None:
-        with self._lock:
-            self._demo = source
 
     def set_aircraft_hint(self, hint: str | None) -> None:
         """Indique le modèle planifié aux adaptateurs qui en ont besoin."""
@@ -37,11 +37,8 @@ class LiveTracker:
                 if callable(setter):
                     setter(hint)
 
-    def read(self, allow_demo: bool = False) -> AircraftState:
+    def read(self) -> AircraftState:
         with self._lock:
-            if allow_demo and self._demo is not None:
-                return self._demo.read()
-
             if self._active is not None:
                 try:
                     return self._active.read()
@@ -76,6 +73,22 @@ class LiveTracker:
                 )
             )
             raise PositionUnavailable(self._last_reason)
+
+    def traffic(self) -> list[TrafficReport]:
+        """Trafic voisin de la source active, s'il y en a une qui l'expose.
+
+        Aucune découverte n'est déclenchée ici : le trafic accompagne un suivi
+        déjà établi, et une source encore muette n'a rien à en dire.
+        """
+        with self._lock:
+            source = self._active
+        reader = getattr(source, "traffic", None) if source else None
+        if not callable(reader):
+            return []
+        try:
+            return reader()
+        except PositionUnavailable:
+            return []
 
     @property
     def active_source(self) -> str | None:

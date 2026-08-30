@@ -60,8 +60,7 @@ if not exist ".env" (
   if exist ".env.example" (
     copy /y ".env.example" ".env" >nul
     echo   Fichier .env cree a partir de .env.example.
-    echo   Configure ton compte SimBrief depuis le bouton Parametres,
-    echo   ou active le mode Demo dans l'application.
+    echo   Configure ton compte SimBrief depuis le bouton Parametres.
     echo.
   )
 )

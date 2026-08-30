@@ -169,11 +169,21 @@ let taxiRouteRequestController = null;
 let liveTimer = null;
 let simulatorTimer = null;
 let weatherTimer = null;
+let vatsimTimer = null;
+/* Postes en ligne par aérodrome, tels que le serveur les a rapportés. */
+let vatsimPositions = {};
+let trafficTimer = null;
+let groundTrafficTimer = null;
+/* Échéance du prochain relevé réseau, et relevé en cours. Le pilote doit
+   pouvoir répondre à « c'est figé ou ça va se rafraîchir ? » sans compter. */
+/* Indicatif de l'appareil dont la fiche est ouverte. */
+let trafficCardCallsign = "";
 let weatherRefreshInFlight = false;
 let weatherRefreshState = "idle";
 let weatherLastUpdatedAt = null;
 let activeRoutePointIndex = null;
 let latestAircraft = null;
+let renderedAircraftTitle = "";
 let flightGeometry = [];
 let flightRouteTotalNm = 0;
 let climbGuidanceState = {
@@ -213,6 +223,20 @@ let siaOverlayKey = null;
 const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+/* Le réseau demande de ne pas interroger son flux plus d'une fois par quart de
+   minute, et le serveur garde déjà sa réponse une minute. Deux minutes ici :
+   un contrôleur ne prend ni ne quitte sa position à la seconde près. */
+const VATSIM_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+
+/* Le trafic en route vient du réseau, qui relève ses pilotes toutes les quinze
+   secondes : demander plus souvent ne rendrait que la même réponse. */
+const TRAFFIC_REFRESH_INTERVAL_MS = 15 * 1000;
+
+/* Le trafic au sol vient du simulateur, où les positions sont exactes. Deux
+   secondes suffisent à voir avancer un appareil qui roule, sans énumérer les
+   objets des environs à chaque battement du suivi. */
+const GROUND_TRAFFIC_INTERVAL_MS = 2000;
 const CURRENT_FLIGHT_TRAIL_INTERVAL_MS = 5000;
 const CURRENT_FLIGHT_TRAIL_MAX_POINTS = 3600;
 const FLIGHT_LOG_INTERVAL_MS = 5000;
@@ -223,6 +247,8 @@ const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
 const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
 const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
 const PROCEDURE_PROGRESS_PREFIX = "navixav-procedure-progress";
+// Rangée avec la progression : la phase la plus avancée que le vol ait vue.
+const PROCEDURE_REACHED_KEY = "__reached";
 /* Chronologie du vol : un changement doit tenir avant d'entrer au journal, et
    le journal conservé avec le résumé reste court pour ne pas saturer le
    stockage local d'un pilote qui garde cent vols. */
@@ -236,7 +262,11 @@ const DISPATCH_FLOW_WINDOW_S = 5 * 60;
 const DISPATCH_GAP_MS = 15000;
 const APP_SESSION_ID = Date.now().toString(36);
 const ONBOARDING_KEY = "navixav-onboarded";
+const INTERFACE_MODE_KEY = "navixav-interface-mode";
 const DEFAULT_TRAIL_COLOR = "#22d3ee";
+let interfaceMode = localStorage.getItem(INTERFACE_MODE_KEY) === "classic"
+  ? "classic"
+  : "guided";
 
 /* ------------------------------------------------------------------ utils */
 
@@ -249,6 +279,53 @@ function el(tag, className, text) {
 
 function show(node, visible) {
   node.classList.toggle("hidden", !visible);
+}
+
+/**
+ * Mesure les deux en-tetes reels plutot que de supposer une hauteur fixe.
+ * La barre d'outils peut se replier selon la largeur, la langue et Windows ;
+ * ces variables gardent le bandeau de vol et le module defile sous elle.
+ */
+function syncStickyLayoutOffsets() {
+  const topbar = document.querySelector(".topbar");
+  const context = $("flight-context");
+  const topbarHeight = Math.ceil(topbar?.getBoundingClientRect().height || 0);
+  const contextHeight = (
+    interfaceMode === "guided" && context && !context.classList.contains("hidden")
+  ) ? Math.ceil(context.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty("--topbar-height", `${topbarHeight}px`);
+  document.documentElement.style.setProperty(
+    "--flight-context-height",
+    `${contextHeight}px`
+  );
+}
+
+function initialiseStickyLayoutOffsets() {
+  const observed = [document.querySelector(".topbar"), $("flight-context")].filter(Boolean);
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(syncStickyLayoutOffsets);
+    observed.forEach((node) => observer.observe(node));
+  }
+  window.addEventListener("resize", syncStickyLayoutOffsets, { passive: true });
+  syncStickyLayoutOffsets();
+}
+
+/**
+ * L'interface classique reste toujours disponible, sans migration de donnees.
+ * Le choix est volontairement local : revenir en arriere ne depend ni du
+ * service, ni du simulateur, ni d'un redemarrage.
+ */
+function applyInterfaceMode(mode, persist = true) {
+  interfaceMode = mode === "classic" ? "classic" : "guided";
+  document.body.dataset.interface = interfaceMode;
+  if (persist) localStorage.setItem(INTERFACE_MODE_KEY, interfaceMode);
+  if ($("settings-interface")) $("settings-interface").value = interfaceMode;
+  syncRouteStripVisibility();
+  updateGuidedContext(latestAircraft);
+  window.requestAnimationFrame(() => {
+    MAP.resize();
+    GROUND.resize();
+  });
 }
 
 function confidenceClass(choice) {
@@ -271,7 +348,6 @@ async function loadStatus() {
   if (!status.simbrief_configured) {
     $("empty-hint").textContent = t("no_simbrief");
   }
-  if (status.demo_available) $("demo-toggle").disabled = false;
   document.body.classList.toggle("remote-client", Boolean(status.remote_client));
   show($("mobile-mode"), Boolean(status.remote_client));
   if ($("settings-lan-url")) {
@@ -355,6 +431,10 @@ async function installAvailableUpdate() {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || t("update_failed"));
+    localStorage.setItem(
+      "navixav-version-history-pending",
+      String(payload.version || version)
+    );
     label.textContent = t("update_restarting");
     showBanner("info", t("update_ready"), [t("update_restart_body")]);
   } catch (error) {
@@ -511,6 +591,23 @@ async function openSupportPage(event) {
   }
 }
 
+async function openFsltlDownload() {
+  const button = $("settings-fsltl-download");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/fsltl/download", {
+      method: "POST",
+      headers: { "X-NaviXav-External": "fsltl" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("fsltl_download_failed"));
+  } catch (error) {
+    showBanner("error", t("fsltl_download_failed"), [String(error)]);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 /**
  * Aligne le champ couleur et son aperçu sur une teinte valide.
  *
@@ -532,6 +629,8 @@ function setTrailColorField(value) {
 function renderAircraftSurvey(report) {
   const covered = report.covered || [];
   const missing = report.missing || [];
+  const community = $("settings-aircraft-community").value.trim();
+  const photoRevision = Date.now();
   $("aircraft-covered-count").textContent = covered.length;
   $("aircraft-missing-count").textContent = missing.length;
   const renderList = (targetId, items, missingAircraft) => {
@@ -546,7 +645,7 @@ function renderAircraftSurvey(report) {
       const visual = aircraftVisual({
         aircraft: aircraft.icao || "",
         aircraft_name: aircraft.label || "",
-      });
+      }, null, community, photoRevision);
       visual.classList.add("aircraft-survey-photo");
       const copy = el("span");
       copy.append(el("strong", "", aircraft.label));
@@ -667,18 +766,41 @@ async function openSettings() {
     $("settings-taxi-speed").value = values.taxi_speed_limit_kt;
     $("settings-taxi-turn-speed").value = values.taxi_turn_speed_limit_kt;
     $("settings-taxi-alarm").checked = values.taxi_speed_alarm_sound !== false;
+    $("settings-vatsim").checked = Boolean(values.vatsim_enabled);
+    $("settings-traffic-source").value = values.traffic_source || "vatsim";
+    syncTrafficSourceSettings();
+    $("settings-aircraft-models").value = values.aircraft_models || "fsltl";
+    $("settings-fsltl-path").value = values.fsltl_path || "";
+    const fsltl = latestStatus?.fsltl || {};
+    $("settings-fsltl-status").textContent = fsltl.detected
+      ? `FSLTL Base Models ✓ ${tf("fsltl_detected", {
+          version: fsltl.version || "?", models: fsltl.models || 0,
+        })}`
+      : `FSLTL Base Models ✕ ${t("fsltl_not_detected")}`;
+    show($("settings-fsltl-download"), !fsltl.detected);
+    show($("settings-fsltl-download-help"), !fsltl.detected);
     $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
     $("settings-aircraft-community").value = values.aircraft_community_path || "";
     show($("settings-lan-access"), Boolean(values.lan_enabled));
     $("settings-lan-url").value = latestStatus?.lan_url || "";
     $("settings-language").value = window.I18N.getLanguage();
     $("settings-theme").value = window.THEME.getPreference();
+    $("settings-interface").value = interfaceMode;
     $("settings-dialog").showModal();
     loadAircraftSurvey();
     loadChartFoxStatus();
   } catch (error) {
     showBanner("error", t("err_settings_open"), [String(error)]);
   }
+}
+
+function syncTrafficSourceSettings() {
+  // La note du trafic réel ne prévient plus d'un refus : elle dit d'où vient
+  // ce qui sera injecté, et l'attribution due à OpenSky l'accompagne.
+  show(
+    $("settings-real-traffic-note"),
+    $("settings-traffic-source").value === "opensky",
+  );
 }
 
 async function saveSettings(event) {
@@ -703,6 +825,15 @@ async function saveSettings(event) {
     taxi_speed_limit_kt: Number($("settings-taxi-speed").value),
     taxi_turn_speed_limit_kt: Number($("settings-taxi-turn-speed").value),
     taxi_speed_alarm_sound: $("settings-taxi-alarm").checked,
+    vatsim_enabled: $("settings-vatsim").checked,
+    // Le trafic se commande depuis la barre de la carte, et ce seul
+    // interrupteur commande aussi l'injection. Sa valeur doit tout de même
+    // partir avec les autres, sinon enregistrer les paramètres l'éteindrait
+    // sans que personne l'ait demandé.
+    traffic_enabled: Boolean(latestStatus?.traffic_enabled),
+    traffic_source: $("settings-traffic-source").value,
+    aircraft_models: $("settings-aircraft-models").value,
+    fsltl_path: $("settings-fsltl-path").value.trim(),
     aircraft_community_path: $("settings-aircraft-community").value.trim(),
     lan_enabled: $("settings-lan-enabled").checked,
   };
@@ -714,16 +845,14 @@ async function saveSettings(event) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || t("err_save_refused"));
+    applyInterfaceMode($("settings-interface").value);
     applyMapPreferences(result);
     applyTaxiSpeedPreferences(result);
     message.textContent = result.lan_restart_required
       ? t("lan_restart_required")
       : t("saved");
     const status = await loadStatus();
-    if (status.simbrief_configured) {
-      $("demo-toggle").checked = false;
-      await buildPlan();
-    }
+    if (status.simbrief_configured) await buildPlan();
     setTimeout(() => $("settings-dialog").close(), 500);
   } catch (error) {
     message.textContent = String(error);
@@ -763,10 +892,6 @@ function refreshWelcomeSubmit() {
 
 function openWelcome(status) {
   show($("welcome-simbrief"), !status.simbrief_configured && !status.remote_client);
-  show(
-    $("welcome-demo"),
-    welcomeNeedsSimbrief() && Boolean(status.demo_available)
-  );
   if (!window.I18N.hasLanguage()) {
     $("welcome-language").value = window.I18N.suggestedLanguage();
   }
@@ -828,70 +953,9 @@ async function submitWelcome(event) {
   }
 }
 
-async function skipWelcomeWithDemo() {
-  closeWelcome();
-  checkForUpdates();
-  $("demo-toggle").checked = true;
-  await buildPlan();
-}
-
 /* ------------------------------------------------------------------- plan */
 
-function resetDemoSession() {
-  const planKey = flightSummaryPlanKey(currentPlan);
-  currentFlightTrail = [];
-  currentFlightTrailPlanKey = planKey;
-  lastCurrentFlightTrailAt = 0;
-  MAP.setTrail([]);
-  resetFlightEvents();
-  flightEventsPlanKey = planKey;
-  activeFlightSummary = null;
-  previousFlightSummarySample = null;
-  lastFlightSummaryAt = 0;
-  dispatchLive = emptyDispatchLive(planKey);
-  dispatchLiveRenderedAt = 0;
-  updateRouteStripProgress(null);
-  renderFlightPanel(currentPlan);
-}
-
-async function restartCurrentPlanDemo() {
-  if (!currentPlan) return false;
-  try {
-    const response = await fetch("/api/demo/restart", { method: "POST" });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || t("demo_restart_failed"));
-    resetDemoSession();
-    await pollLive();
-    return true;
-  } catch (error) {
-    $("demo-toggle").checked = false;
-    showBanner("error", t("demo_restart_failed"), [String(error)]);
-    return false;
-  }
-}
-
-async function toggleDemoMode() {
-  if ($("demo-toggle").checked) {
-    if (currentPlan) await restartCurrentPlanDemo();
-    else await buildPlan();
-    return;
-  }
-  if (currentPlan?.demo && latestStatus?.simbrief_configured) {
-    await buildPlan(null, false);
-  } else {
-    await pollLive();
-  }
-}
-
-async function refreshPlanOrDemo() {
-  if ($("demo-toggle").checked && currentPlan) {
-    await restartCurrentPlanDemo();
-    return;
-  }
-  await buildPlan();
-}
-
-async function buildPlan(nextOverride = null, demoOfp = null) {
+async function buildPlan(nextOverride = null) {
   if (latestStatus?.remote_client) {
     await loadCurrentPlan();
     return;
@@ -906,17 +970,13 @@ async function buildPlan(nextOverride = null, demoOfp = null) {
   const button = $("refresh");
   button.disabled = true;
   button.querySelector("span").textContent = t("loading_plan");
-  showBanner("info", t("cache_title"), [t("cache_body")]);
+  showBanner("info", t("cache_title"), [t("cache_body")], { busy: true });
 
   try {
-    const useBundledDemo = demoOfp ?? (
-      nextOverride && currentPlan ? Boolean(currentPlan.demo) : $("demo-toggle").checked
-    );
     const response = await fetch("/api/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        demo: useBundledDemo,
         ...plannerOverrides,
       }),
     });
@@ -961,11 +1021,31 @@ async function loadCurrentPlan() {
   }
 }
 
-function showBanner(kind, title, lines) {
+/** Piste d'attente : un avion qui la parcourt, et sa traînée derrière lui. */
+function bannerProgress() {
+  const track = el("span", "banner-progress");
+  track.setAttribute("aria-hidden", "true");
+  const plane = el("span", "banner-plane");
+  plane.append(planeMark());
+  track.append(plane);
+  return track;
+}
+
+/**
+ * Bandeau d'information, et son attente quand il en annonce une.
+ *
+ * `busy` ajoute une piste animée : la préparation du cache MSFS dure plusieurs
+ * dizaines de secondes, et un texte immobile pendant tout ce temps laisse
+ * croire que l'application a lâché. La progression reste **indéterminée** — le
+ * service ne sait pas combien d'aérodromes il lui reste à lire, et afficher un
+ * pourcentage inventé serait pire que ne rien afficher.
+ */
+function showBanner(kind, title, lines, { busy = false } = {}) {
   const banner = $("banner");
-  banner.className = `banner ${kind}`;
+  banner.className = `banner ${kind}${busy ? " is-busy" : ""}`;
   banner.innerHTML = "";
-  const body = el("div");
+  banner.setAttribute("aria-busy", String(busy));
+  const body = el("div", "banner-body");
   body.append(el("strong", null, title));
   const list = el("ul");
   for (const line of lines.filter(Boolean)) list.append(el("li", null, line));
@@ -977,6 +1057,7 @@ function showBanner(kind, title, lines) {
   dismiss.setAttribute("aria-label", t("close"));
   dismiss.addEventListener("click", hideBanner);
   banner.append(dismiss);
+  if (busy) banner.append(bannerProgress());
   show(banner, true);
 }
 
@@ -1014,6 +1095,49 @@ function procedureStepKey(phase, step) {
 }
 
 /**
+ * Retient la phase la plus avancée que le vol ait atteinte.
+ *
+ * Au parking, frein serré et moteurs coupés satisfont déjà des points de
+ * l'après-atterrissage ou de l'arrêt : le panneau annonçait des confirmations
+ * pour des phases qui n'avaient pas commencé. La marque avance avec le vol et
+ * ne recule jamais ; seule la réinitialisation la ramène au départ.
+ */
+function markProcedurePhasesReached(data, aircraft) {
+  const phases = data?.phases || [];
+  if (!phases.length) return;
+  const progress = procedureManualProgress(data);
+  const stored = Number(progress[PROCEDURE_REACHED_KEY]);
+  const previous = Number.isFinite(stored) ? stored : 0;
+  const inferred = inferredProcedurePhase(aircraft);
+  const detected = inferred
+    ? phases.findIndex((phase) => phase.phase === inferred)
+    : -1;
+  const reached = Math.max(previous, detected);
+  if (reached !== previous) {
+    progress[PROCEDURE_REACHED_KEY] = reached;
+    saveProcedureManualProgress(progress, data);
+  }
+  // La liste d'une phase se prépare pendant la précédente : celle d'avant
+  // décollage se déroule en roulage, la suivante reste donc ouverte.
+  phases.forEach((phase, index) => {
+    phase.reached = index <= reached + 1;
+  });
+}
+
+/**
+ * Ce que le simulateur dit d'un point, une fois la phase située dans le vol.
+ *
+ * Une phase que le vol n'a pas atteinte ne confirme rien : sa coche
+ * attendrait le moment venu plutôt que l'état du parking.
+ */
+function procedureStepStatus(phase, step) {
+  if (step.mode === "auto" && step.status === "complete" && phase.reached === false) {
+    return "pending";
+  }
+  return step.status;
+}
+
+/**
  * Retient les confirmations que SimConnect vient d'accorder.
  *
  * `status` décrit ce que le simulateur voit à l'instant, pas ce qui a été
@@ -1030,7 +1154,7 @@ function latchProcedureProgress(data) {
   let changed = false;
   for (const phase of phases) {
     for (const step of phase.steps || []) {
-      if (step.mode !== "auto" || step.status !== "complete") continue;
+      if (step.mode !== "auto" || procedureStepStatus(phase, step) !== "complete") continue;
       const key = procedureStepKey(phase, step);
       if (progress[key] === true) continue;
       progress[key] = true;
@@ -1041,17 +1165,26 @@ function latchProcedureProgress(data) {
 }
 
 function procedureStepComplete(phase, step, progress) {
-  if (step.mode === "info") return true;
+  // Un rappel n'est pas une confirmation. Le cocher d'office affichait
+  // « atterrissage terminé » avant même la mise en route.
+  if (step.mode === "info") return false;
   // Une confirmation acquise ne se reprend pas : seule la réinitialisation du
   // vol efface la progression.
   if (progress[procedureStepKey(phase, step)] === true) return true;
-  return step.mode === "auto" && step.status === "complete";
+  return step.mode === "auto" && procedureStepStatus(phase, step) === "complete";
 }
 
 function procedurePhaseStats(phase, progress) {
   const required = phase.steps.filter((step) => step.mode !== "info");
   const complete = required.filter((step) => procedureStepComplete(phase, step, progress));
-  return { complete: complete.length, total: required.length, done: complete.length === required.length };
+  // Une phase qui ne contient que des rappels n'a rien a confirmer : elle
+  // n'est jamais « terminee », sinon elle s'afficherait acquise des l'ouverture.
+  return {
+    complete: complete.length,
+    total: required.length,
+    informational: required.length === 0,
+    done: required.length > 0 && complete.length === required.length,
+  };
 }
 
 function inferredProcedurePhase(aircraft) {
@@ -1195,7 +1328,11 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
     phaseMark.append(procedurePhaseMark(phase.phase));
     const phaseCopy = el("span", "procedure-phase-copy");
     phaseCopy.append(el("strong", null, t(`procedure_phase_${phase.phase}`)));
-    phaseCopy.append(el("small", null, `${stats.complete}/${stats.total}`));
+    phaseCopy.append(el(
+      "small",
+      null,
+      stats.informational ? t("procedure_info_only") : `${stats.complete}/${stats.total}`
+    ));
     button.append(phaseMark, phaseCopy);
     button.append(el("span", "procedure-phase-index", stats.done ? "✓" : String(index + 1)));
     button.addEventListener("click", () => {
@@ -1220,10 +1357,14 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
   phaseTitle.append(workspaceMark, phaseTitleCopy);
   phaseHead.append(phaseTitle);
   const phaseProgress = el("div", "procedure-progress-copy");
-  phaseProgress.append(el("strong", null, tf("procedure_progress", stats)));
+  phaseProgress.append(el(
+    "strong",
+    null,
+    stats.informational ? t("procedure_nothing_to_confirm") : tf("procedure_progress", stats)
+  ));
   const meter = el("span", "procedure-progress-meter");
   const fill = el("i");
-  fill.style.width = `${stats.total ? (stats.complete / stats.total) * 100 : 100}%`;
+  fill.style.width = `${stats.total ? (stats.complete / stats.total) * 100 : 0}%`;
   meter.append(fill);
   phaseProgress.append(meter);
   phaseHead.append(phaseProgress);
@@ -1239,12 +1380,13 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
     previousGroup = group;
     const key = procedureStepKey(phase, step);
     const complete = procedureStepComplete(phase, step, progress);
-    const canConfirm = step.mode === "manual" || step.status === "unknown";
+    const status = procedureStepStatus(phase, step);
+    const canConfirm = step.mode === "manual" || status === "unknown";
     const row = el("button", `procedure-step mode-${step.mode}`);
     row.type = "button";
     row.classList.toggle("complete", complete);
-    row.classList.toggle("unknown", step.status === "unknown" && !complete);
-    row.classList.toggle("pending", step.status === "pending" && !complete);
+    row.classList.toggle("unknown", status === "unknown" && !complete);
+    row.classList.toggle("pending", status === "pending" && !complete);
     row.disabled = !canConfirm;
     row.setAttribute("aria-pressed", String(complete));
     row.append(el("span", "procedure-check", complete ? "✓" : step.mode === "info" ? "i" : ""));
@@ -1259,9 +1401,9 @@ function renderProcedurePanel(data = currentProcedures, aircraft = latestAircraf
     // voit plus serait un mensonge : la case tient, l'étiquette dit d'où elle
     // vient.
     const state = step.mode === "auto"
-      ? step.status === "complete" ? "procedure_confirmed_auto"
+      ? status === "complete" ? "procedure_confirmed_auto"
         : complete ? "procedure_confirmed_earlier"
-          : step.status === "unknown" ? "procedure_confirm_manual"
+          : status === "unknown" ? "procedure_confirm_manual"
             : "procedure_waiting_sim"
       : `procedure_mode_${step.mode}`;
     row.append(el("span", "procedure-step-mode", t(state)));
@@ -1310,6 +1452,7 @@ function updateProcedures(data, aircraft = latestAircraft) {
   currentProcedures = data || { available: false, reason: "aircraft_not_covered", phases: [] };
   // Avant l'affichage : c'est l'arrivée d'un état frais qui fait foi, et lui
   // seul peut ajouter une confirmation.
+  markProcedurePhasesReached(currentProcedures, aircraft);
   latchProcedureProgress(currentProcedures);
   renderProcedurePanel(currentProcedures, aircraft);
 }
@@ -1331,7 +1474,8 @@ function renderPlan(plan) {
   clearSiaMapOverlay();
   hideBanner();
   show($("empty"), false);
-  for (const id of ["strip", "tabs", "module-menu-toggle"]) show($(id), true);
+  for (const id of ["tabs", "module-menu-toggle"]) show($(id), true);
+  syncRouteStripVisibility();
 
   // La progression du bandeau doit utiliser la route opérationnelle complète,
   // y compris les points de SID, STAR et d'approche.
@@ -1346,7 +1490,7 @@ function renderPlan(plan) {
   renderConstraints(plan);
   renderFlightPanel(plan);
   renderDispatch(plan);
-  renderAircraft(plan);
+  renderAircraft(plan, latestAircraft);
   loadProceduresForPlan(plan);
   renderOfficialCharts(plan);
   renderMcdu(plan);
@@ -1354,11 +1498,14 @@ function renderPlan(plan) {
   renderMapBar(plan);
   startLiveLoop();
   startWeatherLoop();
+  startVatsimLoop();
+  startTrafficLoop();
 
   if (plan.warnings?.length) {
     showBanner("warn", t("warnings"), plan.warnings.map(warningText));
   }
   selectTab(document.querySelector(".tabs button.active")?.dataset.tab || "constraints");
+  updateGuidedContext(latestAircraft);
 }
 
 function renderStrip(plan) {
@@ -1732,10 +1879,10 @@ function buildFlightGeometry(plan) {
   return geometry;
 }
 
-function projectAircraftOnFlightPath(aircraft) {
-  if (!aircraft || flightGeometry.length < 2) return null;
-  const latitude = Number(aircraft.latitude);
-  const longitude = Number(aircraft.longitude);
+function projectPointOnFlightPath(point) {
+  if (!point || flightGeometry.length < 2) return null;
+  const latitude = Number(point.latitude ?? point.lat);
+  const longitude = Number(point.longitude ?? point.lon);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
 
   const scaleX = EARTH_RADIUS_M * Math.cos(latitude * Math.PI / 180);
@@ -1780,6 +1927,10 @@ function projectAircraftOnFlightPath(aircraft) {
     distanceToActiveNm: segmentLength * (1 - best.progress),
     remainingNm,
   };
+}
+
+function projectAircraftOnFlightPath(aircraft) {
+  return projectPointOnFlightPath(aircraft);
 }
 
 /** Longueur totale de la route opérationnelle, calculée une fois par plan. */
@@ -1982,6 +2133,126 @@ function detectFlightPhase(aircraft, projection) {
   return t(detectFlightPhaseKey(aircraft, projection));
 }
 
+function contextStage(phaseKey) {
+  if (["phase_taxi_out", "phase_takeoff", "phase_climb"].includes(phaseKey)) {
+    return "departure";
+  }
+  if (["phase_descent"].includes(phaseKey)) return "arrival";
+  if (["phase_approach", "phase_landing", "phase_taxi_in"].includes(phaseKey)) {
+    return "approach";
+  }
+  return "enroute";
+}
+
+function contextPrimaryTab(phaseKey) {
+  return {
+    phase_taxi_out: "ground",
+    phase_takeoff: "procedures",
+    phase_climb: "constraints",
+    phase_cruise: "flight",
+    phase_enroute: "flight",
+    phase_descent: "constraints",
+    phase_approach: "sia",
+    phase_landing: "ground",
+    phase_taxi_in: "ground",
+  }[phaseKey] || "terminal";
+}
+
+function contextOperation(phaseKey) {
+  if (!currentPlan) return "\u2014";
+  const arrival = ["arrival", "approach"].includes(contextStage(phaseKey));
+  const airport = arrival ? currentPlan.arrival : currentPlan.departure;
+  const parts = [];
+  if (airport?.runway?.value) parts.push(`RWY ${airport.runway.value}`);
+  const procedure = arrival
+    ? airport?.approach?.value || airport?.star?.value
+    : airport?.sid?.value;
+  if (procedure) parts.push(procedure);
+  return parts.join(" \u00b7 ") || "\u2014";
+}
+
+function contextNextAction(phaseKey, constraint, aircraft) {
+  const alert = currentActiveAlerts.find((item) => item.severity === "danger")
+    || currentActiveAlerts.find((item) => item.severity === "warning");
+  if (alert) return alert.detail ? `${alert.action} · ${alert.detail}` : alert.action;
+  const guidance = currentTaxiGuidance;
+  if (
+    phaseKey === "phase_taxi_in"
+    && Number(aircraft?.ground_speed_kt || 0) < 2
+    && flightLog.length >= 2
+  ) {
+    return t("context_debrief_ready");
+  }
+  if (["phase_taxi_out", "phase_taxi_in", "phase_landing"].includes(phaseKey)) {
+    if (guidance?.hold_short) {
+      return tf("context_hold_short", { runway: guidance.hold_short });
+    }
+    if (guidance?.next_name) {
+      return tf("context_next_taxiway", { taxiway: guidance.next_name });
+    }
+    return t("context_prepare_taxi");
+  }
+  if (constraint) {
+    const values = [constraint.altitude, constraint.speed].filter(Boolean).join(" \u00b7 ");
+    return `${constraint.label}${values ? ` \u00b7 ${values}` : ""}`;
+  }
+  if (phaseKey === "phase_approach") return t("context_open_approach");
+  if (phaseKey === "phase_descent") return t("context_review_arrival");
+  if (["phase_cruise", "phase_enroute"].includes(phaseKey)) return t("context_monitor_flight");
+  if (phaseKey === "phase_offline") return t("context_connect_sim");
+  return t("context_review_plan");
+}
+
+/** Met au premier plan l'information utile sans changer de module de force. */
+function updateGuidedContext(
+  aircraft = latestAircraft,
+  phaseKey = null,
+  projection = null,
+  constraint = null
+) {
+  const bar = $("flight-context");
+  if (!bar) return;
+  const visible = interfaceMode === "guided" && Boolean(currentPlan);
+  show(bar, visible);
+  window.requestAnimationFrame(syncStickyLayoutOffsets);
+  if (!visible) {
+    document.querySelectorAll(".tabs button.recommended")
+      .forEach((button) => button.classList.remove("recommended"));
+    return;
+  }
+
+  const resolvedProjection = projection || projectAircraftOnFlightPath(aircraft);
+  const resolvedPhase = phaseKey || detectFlightPhaseKey(aircraft, resolvedProjection);
+  const resolvedConstraint = constraint
+    || nextFlightConstraint(currentPlan, resolvedProjection, aircraft || {});
+  let primaryTab = contextPrimaryTab(resolvedPhase);
+  if (
+    resolvedPhase === "phase_taxi_in"
+    && Number(aircraft?.ground_speed_kt || 0) < 2
+    && flightLog.length >= 2
+  ) {
+    primaryTab = "flight";
+  }
+  const departure = currentPlan.departure?.icao || "----";
+  const arrival = currentPlan.arrival?.icao || "----";
+
+  $("context-route-value").textContent = `${departure} \u2192 ${arrival}`;
+  $("context-phase-value").textContent = t(resolvedPhase);
+  $("context-operation-value").textContent = contextOperation(resolvedPhase);
+  $("context-next-value").textContent = contextNextAction(
+    resolvedPhase,
+    resolvedConstraint,
+    aircraft
+  );
+  $("context-primary").dataset.contextTab = primaryTab;
+  $("context-primary").textContent = t(primaryTab === "sia" ? "tab_charts" : `tab_${primaryTab}`);
+
+  document.querySelectorAll(".tabs button[data-tab]").forEach((button) => {
+    button.classList.toggle("recommended", button.dataset.tab === primaryTab);
+  });
+  updateChartPinboardPhase(resolvedPhase);
+}
+
 /*
  * Plafonds publiés de la STAR et de l'approche, rapportés à leur distance de
  * la destination.
@@ -2025,6 +2296,24 @@ function descentCeilings(plan) {
 }
 
 /*
+ * Le TOD de l'OFP inclut le profil de l'avion, la masse, le Cost Index et les
+ * vents prévus. Il n'est retenu que si ses coordonnées se projettent encore
+ * sur la route opérationnelle : une STAR changée ou un ancien OFP ne doit pas
+ * déplacer le repère vers un segment sans rapport avec le vol courant.
+ */
+function simbriefTodFromDestination(plan) {
+  const point = plan.enroute?.simbrief_tod;
+  const projection = projectPointOnFlightPath(point);
+  if (!projection || projection.crossTrackNm > 5) return null;
+  const stages = new Set([
+    flightGeometry[projection.segmentIndex]?.stage,
+    flightGeometry[projection.activeIndex]?.stage,
+  ]);
+  if (!stages.has("enroute") && !stages.has("star")) return null;
+  return projection.remainingNm;
+}
+
+/*
  * Le TOD est un point de la route, pas un écart recalculé à chaque image.
  *
  * L'ancienne formule retranchait de la distance restante la descente qui reste
@@ -2061,11 +2350,20 @@ function descentGuidance(plan, aircraft, projection) {
    * Chacun ouvre son propre profil à 3° ; le TOD est le plus amont d'entre
    * eux, et l'altitude attendue au point courant le plus bas.
    */
-  let anchorFromDestination = finalDistance
+  const geometricAnchor = finalDistance
     + Math.max(0, anchorAltitude - targetAltitude) / 318;
+  const simbriefAnchor = simbriefTodFromDestination(plan);
+  let anchorFromDestination = simbriefAnchor ?? geometricAnchor;
+  const plannedDescentNm = anchorFromDestination - finalDistance;
+  const plannedAltitudeLoss = Math.max(0, anchorAltitude - targetAltitude);
+  const profileGradientFtPerNm = (
+    simbriefAnchor !== null && plannedDescentNm > 1
+      ? Math.max(180, Math.min(450, plannedAltitudeLoss / plannedDescentNm))
+      : 318
+  );
   let expectedAltitude = Math.min(
     cruiseAltitude === null ? Infinity : cruiseAltitude,
-    targetAltitude + distanceToIntercept * 318
+    targetAltitude + distanceToIntercept * profileGradientFtPerNm
   );
   for (const ceiling of descentCeilings(plan)) {
     anchorFromDestination = Math.max(
@@ -2082,7 +2380,9 @@ function descentGuidance(plan, aircraft, projection) {
   const todInNm = projection.remainingNm - anchorFromDestination;
 
   const groundSpeed = Math.max(120, Number(aircraft.ground_speed_kt || 0));
-  const requiredVsFpm = -Math.round((groundSpeed * 318) / 60 / 50) * 50;
+  const requiredVsFpm = -Math.round(
+    (groundSpeed * profileGradientFtPerNm) / 60 / 50
+  ) * 50;
 
   // Quitter la croisière ne se déduit pas de la seule altitude : en montée
   // aussi l'avion est sous son niveau. Le TOD franchi ou une perte d'altitude
@@ -2097,6 +2397,7 @@ function descentGuidance(plan, aircraft, projection) {
 
   return {
     anchorFromDestination,
+    source: simbriefAnchor === null ? "calculated" : "simbrief",
     targetAltitude,
     todInNm,
     requiredVsFpm,
@@ -2202,6 +2503,7 @@ const LIGHT_LABELS = [
 
 let alertsEnabled = localStorage.getItem(ALERTS_STORAGE_KEY) !== "0";
 let alertPhaseMemory = null;
+let currentActiveAlerts = [];
 const alertStates = new Map();
 
 function finiteOr(value, fallback = null) {
@@ -2219,7 +2521,7 @@ function reserveFuelKg(plan) {
     : reserve;
 }
 
-function flightContext(aircraft, projection, phase, constraint) {
+function flightContext(aircraft, projection, phase, constraint, descent = null) {
   const configuration = aircraft?.configuration || null;
   return {
     aircraft,
@@ -2229,6 +2531,7 @@ function flightContext(aircraft, projection, phase, constraint) {
     projection,
     phase,
     constraint,
+    descent,
     onGround: Boolean(aircraft?.on_ground),
     groundSpeed: finiteOr(aircraft?.ground_speed_kt, 0),
     verticalSpeed: finiteOr(aircraft?.vertical_speed_fpm, 0),
@@ -2243,6 +2546,30 @@ function flightContext(aircraft, projection, phase, constraint) {
 }
 
 const ALERT_RULES = [
+  {
+    id: "tod_prepare",
+    severity: "info",
+    armed: (c) => (
+      !c.onGround
+      && c.descent && !c.descent.leftCruise
+      && c.descent.todInNm <= 50 && c.descent.todInNm > 10
+    ),
+    when: () => true,
+    detail: (c) => `${Math.round(c.descent.todInNm)} NM`,
+  },
+  {
+    id: "tod_imminent",
+    severity: "warning",
+    armed: (c) => (
+      !c.onGround
+      && c.descent && !c.descent.leftCruise
+      && c.descent.todInNm <= 10
+    ),
+    when: () => true,
+    detail: (c) => (
+      c.descent.todInNm > 2 ? `${Math.round(c.descent.todInNm)} NM` : t("tod_now")
+    ),
+  },
   {
     id: "interactive_points_crash_risk",
     severity: "danger",
@@ -2569,9 +2896,7 @@ function flightLogStorageKey(plan) {
     plan.departure?.icao || "----",
     plan.arrival?.icao || "----",
     plan.callsign || "flight",
-    plan.demo
-      ? `demo-${APP_SESSION_ID}`
-      : plan.source?.simbrief_generated_at || APP_SESSION_ID,
+    plan.source?.simbrief_generated_at || APP_SESSION_ID,
   ].join(":");
 }
 
@@ -2707,12 +3032,7 @@ function flightTrailPoints(points) {
 
     if (previous) {
       const plausibleDistanceNm = plausibleLegNm(previous, point);
-      const loopRestart = (
-        previous.source === "Démonstration"
-        && finiteOr(previous.ground_speed_kt, 0) < 1
-        && finiteOr(point.ground_speed_kt, 0) > 1
-      );
-      if (loopRestart || haversineNm(previous, point) > plausibleDistanceNm) {
+      if (haversineNm(previous, point) > plausibleDistanceNm) {
         trail.push(null);
       }
     }
@@ -2727,11 +3047,8 @@ function flightTrailPoints(points) {
  * Distance maximale crédible entre deux relevés, au-delà de laquelle le
  * segment vient d'une téléportation (rechargement, slew) et non d'un vol.
  *
- * Le vol de démonstration est exempté : il comprime le temps, sa position
- * avance donc plus vite que la vitesse sol annoncée sans jamais sauter.
  */
 function plausibleLegNm(previous, point) {
-  if (previous?.source === "Démonstration") return Infinity;
   const elapsedMs = (
     Date.parse(point.recorded_at || "") - Date.parse(previous.recorded_at || "")
   );
@@ -3202,9 +3519,7 @@ function flightSummaryPlanKey(plan) {
     plan.departure?.icao || "----",
     plan.arrival?.icao || "----",
     plan.callsign || "flight",
-    plan.demo
-      ? `demo-${APP_SESSION_ID}`
-      : plan.source?.simbrief_generated_at || APP_SESSION_ID,
+    plan.source?.simbrief_generated_at || APP_SESSION_ID,
   ].join(":");
 }
 
@@ -3446,6 +3761,25 @@ function liveValue(id, value, status = "") {
   node.closest(".flight-live-stat")?.setAttribute("data-status", status);
 }
 
+/**
+ * Affiche la fréquence attendue, ou efface la pastille.
+ *
+ * `tuned` note simplement l'accord entre ce qui est attendu et ce qui est
+ * composé. Aucun état d'alerte : rester sur la clairance en début de roulage
+ * est normal, et une pastille qui crierait au désaccord finirait ignorée.
+ */
+function updateExpectedFrequency(aircraft, phaseKey) {
+  const pill = $("flight-radio-expected");
+  if (!pill) return;
+  const expected = expectedFrequency(currentPlan, phaseKey, aircraft);
+  show(pill, Boolean(expected));
+  if (!expected) return;
+  pill.textContent = `${expected.code} ${expected.mhz.toFixed(3)}`;
+  const dialled = aircraft?.configuration?.com1_frequency_mhz;
+  pill.dataset.tuned = Number.isFinite(dialled)
+    && Math.abs(dialled - expected.mhz) <= RADIO_MATCH_MHZ ? "yes" : "no";
+}
+
 /* ------------------------------------------------- rendu de la configuration */
 
 function describeGear(configuration, capabilities) {
@@ -3646,8 +3980,12 @@ function updateLights(configuration) {
   if (!container) return;
   container.innerHTML = "";
   const lights = configuration?.lights || {};
+  let activeCount = 0;
+  let knownCount = 0;
   for (const [key, label] of LIGHT_LABELS) {
     const state = lights[key];
+    if (state === true) activeCount += 1;
+    if (state === true || state === false) knownCount += 1;
     const chip = el("span", "light-chip", label);
     // L'état ne repose pas sur la seule couleur : le texte reste lisible et
     // l'attribut est exposé aux lecteurs d'écran.
@@ -3657,6 +3995,11 @@ function updateLights(configuration) {
       `${label} · ${t(state === true ? "cfg_light_on" : state === false ? "cfg_light_off" : "cfg_unknown")}`
     );
     container.append(chip);
+  }
+  const summary = $("flight-lights-summary");
+  if (summary) {
+    summary.textContent = `${activeCount} / ${knownCount || LIGHT_LABELS.length}`;
+    summary.title = `${activeCount} ${t("cfg_light_on")}`;
   }
 }
 
@@ -4196,6 +4539,7 @@ function updateAlertsDisplay(context) {
   const inhibition = alertsInhibition(context);
   if (inhibition) {
     resetAlertStates();
+    currentActiveAlerts = [];
     updateGlobalFlightAlert([]);
     master.dataset.severity = "none";
     master.textContent = inhibition.detail
@@ -4209,6 +4553,7 @@ function updateAlertsDisplay(context) {
     context.phase,
     performance.now()
   );
+  currentActiveAlerts = active;
 
   if (!active.length) {
     updateGlobalFlightAlert([]);
@@ -4429,9 +4774,12 @@ function updateFlightPanel(aircraft) {
   updateConfigurationBlock(aircraft);
   updateFlightEvents(aircraft, phaseKey);
   renderFlightEvents();
-  updateAlertsDisplay(flightContext(aircraft, projection, phase, constraint));
+  updateAlertsDisplay(flightContext(aircraft, projection, phase, constraint, descent));
+  updateGuidedContext(aircraft, phaseKey, projection, constraint);
 
   liveValue("flight-phase", phase);
+  liveValue("flight-radio", tunedRadioLabel(currentPlan, aircraft));
+  updateExpectedFrequency(aircraft, phaseKey);
   liveValue(
     "flight-next-fix",
     projection?.activePoint?.ident || "—",
@@ -4514,8 +4862,12 @@ function updateFlightPanel(aircraft) {
   }
 
   if (descent) {
-    const todText = descent.todInNm > 2
+    const todText = descent.todInNm > 50
       ? tf("tod_in", { distance: descent.todInNm.toFixed(0) })
+      : descent.todInNm > 10
+        ? tf("tod_prepare", { distance: descent.todInNm.toFixed(0) })
+        : descent.todInNm > 2
+          ? tf("tod_imminent", { distance: descent.todInNm.toFixed(0) })
       : descent.todInNm >= -2
         ? t("tod_now")
         : tf("tod_passed", { distance: Math.abs(descent.todInNm).toFixed(0) });
@@ -4524,7 +4876,15 @@ function updateFlightPanel(aircraft) {
     liveValue(
       "flight-tod",
       todText,
-      descent.todInNm > 2 || descent.leftCruise ? "good" : "warning"
+      descent.leftCruise
+        ? "good"
+        : descent.todInNm > 50
+          ? ""
+          : descent.todInNm > 10
+            ? "tod-ready"
+            : descent.todInNm > 2
+              ? "tod-imminent"
+              : "warning"
     );
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
@@ -4565,16 +4925,7 @@ function updateFlightPanel(aircraft) {
   }
 }
 
-function buildConfigurationSection() {
-  const section = el("section", "flight-config");
-  section.id = "flight-config";
-
-  const head = el("div", "flight-config-head");
-  const heading = el("div");
-  heading.append(el("div", "card-kicker", t("cfg_kicker")));
-  heading.append(el("h2", null, t("cfg_title")));
-  head.append(heading);
-
+function buildFlightAlertsToggle() {
   const switchLabel = el("label", "switch");
   const input = el("input");
   input.type = "checkbox";
@@ -4593,7 +4944,45 @@ function buildConfigurationSection() {
   switchLabel.append(track);
   switchLabel.append(el("span", "switch-label", t("alerts_toggle")));
   switchLabel.title = t("alerts_toggle_title");
-  head.append(switchLabel);
+  return switchLabel;
+}
+
+/** Ouvre une seule fois l'historique après le premier démarrage d'une version.
+ *
+ * La version vue couvre aussi une mise à jour lancée avec l'installateur
+ * manuel. Le marqueur pending couvre la mise à jour intégrée, même si la
+ * WebView n'avait pas encore enregistré de version de référence.
+ */
+async function openVersionHistoryAfterUpdate(status) {
+  if (!status?.version || status.remote_client) return;
+  const seenKey = "navixav-version-history-seen";
+  const pendingKey = "navixav-version-history-pending";
+  const current = String(status.version);
+  const seen = localStorage.getItem(seenKey);
+  const pending = localStorage.getItem(pendingKey);
+  const previousInstallation = Boolean(localStorage.getItem(ONBOARDING_KEY));
+  localStorage.setItem(seenKey, current);
+  if (seen === current && pending !== current) return;
+  if (!seen && pending !== current && !previousInstallation) return;
+  await openChangelog();
+  localStorage.removeItem(pendingKey);
+}
+
+function buildConfigurationSection() {
+  const section = el("section", "flight-config");
+  section.id = "flight-config";
+
+  const head = el("div", "flight-config-head");
+  const heading = el("div");
+  heading.className = "flight-config-heading";
+  const headingMark = el("span", "flight-config-heading-mark", "✈");
+  headingMark.setAttribute("aria-hidden", "true");
+  heading.append(headingMark);
+  const headingCopy = el("div");
+  headingCopy.append(el("div", "card-kicker", t("cfg_kicker")));
+  headingCopy.append(el("h2", null, t("cfg_title")));
+  heading.append(headingCopy);
+  head.append(heading);
   section.append(head);
 
   const unavailable = el("p", "flight-config-empty", t("alerts_no_data"));
@@ -4603,28 +4992,44 @@ function buildConfigurationSection() {
   const body = el("div");
   body.id = "flight-config-body";
   const grid = el("div", "flight-live-grid");
-  const item = (label, id, note = "") => {
+  const item = (label, id, note = "", icon = "·", size = "compact") => {
     const node = el("article", "flight-live-stat");
-    node.append(el("div", "stat-label", label));
+    node.dataset.configSize = size;
+    const mark = el("span", "flight-config-icon", icon);
+    mark.setAttribute("aria-hidden", "true");
+    const copy = el("div", "flight-config-copy");
+    copy.append(el("div", "stat-label", label));
     const value = el("div", "stat-value", "—");
     value.id = id;
-    node.append(value);
-    if (note) node.append(el("div", "stat-note", note));
+    copy.append(value);
+    if (note) copy.append(el("div", "stat-note", note));
+    node.append(mark, copy);
     grid.append(node);
   };
-  item(t("cfg_gear"), "flight-cfg-gear");
-  item(t("cfg_flaps"), "flight-cfg-flaps");
-  item(t("cfg_spoilers"), "flight-cfg-spoilers");
-  item(t("cfg_brake"), "flight-cfg-brake");
-  item(t("cfg_altimeter"), "flight-cfg-altimeter");
-  item(t("cfg_autopilot"), "flight-cfg-autopilot");
-  item(t("cfg_selected_altitude"), "flight-cfg-selected", t("cfg_selected_note"));
-  item(t("cfg_fuel"), "flight-cfg-fuel", t("cfg_fuel_note"));
-  item(t("cfg_wind"), "flight-cfg-wind", t("cfg_wind_note"));
+  item(t("cfg_gear"), "flight-cfg-gear", "", "◉");
+  item(t("cfg_flaps"), "flight-cfg-flaps", "", "⌁");
+  item(t("cfg_spoilers"), "flight-cfg-spoilers", "", "⌃");
+  item(t("cfg_brake"), "flight-cfg-brake", "", "P");
+  item(t("cfg_altimeter"), "flight-cfg-altimeter", "", "Q", "instrument");
+  item(t("cfg_autopilot"), "flight-cfg-autopilot", "", "A", "instrument");
+  item(
+    t("cfg_selected_altitude"),
+    "flight-cfg-selected",
+    t("cfg_selected_note"),
+    "↟",
+    "instrument"
+  );
+  item(t("cfg_fuel"), "flight-cfg-fuel", t("cfg_fuel_note"), "◒", "wide");
+  item(t("cfg_wind"), "flight-cfg-wind", t("cfg_wind_note"), "≋", "wide");
   body.append(grid);
 
   const lightsBlock = el("div", "flight-lights-block");
-  lightsBlock.append(el("div", "stat-label", t("cfg_lights")));
+  const lightsHead = el("div", "flight-lights-head");
+  lightsHead.append(el("div", "stat-label", t("cfg_lights")));
+  const lightsSummary = el("span", "flight-lights-summary", "0 / 0");
+  lightsSummary.id = "flight-lights-summary";
+  lightsHead.append(lightsSummary);
+  lightsBlock.append(lightsHead);
   const lights = el("div", "flight-lights");
   lights.id = "flight-lights";
   lightsBlock.append(lights);
@@ -4657,6 +5062,7 @@ function renderFlightPanel(plan) {
   title.append(el("h2", null, t("flight_tracking_title")));
   header.append(title);
   const pills = el("div", "flight-panel-pills");
+  pills.append(buildFlightAlertsToggle());
   const master = el("span", "flight-alert-pill", t("alerts_none"));
   master.id = "flight-alert-master";
   master.dataset.severity = "none";
@@ -4664,6 +5070,14 @@ function renderFlightPanel(plan) {
   const phase = el("span", "flight-phase-pill", t("phase_offline"));
   phase.id = "flight-phase";
   pills.append(phase);
+  const radio = el("span", "flight-radio-pill", "COM1 —");
+  radio.id = "flight-radio";
+  radio.title = t("flight_radio_title");
+  pills.append(radio);
+  const expected = el("span", "flight-radio-expected hidden");
+  expected.id = "flight-radio-expected";
+  expected.title = t("flight_radio_expected_title");
+  pills.append(expected);
   header.append(pills);
   panel.append(header);
 
@@ -4695,7 +5109,7 @@ function renderFlightPanel(plan) {
   item(t("flight_constraint_distance"), "flight-constraint-distance");
   item(t("flight_required_rate"), "flight-required-vs", t("flight_required_rate_note"));
   item(t("flight_top_of_climb"), "flight-toc", t("flight_calculated_point_note"));
-  item(t("flight_top_of_descent"), "flight-tod", t("flight_calculated_point_note"));
+  item(t("flight_top_of_descent"), "flight-tod", t("flight_tod_source_note"));
   item(t("flight_vertical_profile"), "flight-vertical-profile", t("flight_vertical_profile_note"));
   item(t("flight_descent_rate"), "flight-descent-vs", t("flight_descent_rate_note"));
   panel.append(grid);
@@ -4968,6 +5382,536 @@ function transitionRows(procedure, transition, label, note, overrideField) {
   return [[label, transition, note, overrideField]];
 }
 
+/**
+ * Rangée des fréquences du terrain, dans l'ordre où le pilote s'en sert.
+ *
+ * Les sigles — ATIS, DEL, GND, TWR, APP, DEP — sont des abréviations
+ * aéronautiques : ils restent identiques dans toutes les langues, comme la
+ * notation METAR. Seul le libellé de la rangée suit la langue d'interface.
+ *
+ * Un grand terrain aligne plusieurs fréquences pour un même poste — quatre
+ * tours à Roissy — sans que le simulateur dise laquelle dessert quelle piste.
+ * Le badge montre donc la première et **annonce combien il y en a** : « +3 »
+ * dit au pilote qu'il y a un choix, là où une fréquence seule lui laisserait
+ * croire qu'il n'y en a qu'une. Le détail complet est au survol.
+ */
+function frequencyRow(frequencies, icao) {
+  if (!frequencies?.length) return null;
+  const row = el("div", "freq-row");
+  row.append(el("span", "freq-label", t("frequencies")));
+  for (const frequency of frequencies) {
+    const stations = frequency.stations || [];
+    if (!stations.length) continue;
+    const badge = el("span", "badge freq-badge");
+    badge.dataset.freqCode = frequency.code;
+    badge.dataset.freqIcao = icao || "";
+    badge.append(el("b", "freq-code", frequency.code));
+    badge.append(el("span", "freq-mhz", stations[0].mhz.toFixed(3)));
+    if (stations.length > 1) {
+      badge.append(el("span", "freq-more", `+${stations.length - 1}`));
+    }
+    badge.dataset.freqTitle = frequencyTitle(frequency);
+    badge.title = badge.dataset.freqTitle;
+    row.append(badge);
+  }
+  if (row.childElementCount <= 1) return null;
+  markVatsimPositions(row);
+  return row;
+}
+
+/**
+ * Infobulle d'un rôle : chaque poste nommé, avec ses fréquences.
+ *
+ * Les postes secondaires y figurent sous leur propre nom. « DE GAULLE APRON »
+ * n'est pas un contrôle sol de remplacement, et les confondre sur une même
+ * ligne enverrait le pilote appeler une aire de stationnement.
+ */
+function frequencyTitle(frequency) {
+  const lines = [];
+  const push = (name, stations) => {
+    if (!stations.length) return;
+    const list = stations.map((station) => station.mhz.toFixed(3)).join(" · ");
+    lines.push(name ? `${name} : ${list}` : list);
+  };
+  push(frequency.name, frequency.stations || []);
+  const others = new Map();
+  for (const station of frequency.alternates || []) {
+    if (!others.has(station.name)) others.set(station.name, []);
+    others.get(station.name).push(station);
+  }
+  for (const [name, stations] of others) push(name, stations);
+  return lines.join("\n");
+}
+
+/*
+ * Écart toléré entre la fréquence composée et celle que publie le terrain.
+ *
+ * Le simulateur rend des MHz convertis, jamais parfaitement ronds, et la base
+ * arrondit au kilohertz. Deux millièmes de mégahertz absorbent cet écart tout
+ * en restant sous les cinq kilohertz qui séparent deux canaux 8,33 : 121.905
+ * et 121.910 ne peuvent pas se confondre.
+ */
+const RADIO_MATCH_MHZ = 0.002;
+
+/**
+ * Nomme le poste sur lequel l'avion est réglé, ou null s'il est inconnu.
+ *
+ * NaviXav ne dit pas quoi composer, il dit ce qui est composé : la recherche
+ * part donc de la fréquence de l'avion et non de la phase de vol. Elle couvre
+ * les deux terrains du plan, poste principal et postes secondaires — l'aire de
+ * stationnement compte autant que le contrôle sol.
+ *
+ * Une fréquence hors du plan — un centre de contrôle, un terrain de
+ * dégagement — ne renvoie rien plutôt qu'une approximation : mieux vaut la
+ * fréquence nue qu'un nom emprunté au mauvais aérodrome.
+ */
+function tunedStation(plan, mhz) {
+  if (!Number.isFinite(mhz)) return null;
+  for (const block of [plan?.departure, plan?.arrival]) {
+    for (const frequency of block?.frequencies || []) {
+      const stations = [
+        ...(frequency.stations || []),
+        ...(frequency.alternates || []),
+      ];
+      for (const station of stations) {
+        if (Math.abs(station.mhz - mhz) <= RADIO_MATCH_MHZ) {
+          return { code: frequency.code, icao: block.icao, name: station.name };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Contenu de la pastille radio : ce qui est composé, et sur quoi. */
+function tunedRadioLabel(plan, aircraft) {
+  const mhz = aircraft?.configuration?.com1_frequency_mhz;
+  if (!Number.isFinite(mhz) || mhz <= 0) return "COM1 —";
+  const station = tunedStation(plan, mhz);
+  const dialled = `COM1 ${mhz.toFixed(3)}`;
+  if (!station) return dialled;
+  return `${dialled} · ${station.name || `${station.icao} ${station.code}`}`;
+}
+
+/*
+ * Fréquence attendue à chaque phase, et le terrain qui la publie.
+ *
+ * La croisière et le trajet en route n'y sont pas : la seule fréquence
+ * disponible serait le centre de contrôle publié par l'aérodrome, qui ne vaut
+ * que dans son secteur. Se taire est plus juste que d'envoyer le pilote sur un
+ * secteur qu'il a quitté.
+ */
+const PHASE_FREQUENCIES = {
+  phase_taxi_out: ["departure", "GND"],
+  phase_takeoff: ["departure", "TWR"],
+  phase_climb: ["departure", "DEP"],
+  phase_descent: ["arrival", "ATIS"],
+  phase_approach: ["arrival", "APP"],
+  phase_landing: ["arrival", "TWR"],
+  phase_taxi_in: ["arrival", "GND"],
+};
+
+/**
+ * La fréquence que la phase appelle, ou null si elle ne se déduit pas.
+ *
+ * Elle n'est rendue que lorsque le rôle ne compte **qu'une seule** fréquence.
+ * Les Facilities MSFS ne disent pas laquelle des quatre tours de Roissy tient
+ * la piste en service : trancher au hasard donnerait une consigne fausse, et
+ * une consigne fausse est pire que pas de consigne. La pastille se tait alors,
+ * et la rangée des cartes garde seule le rôle de montrer ce qui existe.
+ */
+function expectedFrequency(plan, phaseKey, aircraft) {
+  // Immobile au parking, ce n'est pas le sol qu'on appelle mais la clairance.
+  const stationary = phaseKey === "phase_taxi_out"
+    && Number(aircraft?.ground_speed_kt || 0) < 1;
+  const target = stationary ? ["departure", "DEL"] : PHASE_FREQUENCIES[phaseKey];
+  if (!target) return null;
+  const [side, code] = target;
+  const row = (plan?.[side]?.frequencies || []).find((entry) => entry.code === code);
+  if (row?.stations?.length !== 1) return null;
+  return { code, mhz: row.stations[0].mhz, name: row.stations[0].name };
+}
+
+/**
+ * Marque les fréquences dont le poste est tenu en ligne sur VATSIM.
+ *
+ * La rangée reste celle du simulateur : le réseau ne remplace pas les
+ * fréquences publiées, il dit lesquels de ces postes sont tenus. Le
+ * rapprochement se fait donc par rôle et non par fréquence — le contrôleur
+ * n'est pas toujours sur celle que le terrain publie, EGLL_S_TWR tient
+ * 118.505 quand MSFS annonce 118.500. C'est pourquoi l'infobulle donne son
+ * indicatif *et* sa fréquence : sur le réseau, c'est la sienne qu'on compose,
+ * et mêler les deux chiffres dans un même badge sèmerait le doute sur
+ * l'origine de chacun.
+ *
+ * `scope` limite la mise à jour à une rangée pendant sa construction ; sans
+ * argument, toute l'interface est reprise après un rafraîchissement.
+ */
+function markVatsimPositions(scope) {
+  const root = scope || document;
+  for (const badge of root.querySelectorAll("[data-freq-code]")) {
+    const online = (vatsimPositions[badge.dataset.freqIcao] || [])
+      .filter((position) => position.code === badge.dataset.freqCode);
+    badge.classList.toggle("freq-online", online.length > 0);
+
+    let dot = badge.querySelector(".freq-online-dot");
+    if (!online.length) {
+      dot?.remove();
+      badge.title = badge.dataset.freqTitle || "";
+      continue;
+    }
+    if (!dot) {
+      dot = el("span", "freq-online-dot");
+      dot.setAttribute("aria-hidden", "true");
+      badge.prepend(dot);
+    }
+    const held = online
+      .map((position) => `${position.callsign} ${position.frequency_mhz.toFixed(3)}`)
+      .join(" · ");
+    badge.title = [badge.dataset.freqTitle, tf("vatsim_online", { list: held })]
+      .filter(Boolean)
+      .join("\n");
+  }
+}
+
+/** Interroge le serveur pour les deux terrains du plan, puis remarque. */
+async function refreshVatsim() {
+  const icaos = [currentPlan?.departure?.icao, currentPlan?.arrival?.icao]
+    .filter(Boolean);
+  if (!icaos.length) return;
+  try {
+    const params = new URLSearchParams({ icao: icaos.join(",") });
+    const data = await fetch(`/api/vatsim?${params}`).then((r) => r.json());
+    // Réseau indisponible : aucun poste marqué, plutôt qu'un marquage figé
+    // qui survivrait à la déconnexion du contrôleur.
+    vatsimPositions = data?.available ? (data.positions || {}) : {};
+  } catch {
+    vatsimPositions = {};
+  }
+  markVatsimPositions();
+}
+
+function startVatsimLoop() {
+  if (vatsimTimer) clearInterval(vatsimTimer);
+  vatsimTimer = null;
+  vatsimPositions = {};
+  if (!latestStatus?.vatsim_enabled) {
+    markVatsimPositions();
+    return;
+  }
+  void refreshVatsim();
+  vatsimTimer = setInterval(refreshVatsim, VATSIM_REFRESH_INTERVAL_MS);
+}
+
+/* --------------------------------------------------------- trafic */
+
+/**
+ * Le trafic en route, relevé par le réseau VATSIM.
+ *
+ * Le relevé arrive entier et la carte écarte ce qui sort du cadre : un
+ * découpage côté service laisserait la carte vide dès qu'on regarde ailleurs
+ * que son propre avion.
+ */
+async function refreshTraffic() {
+  try {
+    const data = await fetch("/api/traffic").then((r) => r.json());
+    // Réseau indisponible : la carte est vidée plutôt que laissée sur un
+    // relevé figé, qui montrerait des appareils là où ils ne sont plus.
+    MAP.setTraffic(data?.available ? (data.traffic || []) : []);
+  } catch {
+    MAP.setTraffic([]);
+  }
+}
+
+/* ------------------------------------------------- fiche d'un appareil */
+
+/**
+ * Fiche d'un appareil du réseau, ouverte au clic sur sa silhouette.
+ *
+ * Ce que le relevé porte déjà — indicatif, type, route, vitesse, altitude —
+ * s'affiche immédiatement ; le nom du pilote, la fréquence et les noms de
+ * terrain arrivent ensuite. Attendre le service pour tout montrer ferait
+ * hésiter la carte à chaque clic, alors que l'essentiel est là.
+ */
+async function showTrafficCard(entry, x, y) {
+  if (!entry) {
+    hideTrafficCard();
+    return;
+  }
+  trafficCardCallsign = entry.callsign;
+  renderTrafficCard(entry);
+  placeTrafficCard(x, y);
+
+  try {
+    const response = await fetch(
+      `/api/traffic/aircraft/${encodeURIComponent(entry.callsign)}`
+    );
+    if (!response.ok) return;
+    const detail = await response.json();
+    // Un autre appareil a pu être ouvert pendant la réponse.
+    if (trafficCardCallsign !== entry.callsign) return;
+    renderTrafficCard({ ...entry, ...detail });
+  } catch {
+    // Le relevé a quinze secondes : l'appareil a pu quitter le réseau entre
+    // le dessin et le clic. La fiche garde alors ce qu'elle montrait.
+  }
+}
+
+function hideTrafficCard() {
+  trafficCardCallsign = "";
+  const card = $("map-traffic-card");
+  if (card) show(card, false);
+  MAP.clearTrafficSelection();
+}
+
+/** Un terrain de la fiche : code OACI, et son nom quand la base le connaît. */
+function trafficCardAirport(icao, name, role) {
+  const block = el("div", `traffic-card-airport ${role}`);
+  block.append(el("b", null, icao || "----"));
+  if (name) block.append(el("small", null, name));
+  return block;
+}
+
+function trafficCardFigure(label, value) {
+  const block = el("div", "traffic-card-figure");
+  block.append(el("small", null, label));
+  block.append(el("b", null, value));
+  return block;
+}
+
+function renderTrafficCard(data) {
+  const card = $("map-traffic-card");
+  if (!card) return;
+  card.innerHTML = "";
+
+  const head = el("div", "traffic-card-head");
+  head.append(el("span", "traffic-card-callsign", data.callsign));
+  if (data.aircraft) head.append(el("span", "traffic-card-type", data.aircraft));
+  if (Number.isFinite(data.frequency_mhz)) {
+    head.append(el("span", "traffic-card-freq", data.frequency_mhz.toFixed(3)));
+  }
+  card.append(head);
+
+  if (data.pilot) card.append(el("div", "traffic-card-pilot", data.pilot));
+
+  const route = el("div", "traffic-card-route");
+  route.append(trafficCardAirport(data.departure, data.departure_name, "departure"));
+  route.append(trafficCardAirport(data.arrival, data.arrival_name, "arrival"));
+  card.append(route);
+
+  const figures = el("div", "traffic-card-figures");
+  figures.append(trafficCardFigure(
+    t("ground_speed"), `${Math.round(data.ground_speed_kt || 0)} kt`
+  ));
+  figures.append(trafficCardFigure(
+    t("traffic_altitude"), `${Math.round(data.altitude_ft || 0)} ft`
+  ));
+  card.append(figures);
+
+  show(card, true);
+}
+
+/**
+ * Pose la fiche à côté de la silhouette, sans sortir de la scène.
+ *
+ * Un appareil cliqué près du bord droit verrait sa fiche coupée : elle bascule
+ * alors de l'autre côté plutôt que de déborder.
+ */
+function placeTrafficCard(x, y) {
+  const card = $("map-traffic-card");
+  const stage = card?.parentElement;
+  if (!card || !stage) return;
+  const width = card.offsetWidth || 260;
+  const height = card.offsetHeight || 150;
+  const left = Math.min(
+    Math.max(8, x + 16), Math.max(8, stage.clientWidth - width - 8)
+  );
+  const top = Math.min(
+    Math.max(8, y - 14), Math.max(8, stage.clientHeight - height - 8)
+  );
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+/**
+ * Le trafic au sol, lu dans le simulateur.
+ *
+ * C'est la seule source utilisable sur un plan de roulage : les clients
+ * réseau injectent leurs appareils dans le simulateur, qui les rend à leur
+ * position courante, là où le relevé du réseau a quinze secondes de retard —
+ * cent cinquante mètres au roulage, plus qu'une largeur de voie.
+ */
+async function refreshGroundTraffic() {
+  try {
+    const data = await fetch("/api/live/traffic").then((r) => r.json());
+    GROUND.setTraffic(data?.enabled ? (data.traffic || []) : []);
+  } catch {
+    GROUND.setTraffic([]);
+  }
+}
+
+/**
+ * Un seul réglage commande les deux relevés : pour le pilote, c'est une même
+ * question — qui d'autre est là ? — et c'est la vue qui décide de la source
+ * capable d'y répondre sans mentir.
+ */
+function startTrafficLoop() {
+  syncTrafficButtons();
+  // L'injection démarre côté service : son état ne se déduit pas d'ici.
+  void refreshTrafficInjectionState();
+  if (trafficTimer) clearInterval(trafficTimer);
+  if (groundTrafficTimer) clearInterval(groundTrafficTimer);
+  trafficTimer = null;
+  groundTrafficTimer = null;
+  MAP.clearTraffic();
+  GROUND.clearTraffic();
+  hideTrafficCard();
+  if (!latestStatus?.traffic_enabled) return;
+
+  void refreshTraffic();
+  trafficTimer = setInterval(refreshTraffic, TRAFFIC_REFRESH_INTERVAL_MS);
+  void refreshGroundTraffic();
+  groundTrafficTimer = setInterval(
+    refreshGroundTraffic, GROUND_TRAFFIC_INTERVAL_MS
+  );
+}
+
+/**
+ * Le trafic depuis la barre de la carte ou du roulage.
+ *
+ * Le bouton commande le réglage lui-même, et non un simple masque : un
+ * affichage qu'on croirait éteint alors que les relevés continuent de partir
+ * mentirait sur ce que fait l'application. C'est le seul interrupteur du
+ * trafic — le mettre aussi dans les paramètres aurait obligé le pilote à
+ * chercher lequel des deux commande vraiment.
+ *
+ * Un client distant n'a pas la main sur les réglages du poste : il suit ce
+ * que celui-ci a décidé, et ses boutons restent cachés.
+ */
+function toggleTraffic() {
+  if (!latestStatus || latestStatus.remote_client) return;
+  latestStatus.traffic_enabled = !latestStatus.traffic_enabled;
+  startTrafficLoop();
+  void persistSetting({ traffic_enabled: latestStatus.traffic_enabled });
+}
+
+function trafficSourceName(source = latestStatus?.traffic_source) {
+  return source === "ivao" ? "IVAO" : source === "opensky" ? "OpenSky" : "VATSIM";
+}
+
+async function switchTrafficSource(event) {
+  if (!latestStatus || latestStatus.remote_client) return;
+  const requested = event.currentTarget.value;
+  if (!["vatsim", "ivao", "opensky"].includes(requested)) return;
+  const previous = latestStatus.traffic_source || "vatsim";
+  if (requested === previous) return;
+  const selectors = [$("map-traffic-source"), $("ground-traffic-source")];
+  selectors.forEach((select) => { select.disabled = true; select.value = requested; });
+  try {
+    const saved = await persistSetting({ traffic_source: requested });
+    if (!saved) throw new Error(t("err_save_refused"));
+    latestStatus.traffic_source = saved.traffic_source || requested;
+    $("settings-traffic-source").value = latestStatus.traffic_source;
+    syncTrafficSourceSettings();
+    startTrafficLoop();
+  } catch (error) {
+    latestStatus.traffic_source = previous;
+    selectors.forEach((select) => { select.value = previous; });
+    syncTrafficButtons();
+    showBanner("error", t("traffic_source_switch_failed"), [String(error)]);
+  } finally {
+    selectors.forEach((select) => { select.disabled = false; });
+  }
+}
+
+/**
+ * Nomme la source réelle par ce qu'elle est, dans la langue de l'interface.
+ *
+ * « OpenSky » désigne un fournisseur, pas une nature de trafic : le pilote qui
+ * ouvre la liste choisit entre des réseaux de simulation et des avions
+ * réellement en vol, et c'est cette différence-là qui doit se lire. Le nom du
+ * fournisseur reste en second, l'attribution lui étant due.
+ */
+function applyTrafficSourceLabels() {
+  for (const id of [
+    "map-traffic-source", "ground-traffic-source", "settings-traffic-source",
+  ]) {
+    const option = $(id)?.querySelector('option[value="opensky"]');
+    if (option) option.textContent = t("traffic_source_real");
+  }
+}
+
+function syncTrafficButtons() {
+  applyTrafficSourceLabels();
+  const enabled = Boolean(latestStatus?.traffic_enabled);
+  const remote = Boolean(latestStatus?.remote_client);
+  for (const id of ["map-traffic", "ground-traffic"]) {
+    const button = $(id);
+    if (!button) continue;
+    show(button, !remote);
+    button.classList.toggle("active", enabled);
+    button.setAttribute("aria-pressed", String(enabled));
+  }
+  const mapButton = $("map-traffic");
+  if (mapButton) {
+    const source = trafficSourceName();
+    mapButton.textContent = tf("map_traffic_source", { source });
+    mapButton.title = tf("map_traffic_source_title", { source });
+  }
+  for (const id of ["map-traffic-source", "ground-traffic-source"]) {
+    const select = $(id);
+    if (!select) continue;
+    select.value = latestStatus?.traffic_source || "vatsim";
+    show(select, !remote);
+  }
+  show(
+    $("map-traffic-source-credit"),
+    !remote && latestStatus?.traffic_source === "opensky"
+  );
+  renderTrafficInjectionState();
+}
+
+/**
+ * Repère du calque affiché sans que le simulateur reçoive rien.
+ *
+ * Voir un appareil sur la carte et le chercher en vain dans MSFS est la
+ * confusion la plus coûteuse du trafic : les deux sont vrais en même temps.
+ * Le badge nomme l'écart et sa cause, plutôt que de laisser croire que la
+ * carte décrit le simulateur.
+ */
+function renderTrafficInjectionState() {
+  const badge = $("map-traffic-injection");
+  if (!badge) return;
+  const status = latestStatus || {};
+  const visible = Boolean(status.traffic_enabled)
+    && !status.remote_client
+    && !status.traffic_injection_active;
+  show(badge, visible);
+  if (!visible) return;
+  badge.textContent = t("traffic_map_only");
+  badge.title = status.fsltl?.detected
+    ? t("traffic_map_only_off")
+    : t("traffic_map_only_fsltl");
+}
+
+/**
+ * Relit l'état réel de l'injection après un changement de trafic.
+ *
+ * Allumer le calque ne dit pas encore que le service a pu démarrer : FSLTL
+ * peut manquer, la source peut être réelle. Seul le service le sait.
+ */
+async function refreshTrafficInjectionState() {
+  if (!latestStatus || latestStatus.remote_client) return;
+  try {
+    const status = await fetch("/api/status").then((r) => r.json());
+    latestStatus.traffic_injection_active = status.traffic_injection_active;
+    latestStatus.fsltl = status.fsltl;
+  } catch {
+    return;
+  }
+  renderTrafficInjectionState();
+}
+
 function renderTerminal(plan) {
   const departure = $("card-departure");
   departure.innerHTML = "";
@@ -4986,6 +5930,8 @@ function renderTerminal(plan) {
         el("span", "badge", tf("transition_altitude", { altitude: plan.departure.transition_altitude_ft }))
       );
     }
+    const frequencies = frequencyRow(plan.departure.frequencies, plan.departure.icao);
+    if (frequencies) departure.append(frequencies);
   }
 
   const route = $("card-route");
@@ -5033,6 +5979,8 @@ function renderTerminal(plan) {
       badges.append(el("span", "badge", tf("transition_level", { altitude: plan.arrival.transition_level_ft })));
     }
     if (badges.childElementCount) arrival.append(badges);
+    const frequencies = frequencyRow(plan.arrival.frequencies, plan.arrival.icao);
+    if (frequencies) arrival.append(frequencies);
   }
 }
 
@@ -5241,6 +6189,11 @@ function liveOnlyStat(label, id, note) {
 function kg(value, unit) {
   if (value === null || value === undefined) return null;
   return `${value.toLocaleString(displayLocale())} ${unit}`;
+}
+
+function percentage(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  return `${Number(value).toLocaleString(displayLocale(), { maximumFractionDigits: 2 })}%`;
 }
 
 function hhmm(seconds) {
@@ -5587,6 +6540,7 @@ function renderDispatch(plan) {
       stat(t("dsp_passengers"), d.passengers, d.bags ? t("dsp_bags").replace("{value}", d.bags) : null),
       stat(t("dsp_payload"), kg(d.payload, unit), d.cargo ? t("dsp_cargo_note").replace("{value}", kg(d.cargo, unit)) : null),
       stat("ZFW", kg(d.zfw, unit), maxNote(d.max_zfw), ratioOf(d.zfw, d.max_zfw)),
+      stat("ZFWCG", percentage(d.zfwcg)),
       stat(t("dsp_takeoff"), kg(d.takeoff_weight, unit), maxNote(d.max_takeoff_weight), ratioOf(d.takeoff_weight, d.max_takeoff_weight), { id: "dispatch-live-tow", label: t("dispatch_actual") }),
       stat(t("dsp_landing"), kg(d.landing_weight, unit), maxNote(d.max_landing_weight), ratioOf(d.landing_weight, d.max_landing_weight), { id: "dispatch-live-ldw", label: t("dispatch_projected") }),
     ]),
@@ -5695,9 +6649,13 @@ const AIRCRAFT_PHOTO_RULES = [
   { asset: "daher-tbm930", codes: ["TBM9"], names: ["TBM 930", "TBM930", "TBM 900"] },
 ];
 
-function aircraftPhotoAsset(plan) {
-  const code = String(plan.aircraft || "").trim().toUpperCase();
-  const name = String(plan.aircraft_name || "").trim().toUpperCase();
+function aircraftPhotoAsset(plan, aircraft = latestAircraft) {
+  const loadedTitle = String(aircraft?.title || "").trim();
+  const liveCode = loadedTitle.toUpperCase().split(/\s+/).find(token => (
+    /^[A-Z0-9]{4}$/.test(token) && /\d/.test(token)
+  )) || "";
+  const code = liveCode || String(plan.aircraft || "").trim().toUpperCase();
+  const name = (loadedTitle || String(plan.aircraft_name || "")).toUpperCase();
   return AIRCRAFT_PHOTO_RULES.find(rule => (
     rule.codes.includes(code) || rule.names.some(token => name.includes(token))
   ))?.asset || "";
@@ -5716,9 +6674,18 @@ function openAircraftPhoto(photo, label, returnFocus) {
   $("aircraft-photo-close").focus();
 }
 
-function aircraftVisual(plan) {
+function aircraftVisual(
+  plan,
+  aircraft = latestAircraft,
+  communityPath = "",
+  photoRevision = "",
+) {
+  const loadedTitle = String(aircraft?.title || "").trim();
+  const loadedCode = loadedTitle.toUpperCase().split(/\s+/).find(token => (
+    /^[A-Z0-9]{4}$/.test(token) && /\d/.test(token)
+  )) || "";
   const visual = el("div", "aircraft-photo");
-  const mark = el("div", "aircraft-mark", plan.aircraft || "—");
+  const mark = el("div", "aircraft-mark", loadedCode || plan.aircraft || "—");
   const photo = document.createElement("img");
   photo.alt = "";
   photo.loading = "eager";
@@ -5726,9 +6693,11 @@ function aircraftVisual(plan) {
   photo.classList.add("hidden");
   visual.append(mark, photo);
 
-  const community = `/api/aircraft/photo?icao=${encodeURIComponent(plan.aircraft || "")}`
-    + `&name=${encodeURIComponent(plan.aircraft_name || "")}`;
-  const asset = aircraftPhotoAsset(plan);
+  const community = `/api/aircraft/photo?icao=${encodeURIComponent(loadedTitle ? "" : plan.aircraft || "")}`
+    + `&name=${encodeURIComponent(loadedTitle || plan.aircraft_name || "")}`
+    + `&community=${encodeURIComponent(communityPath)}`
+    + `&v=${encodeURIComponent(photoRevision)}`;
+  const asset = aircraftPhotoAsset(plan, aircraft);
   const sources = [asset ? `/static/aircraft/${asset}.jpg` : "", community].filter(Boolean);
   const loadNext = () => {
     const source = sources.shift();
@@ -5738,7 +6707,7 @@ function aircraftVisual(plan) {
   photo.addEventListener("load", () => {
     photo.classList.remove("hidden");
     mark.classList.add("hidden");
-    const label = plan.aircraft_name || plan.aircraft || t("acf_unknown_type");
+    const label = loadedTitle || plan.aircraft_name || plan.aircraft || t("acf_unknown_type");
     visual.classList.add("has-photo");
     visual.tabIndex = 0;
     visual.setAttribute("role", "button");
@@ -5756,27 +6725,34 @@ function aircraftVisual(plan) {
   return visual;
 }
 
-function renderAircraft(plan) {
+function renderAircraft(plan, aircraft = latestAircraft) {
   const panel = $("panel-aircraft");
   panel.innerHTML = "";
   const d = plan.dispatch || {};
   const unit = { KGS: "kg", LBS: "lb", kgs: "kg", lbs: "lb" }[d.units] || d.units || "";
+  const loadedTitle = String(aircraft?.title || "").trim();
+  const plannedTitle = plan.aircraft_name || plan.aircraft || "";
+  renderedAircraftTitle = loadedTitle;
 
   const identity = el("div", "aircraft-identity");
   const title = el("div");
-  title.append(el("div", "card-kicker", t("acf_kicker")));
-  title.append(el("h2", null, plan.aircraft_name || plan.aircraft || t("acf_unknown_type")));
+  title.append(el("div", "card-kicker", t(loadedTitle ? "acf_loaded_msfs" : "acf_kicker")));
+  title.append(el("h2", null, loadedTitle || plannedTitle || t("acf_unknown_type")));
   const badges = el("div", "route-meta");
   if (plan.callsign) badges.append(el("span", "badge", t("acf_flight").replace("{value}", plan.callsign)));
   if (d.registration) badges.append(el("span", "badge", d.registration));
+  if (loadedTitle && plannedTitle) {
+    badges.append(el("span", "badge", `${t("acf_planned_simbrief")} · ${plannedTitle}`));
+  }
   title.append(badges);
-  identity.append(aircraftVisual(plan), title);
+  identity.append(aircraftVisual(plan, aircraft), title);
   panel.append(identity);
 
   const blocks = [
     group(t("acf_group_identification"), [
+      stat(t("acf_loaded_msfs"), loadedTitle || "—"),
+      stat(t("acf_planned_simbrief"), plannedTitle || "—"),
       stat(t("acf_icao_type"), plan.aircraft),
-      stat(t("acf_model"), plan.aircraft_name),
       stat(t("dsp_registration"), d.registration),
       stat(t("acf_callsign"), plan.callsign),
       stat("SELCAL", d.selcal),
@@ -6071,6 +7047,7 @@ function preferredOfficialChartIndex(charts, role, airport) {
 function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
   const roleLabel = t(role === "departure" ? "departure" : "arrival");
   const card = el("article", "sia-airport-library");
+  card.dataset.chartRole = role;
   const head = el("div", "sia-library-head");
   const heading = el("div");
   heading.append(el("div", "card-kicker", roleLabel), el("h2", null, icao));
@@ -6359,6 +7336,55 @@ function officialAirportLibrary(icao, role, airport, plan, source = "auto") {
   return card;
 }
 
+function updateChartPinboardPhase(phaseKey) {
+  const active = contextStage(phaseKey);
+  document.querySelectorAll(".chart-pin[data-stage]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.stage === active);
+    button.setAttribute("aria-current", button.dataset.stage === active ? "step" : "false");
+  });
+}
+
+function chartPinboard(plan) {
+  const pinboard = el("div", "chart-pinboard");
+  pinboard.setAttribute("aria-label", t("chart_pinboard"));
+  pinboard.append(el("span", "chart-pinboard-label", t("chart_pinboard")));
+
+  const add = (stage, role, title, detail) => {
+    if (!title) return;
+    const button = el("button", "chart-pin");
+    button.type = "button";
+    button.dataset.stage = stage;
+    button.dataset.chartRole = role;
+    button.append(el("small", null, t(`context_stage_${stage}`)), el("strong", null, title));
+    if (detail) button.append(el("span", null, detail));
+    button.addEventListener("click", () => {
+      selectTab("sia");
+      window.requestAnimationFrame(() => {
+        document.querySelector(`.sia-airport-library[data-chart-role="${role}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    pinboard.append(button);
+  };
+
+  const departure = plan.departure || {};
+  const arrival = plan.arrival || {};
+  add(
+    "departure",
+    "departure",
+    departure.icao,
+    departure.sid?.value || (departure.runway?.value ? `RWY ${departure.runway.value}` : "")
+  );
+  add("arrival", "arrival", arrival.icao, arrival.star?.value || "");
+  add(
+    "approach",
+    "arrival",
+    arrival.approach?.value || arrival.icao,
+    arrival.runway?.value ? `RWY ${arrival.runway.value}` : ""
+  );
+  return pinboard;
+}
+
 function renderOfficialCharts(plan) {
   const panel = $("panel-sia");
   panel.innerHTML = "";
@@ -6380,7 +7406,8 @@ function renderOfficialCharts(plan) {
   panel.append(
     intro,
     el("p", "stat-note", t("chart_intro")),
-    chartfoxAccountNote
+    chartfoxAccountNote,
+    chartPinboard(plan)
   );
   const grid = el("div", "sia-library-grid");
   for (const [role, airport] of [
@@ -6395,6 +7422,10 @@ function renderOfficialCharts(plan) {
     grid.append(el("p", "stat-note", t("chart_need_plan")));
   }
   panel.append(grid);
+  updateChartPinboardPhase(detectFlightPhaseKey(
+    latestAircraft,
+    projectAircraftOnFlightPath(latestAircraft)
+  ));
 }
 
 function minimaEditor(plan, minima) {
@@ -6554,7 +7585,9 @@ function renderMcdu(plan) {
         mcduLine("CRZ FL", `FL${Math.round(plan.enroute.cruise_altitude_ft / 100)}`),
     ]),
     mcduPage(profile.weights, [
+      d.passengers !== null && d.passengers !== undefined && mcduLine("PAX", String(d.passengers)),
       d.zfw && mcduLine("ZFW", kg(d.zfw, unit)),
+      d.zfwcg !== null && d.zfwcg !== undefined && mcduLine("ZFWCG", percentage(d.zfwcg)),
       d.block_fuel && mcduLine("BLOCK", kg(d.block_fuel, unit)),
       d.taxi_fuel && mcduLine("TAXI", kg(d.taxi_fuel, unit)),
       d.trip_fuel && mcduLine("TRIP", kg(d.trip_fuel, unit)),
@@ -6772,6 +7805,14 @@ async function requestTaxiRoute(parking) {
     direction: currentMapRole === "arrival" ? "arrival" : "departure",
     via: currentTaxiClearance,
   });
+  if (
+    currentMapRole === "arrival" && latestAircraft?.on_ground
+    && Number.isFinite(Number(latestAircraft.latitude))
+    && Number.isFinite(Number(latestAircraft.longitude))
+  ) {
+    params.set("latitude", latestAircraft.latitude);
+    params.set("longitude", latestAircraft.longitude);
+  }
   taxiRouteRequestController?.abort();
   const controller = new AbortController();
   taxiRouteRequestController = controller;
@@ -6984,6 +8025,23 @@ function updateGroundHud() {
       announcement = tf(key, { taxiway: guidance.next_name });
     }
     if (announcement) hud.append(el("div", `ground-call is-${kind}`, announcement));
+  }
+
+  // Le repoussage est la première consigne du départ, et la seule que le
+  // pilote ne donne pas lui-même : il la lit avant de demander le tracteur, et
+  // elle disparaît dès que l'avion a quitté la ligne de guidage.
+  const pushback = currentTaxiPlan.pushback;
+  const travelled = guidance?.fix?.travelled_m;
+  if (pushback && !(travelled >= pushback.distance_m)) {
+    const parts = [tf("taxi_pushback", {
+      distance: Math.round(pushback.distance_m),
+    })];
+    if (pushback.heading !== null && pushback.heading !== undefined) {
+      parts.push(tf("taxi_pushback_heading", {
+        heading: String(pushback.heading).padStart(3, "0"),
+      }));
+    }
+    hud.append(el("div", "ground-call is-push", parts.join(" · ")));
   }
 
   const heading = el("div");
@@ -7218,19 +8276,30 @@ function applyMapPreferences(values) {
  * Le PUT attend l'ensemble des réglages : on relit donc les valeurs courantes
  * avant de n'y remplacer que le fond. Un client distant n'écrit rien.
  */
-async function persistBasemap(key) {
+/**
+ * Enregistre un réglage changé depuis une barre d'outils.
+ *
+ * Les valeurs courantes sont relues avant d'être renvoyées : le service attend
+ * l'ensemble, et n'en poster qu'une remettrait toutes les autres à leur valeur
+ * par défaut. Un client distant ne touche pas aux réglages du poste, mais son
+ * affichage suit quand même le choix fait à l'écran.
+ */
+async function persistSetting(patch) {
   if (latestStatus?.remote_client) return;
   try {
     const response = await fetch("/api/settings");
     if (!response.ok) return;
     const values = await response.json();
-    await fetch("/api/settings", {
+    const saved = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, map_basemap: key }),
+      body: JSON.stringify({ ...values, ...patch }),
     });
+    if (!saved.ok) return null;
+    return await saved.json();
   } catch (error) {
-    // Le fond reste appliqué à l'écran même si l'enregistrement échoue.
+    // Le choix reste appliqué à l'écran même si l'enregistrement échoue.
+    return null;
   }
 }
 
@@ -7313,6 +8382,9 @@ function updateHud(aircraft) {
 
 function applyAircraftState(aircraft) {
   latestAircraft = aircraft;
+  if (currentPlan && String(aircraft?.title || "").trim() !== renderedAircraftTitle) {
+    renderAircraft(currentPlan, aircraft);
+  }
   if (currentChart) {
     const point = projectToChart(aircraft.latitude, aircraft.longitude);
     MAP.setAircraft({
@@ -7339,8 +8411,6 @@ async function pollLive() {
   if (!currentChart) return;
 
   const params = new URLSearchParams({
-    demo: $("demo-toggle").checked ? "1" : "0",
-    icao: currentIcao || "",
     aircraft: currentPlan?.aircraft_name || currentPlan?.aircraft || "",
   });
   if (currentChart.highlight_runway) params.set("runway", currentChart.highlight_runway);
@@ -7351,21 +8421,24 @@ async function pollLive() {
       setLiveState(false, t("sim_disconnected"));
       MAP.clearAircraft();
       GROUND.clearAircraft();
+      // Le simulateur parti, son trafic n'existe plus. Celui du réseau, lui,
+      // reste vrai : la carte le garde.
+      GROUND.clearTraffic();
       updateHud(null);
       renderTaxiSpeed(null);
       updateGroundHud();
       updateRouteStripProgress(null);
       latestAircraft = null;
+      if (currentPlan && renderedAircraftTitle) renderAircraft(currentPlan, null);
       updateFlightPanel(null);
       updateDispatchLive(null);
       renderProcedurePanel(currentProcedures, null);
       return;
     }
     const aircraft = data.aircraft;
-    const source = aircraft.source === "Démonstration" ? t("demo") : aircraft.source;
     setLiveState(
       true,
-      aircraft.paused ? t("sim_paused") : `${source} · ${t("live")}`,
+      aircraft.paused ? t("sim_paused") : `${aircraft.source} · ${t("live")}`,
       Boolean(aircraft.paused),
     );
     applyAircraftState(aircraft);
@@ -7816,11 +8889,16 @@ function setModuleMenuOpen(open, restoreFocus = false) {
   }
 }
 
+function syncRouteStripVisibility(tabName = document.querySelector(".tabs button.active")?.dataset.tab) {
+  show($("strip"), Boolean(currentPlan) && (interfaceMode === "classic" || tabName === "terminal"));
+}
+
 function selectTab(name, scrollToModule = false) {
   const restoreMenuFocus = $("module-menu-toggle").getAttribute("aria-expanded") === "true";
   for (const button of document.querySelectorAll(".tabs button")) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
+  syncRouteStripVisibility(name);
   show($("terminal"), name === "terminal");
   for (const key of ["map", "ground", "procedures", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
     show($(`panel-${key}`), key === name);
@@ -7831,7 +8909,7 @@ function selectTab(name, scrollToModule = false) {
   setModuleMenuOpen(false, restoreMenuFocus);
   if (scrollToModule) {
     window.requestAnimationFrame(() => {
-      const target = name === "terminal" ? $("terminal") : $(`panel-${name}`);
+      const target = name === "terminal" ? $("strip") : $(`panel-${name}`);
       target?.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
           ? "auto"
@@ -7887,11 +8965,10 @@ document.addEventListener("keydown", (event) => {
 });
 MOBILE_MODULE_MENU.addEventListener("change", () => setModuleMenuOpen(false));
 
-$("refresh").addEventListener("click", refreshPlanOrDemo);
+$("refresh").addEventListener("click", () => buildPlan());
 $("simbrief-create").addEventListener("click", openSimBriefPlanner);
 $("support-open").addEventListener("click", openSupportPage);
 $("support-open-toolbar").addEventListener("click", openSupportPage);
-$("demo-toggle").addEventListener("change", toggleDemoMode);
 
 $("map-fit").addEventListener("click", () => MAP.fit());
 $("map-zoom-in").addEventListener("click", () => MAP.zoomIn());
@@ -7899,10 +8976,15 @@ $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
+MAP.onTrafficSelect((entry, x, y) => { void showTrafficCard(entry, x, y); });
+$("map-traffic").addEventListener("click", () => toggleTraffic());
+$("ground-traffic").addEventListener("click", () => toggleTraffic());
+$("map-traffic-source").addEventListener("change", switchTrafficSource);
+$("ground-traffic-source").addEventListener("change", switchTrafficSource);
 $("map-basemap-style").addEventListener("change", (event) => {
   const applied = MAP.setBasemap(event.target.value);
   $("settings-basemap").value = applied;
-  persistBasemap(applied);
+  persistSetting({ map_basemap: applied });
 });
 $("map-sia").addEventListener("click", () => toggleSiaMapOverlay());
 $("sia-overlay-close").addEventListener("click", () => toggleSiaMapOverlay(false));
@@ -7944,12 +9026,19 @@ $("aircraft-photo-dialog").addEventListener("close", () => {
 $("settings-close").addEventListener("click", () => $("settings-dialog").close());
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);
+$("settings-fsltl-download").addEventListener("click", openFsltlDownload);
+$("settings-traffic-source").addEventListener("change", syncTrafficSourceSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
 });
 $("settings-theme").addEventListener("change", (event) => {
   window.THEME.setPreference(event.target.value);
 });
+$("context-route").addEventListener("click", () => selectTab("terminal"));
+$("context-primary").addEventListener("click", (event) => {
+  selectTab(event.currentTarget.dataset.contextTab || "terminal", true);
+});
+$("context-charts").addEventListener("click", () => selectTab("sia", true));
 // La langue ne vit que dans le navigateur : un client distant peut la changer
 // sans toucher aux réglages du PC, qui lui restent fermés.
 $("mobile-language").addEventListener("change", (event) => {
@@ -7984,7 +9073,6 @@ $("settings-trail-color").addEventListener("input", (event) => {
   setTrailColorField(event.target.value);
 });
 $("welcome-form").addEventListener("submit", submitWelcome);
-$("welcome-demo").addEventListener("click", skipWelcomeWithDemo);
 // Le premier lancement ne se contourne ni par Échap ni par un clic extérieur.
 $("welcome-dialog").addEventListener("cancel", (event) => event.preventDefault());
 $("welcome-language").addEventListener("change", (event) => {
@@ -8008,6 +9096,8 @@ $("shutdown").addEventListener("click", shutdownApplication);
 $("sim-status").addEventListener("click", pollSimulatorStatus);
 $("global-flight-alert").addEventListener("click", openActiveAlerts);
 initialiseStripScrolling();
+initialiseStickyLayoutOffsets();
+applyInterfaceMode(interfaceMode, false);
 window.I18N.apply();
 syncThemeToggle();
 
@@ -8021,7 +9111,9 @@ window.addEventListener("navixav:languagechange", () => {
   loadStatus().catch(() => {});
   pollSimulatorStatus();
   refreshUpdateButtonText();
+  syncTrafficButtons();
   syncThemeToggle();
+  updateGuidedContext(latestAircraft);
 });
 
 pollSimulatorStatus();
@@ -8029,7 +9121,6 @@ simulatorTimer = setInterval(pollSimulatorStatus, 2500);
 
 async function initialiseApplication() {
   try {
-    $("demo-toggle").checked = false;
     const status = await loadStatus();
     await loadMapPreferences(status);
     if (needsOnboarding(status)) {
@@ -8041,6 +9132,7 @@ async function initialiseApplication() {
     } else {
       checkForUpdates();
       if (status.simbrief_configured) await buildPlan();
+      await openVersionHistoryAfterUpdate(status);
     }
   } catch (error) {
     showBanner("error", "Initialisation impossible", [String(error)]);

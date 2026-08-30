@@ -59,7 +59,9 @@ def test_aircraft_photo_route_only_serves_a_scanned_community_thumbnail(
     monkeypatch.setattr(web_app, "scan", lambda folders: [aircraft])
     app = create_app(Settings())
 
-    response = _endpoint(app, "/api/aircraft/photo")(icao="A21N", name="Fenix A321")
+    response = _endpoint(app, "/api/aircraft/photo")(
+        icao="A21N", name="Fenix A321", community=str(community)
+    )
 
     assert Path(response.path) == thumbnail
     app.state.close_resources()
@@ -140,7 +142,11 @@ def test_aircraft_panel_uses_bundled_photos_then_community_thumbnails():
 
     assert 'asset: "airbus-a321"' in javascript
     assert javascript.index('asset: "airbus-a321"') < javascript.index('asset: "airbus-a320"')
-    assert '`/api/aircraft/photo?icao=${encodeURIComponent(plan.aircraft || "")}`' in javascript
+    assert 'encodeURIComponent(loadedTitle ? "" : plan.aircraft || "")' in javascript
+    assert 'encodeURIComponent(loadedTitle || plan.aircraft_name || "")' in javascript
+    assert '}, null, community, photoRevision)' in javascript
+    assert '`&community=${encodeURIComponent(communityPath)}`' in javascript
+    assert '`&v=${encodeURIComponent(photoRevision)}`' in javascript
     assert 'photo.classList.remove("hidden")' in javascript
     assert 'mark.classList.add("hidden")' in javascript
     assert "photo.hidden" not in javascript

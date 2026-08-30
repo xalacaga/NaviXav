@@ -34,7 +34,9 @@ SCHEMA_VERSION = 3
 #       SID desservant deux seuils laissait tous ses segments dans ses branches
 #       et se retrouvait sans tracé ni contrainte.
 #   3 : intensités des feux de bord et d'axe de piste issues de Facilities.
-GROUND_VERSION = 3
+#   4 : fréquences du terrain — ATIS, sol, tour, approche. Elles étaient lues
+#       par l'extraction puis abandonnées, faute de table pour les recevoir.
+GROUND_VERSION = 4
 
 EARTH_RADIUS_M = 6378137.0
 METRES_TO_FEET = 3.280839895
@@ -72,6 +74,25 @@ CREATE TABLE IF NOT EXISTS runway (
     lon REAL NOT NULL,
     PRIMARY KEY (icao, name)
 );
+
+-- Fréquences publiées du terrain. Le type est conservé tel que le simulateur
+-- l'a donné plutôt que traduit à l'écriture : la correspondance entre ce nombre
+-- et un sigle de radio relève de la lecture, et une correction de cette table
+-- de sigles ne doit pas obliger à reprendre tous les terrains au simulateur.
+--
+-- Table nouvelle : `CREATE TABLE IF NOT EXISTS` suffit à la créer dans une base
+-- existante, il n'y a donc rien à ajouter aux migrations de colonnes. C'est
+-- `GROUND_VERSION` qui provoque la reprise des terrains déjà connus, dont
+-- l'extraction n'avait rien enregistré ici.
+CREATE TABLE IF NOT EXISTS frequency (
+    icao TEXT NOT NULL REFERENCES airport(icao) ON DELETE CASCADE,
+    type INTEGER NOT NULL,
+    mhz REAL NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    rank INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (icao, type, mhz)
+);
+CREATE INDEX IF NOT EXISTS frequency_by_airport ON frequency(icao);
 
 CREATE TABLE IF NOT EXISTS procedure (
     id INTEGER PRIMARY KEY,
@@ -204,6 +225,35 @@ PARKING_TYPES = {
     0: None, 1: "rampe GA", 2: "rampe GA", 3: "rampe GA", 4: "rampe cargo",
     5: "rampe militaire", 6: "porte petite", 7: "porte moyenne",
     8: "porte grande", 9: "dock", 10: "carburant", 11: "dégivrage",
+}
+
+# Types de fréquence, hérités de l'énumération COM de FSX que MSFS reprend.
+#
+# Les valeurs sont traduites en sigles radio réels, ceux qu'un pilote lit sur
+# une carte : GND, TWR, DEL. Ce sont des abréviations aéronautiques, elles ne
+# se traduisent pas d'une langue d'interface à l'autre.
+#
+# Cette correspondance n'a pas été sondée contre le simulateur comme le sont
+# les dispositions de champs : c'est pourquoi la base garde le nombre brut, et
+# qu'un type inconnu est ignoré à la lecture au lieu de produire un sigle faux.
+FREQUENCY_CODES = {
+    1: "ATIS",
+    2: "MULTI",
+    3: "UNICOM",
+    4: "CTAF",
+    5: "GND",
+    6: "TWR",
+    7: "DEL",
+    8: "APP",
+    9: "DEP",
+    10: "CTR",
+    11: "FSS",
+    12: "AWOS",
+    13: "ASOS",
+    # Deux variantes de la délivrance de clairance. La première est la clairance
+    # avant repoussage, la seconde une délivrance déportée.
+    14: "PDC",
+    15: "DEL",
 }
 
 # Natures de segment : SIMCONNECT_AIRPORT_TAXI_PATH_TYPE.
@@ -384,6 +434,7 @@ def store_airport(connection: sqlite3.Connection, extracted: dict[str, Any]) -> 
             ),
         )
         _store_runways(connection, extracted)
+        _store_frequencies(connection, extracted)
         _store_procedures(connection, extracted)
         _store_ground(connection, extracted)
 
@@ -421,6 +472,30 @@ def _store_runways(connection: sqlite3.Connection, extracted: dict[str, Any]) ->
                     position[0], position[1],
                 ),
             )
+
+
+def _store_frequencies(connection: sqlite3.Connection, extracted: dict[str, Any]) -> None:
+    """Écrit les fréquences du terrain dans l'ordre où le simulateur les donne.
+
+    Cet ordre est conservé en `rank` : un grand terrain publie plusieurs
+    fréquences pour un même rôle — deux sols, trois tours — et l'affichage doit
+    pouvoir désigner toujours la même comme principale.
+    """
+    icao = extracted["icao"]
+    for rank, frequency in enumerate(extracted.get("frequencies") or []):
+        mhz = frequency.get("mhz")
+        # Une entrée sans fréquence utilisable n'apprend rien et occuperait une
+        # ligne du tableau à l'écran.
+        if not mhz:
+            continue
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO frequency (icao, type, mhz, name, rank)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (icao, int(frequency.get("type", 0)), float(mhz),
+             (frequency.get("name") or "").strip(), rank),
+        )
 
 
 def _store_procedures(connection: sqlite3.Connection, extracted: dict[str, Any]) -> None:

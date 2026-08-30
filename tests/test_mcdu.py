@@ -75,6 +75,14 @@ def test_init_page_has_route_basics(provider, settings, ofp):
     assert "FL340" in card      # niveau de croisière
 
 
+def test_init_b_page_includes_passengers_and_zfw_centre_of_gravity(
+    provider, settings, ofp
+):
+    card = _card(provider, settings, ofp)
+    assert "162" in _field(card, "PAX")
+    assert "25.4%" in _field(card, "ZFWCG")
+
+
 def test_ils_frequency_is_shown(provider, settings, ofp):
     assert "108.35" in _card(provider, settings, ofp)
 

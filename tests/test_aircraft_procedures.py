@@ -93,7 +93,7 @@ def test_live_api_evaluates_the_loaded_aircraft_procedure(monkeypatch):
         def set_aircraft_hint(self, aircraft):
             self.hint = aircraft
 
-        def read(self, allow_demo=False):
+        def read(self):
             return state
 
         def close(self):
@@ -166,7 +166,10 @@ def test_a_confirmed_procedure_item_is_never_taken_back():
 
     latch = javascript[javascript.index("function latchProcedureProgress"):]
     latch = latch[: latch.index("\n}\n")]
-    assert 'step.mode !== "auto" || step.status !== "complete"' in latch
+    assert (
+        'step.mode !== "auto" || procedureStepStatus(phase, step) !== "complete"'
+        in latch
+    )
     assert "saveProcedureManualProgress(progress, data)" in latch
     # Seule l'arrivée d'un état frais peut ajouter une confirmation.
     assert "latchProcedureProgress(currentProcedures);" in javascript
@@ -189,5 +192,89 @@ def test_a_latched_item_says_where_its_confirmation_comes_from():
 
     assert 'complete ? "procedure_confirmed_earlier"' in javascript
     # Une ligne cochée ne porte plus la mise en forme de l'attente.
-    assert 'row.classList.toggle("pending", step.status === "pending" && !complete);' in javascript
+    assert 'row.classList.toggle("pending", status === "pending" && !complete);' in javascript
     assert translations.count("procedure_confirmed_earlier:") == 8
+
+
+def test_a_phase_made_only_of_reminders_is_never_shown_as_completed():
+    """L'atterrissage n'est qu'une liste de rappels : rien ne s'y confirme.
+
+    Compter ses points d'information comme acquis affichait la phase terminée,
+    coche verte et jauge pleine, avant même la mise en route.
+    """
+    match = AircraftMatcher().match("Cessna 172 Skyhawk G1000")
+    payload = procedure_payload(match)
+    landing = next(phase for phase in payload["phases"] if phase["phase"] == "landing")
+    assert {step["mode"] for step in landing["steps"]} == {"info"}
+
+    static = Path(web_app.__file__).parent / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    complete = javascript[javascript.index("function procedureStepComplete"):]
+    complete = complete[: complete.index("\n}\n")]
+    assert 'if (step.mode === "info") return false;' in complete
+
+    stats = javascript[javascript.index("function procedurePhaseStats"):]
+    stats = stats[: stats.index("\n}\n")]
+    assert "informational: required.length === 0," in stats
+    assert "done: required.length > 0 && complete.length === required.length," in stats
+
+    # La jauge d'une phase sans confirmation reste vide, son onglet garde son
+    # numéro et annonce des rappels plutôt qu'un « 0/0 confirmé(s) ».
+    assert "stats.total ? (stats.complete / stats.total) * 100 : 0" in javascript
+    assert 'stats.informational ? t("procedure_info_only")' in javascript
+    assert 'stats.informational ? t("procedure_nothing_to_confirm")' in javascript
+    for key in ("procedure_info_only", "procedure_nothing_to_confirm"):
+        assert translations.count(f"{key}:") == 8
+
+
+def test_a_phase_the_flight_has_not_reached_confirms_nothing():
+    """Au parking, l'arrêt et l'après-atterrissage sont déjà « satisfaits ».
+
+    Frein serré, volets rentrés et feux éteints valident des points de phases
+    qui n'ont pas commencé : le panneau affichait des confirmations, et le
+    verrou les gardait pour tout le vol.
+    """
+    match = AircraftMatcher().match("Cessna 172 Skyhawk G1000")
+    state = _state(
+        parking_brake=True,
+        flaps_handle_index=0,
+        lights={"landing": False, "strobe": False, "beacon": False},
+    )
+
+    payload = procedure_payload(match, state)
+    shutdown = next(
+        phase for phase in payload["phases"] if phase["phase"] == "shutdown"
+    )
+    status = {step["id"]: step["status"] for step in shutdown["steps"]}
+    assert status["parking_brake_set"] == "complete"
+    assert status["beacon_off"] == "complete"
+
+    static = Path(web_app.__file__).parent / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    # C'est l'interface qui situe la phase dans le vol : la marque avance avec
+    # lui, ne recule jamais, et laisse la phase suivante ouverte parce qu'une
+    # liste se prépare pendant la précédente.
+    reached = javascript[javascript.index("function markProcedurePhasesReached"):]
+    reached = reached[: reached.index("\n}\n")]
+    assert "const reached = Math.max(previous, detected);" in reached
+    assert "progress[PROCEDURE_REACHED_KEY] = reached;" in reached
+    assert "phase.reached = index <= reached + 1;" in reached
+    assert "markProcedurePhasesReached(currentProcedures, aircraft);" in javascript
+
+    effective = javascript[javascript.index("function procedureStepStatus"):]
+    effective = effective[: effective.index("\n}\n")]
+    assert 'step.status === "complete" && phase.reached === false' in effective
+    assert 'return "pending";' in effective
+
+    # Une phase non atteinte n'annonce donc ni coche ni « Confirmé ·
+    # SimConnect » : la ligne attend le moment venu.
+    complete = javascript[javascript.index("function procedureStepComplete"):]
+    complete = complete[: complete.index("\n}\n")]
+    assert 'procedureStepStatus(phase, step) === "complete"' in complete
+    assert 'status === "complete" ? "procedure_confirmed_auto"' in javascript
+
+    # La réinitialisation du vol efface la marque avec la progression.
+    assert 'const PROCEDURE_REACHED_KEY = "__reached";' in javascript

@@ -19,6 +19,7 @@ binaire correspondant exactement aux champs déclarés pour ce type.
 from __future__ import annotations
 
 import ctypes as ct
+import os
 import struct
 import time
 from ctypes import wintypes
@@ -31,6 +32,8 @@ from navixav.paths import resource_path
 RECV_ID_EXCEPTION = 1
 RECV_ID_QUIT = 3
 RECV_ID_SIMOBJECT_DATA = 8
+RECV_ID_SIMOBJECT_DATA_BYTYPE = 9
+RECV_ID_ASSIGNED_OBJECT_ID = 12
 RECV_ID_FACILITY_DATA = 28
 RECV_ID_FACILITY_DATA_END = 29
 
@@ -39,19 +42,42 @@ RECV_ID_FACILITY_DATA_END = 29
 _PAYLOAD_OFFSET = (3 + 7) * 4
 
 DATATYPE_FLOAT64 = 4
+DATATYPE_STRING32 = 6
 DATATYPE_STRING256 = 9
+DATATYPE_INITPOSITION = 12
 PERIOD_ONCE = 1
 OBJECT_ID_USER = 0
 SIMCONNECT_UNUSED = 0xFFFFFFFF
+SIMCONNECT_OPEN_CONFIGINDEX_LOCAL = 0xFFFFFFFF
+
+# Catégories d'objets énumérables autour de l'avion. Le trafic réseau et le
+# trafic généré par le simulateur arrivent tous deux en AIRCRAFT : SimConnect
+# ne distingue pas l'origine d'un appareil, seulement sa nature.
+SIMOBJECT_TYPE_AIRCRAFT = 2
+
+# Largeur fixe d'un champ STRING32 dans la charge renvoyée.
+STRING32_SIZE = 32
+MSFS2024_REQUIRED_EXPORTS = (
+    "SimConnect_AICreateNonATCAircraft_EX1",
+    "SimConnect_EnumerateSimObjectsAndLiveries",
+)
 
 
 def _dll_candidates() -> tuple[Path, ...]:
     """Emplacements possibles de la DLL officielle SimConnect."""
-    return (
+    candidates = [
         resource_path("SimConnect", "SimConnect.dll"),
         resource_path("SimConnect.dll"),
-        Path(r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"),
+    ]
+    sdk_root = os.getenv("MSFS2024_SDK", "").strip()
+    if sdk_root:
+        candidates.append(
+            Path(sdk_root) / "SimConnect SDK" / "lib" / "SimConnect.dll"
+        )
+    candidates.append(
+        Path(r"C:\MSFS 2024 SDK\SimConnect SDK\lib\SimConnect.dll")
     )
+    return tuple(candidates)
 
 
 DLL_CANDIDATES = _dll_candidates()
@@ -135,6 +161,26 @@ class _RECV_SIMOBJECT_DATA(ct.Structure):
     ]
 
 
+class _RECV_ASSIGNED_OBJECT_ID(ct.Structure):
+    _fields_ = _RECV._fields_ + [
+        ("dwRequestID", wintypes.DWORD),
+        ("dwObjectID", wintypes.DWORD),
+    ]
+
+
+class _DATA_INITPOSITION(ct.Structure):
+    _fields_ = [
+        ("Latitude", ct.c_double),
+        ("Longitude", ct.c_double),
+        ("Altitude", ct.c_double),
+        ("Pitch", ct.c_double),
+        ("Bank", ct.c_double),
+        ("Heading", ct.c_double),
+        ("OnGround", wintypes.DWORD),
+        ("Airspeed", wintypes.DWORD),
+    ]
+
+
 class FacilityDefinition:
     """Assemble la définition et retient le décodage de chaque type de bloc."""
 
@@ -204,8 +250,15 @@ class SimConnectClient:
         # lecture les accumulerait côté simulateur pour toute la connexion.
         self._simvar_definitions: dict[tuple[tuple[str, str], ...], int] = {}
         self._string_simvar_definitions: dict[str, int] = {}
+        self._object_definitions: dict[tuple[Any, str | None], int] = {}
+        self._ai_position_definition: int | None = None
+        # Identifiant réel de l'avion du joueur, appris au premier relevé.
+        # SimConnect l'inclut dans ses énumérations sans le distinguer : c'est
+        # le seul moyen sûr de ne pas le compter deux fois.
+        self.user_object_id: int | None = None
         if self._dll.SimConnect_Open(
-            ct.byref(self._handle), b"NaviXav", None, 0, None, 0
+            ct.byref(self._handle), b"NaviXav", None, 0, None,
+            SIMCONNECT_OPEN_CONFIGINDEX_LOCAL,
         ) != 0:
             raise SimConnectError(
                 "Microsoft Flight Simulator ne répond pas. Lance le simulateur "
@@ -217,14 +270,25 @@ class SimConnectClient:
     @staticmethod
     def _load(dll_path: Path | str | None):
         candidates = [Path(dll_path)] if dll_path else list(DLL_CANDIDATES)
+        outdated: list[Path] = []
         for path in candidates:
             if not path.is_file():
                 continue
             dll = ct.WinDLL(str(path))
+            if any(not hasattr(dll, name) for name in MSFS2024_REQUIRED_EXPORTS):
+                outdated.append(path)
+                continue
             _declare(dll)
             return dll
+        if outdated:
+            paths = ", ".join(str(path) for path in outdated)
+            raise SimConnectError(
+                "DLL SimConnect incompatible avec MSFS 2024 (API EX1 absente) : "
+                f"{paths}. Installe le SDK MSFS 2024 à jour avant de lancer NaviXav."
+            )
         raise SimConnectError(
-            "SimConnect.dll introuvable. Installe le SDK MSFS, ou indique son "
+            "SimConnect.dll MSFS 2024 introuvable. Installe le SDK MSFS 2024, "
+            "ou indique son "
             "chemin explicitement."
         )
 
@@ -354,6 +418,7 @@ class SimConnectClient:
                 data = ct.cast(pointer, ct.POINTER(_RECV_SIMOBJECT_DATA)).contents
                 if data.dwRequestID != request_id:
                     continue
+                self.user_object_id = int(data.dwObjectID)
                 payload = ct.string_at(pointer, recv.dwSize)[_PAYLOAD_OFFSET:]
                 if len(payload) < expected:
                     raise SimConnectError(
@@ -443,6 +508,265 @@ class SimConnectClient:
             )
         raise SimConnectError(f"Aucune valeur reçue pour {name}.")
 
+    def read_objects(
+        self,
+        variables: Sequence[tuple[str, str]],
+        radius_m: int,
+        text_variable: str | None = None,
+        object_type: int = SIMOBJECT_TYPE_AIRCRAFT,
+        timeout_s: float = 2.0,
+    ) -> list[dict[str, Any]]:
+        """Énumère les objets d'un type autour de l'avion du joueur.
+
+        Là où `read_simvars` interroge un objet connu, celle-ci demande une
+        catégorie : le simulateur répond par autant de messages qu'il a
+        d'objets, chacun annonçant son rang et le total. L'avion du joueur en
+        fait partie — SimConnect ne l'écarte pas de sa propre énumération — et
+        c'est à l'appelant de le reconnaître.
+
+        `text_variable` ajoute une SimVar texte en fin de définition, en
+        STRING32 : de quoi porter un indicatif sans allonger la charge de
+        chaque appareil de deux cent cinquante octets.
+
+        Un relevé partiel est rendu tel quel plutôt que perdu : mieux vaut la
+        moitié du trafic que rien du tout, et le rayon demandé fait de toute
+        façon du plus proche le plus utile.
+        """
+        if not variables:
+            return []
+
+        definition_id = self._object_definition_for(variables, text_variable)
+        self._next_id += 1
+        request_id = self._next_id
+
+        result = self._dll.SimConnect_RequestDataOnSimObjectType(
+            self._handle, request_id, definition_id,
+            max(0, int(radius_m)), object_type,
+        )
+        if result != 0:
+            self._forget_object_definition(variables, text_variable)
+            raise SimConnectError("Impossible d'énumérer les objets du simulateur.")
+
+        numeric = len(variables) * 8
+        expected = numeric + (STRING32_SIZE if text_variable else 0)
+        found: dict[int, dict[str, Any]] = {}
+        total: int | None = None
+        pointer = ct.POINTER(_RECV)()
+        size = wintypes.DWORD()
+        deadline = time.monotonic() + timeout_s
+        exceptions: list[int] = []
+
+        while time.monotonic() < deadline:
+            if self._dll.SimConnect_GetNextDispatch(
+                self._handle, ct.byref(pointer), ct.byref(size)
+            ) != 0:
+                time.sleep(0.002)
+                continue
+
+            recv = pointer.contents
+            if recv.dwID == RECV_ID_SIMOBJECT_DATA_BYTYPE:
+                data = ct.cast(pointer, ct.POINTER(_RECV_SIMOBJECT_DATA)).contents
+                if data.dwRequestID != request_id:
+                    continue
+                total = int(data.dwoutof)
+                if total == 0:
+                    return []
+                payload = ct.string_at(pointer, recv.dwSize)[_PAYLOAD_OFFSET:]
+                if len(payload) < expected:
+                    self._forget_object_definition(variables, text_variable)
+                    raise SimConnectError(
+                        f"Réponse de {len(payload)} octets pour {expected} attendus."
+                    )
+                values = struct.unpack(f"<{len(variables)}d", payload[:numeric])
+                entry: dict[str, Any] = {
+                    name: value for (name, _unit), value in zip(variables, values)
+                }
+                entry["object_id"] = int(data.dwObjectID)
+                if text_variable:
+                    entry[text_variable] = payload[
+                        numeric : numeric + STRING32_SIZE
+                    ].split(b"\0", 1)[0].decode("utf-8", errors="replace").strip()
+                found[int(data.dwentrynumber)] = entry
+                if len(found) >= total:
+                    break
+            elif recv.dwID == RECV_ID_EXCEPTION:
+                exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
+                if exception.dwException not in exceptions:
+                    exceptions.append(exception.dwException)
+                deadline = min(deadline, time.monotonic() + EXCEPTION_GRACE_S)
+            elif recv.dwID == RECV_ID_QUIT:
+                raise SimConnectError("Le simulateur s'est fermé.")
+
+        if exceptions and not found:
+            self._forget_object_definition(variables, text_variable)
+            names = ", ".join(
+                EXCEPTION_NAMES.get(code, str(code)) for code in exceptions
+            )
+            raise SimConnectRefused(
+                f"SimConnect a refusé l'énumération ({names}).", exceptions
+            )
+        if total is None and not found:
+            # Le silence n'est pas une erreur : hors de tout terrain, il n'y a
+            # simplement personne dans le rayon demandé.
+            return []
+        return [found[rank] for rank in sorted(found)]
+
+    def create_ai_aircraft(
+        self,
+        title: str,
+        callsign: str,
+        *,
+        latitude: float,
+        longitude: float,
+        altitude_ft: float,
+        heading_deg: float,
+        airspeed_kt: float,
+        on_ground: bool,
+        timeout_s: float = 5.0,
+    ) -> tuple[int, int]:
+        """Crée un non-ATC AI et rend son (RequestID, ObjectID) attribué."""
+        self._next_id += 1
+        request_id = self._next_id
+        position = _DATA_INITPOSITION(
+            latitude, longitude, altitude_ft, 0.0, 0.0, heading_deg % 360,
+            int(on_ground), max(0, int(round(airspeed_kt))),
+        )
+        result = self._dll.SimConnect_AICreateNonATCAircraft_EX1(
+            self._handle,
+            title.encode("utf-8"),
+            b"",  # FSLTL est un paquet legacy : la livrée est portée par title.
+            callsign[:12].encode("ascii", errors="ignore"),
+            position,
+            request_id,
+        )
+        if result != 0:
+            raise SimConnectError(f"Impossible de créer l'appareil AI {callsign}.")
+
+        pointer = ct.POINTER(_RECV)()
+        size = wintypes.DWORD()
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self._dll.SimConnect_GetNextDispatch(
+                self._handle, ct.byref(pointer), ct.byref(size)
+            ) != 0:
+                time.sleep(0.002)
+                continue
+            recv = pointer.contents
+            if recv.dwID == RECV_ID_ASSIGNED_OBJECT_ID:
+                data = ct.cast(pointer, ct.POINTER(_RECV_ASSIGNED_OBJECT_ID)).contents
+                if data.dwRequestID != request_id:
+                    continue
+                object_id = int(data.dwObjectID)
+                release_id = request_id + 1
+                self._next_id = max(self._next_id, release_id)
+                release = self._dll.SimConnect_AIReleaseControl(
+                    self._handle, object_id, release_id
+                )
+                if release != 0:
+                    self.remove_ai_object(object_id)
+                    raise SimConnectError(
+                        f"Impossible de prendre le contrôle de l'appareil AI {callsign}."
+                    )
+                return request_id, object_id
+            if recv.dwID == RECV_ID_EXCEPTION:
+                exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
+                name = EXCEPTION_NAMES.get(exception.dwException, str(exception.dwException))
+                raise SimConnectError(f"Création AI refusée ({name}).")
+            if recv.dwID == RECV_ID_QUIT:
+                raise SimConnectError("Le simulateur s'est fermé.")
+        raise SimConnectError(f"Aucun ObjectID reçu pour l'appareil AI {callsign}.")
+
+    def update_ai_aircraft(
+        self,
+        object_id: int,
+        *,
+        latitude: float,
+        longitude: float,
+        altitude_ft: float,
+        heading_deg: float,
+        airspeed_kt: float,
+        on_ground: bool,
+    ) -> None:
+        """Replace un objet AI connu sans toucher aux objets seulement observés."""
+        if self._ai_position_definition is None:
+            self._next_id += 1
+            definition_id = self._next_id
+            result = self._dll.SimConnect_AddToDataDefinition(
+                self._handle, definition_id, b"Initial Position", None,
+                DATATYPE_INITPOSITION, 0.0, SIMCONNECT_UNUSED,
+            )
+            if result != 0:
+                raise SimConnectError("Impossible de définir la position AI.")
+            self._ai_position_definition = definition_id
+        position = _DATA_INITPOSITION(
+            latitude, longitude, altitude_ft, 0.0, 0.0, heading_deg % 360,
+            int(on_ground), max(0, int(round(airspeed_kt))),
+        )
+        result = self._dll.SimConnect_SetDataOnSimObject(
+            self._handle, self._ai_position_definition, int(object_id),
+            0, 0, ct.sizeof(position), ct.byref(position),
+        )
+        if result != 0:
+            raise SimConnectError(f"Impossible de mettre à jour l'objet AI {object_id}.")
+
+    def remove_ai_object(self, object_id: int) -> None:
+        """Supprime un objet dont l'appelant a établi la propriété."""
+        self._next_id += 1
+        request_id = self._next_id
+        result = self._dll.SimConnect_AIRemoveObject(
+            self._handle, int(object_id), request_id
+        )
+        if result != 0:
+            raise SimConnectError(f"Impossible de supprimer l'objet AI {object_id}.")
+
+    def _object_definition_for(
+        self, variables: Sequence[tuple[str, str]], text_variable: str | None
+    ) -> int:
+        """Définition d'énumération, chiffres puis texte, mise en cache.
+
+        Elle est distincte de celle des relevés de vol : le champ texte final
+        décalerait la structure purement FLOAT64 sur laquelle ceux-ci
+        s'appuient.
+        """
+        key = (tuple(variables), text_variable)
+        existing = self._object_definitions.get(key)
+        if existing is not None:
+            return existing
+
+        self._next_id += 1
+        definition_id = self._next_id
+        for name, unit in variables:
+            result = self._dll.SimConnect_AddToDataDefinition(
+                self._handle, definition_id, name.encode(), unit.encode(),
+                DATATYPE_FLOAT64, 0.0, SIMCONNECT_UNUSED,
+            )
+            if result != 0:
+                self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+                raise SimConnectError(
+                    f"Impossible de déclarer la variable {name} ({unit})."
+                )
+        if text_variable:
+            result = self._dll.SimConnect_AddToDataDefinition(
+                self._handle, definition_id, text_variable.encode(), None,
+                DATATYPE_STRING32, 0.0, SIMCONNECT_UNUSED,
+            )
+            if result != 0:
+                self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+                raise SimConnectError(
+                    f"Impossible de déclarer la variable texte {text_variable}."
+                )
+        self._object_definitions[key] = definition_id
+        return definition_id
+
+    def _forget_object_definition(
+        self, variables: Sequence[tuple[str, str]], text_variable: str | None
+    ) -> None:
+        definition_id = self._object_definitions.pop(
+            (tuple(variables), text_variable), None
+        )
+        if definition_id is not None:
+            self._dll.SimConnect_ClearDataDefinition(self._handle, definition_id)
+
     def _definition_for(self, variables: Sequence[tuple[str, str]]) -> int:
         """Renvoie l'identifiant de définition de ce jeu de variables."""
         key = tuple(variables)
@@ -478,7 +802,7 @@ class SimConnectClient:
         self._next_id += 1
         definition_id = self._next_id
         result = self._dll.SimConnect_AddToDataDefinition(
-            self._handle, definition_id, name.encode(), b"NULL",
+            self._handle, definition_id, name.encode(), None,
             DATATYPE_STRING256, 0.0, SIMCONNECT_UNUSED,
         )
         if result != 0:
@@ -498,6 +822,8 @@ class SimConnectClient:
             self._handle = ct.c_void_p()
         self._simvar_definitions.clear()
         self._string_simvar_definitions.clear()
+        self._object_definitions.clear()
+        self._ai_position_definition = None
 
     def __enter__(self) -> "SimConnectClient":
         return self
@@ -541,6 +867,18 @@ def _declare(dll) -> None:
         ("SimConnect_RequestDataOnSimObject",
          [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
           ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_RequestDataOnSimObjectType",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_AICreateNonATCAircraft_EX1",
+         [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_char_p,
+          _DATA_INITPOSITION, ct.c_ulong]),
+        ("SimConnect_AIReleaseControl",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_SetDataOnSimObject",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
+          ct.c_ulong, ct.c_void_p]),
+        ("SimConnect_AIRemoveObject",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong]),
         ("SimConnect_ClearDataDefinition", [ct.c_void_p, ct.c_ulong]),
         ("SimConnect_Close", [ct.c_void_p]),
     ]

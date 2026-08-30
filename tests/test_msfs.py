@@ -291,7 +291,7 @@ def test_store_creates_its_schema(tmp_path):
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         )
     }
-    assert {"airport", "runway", "procedure", "leg", "transition",
+    assert {"airport", "runway", "frequency", "procedure", "leg", "transition",
             "navaid", "waypoint", "airway_segment"} <= tables
     connection.close()
 
@@ -341,6 +341,137 @@ def _minimal_airport() -> dict:
         "frequencies": [], "approaches": [], "departures": [], "arrivals": [],
         "taxi_points": [], "taxi_parkings": [], "taxi_paths": [],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Fréquences du terrain
+#
+# Le simulateur désigne un rôle radio par un nombre. La base conserve ce nombre
+# tel quel et c'est la lecture qui le traduit en sigle : une correction de la
+# table de sigles ne doit obliger à reprendre aucun terrain au simulateur.
+# --------------------------------------------------------------------------- #
+
+
+def _airport_with_frequencies() -> dict:
+    airport = _minimal_airport()
+    airport["frequencies"] = [
+        {"type": 6, "mhz": 118.5, "name": "TOWER"},
+        {"type": 5, "mhz": 121.855, "name": "GROUND"},
+        {"type": 5, "mhz": 121.605, "name": "GROUND SOUTH"},
+        {"type": 1, "mhz": 128.075, "name": "ATIS"},
+        {"type": 7, "mhz": 121.975, "name": "DELIVERY"},
+    ]
+    return airport
+
+
+def _provider_over(path, airport):
+    from navixav.navdata.msfs import MsfsProvider
+
+    connection = msfs_store.connect(path)
+    msfs_store.store_airport(connection, airport)
+    connection.close()
+    return MsfsProvider(path, allow_fetch=False)
+
+
+def test_the_frequencies_of_an_airport_are_kept(tmp_path):
+    connection = msfs_store.connect(tmp_path / "navixav.sqlite")
+    msfs_store.store_airport(connection, _airport_with_frequencies())
+    rows = connection.execute(
+        "SELECT type, mhz, rank FROM frequency WHERE icao = 'TEST' ORDER BY rank"
+    ).fetchall()
+    assert [row["type"] for row in rows] == [6, 5, 5, 1, 7]
+    # L'ordre du simulateur est conservé : c'est lui qui désigne la principale
+    # lorsqu'un terrain publie deux fréquences pour le même rôle.
+    assert rows[1]["mhz"] == 121.855
+    connection.close()
+
+
+def test_a_frequency_read_as_zero_is_not_kept(tmp_path):
+    """Une entrée sans fréquence utilisable occuperait une ligne pour rien."""
+    airport = _minimal_airport()
+    airport["frequencies"] = [{"type": 6, "mhz": 0.0, "name": "VIDE"}]
+    connection = msfs_store.connect(tmp_path / "navixav.sqlite")
+    msfs_store.store_airport(connection, airport)
+    assert connection.execute("SELECT COUNT(*) FROM frequency").fetchone()[0] == 0
+    connection.close()
+
+
+def test_the_frequencies_are_read_back_as_radio_call_signs(tmp_path):
+    provider = _provider_over(
+        tmp_path / "navixav.sqlite", _airport_with_frequencies()
+    )
+    try:
+        found = provider.frequencies("TEST")
+        assert [f.code for f in found] == ["TWR", "GND", "GND", "ATIS", "DEL"]
+        assert found[0].label == "TWR 118.500"
+        assert found[3].name == "ATIS"
+    finally:
+        provider.close()
+
+
+def test_an_unknown_frequency_type_is_dropped_rather_than_labelled(tmp_path):
+    """Mieux vaut une fréquence de moins qu'un sigle inventé.
+
+    La correspondance entre le nombre du simulateur et le sigle n'a pas été
+    sondée comme le sont les dispositions de champs. Un type imprévu doit donc
+    disparaître de l'affichage, et non y entrer sous une étiquette fausse qu'un
+    pilote afficherait puis composerait.
+    """
+    airport = _minimal_airport()
+    airport["frequencies"] = [
+        {"type": 6, "mhz": 118.5, "name": "TOWER"},
+        {"type": 99, "mhz": 130.0, "name": "INCONNU"},
+    ]
+    provider = _provider_over(tmp_path / "navixav.sqlite", airport)
+    try:
+        assert [f.code for f in provider.frequencies("TEST")] == ["TWR"]
+    finally:
+        provider.close()
+
+
+def test_the_raw_simulator_type_travels_with_the_frequency(tmp_path):
+    """Le nombre du simulateur est ce qui dit quelle entrée corriger."""
+    provider = _provider_over(
+        tmp_path / "navixav.sqlite", _airport_with_frequencies()
+    )
+    try:
+        found = provider.frequencies("TEST")
+        assert [(f.code, f.type_id) for f in found][:2] == [("TWR", 6), ("GND", 5)]
+    finally:
+        provider.close()
+
+
+def test_an_unknown_type_can_be_kept_for_diagnosis(tmp_path):
+    """Vue de diagnostic : la fréquence existe, c'est la table qui manque.
+
+    Écartée de l'affichage, une fréquence dont le type est imprévu serait aussi
+    invisible qu'une fréquence absente. Le diagnostic a besoin de les
+    distinguer, sigle vide et nombre brut à l'appui.
+    """
+    airport = _minimal_airport()
+    airport["frequencies"] = [
+        {"type": 6, "mhz": 118.5, "name": "TOWER"},
+        {"type": 99, "mhz": 130.0, "name": "INCONNU"},
+    ]
+    provider = _provider_over(tmp_path / "navixav.sqlite", airport)
+    try:
+        found = provider.frequencies("TEST", include_unknown=True)
+        assert [(f.code, f.type_id) for f in found] == [("TWR", 6), ("", 99)]
+        # Sans sigle, l'étiquette se réduit à la fréquence plutôt que de
+        # commencer par une espace.
+        assert found[1].label == "130.000"
+    finally:
+        provider.close()
+
+
+def test_the_frequencies_leave_with_their_airport(tmp_path):
+    """Une reprise du terrain ne doit pas empiler deux jeux de fréquences."""
+    path = tmp_path / "navixav.sqlite"
+    connection = msfs_store.connect(path)
+    msfs_store.store_airport(connection, _airport_with_frequencies())
+    msfs_store.store_airport(connection, _airport_with_frequencies())
+    assert connection.execute("SELECT COUNT(*) FROM frequency").fetchone()[0] == 5
+    connection.close()
 
 
 # --------------------------------------------------------------------------- #

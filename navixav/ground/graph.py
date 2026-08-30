@@ -120,6 +120,10 @@ class TaxiGraph:
     adjacency: dict[int, tuple[TaxiEdge, ...]] = field(default_factory=dict)
     # Seuil de chaque piste, en mètres locaux comme le reste du réseau.
     thresholds: dict[str, tuple[float, float]] = field(default_factory=dict)
+    # Cap vrai de chaque sens de piste. Il permet de choisir, après
+    # l'atterrissage, le prochain nœud devant l'avion plutôt qu'une sortie déjà
+    # dépassée mais plus proche du poste.
+    runway_headings: dict[str, float] = field(default_factory=dict)
     # Plus grand composant praticable, sans routes fermées ni voies véhicules.
     # Il évite qu'une reprise hors route choisisse un point isolé du terrain.
     routable_nodes: frozenset[int] = field(default_factory=frozenset)
@@ -203,12 +207,19 @@ class TaxiGraph:
             on_runway = any(
                 edge.is_runway and edge.runway in wanted for edge in edges
             )
-            if on_runway and any(not edge.is_runway for edge in edges):
+            if on_runway and any(
+                not edge.is_runway and edge.kind not in FORBIDDEN_KINDS
+                for edge in edges
+            ):
                 entries.append(index)
-        # Un point d'attente publié est l'entrée normale ; à défaut, toute
-        # jonction avec la piste fait l'affaire.
-        holding = [index for index in entries if self.nodes[index].is_hold_short]
-        return tuple(holding or entries)
+        # Les marquages de point d'attente publiés par MSFS sont incomplets et
+        # parfois très éloignés du seuil demandé. Écarter toutes les jonctions
+        # normales dès qu'un seul marquage existe forçait notamment la 23 de
+        # CYYZ par H3 au lieu des accès H/Q proches du seuil. Le choix de sens
+        # appartient à takeoff_entry(), qui compare toutes les jonctions au
+        # seuil ; _hold_short_runway() sait annoncer l'attente même si le nœud
+        # n'est pas explicitement typé comme tel.
+        return tuple(entries)
 
     def takeoff_entry(self, runway_name: str) -> tuple[int, ...]:
         """Entrée à utiliser pour décoller du seuil demandé.
@@ -233,6 +244,60 @@ class TaxiGraph:
             ),
         )
         return (closest,)
+
+    def arrival_start(
+        self, runway_name: str, x: float, y: float
+    ) -> tuple[int, float] | None:
+        """Prochain nœud de piste dans le sens de l'atterrissage.
+
+        La position n'est interprétée ainsi que lorsqu'elle se trouve sur la
+        bande demandée. Une fois la piste dégagée, l'appelant reprend donc le
+        roulage depuis le nœud de circulation le plus proche.
+        """
+        wanted = {
+            normalise_runway(runway_name), reciprocal_runway(runway_name)
+        }
+        runway_edges = tuple(
+            edge for edge in self.edges
+            if edge.is_runway and edge.runway in wanted
+        )
+        heading = self.runway_headings.get(normalise_runway(runway_name))
+        if not runway_edges or heading is None:
+            return None
+
+        def distance_to_segment(edge: TaxiEdge) -> float:
+            first, second = self.nodes[edge.start], self.nodes[edge.end]
+            dx, dy = second.x - first.x, second.y - first.y
+            length_sq = dx * dx + dy * dy
+            if length_sq == 0:
+                return math.hypot(x - first.x, y - first.y)
+            ratio = max(0.0, min(1.0, (
+                (x - first.x) * dx + (y - first.y) * dy
+            ) / length_sq))
+            return math.hypot(
+                x - (first.x + ratio * dx), y - (first.y + ratio * dy)
+            )
+
+        closest_edge = min(runway_edges, key=distance_to_segment)
+        # Quinze mètres absorbent l'imprécision SimConnect et les points de
+        # piste placés sur l'axe plutôt que sur ses bords.
+        if distance_to_segment(closest_edge) > closest_edge.width_m / 2 + 15.0:
+            return None
+
+        radians = math.radians(heading)
+        forward_x, forward_y = math.sin(radians), math.cos(radians)
+        runway_nodes = {
+            node for edge in runway_edges for node in (edge.start, edge.end)
+        }
+        ahead = []
+        for node in runway_nodes:
+            point = self.nodes[node]
+            progress = (point.x - x) * forward_x + (point.y - y) * forward_y
+            if progress >= -5.0:
+                ahead.append((max(0.0, progress), node))
+        if not ahead:
+            return None
+        return min(ahead)[1], heading
 
     def runway_names(self) -> tuple[str, ...]:
         """Pistes que le réseau au sol sait desservir."""
@@ -352,6 +417,10 @@ def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
         normalise_runway(runway.name): projection.to_xy(runway.lat, runway.lon)
         for runway in provider.runways(key)
     }
+    runway_headings = {
+        normalise_runway(runway.name): runway.heading_true_deg
+        for runway in provider.runways(key)
+    }
 
     graph = TaxiGraph(
         icao=key,
@@ -362,6 +431,7 @@ def _build_graph(provider: Any, key: str, connection: Any) -> TaxiGraph:
         parkings=(),
         adjacency={index: tuple(items) for index, items in adjacency.items()},
         thresholds=thresholds,
+        runway_headings=runway_headings,
     )
     graph.parkings = _attach_parkings(graph, connection, key, parking_nodes)
     return graph

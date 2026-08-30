@@ -56,15 +56,11 @@ def _environment_path(variable: str, *parts: str) -> Path | None:
 
 
 def user_config_candidates() -> list[Path]:
-    """Emplacements connus de `UserCfg.opt`, boutique et version confondues."""
+    """Emplacements MS Store et Steam de `UserCfg.opt` pour MSFS 2024."""
     candidates = [
         _environment_path(
             "LOCALAPPDATA", "Packages",
-            "Microsoft.FlightSimulator_8wekyb3d8bbwe", "LocalCache", "UserCfg.opt"),
-        _environment_path(
-            "LOCALAPPDATA", "Packages",
             "Microsoft.Limitless_8wekyb3d8bbwe", "LocalCache", "UserCfg.opt"),
-        _environment_path("APPDATA", "Microsoft Flight Simulator", "UserCfg.opt"),
         _environment_path("APPDATA", "Microsoft Flight Simulator 2024", "UserCfg.opt"),
     ]
     return [path for path in candidates if path is not None]
@@ -258,6 +254,13 @@ def read_aircraft(directory: Path, package: str) -> InstalledAircraft | None:
         for block in variations
         if block.get("title") and block.get("isairtraffic", "0").strip() != "1"
     ]
+    # Certains add-ons pilotables (notamment le Rafale M Alpha60) marquent
+    # pourtant toutes leurs livrées `isAirTraffic=1`. La présence d'un cockpit
+    # propre au dossier est une preuve plus forte que ce drapeau mal renseigné.
+    # Les bibliothèques de trafic comme FSLTL n'en fournissent pas et restent
+    # donc exclues de l'inventaire.
+    if not flyable and (directory / "cockpit.cfg").is_file():
+        flyable = [block["title"] for block in variations if block.get("title")]
     titles = tuple(dict.fromkeys(flyable or ()))
     if not titles and not variations:
         titles = tuple(dict.fromkeys(values.get("title", ())))

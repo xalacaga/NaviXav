@@ -12,6 +12,13 @@ def mass(value: int | None, unit: str) -> str | None:
     return f"{value:,}".replace(",", " ") + (f" {unit}" if unit else "")
 
 
+def percentage(value: float | None) -> str | None:
+    """Pourcentage opérationnel sans zéro décimal superflu."""
+    if value is None:
+        return None
+    return f"{value:g}%"
+
+
 def duration(seconds: int | None) -> str | None:
     """Durée en heures et minutes, format MCDU (« 1h12 »)."""
     if not seconds:

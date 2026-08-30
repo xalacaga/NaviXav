@@ -64,6 +64,7 @@ class DispatchSummary:
     oew: int | None = None
     payload: int | None = None
     zfw: int | None = None
+    zfwcg: float | None = None
     max_zfw: int | None = None
     takeoff_weight: int | None = None
     max_takeoff_weight: int | None = None
@@ -159,6 +160,12 @@ class OfpSummary:
 
     navlog: list[NavlogFix] = field(default_factory=list)
 
+    # Point de descente calculé par le moteur de performances SimBrief. Il ne
+    # fait pas partie de la route navigable, mais ses coordonnées permettent à
+    # l'interface de préférer ce profil avion/masse/vent au secours géométrique.
+    simbrief_tod_lat: float | None = None
+    simbrief_tod_lon: float | None = None
+
     # Noms de procédures tels que SimBrief les a filés, s'ils existent.
     simbrief_sid: str | None = None
     simbrief_star: str | None = None
@@ -232,6 +239,10 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
     weather = _as_dict(data.get("weather"))
 
     navlog = _parse_navlog(data.get("navlog"))
+    planned_tod = next(
+        (fix for fix in navlog if fix.ident.upper() in {"TOD", "T/D"}),
+        None,
+    )
     sid_block = _leading_procedure_block(navlog)
     star_block = _trailing_procedure_block(navlog)
     sid = _block_procedure_name(sid_block)
@@ -272,6 +283,8 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         origin_taf=_text(weather, "orig_taf") or _text(origin, "taf") or None,
         destination_taf=_text(weather, "dest_taf") or _text(destination, "taf") or None,
         navlog=navlog,
+        simbrief_tod_lat=planned_tod.lat if planned_tod else None,
+        simbrief_tod_lon=planned_tod.lon if planned_tod else None,
         simbrief_sid=sid,
         simbrief_star=star,
         sid_exit_hint=sid_block[-1].ident if sid_block else None,
@@ -299,6 +312,7 @@ def _parse_dispatch(data: dict[str, Any]) -> DispatchSummary:
         oew=_int(weights, "oew"),
         payload=_int(weights, "payload"),
         zfw=_int(weights, "est_zfw"),
+        zfwcg=_float(weights, "est_zfwcg") or _float(weights, "zfwcg"),
         max_zfw=_int(weights, "max_zfw"),
         takeoff_weight=_int(weights, "est_tow"),
         max_takeoff_weight=_int(weights, "max_tow"),
@@ -471,6 +485,17 @@ def _int(source: dict[str, Any] | None, key: str) -> int | None:
         return int(float(raw))
     except ValueError:
         return None
+
+
+def _float(source: dict[str, Any] | None, key: str) -> float | None:
+    raw = _text(source, key)
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if isfinite(value) else None
 
 
 def _coordinate(

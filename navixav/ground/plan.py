@@ -35,6 +35,18 @@ DIRECTIONS = (DEPARTURE, ARRIVAL)
 # réseau : il ne se parcourt pas comme une voie de circulation.
 STAND_KIND = "stand"
 
+# Même ligne de guidage, quittée en marche arrière derrière un tracteur.
+PUSHBACK_KIND = "pushback"
+
+# Étape annoncée dans l'enchaînement, en français comme les consignes d'attente ;
+# l'interface la traduit.
+PUSHBACK_STEP = "repoussage"
+
+# Postes qu'on ne quitte pas par ses propres moyens : l'avion y stationne nez
+# au terminal et en sort tracté. Une rampe se quitte au moteur, et y annoncer
+# un repoussage serait faux.
+NOSE_IN_KINDS = ("porte petite", "porte moyenne", "porte grande", "dock")
+
 # Raccordement entre la position de l'avion et le réseau, lors d'une reprise en
 # cours de roulage.
 JOIN_KIND = "join"
@@ -92,6 +104,17 @@ class TaxiPlan:
         if self.parking.lead_in_m < MIN_LEAD_IN_M:
             return False
         return not (self.from_position and self.direction == DEPARTURE)
+
+    @property
+    def needs_pushback(self) -> bool:
+        """Le départ commence-t-il par un repoussage ?
+
+        Repris en cours de roulage, il ne repasse pas par le poste : `has_lead_in`
+        le dit déjà, et le repoussage est alors derrière l'avion.
+        """
+        if self.direction != DEPARTURE or not self.has_lead_in:
+            return False
+        return (self.parking.kind or "") in NOSE_IN_KINDS
 
     @property
     def distance_m(self) -> float:
@@ -166,7 +189,12 @@ class TaxiPlan:
         }
 
     def _stand_leg(self) -> dict[str, Any]:
-        """Ligne de guidage entre le poste et le réseau de circulation."""
+        """Ligne de guidage entre le poste et le réseau de circulation.
+
+        Au départ d'un poste nez-dedans, c'est le trajet du tracteur : même
+        géométrie, parcourue en marche arrière. Le tronçon le dit, pour que le
+        tracé et le bandeau ne l'annoncent pas comme un roulage.
+        """
         node = self.graph.nodes[self.parking.node]
         points = [
             {"x": self.parking.x, "y": self.parking.y},
@@ -176,13 +204,51 @@ class TaxiPlan:
             points.reverse()
         return {
             "name": self.parking.label,
-            "kind": STAND_KIND,
+            "kind": PUSHBACK_KIND if self.needs_pushback else STAND_KIND,
             "distance_m": round(self.parking.lead_in_m, 1),
+            # `turn` reste vide : le guidage y lit les virages du roulage, et
+            # une consigne de tracteur n'en est pas un. Le cap du repoussage
+            # vit au niveau du plan, où le bandeau le lit.
             "turn": None,
             "hold_short": None,
             "points": points,
             "from_clearance": True,
         }
+
+    def pushback(self) -> dict[str, Any] | None:
+        """Manœuvre du tracteur, ou rien si le poste se quitte au moteur.
+
+        Le cap dit tout : « nez à gauche » est le calque de *nose left*, quand
+        la phraséologie française annonce l'orientation obtenue.
+        """
+        if not self.needs_pushback:
+            return None
+        heading = self._pushback_heading()
+        node = self.graph.nodes[self.parking.node]
+        return {
+            "distance_m": round(self.parking.lead_in_m, 1),
+            "heading": None if heading is None else round(heading),
+            # Point où le repoussage s'achève : le bout de la ligne de guidage,
+            # là où l'avion rejoint le réseau. C'est la cible que le tracteur
+            # doit atteindre, et l'interface la propose d'un geste plutôt que
+            # de la faire viser à la main.
+            "target": {"x": round(node.x, 1), "y": round(node.y, 1)},
+        }
+
+    def _pushback_heading(self) -> float | None:
+        """Cap présenté une fois l'avion repoussé, lu sur le tracé lui-même.
+
+        C'est la direction du premier tronçon de circulation : le tracteur
+        laisse l'avion face au chemin qu'il va suivre. Le déduire du tracé plutôt
+        que du cap au poste évite d'annoncer un cap que l'itinéraire dément.
+        """
+        node = self.graph.nodes[self.parking.node]
+        for leg in self.route.legs:
+            for x, y in leg.points:
+                if math.hypot(x - node.x, y - node.y) < MIN_LEAD_IN_M:
+                    continue
+                return math.degrees(math.atan2(x - node.x, y - node.y)) % 360.0
+        return None
 
     def summary(self) -> tuple[str, ...]:
         """Enchaînement annoncé au pilote, poste compris.
@@ -193,7 +259,7 @@ class TaxiPlan:
         """
         steps: list[str] = []
         for leg in self.legs():
-            if leg["kind"] in (STAND_KIND, JOIN_KIND):
+            if leg["kind"] in (STAND_KIND, PUSHBACK_KIND, JOIN_KIND):
                 continue
             if leg["name"]:
                 steps.append(leg["name"])
@@ -201,6 +267,8 @@ class TaxiPlan:
                 steps.append(f"attente {leg['hold_short']}")
         if self.direction == ARRIVAL:
             return (*steps, self.parking.label)
+        if self.needs_pushback:
+            return (self.parking.label, PUSHBACK_STEP, *steps)
         # Repris en cours de roulage, un départ ne repasse pas par le poste :
         # l'annoncer en tête ferait croire à un retour en arrière.
         if self.from_position:
@@ -229,6 +297,7 @@ class TaxiPlan:
             "direction": self.direction,
             "runway": self.runway,
             "from_position": self.from_position,
+            "pushback": self.pushback(),
             "via": list(self.via),
             "dictated": self.is_dictated,
             "completed": self.is_completed,
@@ -298,8 +367,16 @@ def plan_taxi(
 
     # Reprise en cours de roulage : on repart d'où l'avion est, pas de l'autre
     # extrémité du trajet.
+    arrival_heading: float | None = None
     if position is not None:
-        start: int | tuple[int, ...] = graph.nearest_node(*position)
+        arrival_start = (
+            graph.arrival_start(runway, *position)
+            if direction == ARRIVAL else None
+        )
+        if arrival_start is not None:
+            start, arrival_heading = arrival_start
+        else:
+            start = graph.nearest_node(*position)
     elif direction == DEPARTURE:
         start = stand.node
     else:
@@ -310,7 +387,9 @@ def plan_taxi(
     if clearance:
         route = follow_route(graph, start, goal, clearance, costs)
     else:
-        route = find_route(graph, start, goal, costs)
+        route = find_route(
+            graph, start, goal, costs, initial_heading=arrival_heading
+        )
 
     return TaxiPlan(
         graph=graph,

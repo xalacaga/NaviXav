@@ -148,7 +148,9 @@ def _init_b_page(plan: FlightPlan) -> Table | None:
     dispatch = plan.dispatch
     unit = dispatch.unit_label
     rows = [
+        ("PAX", str(dispatch.passengers) if dispatch.passengers is not None else None),
         ("ZFW", fmt.mass(dispatch.zfw, unit)),
+        ("ZFWCG", fmt.percentage(dispatch.zfwcg)),
         ("BLOCK", fmt.mass(dispatch.block_fuel, unit)),
         ("TAXI", fmt.mass(dispatch.taxi_fuel, unit)),
         ("TRIP", fmt.mass(dispatch.trip_fuel, unit)),

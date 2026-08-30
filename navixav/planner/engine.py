@@ -28,12 +28,15 @@ from navixav.models import (
     DepartureBlock,
     EnrouteBlock,
     FlightPlan,
+    FrequencyRow,
+    RadioStation,
     RunwayChoice,
     WeatherBriefing,
     WindInfo,
 )
 from navixav.navdata.base import (
     Airport,
+    AirportFrequency,
     NavdataProvider,
     Procedure,
     ProcedureKind,
@@ -49,6 +52,22 @@ from navixav.weather.metar import fetch_metar, parse_wind
 LOGGER = logging.getLogger(__name__)
 
 VECTORS = "VECTORS"
+
+# Fréquences retenues pour chaque extrémité du vol, dans l'ordre où le pilote
+# s'en sert : au départ on écoute l'ATIS, on demande la clairance, on roule, on
+# décolle, puis on passe au départ ; à l'arrivée on écoute l'ATIS, on contacte
+# l'approche, la tour, puis le sol. Cet ordre est celui de l'affichage.
+#
+# Le centre de contrôle n'y figure pas, contrairement au départ : la fréquence
+# de centre publiée par un terrain ne vaut que pour son secteur, et le secteur
+# dépend de la position en route, pas de l'aérodrome quitté.
+_DEPARTURE_FREQUENCIES = ("ATIS", "DEL", "GND", "TWR", "DEP")
+_ARRIVAL_FREQUENCIES = ("ATIS", "APP", "TWR", "GND")
+
+# Terrain non contrôlé : il n'a ni tour ni sol, et c'est l'auto-information qui
+# tient le rôle. Sans ce repli, l'aérodrome sortirait sans aucune fréquence
+# alors qu'il en publie.
+_UNCONTROLLED_FREQUENCIES = ("CTAF", "UNICOM", "AWOS", "ASOS")
 
 
 @dataclass
@@ -68,6 +87,26 @@ class PlannerOverrides:
     prefer_ils: bool = True
     # None = valeur de la configuration ; sinon force la capacité RNP de l'avion.
     rnp_capable: bool | None = None
+
+
+def _leading_station(
+    entries: Sequence[AirportFrequency], roles_of: dict[str, set[str]]
+) -> str:
+    """Le poste qui tient réellement le rôle, parmi ceux qui le partagent.
+
+    Le simulateur type de la même façon un contrôle sol, une aire de
+    stationnement et une rampe cargo. Le poste retenu est celui qui apparaît
+    sous le plus de rôles différents : un organisme de contrôle tient la
+    clairance, le sol, la tour et le départ, là où un satellite ne tient que
+    le sien. À égalité, l'ordre du simulateur tranche.
+    """
+    first_seen: dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        first_seen.setdefault(entry.name, index)
+    return min(
+        first_seen,
+        key=lambda name: (-len(roles_of.get(name, ())), first_seen[name]),
+    )
 
 
 @dataclass
@@ -200,6 +239,12 @@ class CompletionEngine:
             route_legs=route_legs,
             route_path=route_path,
             cruise_altitude_ft=ofp.cruise_altitude_ft,
+            simbrief_tod=(
+                {"lat": ofp.simbrief_tod_lat, "lon": ofp.simbrief_tod_lon}
+                if ofp.simbrief_tod_lat is not None
+                and ofp.simbrief_tod_lon is not None
+                else None
+            ),
         )
 
         plan.departure = self._build_departure(ofp, overrides)
@@ -348,6 +393,7 @@ class CompletionEngine:
             return block
 
         block.transition_altitude_ft = airport.transition_altitude_ft
+        block.frequencies = self._frequencies(icao, _DEPARTURE_FREQUENCIES)
         block.wind = self._wind_for(icao, overrides.departure_metar, ofp.origin_metar)
 
         runways = self.provider.runways(icao)
@@ -562,6 +608,7 @@ class CompletionEngine:
             return block
 
         block.transition_level_ft = airport.transition_level_ft
+        block.frequencies = self._frequencies(icao, _ARRIVAL_FREQUENCIES)
         block.wind = self._wind_for(icao, overrides.arrival_metar, ofp.destination_metar)
 
         runways = self.provider.runways(icao)
@@ -1279,6 +1326,68 @@ class CompletionEngine:
             if gap < best_gap:
                 best_ident, best_gap = ident, gap
         return best_ident if best_gap <= 150 else None
+
+    def _frequencies(
+        self, icao: str, chain: Sequence[str]
+    ) -> list[FrequencyRow]:
+        """Chaîne de fréquences du terrain, dans l'ordre d'utilisation.
+
+        Un rôle rassemble parfois plusieurs postes que le type ne distingue
+        pas : à Roissy, le contrôle sol, cinq secteurs d'aire de stationnement
+        et une rampe cargo partagent le type « sol ». Le nom les sépare, et
+        seul le poste cité en premier tient la rangée ; les autres suivent en
+        `alternates`, avec leur nom, plutôt que de la faire déborder.
+        """
+        reader = getattr(self.provider, "frequencies", None)
+        if not callable(reader):
+            # Fournisseur antérieur à cette lecture : le plan se construit sans
+            # les fréquences plutôt que d'échouer.
+            return []
+
+        published = list(reader(icao))
+        by_code: dict[str, list[AirportFrequency]] = {}
+        for entry in published:
+            by_code.setdefault(entry.code, []).append(entry)
+
+        # Sous quels rôles chaque poste apparaît-il ? C'est ce qui distingue
+        # l'organisme de contrôle de ses satellites : « DE GAULLE » tient la
+        # clairance, le sol, la tour, le départ et l'approche, tandis que
+        # « DE GAULLE APRON » et « FEDEX RAMP CONTROL » ne tiennent que le sol.
+        #
+        # Sans ce comptage, l'ordre du simulateur décidait — et il place l'aire
+        # de stationnement en tête à Roissy. La carte aurait proposé d'appeler
+        # une aire pour rouler.
+        roles_of: dict[str, set[str]] = {}
+        for entry in published:
+            roles_of.setdefault(entry.name, set()).add(entry.code)
+
+        wanted = [code for code in chain if code in by_code]
+        if not wanted:
+            wanted = [
+                code for code in _UNCONTROLLED_FREQUENCIES if code in by_code
+            ]
+
+        rows: list[FrequencyRow] = []
+        for code in wanted:
+            entries = by_code[code]
+            principal = _leading_station(entries, roles_of)
+            rows.append(
+                FrequencyRow(
+                    code=code,
+                    name=principal,
+                    stations=[
+                        RadioStation(mhz=entry.mhz, name=entry.name)
+                        for entry in entries
+                        if entry.name == principal
+                    ],
+                    alternates=[
+                        RadioStation(mhz=entry.mhz, name=entry.name)
+                        for entry in entries
+                        if entry.name != principal
+                    ],
+                )
+            )
+        return rows
 
     def _wind_for(
         self, icao: str, forced_metar: str | None, ofp_metar: str | None

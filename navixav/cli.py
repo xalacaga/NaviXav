@@ -282,6 +282,32 @@ def cmd_airport(args: argparse.Namespace, settings: Settings) -> int:
             )
         console.print(runways)
 
+        # Le nombre par lequel le simulateur désigne le rôle est affiché en
+        # regard du sigle. C'est ce qui permet de vérifier la table de
+        # correspondance sans décoller : si « tour » ne tombe pas sur TWR, la
+        # ligne dit exactement quelle entrée de FREQUENCY_CODES corriger.
+        published = provider.frequencies(icao, include_unknown=True)
+        if published:
+            table = Table(title="Fréquences", title_justify="left")
+            for column in ("Sigle", "Fréquence", "Type MSFS", "Station"):
+                table.add_column(column)
+            for frequency in published:
+                table.add_row(
+                    frequency.code or "[yellow]—[/yellow]",
+                    f"{frequency.mhz:.3f}",
+                    str(frequency.type_id),
+                    frequency.name or "—",
+                )
+            console.print(table)
+
+            untranslated = sorted({f.type_id for f in published if not f.code})
+            if untranslated:
+                console.print(
+                    "[yellow]Type de fréquence non traduit :[/yellow] "
+                    + ", ".join(str(value) for value in untranslated)
+                    + " [dim]— à ajouter à FREQUENCY_CODES[/dim]"
+                )
+
         wanted = args.runway.strip().upper() if args.runway else None
         for kind, title in (
             (ProcedureKind.SID, "SID"),

@@ -33,7 +33,11 @@ from navixav.ground import (
     ARRIVAL,
     DEPARTURE,
     GroundError,
+    Parking,
     TaxiCosts,
+    TaxiEdge,
+    TaxiGraph,
+    TaxiNode,
     build_graph,
     find_route,
     parse_taxiways,
@@ -144,11 +148,130 @@ def test_a_hold_short_point_is_recognised(graph):
 
 def test_runway_entries_are_where_the_taxiways_meet_the_runway(graph):
     """Les autres points de la piste lui sont intérieurs et ne mènent nulle part."""
-    assert graph.runway_entries("09") == (3,)
+    assert graph.runway_entries("09") == (3, 6)
 
 
 def test_runway_entries_accept_an_unpadded_number(graph):
     assert graph.runway_entries("9") == graph.runway_entries("09")
+
+
+def test_takeoff_entry_does_not_discard_a_threshold_entry_for_a_remote_hold_marker():
+    """Un marquage MSFS isolé ne doit pas imposer une intersection lointaine."""
+    nodes = {
+        0: TaxiNode(0, 0.0, 0.0, "normal"),
+        1: TaxiNode(1, 0.0, -50.0, "normal"),
+        2: TaxiNode(2, 1000.0, 0.0, "hold_short"),
+        3: TaxiNode(3, 1000.0, -50.0, "normal"),
+        4: TaxiNode(4, 100.0, 0.0, "normal"),
+        5: TaxiNode(5, 1100.0, 0.0, "normal"),
+    }
+    edges = (
+        TaxiEdge(0, 4, 100.0, 45.0, "runway", None, "09"),
+        TaxiEdge(0, 1, 50.0, 23.0, "path", "Q", None),
+        TaxiEdge(2, 5, 100.0, 45.0, "runway", None, "09"),
+        TaxiEdge(2, 3, 50.0, 23.0, "path", "H3", None),
+    )
+    adjacency = {index: [] for index in nodes}
+    for edge in edges:
+        adjacency[edge.start].append(edge)
+        adjacency[edge.end].append(edge)
+    network = TaxiGraph(
+        icao="TEST",
+        origin_lat=0.0,
+        origin_lon=0.0,
+        nodes=nodes,
+        edges=edges,
+        parkings=(),
+        adjacency={index: tuple(value) for index, value in adjacency.items()},
+        thresholds={"09": (0.0, 0.0)},
+    )
+
+    assert network.runway_entries("09") == (0, 2)
+    assert network.takeoff_entry("09") == (0,)
+
+
+def test_a_taxiway_crossing_a_runway_is_split_at_an_explicit_hold():
+    nodes = {
+        0: TaxiNode(0, -100.0, 0.0, "normal"),
+        1: TaxiNode(1, 0.0, 0.0, "normal"),
+        2: TaxiNode(2, 100.0, 0.0, "normal"),
+        3: TaxiNode(3, 0.0, -100.0, "normal"),
+        4: TaxiNode(4, 0.0, 100.0, "normal"),
+    }
+    edges = (
+        TaxiEdge(0, 1, 100.0, 23.0, "path", "A", None),
+        TaxiEdge(1, 2, 100.0, 23.0, "path", "A", None),
+        TaxiEdge(3, 1, 100.0, 45.0, "runway", None, "18"),
+        TaxiEdge(1, 4, 100.0, 45.0, "runway", None, "18"),
+    )
+    adjacency = {index: [] for index in nodes}
+    for edge in edges:
+        adjacency[edge.start].append(edge)
+        adjacency[edge.end].append(edge)
+    network = TaxiGraph(
+        icao="TEST",
+        origin_lat=0.0,
+        origin_lon=0.0,
+        nodes=nodes,
+        edges=edges,
+        parkings=(),
+        adjacency={index: tuple(value) for index, value in adjacency.items()},
+    )
+
+    route = find_route(network, 0, 2)
+
+    assert route.summary() == ("A", "attente 18", "A")
+    assert route.legs[0].points[-1] == (0.0, 0.0)
+    assert route.legs[0].hold_short == "18"
+
+
+def test_the_validator_rejects_a_certain_crossing_if_its_hold_disappears():
+    from navixav.ground.route import RouteLeg, _validate_runway_crossings
+
+    nodes = {
+        0: TaxiNode(0, -100.0, 0.0, "normal"),
+        1: TaxiNode(1, 0.0, 0.0, "normal"),
+        2: TaxiNode(2, 100.0, 0.0, "normal"),
+        3: TaxiNode(3, 0.0, -100.0, "normal"),
+        4: TaxiNode(4, 0.0, 100.0, "normal"),
+    }
+    edges = (
+        TaxiEdge(0, 1, 100.0, 23.0, "path", "A", None),
+        TaxiEdge(1, 2, 100.0, 23.0, "path", "A", None),
+        TaxiEdge(3, 1, 100.0, 45.0, "runway", None, "18"),
+        TaxiEdge(1, 4, 100.0, 45.0, "runway", None, "18"),
+    )
+    adjacency = {index: [] for index in nodes}
+    for edge in edges:
+        adjacency[edge.start].append(edge)
+        adjacency[edge.end].append(edge)
+    network = TaxiGraph(
+        icao="TEST",
+        origin_lat=0.0,
+        origin_lon=0.0,
+        nodes=nodes,
+        edges=edges,
+        parkings=(),
+        adjacency={index: tuple(value) for index, value in adjacency.items()},
+    )
+    silently_grouped = (
+        RouteLeg(
+            name="A",
+            kind="path",
+            distance_m=200.0,
+            turn=None,
+            points=((-100.0, 0.0), (0.0, 0.0), (100.0, 0.0)),
+            hold_short=None,
+        ),
+    )
+
+    with pytest.raises(GroundError) as error:
+        _validate_runway_crossings(
+            network, (0, 1, 2), edges[:2], silently_grouped
+        )
+
+    assert error.value.code == "ground_unsafe_runway_crossing"
+    assert error.value.params == {"icao": "TEST", "runway": "18"}
 
 
 def test_the_network_knows_which_runways_it_serves(graph):
@@ -271,7 +394,9 @@ def test_a_departure_starts_at_the_stand_and_ends_short_of_the_runway(graph):
     plan = plan_taxi(graph, parking="porte A 1", runway="09")
     assert plan.direction == DEPARTURE
     first, last = plan.legs()[0], plan.legs()[-1]
-    assert first["kind"] == "stand"
+    # Le poste d'essai est une porte : on le quitte tracté, et le tronçon le
+    # dit. Voir les épreuves du repoussage plus bas.
+    assert first["kind"] == "pushback"
     assert first["points"][0] == {"x": -50.0, "y": -25.0}
     assert last["hold_short"] == "09"
 
@@ -291,6 +416,78 @@ def test_an_arrival_leaves_the_runway_by_its_nearest_exit(graph):
     assert plan.route.nodes[-1] == graph.parking("porte A 1").node
 
 
+def _directional_arrival_graph() -> TaxiGraph:
+    """Deux sorties : la plus courte vers la porte est derrière l'avion."""
+    nodes = {
+        index: TaxiNode(index, x, y, NORMAL)
+        for index, (x, y) in enumerate((
+            (0.0, 0.0), (100.0, 0.0), (200.0, 0.0), (300.0, 0.0),
+            (100.0, -100.0), (300.0, -100.0), (150.0, -200.0),
+        ))
+    }
+    edges = (
+        TaxiEdge(0, 1, 100.0, 45.0, "runway", None, "09"),
+        TaxiEdge(1, 2, 100.0, 45.0, "runway", None, "09"),
+        TaxiEdge(2, 3, 100.0, 45.0, "runway", None, "09"),
+        TaxiEdge(1, 4, 100.0, 23.0, "taxi", "A", None),
+        TaxiEdge(4, 6, 180.0, 23.0, "taxi", "A", None),
+        TaxiEdge(3, 5, 100.0, 23.0, "taxi", "B", None),
+        TaxiEdge(5, 6, 180.0, 23.0, "taxi", "B", None),
+    )
+    adjacency = {index: [] for index in nodes}
+    for edge in edges:
+        adjacency[edge.start].append(edge)
+        adjacency[edge.end].append(edge)
+    return TaxiGraph(
+        icao="TEST",
+        origin_lat=0.0,
+        origin_lon=0.0,
+        nodes=nodes,
+        edges=edges,
+        parkings=(Parking("porte 32", "porte grande", 150.0, -220.0,
+                          20.0, 0.0, 6, 20.0),),
+        adjacency={index: tuple(items) for index, items in adjacency.items()},
+        runway_headings={"09": 90.0, "27": 270.0},
+        routable_nodes=frozenset(nodes),
+    )
+
+
+def test_an_arrival_never_returns_to_an_exit_already_passed():
+    network = _directional_arrival_graph()
+
+    # Sans position, l'ancien calcul choisit bien A, plus proche de la porte.
+    assert plan_taxi(
+        network, parking="porte 32", runway="09", direction=ARRIVAL
+    ).route.nodes[0] == 1
+
+    plan = plan_taxi(
+        network,
+        parking="porte 32",
+        runway="09",
+        direction=ARRIVAL,
+        position=(190.0, 0.0),
+    )
+
+    assert plan.route.nodes[:2] == (2, 3)
+    assert 1 not in plan.route.nodes
+    assert "B" in plan.summary()
+
+
+def test_the_reciprocal_runway_reverses_the_allowed_arrival_direction():
+    network = _directional_arrival_graph()
+    plan = plan_taxi(
+        network,
+        parking="porte 32",
+        runway="27",
+        direction=ARRIVAL,
+        position=(210.0, 0.0),
+    )
+
+    assert plan.route.nodes[:2] == (2, 1)
+    assert 3 not in plan.route.nodes
+    assert "A" in plan.summary()
+
+
 def test_the_lead_in_line_counts_in_the_total_distance(graph):
     plan = plan_taxi(graph, parking="porte A 1", runway="09")
     assert plan.has_lead_in
@@ -301,7 +498,7 @@ def test_the_lead_in_line_counts_in_the_total_distance(graph):
 
 def test_the_summary_names_both_ends(graph):
     plan = plan_taxi(graph, parking="porte A 1", runway="09")
-    assert plan.summary() == ("porte A 1", "A", "B", "attente 09")
+    assert plan.summary() == ("porte A 1", "repoussage", "A", "B", "attente 09")
     arrival = plan_taxi(graph, parking="porte A 1", runway="09", direction=ARRIVAL)
     assert arrival.summary()[-1] == "porte A 1"
 
@@ -334,7 +531,7 @@ def test_a_departure_from_the_other_threshold_finds_the_same_entries(graph):
     """Le simulateur ne nomme qu'un seuil : « 27 » doit trouver la piste « 09 »."""
     assert graph.runway_entries("27") == graph.runway_entries("09")
     plan = plan_taxi(graph, parking="porte A 1", runway="27")
-    assert plan.route.nodes == (7, 0, 1, 3)
+    assert plan.route.nodes == (7, 0, 1, 2, 6)
 
 
 def test_the_hold_instruction_names_the_runway_the_pilot_uses(graph):
@@ -462,7 +659,7 @@ def test_lfbo_e42_does_not_cut_across_the_airport(ground_provider):
     network = _routable(ground_provider, "LFBO")
     plan = plan_taxi(network, parking="porte E 42", runway="32R")
 
-    assert plan.summary()[:3] == ("porte E 42", "T41", "T40")
+    assert plan.summary()[:4] == ("porte E 42", "repoussage", "T41", "T40")
     assert plan.summary()[-2:] == ("N1", "attente 32R")
     assert all(edge.kind != "parking" for edge in network.edges)
     # Aucun segment individuel de cet itinéraire local ne doit traverser tout
@@ -533,8 +730,13 @@ def test_the_service_returns_a_drawable_route(routable_app):
     payload = _endpoint(routable_app, "/api/ground/{icao}/route")(
         "TEST", "porte A 1", "09", DEPARTURE
     )
-    assert payload["summary"] == ["porte A 1", "A", "B", "attente 09"]
-    assert payload["legs"][0]["kind"] == "stand"
+    assert payload["summary"] == ["porte A 1", "repoussage", "A", "B", "attente 09"]
+    assert payload["legs"][0]["kind"] == "pushback"
+    # Le bandeau lit la manœuvre du tracteur au niveau du plan, pas du tronçon :
+    # tous les tronçons gardent la même forme.
+    assert payload["pushback"] == {
+        "distance_m": 50.2, "heading": 0, "target": {"x": 0.0, "y": -20.0},
+    }
     assert payload["distance_m"] > 600
     assert all(leg["points"] for leg in payload["legs"])
 
@@ -570,7 +772,7 @@ def test_the_dictated_route_follows_the_named_taxiways(graph):
     assert [leg["name"] for leg in plan.legs() if leg["name"]] == [
         "porte A 1", "A", "B"
     ]
-    assert plan.summary() == ("porte A 1", "A", "B", "attente 09")
+    assert plan.summary() == ("porte A 1", "repoussage", "A", "B", "attente 09")
 
 
 def test_the_dictated_route_matches_the_automatic_one_when_it_is_the_same(graph):
@@ -592,7 +794,8 @@ def test_the_leg_of_the_clearance_itself_is_not_marked_as_added(graph):
     plan = plan_taxi(graph, parking="porte A 1", runway="09", via=("A",))
     cleared = [
         leg["name"] for leg in plan.legs()
-        if leg["from_clearance"] and leg["name"] and leg["kind"] != "stand"
+        if leg["from_clearance"] and leg["name"]
+        and leg["kind"] not in ("stand", "pushback")
     ]
     assert cleared == ["A"]
 
@@ -671,7 +874,7 @@ def test_no_clearance_keeps_the_automatic_route(routable_app):
         "TEST", "porte A 1", "09", DEPARTURE, ""
     )
     assert payload["dictated"] is False
-    assert payload["summary"] == ["porte A 1", "A", "B", "attente 09"]
+    assert payload["summary"] == ["porte A 1", "repoussage", "A", "B", "attente 09"]
 
 
 def test_every_ground_error_code_is_translated_in_every_language():
@@ -696,3 +899,105 @@ def test_every_ground_error_code_is_translated_in_every_language():
         if catalogue.count(f"err_{code}:") != 8
     }
     assert not missing, f"codes sans leurs huit traductions : {missing}"
+
+
+# --------------------------------------------------------------------------- #
+# Repoussage
+# --------------------------------------------------------------------------- #
+
+
+def _graph_with_stand(tmp_path: Path, *, name_index: int, kind: int):
+    """Le même aérodrome, avec un poste d'une autre nature."""
+    airport = _airport()
+    airport["taxi_parkings"][0] |= {"name_index": name_index, "type": kind}
+    store = tmp_path / "navixav.sqlite"
+    connection = msfs_store.connect(store)
+    msfs_store.store_airport(connection, airport)
+    connection.close()
+
+    provider = MsfsProvider(store, allow_fetch=False)
+    try:
+        return build_graph(provider, "TEST")
+    finally:
+        provider.close()
+
+
+def test_a_gate_is_left_by_a_pushback_facing_the_taxiway(graph):
+    """Un avion nez au terminal n'en sort pas par ses propres moyens.
+
+    La ligne de guidage est la même, parcourue en marche arrière : le tracé et
+    la distance ne changent pas, seule la nature du tronçon le dit.
+    """
+    plan = plan_taxi(graph, parking="porte A 1", runway="09")
+
+    assert plan.needs_pushback
+    assert plan.legs()[0]["kind"] == "pushback"
+    pushback = plan.pushback()
+    assert pushback["distance_m"] == pytest.approx(plan.parking.lead_in_m, abs=0.1)
+    # Le poste regarde l'est, la desserte rejoint le réseau vers le nord : une
+    # fois repoussé, l'avion présente le cap de la voie qu'il va suivre. C'est
+    # l'orientation obtenue qui s'annonce, jamais le côté du mouvement — « nez
+    # à gauche » est un calque, pas de la phraséologie française.
+    assert plan.parking.heading == 90.0
+    assert pushback["heading"] == 0
+    assert "nose" not in pushback
+    # Le guidage lit `turn` pour annoncer les virages du roulage : une consigne
+    # de tracteur n'en est pas un.
+    assert plan.legs()[0]["turn"] is None
+    assert plan.summary()[:2] == ("porte A 1", "repoussage")
+
+
+def test_a_general_aviation_ramp_is_left_under_its_own_power(tmp_path):
+    """Annoncer un repoussage devant un hangar serait faux."""
+    network = _graph_with_stand(tmp_path, name_index=1, kind=2)
+    plan = plan_taxi(network, parking="parking 1", runway="09")
+
+    assert plan.parking.kind == "rampe GA"
+    assert not plan.needs_pushback
+    assert plan.pushback() is None
+    assert plan.legs()[0]["kind"] == "stand"
+    assert "repoussage" not in plan.summary()
+
+
+def test_a_taxi_taken_up_again_does_not_push_back_a_second_time(graph):
+    """Repris en cours de roulage, le départ ne repasse pas par le poste."""
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", position=(150.0, 0.0))
+
+    assert plan.from_position
+    assert not plan.needs_pushback
+    assert plan.pushback() is None
+    assert all(leg["kind"] != "pushback" for leg in plan.legs())
+
+
+def test_an_arrival_is_never_a_pushback(graph):
+    """À l'arrivée, l'avion entre au poste : le tracteur n'y est pour rien."""
+    plan = plan_taxi(graph, parking="porte A 1", runway="09", direction=ARRIVAL)
+
+    assert not plan.needs_pushback
+    assert plan.pushback() is None
+    assert plan.legs()[-1]["kind"] == "stand"
+
+
+def test_the_pushback_heading_follows_the_route_not_the_stand(tmp_path):
+    """Le cap annoncé est celui de la voie, quel que soit le cap au poste.
+
+    Le poste regarde ici le sud, la desserte rejoint toujours le réseau vers le
+    nord : c'est elle qui commande, sans quoi le bandeau annoncerait un cap que
+    le tracé dément.
+    """
+    airport = _airport()
+    airport["taxi_parkings"][0]["heading"] = 180.0
+    store = tmp_path / "navixav.sqlite"
+    connection = msfs_store.connect(store)
+    msfs_store.store_airport(connection, airport)
+    connection.close()
+    provider = MsfsProvider(store, allow_fetch=False)
+    try:
+        network = build_graph(provider, "TEST")
+    finally:
+        provider.close()
+
+    plan = plan_taxi(network, parking="porte A 1", runway="09")
+
+    assert plan.parking.heading == 180.0
+    assert plan.pushback()["heading"] == 0
