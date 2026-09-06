@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ctypes
+
 import pytest
 
 from navixav.msfs import client as msfs_client
@@ -11,6 +13,9 @@ from navixav.live.simconnect import (
     _CAPABILITY_VARIABLES,
     _CONFIGURATION_VARIABLES,
     _FENIX_CONTROL_VARIABLES,
+    _FENIX_BARO_VARIABLES,
+    _FENIX_ILS_VARIABLES,
+    _NAV_SELECTION_VARIABLES,
     _AIRCRAFT_TITLE_VARIABLES,
     _LIGHT_STATE_VARIABLES,
     _MODERN_CONFIGURATION_VARIABLES,
@@ -59,6 +64,10 @@ def test_configuration_variables_declare_their_units():
         + _MODERN_CONFIGURATION_VARIABLES
         + _LIGHT_STATE_VARIABLES
         + _CAPABILITY_VARIABLES
+        + _FENIX_CONTROL_VARIABLES
+        + _FENIX_BARO_VARIABLES
+        + _FENIX_ILS_VARIABLES
+        + _NAV_SELECTION_VARIABLES
     ):
         assert name and unit, f"unité manquante pour {name}"
 
@@ -173,6 +182,12 @@ class FakeClient:
                 "SPOILER AVAILABLE": 0.0,
                 "FLAPS NUM HANDLE POSITIONS": 5.0,
             }
+        if variables == _FENIX_BARO_VARIABLES:
+            return {"L:B_FCU_EFIS1_BARO_STD": 1.0}
+        if variables == _FENIX_ILS_VARIABLES:
+            return {"NAV ACTIVE FREQUENCY:3": 108.15}
+        if variables == _NAV_SELECTION_VARIABLES:
+            return {"AUTOPILOT NAV SELECTED": 1.0}
         raise AssertionError(f"bloc de variables inattendu : {variables}")
 
     def close(self):
@@ -256,6 +271,7 @@ def test_configuration_is_read_and_normalised(monkeypatch):
     # le réglage de la radio, il ne le commande pas.
     assert configuration.com1_frequency_mhz == pytest.approx(121.855)
     assert configuration.nav1_frequency_mhz == pytest.approx(110.30)
+    assert configuration.ils_frequency_mhz == pytest.approx(110.30)
     assert configuration.fuel_total_kg == 4200.0
     # Les caps sont ramenés dans [0, 360[ comme ceux de la position.
     assert configuration.selected_heading_deg == 1.0
@@ -393,6 +409,8 @@ def test_fenix_family_reads_its_cockpit_levers_with_engines_off(monkeypatch, mod
                     "L:S_FC_FLAPS": 2.0,
                     "L:A_FC_SPEEDBRAKE": 3.0,
                     "L:S_MIP_PARKING_BRAKE": 1.0,
+                    "L:S_OH_PNEUMATIC_ENG1_ANTI_ICE": 1.0,
+                    "L:S_OH_PNEUMATIC_ENG2_ANTI_ICE": 1.0,
                 }
             return super().read_simvars(variables, timeout_s)
 
@@ -407,6 +425,9 @@ def test_fenix_family_reads_its_cockpit_levers_with_engines_off(monkeypatch, mod
     assert configuration.spoilers_handle_pct == 100.0
     assert configuration.spoilers_armed is False
     assert configuration.parking_brake is True
+    # La SimVar standard du faux client vaut zéro : seule la commande Fenix
+    # prouve ici que l'antigivrage est réellement sélectionné.
+    assert configuration.engine_anti_ice is True
 
 
 def test_fenix_speedbrake_zero_means_armed(monkeypatch):
@@ -417,6 +438,8 @@ def test_fenix_speedbrake_zero_means_armed(monkeypatch):
                     "L:S_FC_FLAPS": 0.0,
                     "L:A_FC_SPEEDBRAKE": 0.0,
                     "L:S_MIP_PARKING_BRAKE": 0.0,
+                    "L:S_OH_PNEUMATIC_ENG1_ANTI_ICE": 0.0,
+                    "L:S_OH_PNEUMATIC_ENG2_ANTI_ICE": 0.0,
                 }
             values = super().read_simvars(variables, timeout_s)
             if variables == _CONFIGURATION_VARIABLES:
@@ -452,6 +475,8 @@ def test_loaded_msfs_title_selects_fenix_when_simbrief_name_is_generic(monkeypat
                     "L:S_FC_FLAPS": 0.0,
                     "L:A_FC_SPEEDBRAKE": 0.0,
                     "L:S_MIP_PARKING_BRAKE": 0.0,
+                    "L:S_OH_PNEUMATIC_ENG1_ANTI_ICE": 0.0,
+                    "L:S_OH_PNEUMATIC_ENG2_ANTI_ICE": 0.0,
                 }
             return super().read_simvars(variables, timeout_s)
 
@@ -464,6 +489,102 @@ def test_loaded_msfs_title_selects_fenix_when_simbrief_name_is_generic(monkeypat
     assert state.title == "Fenix A320 CFM Air France"
     assert state.configuration is not None
     assert state.configuration.spoilers_armed is True
+
+
+@pytest.mark.parametrize("model", ["A319", "A320", "A321"])
+@pytest.mark.parametrize("frequency", [108.15, 110.30, None, 0, float("nan"), float("inf")])
+def test_fenix_ils_uses_nav3_without_replacing_nav1(monkeypatch, model, frequency):
+    class IlsClient(FakeClient):
+        def read_simvars(self, variables, timeout_s=3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                raise SimConnectError("controls unavailable")
+            if variables == _FENIX_ILS_VARIABLES:
+                if frequency is None:
+                    raise SimConnectError("ILS unavailable")
+                return {"NAV ACTIVE FREQUENCY:3": frequency}
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint(f"Fenix {model}")
+    monkeypatch.setattr(source, "_connect", lambda: IlsClient())
+    configuration = source.read().configuration
+    assert configuration.nav1_frequency_mhz == pytest.approx(110.30)
+    if frequency in (108.15, 110.30):
+        assert configuration.ils_frequency_mhz == pytest.approx(frequency)
+    else:
+        assert configuration.ils_frequency_mhz is None
+
+
+@pytest.mark.parametrize("selected", [1, 2, 3, 4, 0, 1.5, None])
+def test_generic_ils_follows_selected_receiver_and_rejects_unknown(selected):
+    class Radios:
+        def read_simvars(self, variables, timeout_s):
+            if variables == _NAV_SELECTION_VARIABLES:
+                if selected is None:
+                    raise SimConnectError("selection unavailable")
+                return {"AUTOPILOT NAV SELECTED": selected}
+            return {variables[0][0]: 108.15}
+
+    result = SimConnectSource()._read_ils_receiver(Radios(), {"NAV ACTIVE FREQUENCY:1": 113.6})
+    if selected in (1, 2, 3, 4):
+        assert result == (selected, 113.6 if selected == 1 else 108.15)
+    else:
+        assert result == (None, None)
+
+
+@pytest.mark.parametrize("title", ["FlyByWire A320 Neo", "A32NX Air France", "Fenix A319", "Fenix A320", "Fenix A321"])
+def test_dedicated_ils_mapping_ignores_generic_nav_selection(title):
+    class Radios:
+        def read_simvars(self, variables, timeout_s):
+            assert variables == _FENIX_ILS_VARIABLES
+            return {"NAV ACTIVE FREQUENCY:3": 108.15}
+
+    source = SimConnectSource()
+    source._aircraft_title = title
+    assert source._read_ils_receiver(Radios(), {}) == (3, 108.15)
+
+
+def test_loaded_aircraft_overrides_planned_fenix_for_ils():
+    source = SimConnectSource()
+    source._aircraft_title = "Cessna 172"
+    source.set_aircraft_hint("Fenix A320")
+    assert source._read_ils_receiver(FakeClient(), {"NAV ACTIVE FREQUENCY:1": 110.30}) == (1, 110.30)
+
+
+def test_fenix_reports_anti_ice_off_if_either_engine_is_unprotected(monkeypatch):
+    class OneEngineUnprotectedClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                return {
+                    "L:S_FC_FLAPS": 0.0,
+                    "L:A_FC_SPEEDBRAKE": 0.0,
+                    "L:S_MIP_PARKING_BRAKE": 0.0,
+                    "L:S_OH_PNEUMATIC_ENG1_ANTI_ICE": 1.0,
+                    "L:S_OH_PNEUMATIC_ENG2_ANTI_ICE": 0.0,
+                }
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint("Fenix A320")
+    monkeypatch.setattr(source, "_connect", lambda: OneEngineUnprotectedClient())
+
+    assert source.read().configuration.engine_anti_ice is False
+
+
+def test_fenix_does_not_turn_a_lvar_read_failure_into_a_false_anti_ice_alarm(
+    monkeypatch,
+):
+    class UnavailableFenixControlsClient(FakeClient):
+        def read_simvars(self, variables, timeout_s: float = 3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                raise SimConnectError("bloc Fenix momentanément indisponible")
+            return super().read_simvars(variables, timeout_s)
+
+    source = SimConnectSource()
+    source.set_aircraft_hint("Fenix A320")
+    monkeypatch.setattr(source, "_connect", lambda: UnavailableFenixControlsClient())
+
+    assert source.read().configuration.engine_anti_ice is None
 
 
 def test_atc_model_identifies_an_aircraft_whose_title_is_empty(monkeypatch):
@@ -690,6 +811,61 @@ def test_msfs2024_ai_creation_uses_ex1_with_legacy_fsltl_title():
     )
 
 
+def test_created_ai_aircraft_is_frozen_before_client_position_updates():
+    class AiDll:
+        def __init__(self):
+            self.assigned = msfs_client._RECV_ASSIGNED_OBJECT_ID()
+            self.assigned.dwSize = ctypes.sizeof(self.assigned)
+            self.assigned.dwID = msfs_client.RECV_ID_ASSIGNED_OBJECT_ID
+            self.assigned.dwRequestID = 2
+            self.assigned.dwObjectID = 42
+            self._view = ctypes.cast(
+                ctypes.byref(self.assigned), ctypes.POINTER(msfs_client._RECV)
+            )
+            self.mapped = []
+            self.transmitted = []
+
+        def SimConnect_AICreateNonATCAircraft_EX1(self, *_args):
+            return 0
+
+        def SimConnect_GetNextDispatch(self, _handle, pointer_ref, size_ref):
+            pointer_ref._obj.contents = self._view.contents
+            size_ref._obj.value = ctypes.sizeof(msfs_client._RECV_ASSIGNED_OBJECT_ID)
+            return 0
+
+        def SimConnect_AIReleaseControl(self, *_args):
+            return 0
+
+        def SimConnect_MapClientEventToSimEvent(self, _handle, event_id, name):
+            self.mapped.append((event_id, name))
+            return 0
+
+        def SimConnect_TransmitClientEvent(self, *args):
+            self.transmitted.append(args)
+            return 0
+
+        def SimConnect_AIRemoveObject(self, *_args):
+            return 0
+
+    client = object.__new__(SimConnectClient)
+    client._dll = AiDll()
+    client._handle = None
+    client._next_id = 1
+    client._client_events = {}
+
+    assert client.create_ai_aircraft(
+        "FSLTL A320 Air France", "AFR123",
+        latitude=48.0, longitude=2.0, altitude_ft=5000,
+        heading_deg=90, airspeed_kt=180, on_ground=False,
+    ) == (2, 42)
+
+    assert [name for _event_id, name in client._dll.mapped] == [
+        event.encode("ascii") for event in msfs_client.AI_POSITION_FREEZE_EVENTS
+    ]
+    assert len(client._dll.transmitted) == 3
+    assert all(call[1] == 42 and call[3] == 1 for call in client._dll.transmitted)
+
+
 def test_old_simconnect_dll_is_rejected_for_msfs2024(monkeypatch, tmp_path):
     old_dll = tmp_path / "SimConnect.dll"
     old_dll.touch()
@@ -805,3 +981,46 @@ def test_the_tracker_says_nothing_without_an_established_source():
     tracker = LiveTracker()
 
     assert tracker.traffic() == []
+
+
+def test_strict_traffic_reports_failure_including_retry_cooldown(monkeypatch):
+    source = SimConnectSource()
+    fake = _TrafficClient([], failing=True)
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+    tracker = LiveTracker()
+    tracker._active = source
+    for _ in range(2):
+        with pytest.raises(PositionUnavailable):
+            tracker.traffic(strict=True)
+    assert fake.calls == 1
+    assert tracker.traffic() == []
+
+
+@pytest.mark.parametrize("aircraft", ["Fenix A319", "Fenix A320", "Fenix A321"])
+@pytest.mark.parametrize("mode", [0, 1, None, 2])
+def test_fenix_captain_std_overrides_generic_mode_and_missing_data_stays_unknown(monkeypatch, aircraft, mode):
+    class BaroClient(FakeClient):
+        def read_simvars(self, variables, timeout_s=3.0):
+            if variables == _FENIX_CONTROL_VARIABLES:
+                return {name: 0 for name, unit in variables}
+            if variables == _FENIX_BARO_VARIABLES:
+                if mode is None:
+                    raise SimConnectError("EFIS unavailable")
+                # Actual session: the input remains zero with the displayed STD on.
+                return {"L:B_FCU_EFIS1_BARO_STD": mode, "L:S_FCU_EFIS1_BARO_STD": 0}
+            result = super().read_simvars(variables, timeout_s)
+            if variables == _MODERN_CONFIGURATION_VARIABLES:
+                result["KOHLSMAN SETTING STD:1"] = 1 if mode == 0 else 0
+                result["KOHLSMAN SETTING MB EX1:1"] = 1008
+            return result
+
+    source = SimConnectSource()
+    source.set_aircraft_hint(aircraft)
+    monkeypatch.setattr(source, "_connect", lambda: BaroClient())
+    configuration = source.read().configuration
+    if mode in (0, 1):
+        assert configuration.altimeter_std is bool(mode)
+        assert configuration.altimeter_hpa == (1013.25 if mode == 1 else 1008)
+    else:
+        assert configuration.altimeter_std is None
+        assert configuration.altimeter_hpa is None

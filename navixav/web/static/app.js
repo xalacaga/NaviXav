@@ -1,5 +1,68 @@
 "use strict";
 
+// One in-flight request per recurring read; old contexts cannot update the UI.
+const activePolls = new Map();
+let trafficGeneration = 0;
+let groundTrafficExpiry = null;
+let groundTrafficStale = false;
+let groundTrafficHeld = false;
+let panelFlightPublishedAt = -Infinity;
+
+function beginPoll(key, context = () => true) {
+  if (activePolls.has(key)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  const poll = {
+    current: () => context(),
+    async json(url, options = {}) {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (controller.signal.aborted) throw new Error("Polling timeout");
+      return data;
+    },
+    finish() {
+      clearTimeout(timer);
+      activePolls.delete(key);
+    },
+  };
+  activePolls.set(key, poll);
+  return poll;
+}
+
+function resetGroundTraffic() {
+  clearTimeout(groundTrafficExpiry);
+  groundTrafficExpiry = null;
+  groundTrafficHeld = false;
+  groundTrafficStale = false;
+  GROUND.clearTraffic();
+  renderGroundTrafficFreshness();
+}
+
+function renderGroundTrafficFreshness() {
+  const badge = $("ground-traffic-freshness");
+  if (!badge) return;
+  show(badge, groundTrafficStale && Boolean(latestStatus?.traffic_enabled));
+  badge.textContent = groundTrafficStale
+    ? t(groundTrafficHeld ? "taxi_traffic_held" : "taxi_traffic_expired") : "";
+}
+
+function trafficViewVisible(name) {
+  return !document.hidden && Boolean($(`panel-${name}`)?.getClientRects().length);
+}
+
+function refreshVisibleTraffic() {
+  if (document.hidden) return;
+  if (trafficViewVisible("map")) {
+    MAP.resize();
+    if (latestStatus?.traffic_enabled) void refreshTraffic();
+  }
+  if (trafficViewVisible("ground")) {
+    GROUND.resize();
+    if (latestStatus?.traffic_enabled) void refreshGroundTraffic();
+  }
+}
+
 const $ = (id) => document.getElementById(id);
 const t = (key) => window.I18N.t(key);
 const displayLocale = () => window.I18N.getLanguage();
@@ -45,6 +108,10 @@ function plannerText(value) {
     ["RNP requis, avion qualifié", t("reason_rnp_qualified")],
     ["transition la plus proche de la fin de la STAR", t("reason_transition_nearest_star")],
     ["transition imposée", t("reason_transition_forced")],
+    ["transition imposée non vérifiée", t("reason_transition_unverified")],
+    ["aucun raccord publié : transition à confirmer", t("reason_connection_missing")],
+    ["aucun raccord publié : guidage radar à confirmer", t("reason_vectors_unconfirmed")],
+    ["entrée unique publiée", t("reason_direct_entry")],
     ["piste imposée", t("source_forced")],
     ["approche imposée", t("source_forced")],
     ["SID imposée", t("source_forced")],
@@ -76,6 +143,10 @@ function plannerText(value) {
   ]);
   return text.split(" ; ").map((part) => {
     if (exact.has(part)) return exact.get(part);
+    const connection = part.match(/^Raccord (SID|STAR) (.+) → (.+) non vérifié\.$/);
+    if (connection) return tf("reason_link_unverified", { kind: connection[1], from: connection[2], to: connection[3] });
+    const transition = part.match(/^Transition (.+) non publiée pour (.+)\.$/);
+    if (transition) return tf("reason_transition_unpublished", { transition: transition[1], procedure: transition[2] });
     let match = part.match(/^type (.+) selon la préférence$/);
     if (match) return tf("reason_approach_type", { type: match[1] });
     match = part.match(/^(.+) à ([\d,.]+) NM de (.+)$/);
@@ -174,6 +245,10 @@ let vatsimTimer = null;
 let vatsimPositions = {};
 let trafficTimer = null;
 let groundTrafficTimer = null;
+/* Les réglages de trafic ne se commandent pas qu'ici : le panneau de la barre
+   d'outils MSFS agit sur le même service. Ce relevé les relit. */
+let trafficSettingsTimer = null;
+let trafficChangePending = false;
 /* Échéance du prochain relevé réseau, et relevé en cours. Le pilote doit
    pouvoir répondre à « c'est figé ou ça va se rafraîchir ? » sans compter. */
 /* Indicatif de l'appareil dont la fiche est ouverte. */
@@ -237,6 +312,12 @@ const TRAFFIC_REFRESH_INTERVAL_MS = 15 * 1000;
    secondes suffisent à voir avancer un appareil qui roule, sans énumérer les
    objets des environs à chaque battement du suivi. */
 const GROUND_TRAFFIC_INTERVAL_MS = 2000;
+
+/* Le panneau MSFS interroge le service toutes les trois secondes ; la fenêtre
+   fait de même pour les réglages de trafic, sans quoi elle continuerait
+   d'afficher la source précédente après un changement fait dans le
+   simulateur. Le relevé est local et ne coûte rien. */
+const TRAFFIC_SETTINGS_INTERVAL_MS = 3000;
 const CURRENT_FLIGHT_TRAIL_INTERVAL_MS = 5000;
 const CURRENT_FLIGHT_TRAIL_MAX_POINTS = 3600;
 const FLIGHT_LOG_INTERVAL_MS = 5000;
@@ -511,25 +592,35 @@ async function openChangelog() {
 }
 
 async function pollSimulatorStatus() {
-  const indicator = $("sim-status");
+  const context = () => true;
+  const poll = beginPoll("pollSimulatorStatus", context);
+  if (!poll) return;
   try {
-    const status = await fetch("/api/simulator", { cache: "no-store" }).then((r) => r.json());
-    const paused = Boolean(status.connected && status.paused);
-    indicator.classList.toggle("online", Boolean(status.connected) && !paused);
-    indicator.classList.toggle("paused", paused);
-    indicator.classList.toggle("offline", !status.connected);
-    $("sim-status-text").textContent = paused
-      ? t("sim_paused")
-      : (status.connected ? t("sim_connected") : t("sim_offline"));
-    indicator.title = status.connected
-      ? (paused
-        ? tf("sim_paused_title", { source: status.source || "SimConnect" })
-        : tf("sim_connected_title", { source: status.source || "SimConnect" }))
-      : (status.reason || t("sim_no_answer"));
-  } catch (_error) {
-    indicator.classList.remove("online", "paused");
-    indicator.classList.add("offline");
-    $("sim-status-text").textContent = t("server_stopped");
+    const indicator = $("sim-status");
+    try {
+      const status = await poll.json("/api/simulator", { cache: "no-store" });
+      if (!poll.current()) return;
+      const paused = Boolean(status.connected && status.paused);
+      indicator.classList.toggle("online", Boolean(status.connected) && !paused);
+      indicator.classList.toggle("paused", paused);
+      indicator.classList.toggle("offline", !status.connected);
+      $("sim-status-text").textContent = paused
+        ? t("sim_paused")
+        : (status.connected ? t("sim_connected") : t("sim_offline"));
+      indicator.title = status.connected
+        ? (paused
+          ? tf("sim_paused_title", { source: status.source || "SimConnect" })
+          : tf("sim_connected_title", { source: status.source || "SimConnect" }))
+        : (status.reason || t("sim_no_answer"));
+    } catch (_error) {
+      if (!poll.current()) return;
+      indicator.classList.remove("online", "paused");
+      indicator.classList.add("offline");
+      $("sim-status-text").textContent = t("server_stopped");
+    }
+
+  } finally {
+    poll.finish();
   }
 }
 
@@ -603,6 +694,117 @@ async function openFsltlDownload() {
     if (!response.ok) throw new Error(payload.detail || t("fsltl_download_failed"));
   } catch (error) {
     showBanner("error", t("fsltl_download_failed"), [String(error)]);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/**
+ * Installe ou retire le paquet du panneau MSFS, jamais sans un geste.
+ *
+ * Le dossier Community appartient au pilote : NaviXav n'y écrit que sur
+ * demande explicite, et n'en retire que le paquet qu'il y a lui-même posé.
+ */
+let msfsPanelActionPending = false;
+
+async function setMsfsPanel(action) {
+  const button = $(
+    action === "install" ? "settings-msfs-panel-install" : "settings-msfs-panel-remove"
+  );
+  if (action === "uninstall" && !confirm(t("msfs_panel_confirm_remove"))) return;
+  if (msfsPanelActionPending) return;
+
+  const buttons = [
+    $("settings-msfs-panel-install"),
+    $("settings-msfs-panel-remove"),
+  ];
+  const statusLine = $("settings-msfs-panel-status");
+  const previousStatus = statusLine?.textContent || "";
+  const pendingKey = action === "install"
+    ? "msfs_panel_installing"
+    : "msfs_panel_removing";
+
+  msfsPanelActionPending = true;
+  buttons.forEach((candidate) => { candidate.disabled = true; });
+  button.classList.add("is-busy");
+  button.setAttribute("aria-busy", "true");
+  button.textContent = t(pendingKey);
+  if (statusLine) {
+    statusLine.textContent = t(pendingKey);
+    statusLine.setAttribute("aria-busy", "true");
+  }
+  try {
+    const response = await fetch(`/api/msfs-panel/${action}`, {
+      method: "POST",
+      headers: { "X-NaviXav-External": "msfs-panel" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("msfs_panel_failed"));
+    renderMsfsPanelStatus(payload);
+  } catch (error) {
+    if (statusLine) statusLine.textContent = previousStatus;
+    showBanner("error", t("msfs_panel_failed"), [String(error)]);
+  } finally {
+    msfsPanelActionPending = false;
+    button.classList.remove("is-busy");
+    button.removeAttribute("aria-busy");
+    $("settings-msfs-panel-install").textContent = t("settings_msfs_panel_install");
+    $("settings-msfs-panel-remove").textContent = t("settings_msfs_panel_remove");
+    buttons.forEach((candidate) => { candidate.disabled = false; });
+    if (statusLine) statusLine.removeAttribute("aria-busy");
+  }
+}
+
+function renderMsfsPanelStatus(status) {
+  const line = $("settings-msfs-panel-status");
+  if (!line) return;
+  if (!status || !status.available || !status.complete) {
+    line.textContent = t("msfs_panel_unavailable");
+    show($("settings-msfs-panel-install"), false);
+    show($("settings-msfs-panel-remove"), false);
+    return;
+  }
+  // Le paquet installé garde le contenu de la version qui l'a écrit : un
+  // panneau plus ancien que celui livré ici n'a pas ses derniers boutons, et
+  // le bouton d'installation doit rester offert pour le remplacer.
+  const outdated = Boolean(
+    status.installed && status.version && status.installed_version !== status.version
+  );
+  if (outdated) {
+    line.textContent = tf("msfs_panel_outdated", {
+      installed: status.installed_version || "?",
+      version: status.version,
+    });
+  } else {
+    line.textContent = status.installed
+      ? tf("msfs_panel_installed", { version: status.installed_version || "?" })
+      : t("msfs_panel_not_installed");
+  }
+  show($("settings-msfs-panel-install"), !status.installed || outdated);
+  show($("settings-msfs-panel-remove"), Boolean(status.installed));
+}
+
+async function loadMsfsPanelStatus() {
+  try {
+    const response = await fetch("/api/msfs-panel/status");
+    renderMsfsPanelStatus(await response.json());
+  } catch {
+    renderMsfsPanelStatus(null);
+  }
+}
+
+async function openAigDownload() {
+  const button = $("settings-aig-download");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/aig/download", {
+      method: "POST",
+      headers: { "X-NaviXav-External": "aig" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("aig_download_failed"));
+  } catch (error) {
+    showBanner("error", t("aig_download_failed"), [String(error)]);
   } finally {
     button.disabled = false;
   }
@@ -768,10 +970,17 @@ async function openSettings() {
     $("settings-taxi-alarm").checked = values.taxi_speed_alarm_sound !== false;
     $("settings-vatsim").checked = Boolean(values.vatsim_enabled);
     $("settings-traffic-source").value = values.traffic_source || "vatsim";
+    $("settings-traffic-radius").value = values.traffic_radius_nm ?? 40;
+    $("settings-traffic-max-aircraft").value = values.traffic_max_aircraft ?? 10;
     syncTrafficSourceSettings();
     $("settings-aircraft-models").value = values.aircraft_models || "fsltl";
     $("settings-fsltl-path").value = values.fsltl_path || "";
-    const fsltl = latestStatus?.fsltl || {};
+    $("settings-aig-path").value = values.aig_path || "";
+    // Les deux jeux sont relevés quel que soit le choix : savoir ce qui est
+    // installé aide à choisir, et cacher le jeu non retenu laisserait croire
+    // qu'il est absent.
+    const sets = latestStatus?.models?.sets || {};
+    const fsltl = sets.fsltl || {};
     $("settings-fsltl-status").textContent = fsltl.detected
       ? `FSLTL Base Models ✓ ${tf("fsltl_detected", {
           version: fsltl.version || "?", models: fsltl.models || 0,
@@ -779,6 +988,20 @@ async function openSettings() {
       : `FSLTL Base Models ✕ ${t("fsltl_not_detected")}`;
     show($("settings-fsltl-download"), !fsltl.detected);
     show($("settings-fsltl-download-help"), !fsltl.detected);
+    const aig = sets.aig || {};
+    const companions = Array.isArray(aig.companions) ? aig.companions : [];
+    $("settings-aig-status").textContent = aig.detected
+      ? [
+          `AIG AI Traffic ✓ ${tf("aig_detected", {
+            version: aig.version || "?", models: aig.models || 0,
+          })}`,
+          companions.length
+            ? tf("aig_companions_missing", { packages: companions.join(", ") })
+            : "",
+        ].filter(Boolean).join(" · ")
+      : `AIG AI Traffic ✕ ${t("aig_not_detected")}`;
+    show($("settings-aig-download"), !aig.detected);
+    show($("settings-aig-download-help"), !aig.detected);
     $("settings-lan-enabled").checked = Boolean(values.lan_enabled);
     $("settings-aircraft-community").value = values.aircraft_community_path || "";
     show($("settings-lan-access"), Boolean(values.lan_enabled));
@@ -787,6 +1010,7 @@ async function openSettings() {
     $("settings-theme").value = window.THEME.getPreference();
     $("settings-interface").value = interfaceMode;
     $("settings-dialog").showModal();
+    loadMsfsPanelStatus();
     loadAircraftSurvey();
     loadChartFoxStatus();
   } catch (error) {
@@ -797,47 +1021,55 @@ async function openSettings() {
 function syncTrafficSourceSettings() {
   // La note du trafic réel ne prévient plus d'un refus : elle dit d'où vient
   // ce qui sera injecté, et l'attribution due à OpenSky l'accompagne.
-  show(
-    $("settings-real-traffic-note"),
-    $("settings-traffic-source").value === "opensky",
-  );
+  const source = $("settings-traffic-source").value;
+  show($("settings-real-traffic-note"), source === "opensky");
+  show($("settings-static-traffic-note"), source === "static");
 }
 
 async function saveSettings(event) {
   event.preventDefault();
+  const submit = $("settings-submit");
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.classList.add("is-busy");
+  submit.setAttribute("aria-busy", "true");
+  submit.textContent = t("saving");
   const message = $("settings-message");
   message.textContent = t("saving");
   message.className = "settings-message";
-  const payload = {
-    simbrief_pilot_id: $("settings-pilot-id").value.trim(),
-    simbrief_username: $("settings-username").value.trim(),
-    // Vide : la base NaviXav garde son emplacement par défaut.
-    navdata_store: "",
-    metar_source: $("settings-metar").value,
-    approach_preference: $("settings-approaches").value
-      .split(",").map((item) => item.trim()).filter(Boolean),
-    max_tailwind_kt: Number($("settings-tailwind").value),
-    max_crosswind_kt: Number($("settings-crosswind").value),
-    min_runway_length_ft: Number($("settings-runway-length").value),
-    aircraft_rnp_capable: $("settings-rnp").checked,
-    map_basemap: $("settings-basemap").value,
-    map_trail_color: $("settings-trail-color").value,
-    taxi_speed_limit_kt: Number($("settings-taxi-speed").value),
-    taxi_turn_speed_limit_kt: Number($("settings-taxi-turn-speed").value),
-    taxi_speed_alarm_sound: $("settings-taxi-alarm").checked,
-    vatsim_enabled: $("settings-vatsim").checked,
-    // Le trafic se commande depuis la barre de la carte, et ce seul
-    // interrupteur commande aussi l'injection. Sa valeur doit tout de même
-    // partir avec les autres, sinon enregistrer les paramètres l'éteindrait
-    // sans que personne l'ait demandé.
-    traffic_enabled: Boolean(latestStatus?.traffic_enabled),
-    traffic_source: $("settings-traffic-source").value,
-    aircraft_models: $("settings-aircraft-models").value,
-    fsltl_path: $("settings-fsltl-path").value.trim(),
-    aircraft_community_path: $("settings-aircraft-community").value.trim(),
-    lan_enabled: $("settings-lan-enabled").checked,
-  };
   try {
+    const payload = {
+      simbrief_pilot_id: $("settings-pilot-id").value.trim(),
+      simbrief_username: $("settings-username").value.trim(),
+      // Vide : la base NaviXav garde son emplacement par défaut.
+      navdata_store: "",
+      metar_source: $("settings-metar").value,
+      approach_preference: $("settings-approaches").value
+        .split(",").map((item) => item.trim()).filter(Boolean),
+      max_tailwind_kt: Number($("settings-tailwind").value),
+      max_crosswind_kt: Number($("settings-crosswind").value),
+      min_runway_length_ft: Number($("settings-runway-length").value),
+      aircraft_rnp_capable: $("settings-rnp").checked,
+      map_basemap: $("settings-basemap").value,
+      map_trail_color: $("settings-trail-color").value,
+      taxi_speed_limit_kt: Number($("settings-taxi-speed").value),
+      taxi_turn_speed_limit_kt: Number($("settings-taxi-turn-speed").value),
+      taxi_speed_alarm_sound: $("settings-taxi-alarm").checked,
+      vatsim_enabled: $("settings-vatsim").checked,
+      // Le trafic se commande depuis la barre de la carte, et ce seul
+      // interrupteur commande aussi l'injection. Sa valeur doit tout de même
+      // partir avec les autres, sinon enregistrer les paramètres l'éteindrait
+      // sans que personne l'ait demandé.
+      traffic_enabled: Boolean(latestStatus?.traffic_enabled),
+      traffic_source: $("settings-traffic-source").value,
+      traffic_radius_nm: Number($("settings-traffic-radius").value) || 40,
+      traffic_max_aircraft: Number($("settings-traffic-max-aircraft").value) || 10,
+      aircraft_models: $("settings-aircraft-models").value,
+      fsltl_path: $("settings-fsltl-path").value.trim(),
+      aig_path: $("settings-aig-path").value.trim(),
+      aircraft_community_path: $("settings-aircraft-community").value.trim(),
+      lan_enabled: $("settings-lan-enabled").checked,
+    };
     const response = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -852,11 +1084,20 @@ async function saveSettings(event) {
       ? t("lan_restart_required")
       : t("saved");
     const status = await loadStatus();
-    if (status.simbrief_configured) await buildPlan();
+    // L'enregistrement est terminé à ce stade. Le recalcul du plan peut
+    // prendre plusieurs dizaines de secondes (SimBrief, navdata, météo) :
+    // il continue en arrière-plan sans retenir la boîte de dialogue ni donner
+    // l'impression que le bouton Enregistrer n'a rien fait.
     setTimeout(() => $("settings-dialog").close(), 500);
+    if (status.simbrief_configured) void buildPlan();
   } catch (error) {
     message.textContent = String(error);
     message.className = "settings-message error";
+  } finally {
+    submit.disabled = false;
+    submit.classList.remove("is-busy");
+    submit.setAttribute("aria-busy", "false");
+    submit.textContent = t("save");
   }
 }
 
@@ -2203,6 +2444,20 @@ function contextNextAction(phaseKey, constraint, aircraft) {
   return t("context_review_plan");
 }
 
+/** Temps restant sur la route, mesuré en vol et prévu avant le décollage. */
+function remainingFlightSeconds(aircraft, projection) {
+  const plannedEteSeconds = Number(currentPlan?.dispatch?.time_enroute_s || 0);
+  const groundSpeedKt = Number(aircraft?.ground_speed_kt || 0);
+  const arrived = projection ? projection.remainingNm <= 5 : false;
+  if (projection && groundSpeedKt >= 40) {
+    return (projection.remainingNm / groundSpeedKt) * 3600;
+  }
+  if (plannedEteSeconds && !arrived && (!aircraft || aircraft.on_ground)) {
+    return plannedEteSeconds;
+  }
+  return null;
+}
+
 /** Met au premier plan l'information utile sans changer de module de force. */
 function updateGuidedContext(
   aircraft = latestAircraft,
@@ -2239,6 +2494,9 @@ function updateGuidedContext(
   $("context-route-value").textContent = `${departure} \u2192 ${arrival}`;
   $("context-phase-value").textContent = t(resolvedPhase);
   $("context-operation-value").textContent = contextOperation(resolvedPhase);
+  $("context-time-value").textContent = hhmm(
+    remainingFlightSeconds(aircraft, resolvedProjection)
+  ) || "—";
   $("context-next-value").textContent = contextNextAction(
     resolvedPhase,
     resolvedConstraint,
@@ -2397,7 +2655,7 @@ function descentGuidance(plan, aircraft, projection) {
 
   return {
     anchorFromDestination,
-    source: simbriefAnchor === null ? "calculated" : "simbrief",
+    source: simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated",
     targetAltitude,
     todInNm,
     requiredVsFpm,
@@ -2737,16 +2995,17 @@ const ALERT_RULES = [
     severity: "warning",
     armed: (c) => (
       Boolean(finiteOr(c.plan?.arrival?.ils_frequency_mhz))
+      && finiteOr(c.configuration.ils_frequency_mhz) !== null
       && (c.phase === t("phase_descent") || c.phase === t("phase_approach"))
       && finiteOr(c.projection?.remainingNm, Infinity) < 25
     ),
     when: (c) => {
       const expected = finiteOr(c.plan.arrival.ils_frequency_mhz);
-      const tuned = finiteOr(c.configuration.nav1_frequency_mhz, 0);
-      return Math.abs(tuned - expected) > 0.005;
+      const tuned = finiteOr(c.configuration.ils_frequency_mhz);
+      return tuned !== null && Math.abs(tuned - expected) > 0.005;
     },
     detail: (c) => (
-      `${finiteOr(c.configuration.nav1_frequency_mhz, 0).toFixed(2)}`
+      `NAV${c.configuration.ils_receiver_index || "?"} · ${finiteOr(c.configuration.ils_frequency_mhz, 0).toFixed(2)}`
       + ` / ${finiteOr(c.plan.arrival.ils_frequency_mhz).toFixed(2)}`
     ),
   },
@@ -4762,6 +5021,50 @@ function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEte
   liveValue("flight-progress-remaining", hhmm(remainingSeconds) || "—");
 }
 
+function updateTodDisplay(descent, phaseKey) {
+  // Phase comes from telemetry, not a reading of the FMS mode.
+  // Keep descent active through intermediate level segments.
+  const inDescent = phaseKey === "phase_descent"
+    || (descent?.leftCruise && phaseKey === "phase_enroute");
+  const inApproach = phaseKey === "phase_approach";
+  if (inDescent || inApproach) {
+    const text = t(inApproach ? "phase_approach" : "tod_descent_active");
+    liveValue("flight-tod", text, "good");
+    $("flight-tod").title = text;
+    return;
+  }
+  if (!descent || ["phase_offline", "phase_taxi_out", "phase_takeoff", "phase_landing", "phase_taxi_in"].includes(phaseKey)) {
+    liveValue("flight-tod", "\u2014");
+    $("flight-tod").title = "";
+    return;
+  }
+  const todText = descent.todInNm > 50
+    ? tf("tod_in", { distance: descent.todInNm.toFixed(0) })
+    : descent.todInNm > 10
+      ? tf("tod_prepare", { distance: descent.todInNm.toFixed(0) })
+      : descent.todInNm > 2
+        ? tf("tod_imminent", { distance: descent.todInNm.toFixed(0) })
+    : descent.todInNm >= -2
+      ? t("tod_now")
+      : tf("tod_passed", { distance: Math.abs(descent.todInNm).toFixed(0) });
+  // Franchir le TOD n'a rien d'anormal une fois la descente entamée : c'est
+  // rester en croisière au-delà du point qui doit alerter.
+  liveValue(
+    "flight-tod",
+    `${todText} · ${t(descent.source === "simbrief" ? "tod_source_simbrief" : "tod_source_estimated")}`,
+    descent.leftCruise
+      ? "good"
+      : descent.todInNm > 50
+        ? ""
+        : descent.todInNm > 10
+          ? "tod-ready"
+          : descent.todInNm > 2
+            ? "tod-imminent"
+            : "warning"
+  );
+  $("flight-tod").title = t("tod_fms_difference");
+}
+
 function updateFlightPanel(aircraft) {
   const projection = projectAircraftOnFlightPath(aircraft);
   const phaseKey = detectFlightPhaseKey(aircraft, projection);
@@ -4804,14 +5107,7 @@ function updateFlightPanel(aircraft) {
   // sol réelle. Sous 40 kt la division devient instable : avant le décollage on
   // retombe sur la prévision SimBrief, et après l'arrivée on n'affiche plus rien.
   const plannedEteSeconds = Number(currentPlan?.dispatch?.time_enroute_s || 0);
-  const groundSpeedKt = Number(aircraft?.ground_speed_kt || 0);
-  const arrived = projection ? projection.remainingNm <= 5 : false;
-  let remainingSeconds = null;
-  if (projection && groundSpeedKt >= 40) {
-    remainingSeconds = (projection.remainingNm / groundSpeedKt) * 3600;
-  } else if (plannedEteSeconds && !arrived && (!aircraft || aircraft.on_ground)) {
-    remainingSeconds = plannedEteSeconds;
-  }
+  const remainingSeconds = remainingFlightSeconds(aircraft, projection);
   updateFlightProgress(aircraft, projection, remainingSeconds, plannedEteSeconds);
 
   liveValue(
@@ -4861,31 +5157,8 @@ function updateFlightPanel(aircraft) {
     liveValue("flight-toc", "—");
   }
 
+  updateTodDisplay(descent, phaseKey);
   if (descent) {
-    const todText = descent.todInNm > 50
-      ? tf("tod_in", { distance: descent.todInNm.toFixed(0) })
-      : descent.todInNm > 10
-        ? tf("tod_prepare", { distance: descent.todInNm.toFixed(0) })
-        : descent.todInNm > 2
-          ? tf("tod_imminent", { distance: descent.todInNm.toFixed(0) })
-      : descent.todInNm >= -2
-        ? t("tod_now")
-        : tf("tod_passed", { distance: Math.abs(descent.todInNm).toFixed(0) });
-    // Franchir le TOD n'a rien d'anormal une fois la descente entamée : c'est
-    // rester en croisière au-delà du point qui doit alerter.
-    liveValue(
-      "flight-tod",
-      todText,
-      descent.leftCruise
-        ? "good"
-        : descent.todInNm > 50
-          ? ""
-          : descent.todInNm > 10
-            ? "tod-ready"
-            : descent.todInNm > 2
-              ? "tod-imminent"
-              : "warning"
-    );
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
     // `leftCruise` d'abord : sans lui, stabiliser à 4 000 ft bien avant le
@@ -4919,10 +5192,31 @@ function updateFlightPanel(aircraft) {
       );
     }
   } else {
-    for (const id of ["flight-tod", "flight-descent-vs", "flight-vertical-profile"]) {
+    for (const id of ["flight-descent-vs", "flight-vertical-profile"]) {
       liveValue(id, "—");
     }
   }
+  publishPanelFlight(aircraft);
+}
+
+function publishPanelFlight(aircraft) {
+  if (latestStatus?.remote_client || performance.now() - panelFlightPublishedAt < 2000) return;
+  const poll = beginPoll("panelFlight");
+  if (!poll) return;
+  panelFlightPublishedAt = performance.now();
+  const values = {};
+  for (const id of ["flight-next-fix", "flight-next-distance", "flight-progress-remaining", "flight-next-constraint", "flight-constraint-distance", "flight-tod"]) {
+    values[id] = $(id)?.textContent || "—";
+  }
+  const labels = {};
+  for (const key of ["panel_my_flight", "panel_flight_unavailable", "panel_confirmed", "panel_remaining", "flight_next_fix", "flight_next_constraint", "traffic_state_loading", "traffic_state_active", "traffic_state_empty", "traffic_state_error", "traffic_state_opensky_quota", "traffic_state_opensky_quota_detail", "traffic_state_stale", "traffic_state_detail"]) labels[key] = t(key);
+  void poll.json("/api/panel/flight", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision: currentPlan?.panel_revision || 0,
+      connected: Boolean(aircraft && currentPlan),
+      route: currentPlan ? `${currentPlan.departure?.icao || "----"} → ${currentPlan.arrival?.icao || "----"}` : "",
+      values, labels }),
+  }).catch(() => {}).finally(() => poll.finish());
 }
 
 function buildFlightAlertsToggle() {
@@ -5576,19 +5870,30 @@ function markVatsimPositions(scope) {
 
 /** Interroge le serveur pour les deux terrains du plan, puis remarque. */
 async function refreshVatsim() {
-  const icaos = [currentPlan?.departure?.icao, currentPlan?.arrival?.icao]
-    .filter(Boolean);
-  if (!icaos.length) return;
+  const chart = currentChart, plan = currentPlan;
+  const context = () => chart === currentChart && plan === currentPlan;
+  const poll = beginPoll("refreshVatsim", context);
+  if (!poll) return;
   try {
-    const params = new URLSearchParams({ icao: icaos.join(",") });
-    const data = await fetch(`/api/vatsim?${params}`).then((r) => r.json());
-    // Réseau indisponible : aucun poste marqué, plutôt qu'un marquage figé
-    // qui survivrait à la déconnexion du contrôleur.
-    vatsimPositions = data?.available ? (data.positions || {}) : {};
-  } catch {
-    vatsimPositions = {};
+    const icaos = [currentPlan?.departure?.icao, currentPlan?.arrival?.icao]
+      .filter(Boolean);
+    if (!icaos.length) return;
+    try {
+      const params = new URLSearchParams({ icao: icaos.join(",") });
+      const data = await poll.json(`/api/vatsim?${params}`);
+      if (!poll.current()) return;
+      // Réseau indisponible : aucun poste marqué, plutôt qu'un marquage figé
+      // qui survivrait à la déconnexion du contrôleur.
+      vatsimPositions = data?.available ? (data.positions || {}) : {};
+    } catch {
+      if (!poll.current()) return;
+      vatsimPositions = {};
+    }
+    markVatsimPositions();
+
+  } finally {
+    poll.finish();
   }
-  markVatsimPositions();
 }
 
 function startVatsimLoop() {
@@ -5613,13 +5918,25 @@ function startVatsimLoop() {
  * que son propre avion.
  */
 async function refreshTraffic() {
+  if (!trafficViewVisible("map")) return;
+  const generation = trafficGeneration;
+  const context = () => generation === trafficGeneration && trafficViewVisible("map");
+  const poll = beginPoll("refreshTraffic", context);
+  if (!poll) return;
   try {
-    const data = await fetch("/api/traffic").then((r) => r.json());
-    // Réseau indisponible : la carte est vidée plutôt que laissée sur un
-    // relevé figé, qui montrerait des appareils là où ils ne sont plus.
-    MAP.setTraffic(data?.available ? (data.traffic || []) : []);
-  } catch {
-    MAP.setTraffic([]);
+    try {
+      const data = await poll.json("/api/traffic");
+      if (!poll.current()) return;
+      // Réseau indisponible : la carte est vidée plutôt que laissée sur un
+      // relevé figé, qui montrerait des appareils là où ils ne sont plus.
+      MAP.setTraffic(data?.available ? (data.traffic || []) : []);
+    } catch {
+      if (!poll.current()) return;
+      MAP.setTraffic([]);
+    }
+
+  } finally {
+    poll.finish();
   }
 }
 
@@ -5742,11 +6059,40 @@ function placeTrafficCard(x, y) {
  * cent cinquante mètres au roulage, plus qu'une largeur de voie.
  */
 async function refreshGroundTraffic() {
+  if (!trafficViewVisible("ground")) return;
+  const generation = trafficGeneration;
+  const context = () => generation === trafficGeneration && trafficViewVisible("ground");
+  const poll = beginPoll("refreshGroundTraffic", context);
+  if (!poll) return;
   try {
-    const data = await fetch("/api/live/traffic").then((r) => r.json());
-    GROUND.setTraffic(data?.enabled ? (data.traffic || []) : []);
-  } catch {
-    GROUND.setTraffic([]);
+    try {
+      const data = await poll.json("/api/live/traffic");
+      if (!poll.current()) return;
+      if (typeof data?.enabled !== "boolean" || !Array.isArray(data.traffic)) {
+        throw new Error("Invalid traffic response");
+      }
+      clearTimeout(groundTrafficExpiry);
+      groundTrafficExpiry = null;
+      groundTrafficStale = false;
+      GROUND.setTraffic(data.enabled ? data.traffic : []);
+      groundTrafficHeld = data.enabled && data.traffic.length > 0;
+      renderGroundTrafficFreshness();
+      if (data.enabled) {
+        groundTrafficExpiry = setTimeout(() => {
+          groundTrafficHeld = false;
+          groundTrafficStale = true;
+          GROUND.clearTraffic();
+          renderGroundTrafficFreshness();
+        }, 10000);
+      }
+    } catch {
+      if (!poll.current()) return;
+      groundTrafficStale = true;
+      renderGroundTrafficFreshness();
+    }
+
+  } finally {
+    poll.finish();
   }
 }
 
@@ -5756,6 +6102,8 @@ async function refreshGroundTraffic() {
  * capable d'y répondre sans mentir.
  */
 function startTrafficLoop() {
+  trafficGeneration += 1;
+  resetGroundTraffic();
   syncTrafficButtons();
   // L'injection démarre côté service : son état ne se déduit pas d'ici.
   void refreshTrafficInjectionState();
@@ -5788,25 +6136,36 @@ function startTrafficLoop() {
  * Un client distant n'a pas la main sur les réglages du poste : il suit ce
  * que celui-ci a décidé, et ses boutons restent cachés.
  */
-function toggleTraffic() {
-  if (!latestStatus || latestStatus.remote_client) return;
-  latestStatus.traffic_enabled = !latestStatus.traffic_enabled;
+async function toggleTraffic() {
+  if (!latestStatus || latestStatus.remote_client || trafficChangePending) return;
+  const previous = latestStatus.traffic_enabled;
+  trafficChangePending = true;
+  latestStatus.traffic_enabled = !previous;
+  renderTrafficInjectionState();
+  const saved = await persistSetting({ traffic_enabled: !previous });
+  trafficChangePending = false;
+  latestStatus.traffic_enabled = saved ? saved.traffic_enabled : previous;
+  if (!saved) showBanner("error", t("traffic_source_switch_failed"));
   startTrafficLoop();
-  void persistSetting({ traffic_enabled: latestStatus.traffic_enabled });
 }
 
 function trafficSourceName(source = latestStatus?.traffic_source) {
-  return source === "ivao" ? "IVAO" : source === "opensky" ? "OpenSky" : "VATSIM";
+  if (source === "ivao") return "IVAO";
+  if (source === "opensky") return "OpenSky";
+  if (source === "static") return "Static";
+  return "VATSIM";
 }
 
 async function switchTrafficSource(event) {
-  if (!latestStatus || latestStatus.remote_client) return;
+  if (!latestStatus || latestStatus.remote_client || trafficChangePending) return;
   const requested = event.currentTarget.value;
-  if (!["vatsim", "ivao", "opensky"].includes(requested)) return;
+  if (!["vatsim", "ivao", "opensky", "static"].includes(requested)) return;
   const previous = latestStatus.traffic_source || "vatsim";
   if (requested === previous) return;
   const selectors = [$("map-traffic-source"), $("ground-traffic-source")];
   selectors.forEach((select) => { select.disabled = true; select.value = requested; });
+  trafficChangePending = true;
+  renderTrafficInjectionState();
   try {
     const saved = await persistSetting({ traffic_source: requested });
     if (!saved) throw new Error(t("err_save_refused"));
@@ -5820,7 +6179,9 @@ async function switchTrafficSource(event) {
     syncTrafficButtons();
     showBanner("error", t("traffic_source_switch_failed"), [String(error)]);
   } finally {
+    trafficChangePending = false;
     selectors.forEach((select) => { select.disabled = false; });
+    void refreshTrafficInjectionState();
   }
 }
 
@@ -5880,18 +6241,51 @@ function syncTrafficButtons() {
  * carte décrit le simulateur.
  */
 function renderTrafficInjectionState() {
-  const badge = $("map-traffic-injection");
+  renderGroundTrafficFreshness();
+  for (const id of ["map-traffic-injection", "ground-traffic-injection"]) {
+    renderTrafficInjectionBadge($(id));
+  }
+}
+
+function renderTrafficInjectionBadge(badge) {
   if (!badge) return;
   const status = latestStatus || {};
-  const visible = Boolean(status.traffic_enabled)
-    && !status.remote_client
-    && !status.traffic_injection_active;
+  const visible = (Boolean(status.traffic_enabled) || trafficChangePending)
+    && !status.remote_client;
   show(badge, visible);
   if (!visible) return;
+  const injection = status.traffic_injection || {};
+  const state = trafficChangePending ? "loading" : injection.state;
+  badge.dataset.state = state || "unavailable";
+  if (["loading", "active", "empty", "error", "stale"].includes(state)) {
+    if (state === "error" && injection.error_code === "opensky_daily_quota") {
+      badge.textContent = t("traffic_state_opensky_quota");
+      badge.title = t("traffic_state_opensky_quota_detail");
+      return;
+    }
+    const key = state === "empty" && status.traffic_source === "static" && !injection.selected
+      ? "traffic_state_no_stands" : `traffic_state_${state}`;
+    badge.textContent = tf(key, { count: injection.confirmed || 0 });
+    badge.title = tf("traffic_state_detail", {
+      count: injection.confirmed || 0, selected: injection.selected || 0,
+      skipped: injection.skipped || 0,
+    });
+    if (state === "error" && injection.reason) {
+      badge.title = `${badge.title} · ${injection.reason}`;
+    }
+    return;
+  }
   badge.textContent = t("traffic_map_only");
-  badge.title = status.fsltl?.detected
-    ? t("traffic_map_only_off")
-    : t("traffic_map_only_fsltl");
+  // Un injecteur concurrent explique l'inaction mieux que tout le reste :
+  // l'injection n'a pas échoué, elle a cédé la place.
+  const conflict = Array.isArray(status.traffic_conflict) ? status.traffic_conflict : [];
+  if (conflict.length) {
+    badge.title = tf("traffic_map_only_conflict", { program: conflict.join(", ") });
+  } else {
+    badge.title = status.models?.detected
+      ? t("traffic_map_only_off")
+      : t("traffic_map_only_models");
+  }
 }
 
 /**
@@ -5905,11 +6299,57 @@ async function refreshTrafficInjectionState() {
   try {
     const status = await fetch("/api/status").then((r) => r.json());
     latestStatus.traffic_injection_active = status.traffic_injection_active;
-    latestStatus.fsltl = status.fsltl;
+    latestStatus.traffic_injection = status.traffic_injection;
+    latestStatus.models = status.models;
+    latestStatus.traffic_conflict = status.traffic_conflict;
   } catch {
     return;
   }
   renderTrafficInjectionState();
+}
+
+/**
+ * Suit le trafic tel que le service le connaît, pas tel qu'on l'a laissé.
+ *
+ * Le panneau de la barre d'outils MSFS commande le même réglage : sans ce
+ * relevé, la fenêtre annonçait VATSIM pendant que le simulateur injectait
+ * OpenSky. Une seule injection ne peut pas avoir deux sources, et c'est le
+ * service qui tranche — la fenêtre le suit, elle ne le contredit pas.
+ */
+async function adoptTrafficSettings() {
+  if (!latestStatus || latestStatus.remote_client || trafficChangePending) return;
+  let status;
+  try {
+    status = await fetch("/api/status").then((r) => r.json());
+  } catch {
+    return;
+  }
+  latestStatus.traffic_injection_active = status.traffic_injection_active;
+  latestStatus.traffic_injection = status.traffic_injection;
+  latestStatus.models = status.models;
+  latestStatus.traffic_conflict = status.traffic_conflict;
+
+  const source = status.traffic_source || latestStatus.traffic_source;
+  const sourceChanged = source !== latestStatus.traffic_source;
+  const enabledChanged =
+    Boolean(status.traffic_enabled) !== Boolean(latestStatus.traffic_enabled);
+  if (sourceChanged) {
+    latestStatus.traffic_source = source;
+    for (const id of [
+      "map-traffic-source", "ground-traffic-source", "settings-traffic-source",
+    ]) {
+      const select = $(id);
+      // Un changement pendant qu'une bascule est en cours ici attendra le
+      // relevé suivant : le sélecteur désactivé est celui qu'on manipule.
+      if (select && !select.disabled) select.value = source;
+    }
+    syncTrafficSourceSettings();
+  }
+  if (enabledChanged) {
+    latestStatus.traffic_enabled = Boolean(status.traffic_enabled);
+  }
+  if (sourceChanged || enabledChanged) startTrafficLoop();
+  else renderTrafficInjectionState();
 }
 
 function renderTerminal(plan) {
@@ -7841,7 +8281,9 @@ async function requestTaxiRoute(parking) {
     currentTaxiPlan = payload;
     currentTaxiGuidance = null;
     GROUND.setPlan(payload);
-    GROUND.fitPlan();
+    // Cadrage automatique : calculer un itinéraire n'est pas demander à
+    // lâcher son appareil, contrairement au bouton Itinéraire.
+    GROUND.fitPlan(true);
     updateGroundHud();
   } catch (error) {
     if (error?.name === "AbortError") return;
@@ -8408,48 +8850,60 @@ function applyAircraftState(aircraft) {
 }
 
 async function pollLive() {
-  if (!currentChart) return;
-
-  const params = new URLSearchParams({
-    aircraft: currentPlan?.aircraft_name || currentPlan?.aircraft || "",
-  });
-  if (currentChart.highlight_runway) params.set("runway", currentChart.highlight_runway);
-
+  const chart = currentChart, plan = currentPlan;
+  const context = () => chart === currentChart && plan === currentPlan;
+  const poll = beginPoll("pollLive", context);
+  if (!poll) return;
   try {
-    const data = await fetch(`/api/live?${params}`).then((r) => r.json());
-    if (!data.connected) {
-      setLiveState(false, t("sim_disconnected"));
-      MAP.clearAircraft();
-      GROUND.clearAircraft();
-      // Le simulateur parti, son trafic n'existe plus. Celui du réseau, lui,
-      // reste vrai : la carte le garde.
-      GROUND.clearTraffic();
-      updateHud(null);
-      renderTaxiSpeed(null);
-      updateGroundHud();
+    if (!currentChart) return;
+
+    const params = new URLSearchParams({
+      aircraft: currentPlan?.aircraft_name || currentPlan?.aircraft || "",
+    });
+    if (currentChart.highlight_runway) params.set("runway", currentChart.highlight_runway);
+
+    try {
+      const data = await poll.json(`/api/live?${params}`);
+      if (!poll.current()) return;
+      if (!data.connected) {
+        setLiveState(false, t("sim_disconnected"));
+        MAP.clearAircraft();
+        GROUND.clearAircraft();
+        // Le simulateur parti, son trafic n'existe plus. Celui du réseau, lui,
+        // reste vrai : la carte le garde.
+        trafficGeneration += 1;
+        resetGroundTraffic();
+        updateHud(null);
+        renderTaxiSpeed(null);
+        updateGroundHud();
+        updateRouteStripProgress(null);
+        latestAircraft = null;
+        if (currentPlan && renderedAircraftTitle) renderAircraft(currentPlan, null);
+        updateFlightPanel(null);
+        updateDispatchLive(null);
+        renderProcedurePanel(currentProcedures, null);
+        return;
+      }
+      const aircraft = data.aircraft;
+      setLiveState(
+        true,
+        aircraft.paused ? t("sim_paused") : `${aircraft.source} · ${t("live")}`,
+        Boolean(aircraft.paused),
+      );
+      applyAircraftState(aircraft);
+      updateProcedures(data.procedures, aircraft);
+      pollTaxiGuidance(aircraft);
+    } catch (error) {
+      if (!poll.current()) return;
+      setLiveState(false, t("connection_error"));
       updateRouteStripProgress(null);
-      latestAircraft = null;
-      if (currentPlan && renderedAircraftTitle) renderAircraft(currentPlan, null);
       updateFlightPanel(null);
       updateDispatchLive(null);
       renderProcedurePanel(currentProcedures, null);
-      return;
     }
-    const aircraft = data.aircraft;
-    setLiveState(
-      true,
-      aircraft.paused ? t("sim_paused") : `${aircraft.source} · ${t("live")}`,
-      Boolean(aircraft.paused),
-    );
-    applyAircraftState(aircraft);
-    updateProcedures(data.procedures, aircraft);
-    pollTaxiGuidance(aircraft);
-  } catch (error) {
-    setLiveState(false, t("connection_error"));
-    updateRouteStripProgress(null);
-    updateFlightPanel(null);
-    updateDispatchLive(null);
-    renderProcedurePanel(currentProcedures, null);
+
+  } finally {
+    poll.finish();
   }
 }
 
@@ -8904,11 +9358,11 @@ function selectTab(name, scrollToModule = false) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
-  if (name === "map") window.requestAnimationFrame(() => MAP.resize());
-  if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());
+  if (name === "map" || name === "ground") window.requestAnimationFrame(refreshVisibleTraffic);
   setModuleMenuOpen(false, restoreMenuFocus);
   if (scrollToModule) {
     window.requestAnimationFrame(() => {
+      syncStickyLayoutOffsets();
       const target = name === "terminal" ? $("strip") : $(`panel-${name}`);
       target?.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -8936,6 +9390,8 @@ function openActiveAlerts() {
 }
 
 /* ------------------------------------------------------------------- init */
+
+document.addEventListener("visibilitychange", refreshVisibleTraffic);
 
 document.querySelector(".tabs").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-tab]");
@@ -9027,6 +9483,9 @@ $("settings-close").addEventListener("click", () => $("settings-dialog").close()
 $("settings-cancel").addEventListener("click", () => $("settings-dialog").close());
 $("settings-form").addEventListener("submit", saveSettings);
 $("settings-fsltl-download").addEventListener("click", openFsltlDownload);
+$("settings-aig-download").addEventListener("click", openAigDownload);
+$("settings-msfs-panel-install").addEventListener("click", () => setMsfsPanel("install"));
+$("settings-msfs-panel-remove").addEventListener("click", () => setMsfsPanel("uninstall"));
 $("settings-traffic-source").addEventListener("change", syncTrafficSourceSettings);
 $("settings-language").addEventListener("change", (event) => {
   window.I18N.setLanguage(event.target.value);
@@ -9118,6 +9577,9 @@ window.addEventListener("navixav:languagechange", () => {
 
 pollSimulatorStatus();
 simulatorTimer = setInterval(pollSimulatorStatus, 2500);
+// Ce relevé-ci ne s'arrête jamais avec le trafic : c'est lui qui apprend à la
+// fenêtre que le panneau MSFS vient de le rallumer.
+trafficSettingsTimer = setInterval(adoptTrafficSettings, TRAFFIC_SETTINGS_INTERVAL_MS);
 
 async function initialiseApplication() {
   try {

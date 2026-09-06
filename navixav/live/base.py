@@ -84,6 +84,9 @@ class AircraftConfiguration:
 
     # Radionavigation
     nav1_frequency_mhz: float | None = None
+    # Dedicated ILS receiver when the aircraft separates ILS from VOR tuning.
+    ils_frequency_mhz: float | None = None
+    ils_receiver_index: int | None = None
     nav1_course_deg: float | None = None
     nav1_has_localizer: bool | None = None
     nav1_has_glide_slope: bool | None = None

@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from navixav.traffic.opensky import OpenSkyClient, OpenSkyError
+from navixav.traffic.opensky import CACHE_TTL_S, OpenSkyClient, OpenSkyError
 from navixav.traffic.registry import AircraftIdentity, AircraftRegistry
 
 
@@ -29,11 +29,16 @@ class _RefusingSession:
 
 
 class _Response:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200, headers=None):
         self.payload = payload
+        self.status_code = status_code
+        self.headers = headers or {}
 
     def raise_for_status(self):
-        return None
+        if self.status_code >= 400:
+            error = requests.HTTPError(f"{self.status_code} Client Error")
+            error.response = self
+            raise error
 
     def json(self):
         return self.payload
@@ -57,7 +62,7 @@ def test_real_traffic_is_bounded_normalized_and_cached(tmp_path):
     session = _Session({
         "time": 1788084000,
         "states": [[
-            "39abcd", " AFR123 ", "France", 0, 0, 2.2, 48.5,
+            "39abcd", " AFR123 ", "France", 1788083970, 1788083999, 2.2, 48.5,
             3048.0, False, 154.33, 270.0, -2.54, None, None, None, False, 0,
         ]],
     })
@@ -70,6 +75,7 @@ def test_real_traffic_is_bounded_normalized_and_cached(tmp_path):
     client.updated_at()
 
     assert aircraft.uid == "opensky:39abcd"
+    assert aircraft.position_timestamp == 1788083970
     assert aircraft.callsign == "AFR123"
     assert aircraft.aircraft_type is None
     assert aircraft.altitude_ft == pytest.approx(10000, rel=0.001)
@@ -136,6 +142,46 @@ def test_identity_resolved_during_the_opensky_cache_is_used_immediately(tmp_path
     assert resolved.aircraft_type == "A320"
     assert resolved.airline_icao == "AFR"
     assert session.calls == 1
+
+
+def test_anonymous_refresh_interval_fits_the_daily_credit_allowance():
+    assert CACHE_TTL_S >= 86400 / 400
+
+
+def test_rate_limit_header_stops_requests_until_opensky_allows_retry(tmp_path, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("navixav.traffic.opensky.time.monotonic", lambda: clock[0])
+
+    class Session:
+        calls = 0
+        def get(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return _Response({}, 429, {
+                    "X-Rate-Limit-Retry-After-Seconds": "120",
+                })
+            return _Response({"time": 1234, "states": []})
+
+    session = Session()
+    client = OpenSkyClient(
+        lambda: (48.0, 2.0), session=session, ttl_s=0,
+        registry=_OfflineRegistry(tmp_path / "rate-limit.sqlite"),
+    )
+
+    with pytest.raises(OpenSkyError, match="Quota public OpenSky") as first:
+        client.traffic()
+    assert first.value.code == "opensky_daily_quota"
+    assert first.value.retry_after_s == 120
+    clock[0] += 119
+    with pytest.raises(OpenSkyError, match="Quota public OpenSky") as waiting:
+        client.traffic()
+    assert waiting.value.code == "opensky_daily_quota"
+    assert waiting.value.retry_after_s == 1
+    assert session.calls == 1
+
+    clock[0] += 1
+    assert client.traffic() == []
+    assert session.calls == 2
 
 
 def test_unknown_address_is_queued_and_flown_without_a_type(tmp_path):

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/SCSS/common.css" />
+    <link rel="stylesheet" href="NaviXavPanel.css" />
+
+    <script type="text/javascript" src="/JS/coherent.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+    <script type="text/javascript" src="/JS/dataStorage.js"></script>
+    <script type="text/javascript" src="/JS/buttons.js"></script>
+    <script type="text/javascript" src="/JS/Services/ToolBarPanels.js"></script>
+    <script type="text/javascript" src="/Pages/VCockpit/Instruments/Shared/BaseInstrument.js"></script>
+
+    <link rel="import" href="/templates/NewPushButton/NewPushButton.html" />
+    <link rel="import" href="/templates/ingameUi/ingameUi.html" />
+    <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
+
+    <script type="text/javascript" src="NaviXavPanel.js"></script>
+</head>
+
+<body class="border-box">
+    <ingamepanel-navixav>
+        <ingame-ui id="NaviXavPanel" panel-id="PANEL_NAVIXAV" title="NaviXav" class="ingameNaviXavFrame panelInvisible" content-fit="true" min-width="60" min-height="60">
+            <div class="ingameNaviXavContent">
+                <div id="navixavOffline" class="panelHidden">
+                    <div class="sectionPad">
+                        <p id="navixavConnectionNotice" class="navixavNotice">Connexion à NaviXav indisponible. Nouvelle tentative automatique…</p>
+                    </div>
+                </div>
+                <div id="navixavControls" class="panelHidden">
+                    <!-- Une seule ligne d'identite : la version a gauche, le jeu
+                         de modeles a droite. Ce sont deux faits, pas deux
+                         phrases. -->
+                    <div class="navixavHeader">
+                        <span id="navixavVersion" class="navixavTitle"></span>
+                        <span id="navixavModels" class="navixavModels"></span>
+                    </div>
+
+                    <!-- Trois etats lus d'un coup d'oeil, alignes en colonnes :
+                         le pilote cherche une valeur, jamais une phrase. -->
+                    <section class="navixavFlight" aria-labelledby="navixavFlightTitle">
+                        <h2 id="navixavFlightTitle">Mon vol</h2>
+                        <p id="navixavFlightRoute"></p>
+                        <p id="navixavFlightNotice" role="status"></p>
+                        <div id="navixavFlightValues"></div>
+                    </section>
+                    <div class="navixavStatus">
+                        <div class="navixavRow">
+                            <span class="navixavLabel">Traffic</span>
+                            <span id="navixavTraffic" class="navixavValue"></span>
+                        </div>
+                        <div class="navixavRow">
+                            <span class="navixavLabel">Source</span>
+                            <span id="navixavSource" class="navixavValue"></span>
+                        </div>
+                        <div class="navixavRow">
+                            <span class="navixavLabel">Injection</span>
+                            <span class="navixavValue">
+                                <span id="navixavDot" class="navixavDot"></span>
+                                <span id="navixavInjection"></span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <p id="navixavHint" class="navixavHint panelHidden"></p>
+                    <p id="navixavInjectionDetail" class="navixavHint" role="status"></p>
+
+                    <div class="btn-container">
+                        <new-push-button id="trafficToggle" class="large triggerButton" title="Toggle traffic"></new-push-button>
+                        <new-push-button id="openWindow" class="large triggerButton" title="Open NaviXav"></new-push-button>
+                    </div>
+                    <p class="navixavLegend">Traffic source</p>
+                    <div class="btn-container">
+                        <new-push-button id="sourceVatsim" class="triggerButton sourceButton" title="VATSIM"></new-push-button>
+                        <new-push-button id="sourceIvao" class="triggerButton sourceButton" title="IVAO"></new-push-button>
+                        <new-push-button id="sourceOpensky" class="triggerButton sourceButton" title="OpenSky"></new-push-button>
+                        <new-push-button id="sourceStatic" class="triggerButton sourceButton" title="Static"></new-push-button>
+                    </div>
+                </div>
+            </div>
+        </ingame-ui>
+    </ingamepanel-navixav>
+</body>
+</html>

@@ -12,11 +12,11 @@ Flight Simulator. Ze haalt het laatste SimBrief-vluchtplan op, vult de
 terminalinformatie aan met gegevens uit de simulator en presenteert alles in een
 interface die is afgestemd op de vluchtvoorbereiding en de MCDU-invoer.
 
-De applicatie heeft een eigen Windows-venster. De interface wordt weergegeven
-door Microsoft WebView2 en communiceert uitsluitend met een lokale dienst
-gebonden aan `127.0.0.1`. Alleen de knop **SimBrief-plan maken** opent op
-verzoek de officiële editor in een externe browser. Instellingen,
-de navigatiedatabase en caches blijven op de computer.
+De toepassing heeft een eigen Windows-venster, weergegeven door Microsoft
+WebView2 en verbonden met de lokale dienst op `127.0.0.1`. Instellingen,
+navigatiegegevens en caches blijven op de computer. De systeembrowser opent
+alleen op uitdrukkelijk verzoek, bijvoorbeeld voor SimBrief,
+ChartFox-aanmelding, FSLTL/AIG-downloads en projectondersteuning.
 
 Het venster is volledig schaalbaar. De interface herschikt haar panelen,
 bedieningselementen, tabbladen en de kaarthoogte afhankelijk van de beschikbare
@@ -37,6 +37,12 @@ ruimte, tot een minimale grootte van 720 × 560 pixels.
   het vliegtuig, waarbij reeds gepasseerde punten worden gedimd;
 - massa's, brandstof, vluchttijd, uitwijkhaven en dispatchgegevens;
 - informatie over het toestel, registratie en opgegeven uitrusting.
+De balk voor de actieve vlucht toont resterende tijd uit resterende afstand en
+grondsnelheid waar bruikbaar, anders vóór vertrek de SimBrief-ETE. Na het
+opslaan vernieuwt het vluchtplan op de achtergrond zonder het dialoogvenster
+open te houden. Verkeersopdrachten vanuit het MSFS-paneel behouden andere
+instellingen, inclusief SimBrief-identificatie.
+
 
 ### Vluchtweer
 
@@ -64,6 +70,8 @@ NaviXav vult aan en toont:
 
 De blokken **Vertrek · Route · Aankomst** kunnen worden ingeklapt om ruimte vrij
 te maken in de interface.
+
+Elke SimBrief-import en herberekening controleert SID–route–STAR–naderingsaansluitingen aan de hand van de werkelijk gevlogen eindpunten in MSFS-data, ook wanneer transitienamen afwijken van de aansluitpunten. Ontbrekende aansluitingen vereisen bevestiging; er wordt geen willekeurige transitie gekozen. Baanvertakkingen die het STAR-begin exact herhalen veroorzaken geen terugkeer naar de ingang meer; afwijkende beperkingen blijven behouden. De route behoudt DCT en luchtwegen uit het OFP. Gekozen transities die niet in de database staan worden als niet geverifieerd aangeduid.
 
 ### Vluchtopvolging
 
@@ -115,6 +123,20 @@ Een speciale adapter voor de Fenix A319/A320/A321 leest de drie cockpitbediening
 rechtstreeks uit. Wijzigingen aan flaps, speedbrakes en parkeerrem worden daardoor
 ook gemeld wanneer de motoren en hydraulische systemen uitgeschakeld zijn.
 
+Bij de Fenix A319/A320/A321 leest NaviXav de STD-modus van de EFIS aan de gezagvoerderskant voor de weergave en QNH/STD-waarschuwingen. Een tegenstrijdige generieke MSFS-SimVar overschrijft die modus niet meer. Als de Fenix-meting ontbreekt of ongeldig is, blijft de instelling onbekend en worden deze waarschuwingen niet afgeleid van de generieke druk. Deze meting bewaakt de copilootkant niet.
+
+Bij deze Fenix-toestellen worden ook beide motoranti-icebedieningen rechtstreeks
+gelezen. Is die meting niet beschikbaar, dan blijft de toestand onbekend in
+plaats van een vals alarm vanuit de standaard-SimVar te geven.
+
+Bij de Fenix A319/A320/A321 leest STD-detectie de werkelijke barometerstand van de gezagvoerder (B_FCU_EFIS1_BARO_STD), in plaats van de invoer S_FCU_EFIS1_BARO_STD. Een invoer die terugvalt naar nul veroorzaakt geen vals alarm meer bij weergegeven STD. Ontbrekende of ongeldige waarden blijven onbekend.
+
+ILS-bewaking gebruikt de ontvanger die het geladen vliegtuig aanwijst. Fenix A319/A320/A321 en FlyByWire A32NX gebruiken NAV3 van de gezagvoerder; andere vliegtuigen gebruiken de door MSFS geselecteerde index NAV1 tot NAV4. Als index of frequentie ontbreekt, blijft de waarschuwing stil in plaats van een andere ontvanger te vergelijken.
+
+De getoonde TOD is een SimBrief- of NaviXav-schatting, geen uitlezing van de MCDU. Het FMS-profiel kan bij dezelfde route en vlieghoogte een ander punt bepalen. Vervroegen beperkingen het SimBrief-punt, dan wordt de bron een berekende schatting.
+
+Vluchtvolging en het paneel in de simulator tonen tijdens de daling “Daling bezig” in plaats van TOD, daarna “Nadering”. Horizontale segmenten behouden de melding wanneer het hoogteverlies de daling bevestigt. De status komt uit telemetrie, niet uit de DES-modus van het FMS.
+
 ### MCDU-kaart
 
 Het tabblad **MCDU-kaart** past de pagina's aan het vliegtuigtype aan: Airbus
@@ -145,24 +167,69 @@ NaviXav gebruikt SimConnect om:
   en radionavigatiemiddelen op te halen;
 - geleidelijk een lokale database op te bouwen in `data/navixav.sqlite`.
 
-De optionele instelling **VATSIM-verkeer in MSFS injecteren** detecteert
-**FSLTL Base Models** in de MSFS Community-map en gebruikt de modellen voor
-netwerkverkeer in de buurt. NaviXav leest alleen de `aircraft.cfg`- en
-VMR-bestanden van FSLTL; het installeert, actualiseert of wijzigt FSLTL niet.
-De instelling staat standaard uit, begrenst aantal en straal van de
-geïnjecteerde vliegtuigen en verwijdert bij uitschakelen of afsluiten alleen de
-SimConnect-objecten die NaviXav zelf heeft gemaakt.
-Als gratis openbare netwerkbron kan VATSIM of IVAO worden gekozen. FSLTL wordt
-automatisch gedetecteerd, maar het pakket- of Community-pad kan ook handmatig
-worden ingevuld. Als FSLTL ontbreekt, openen de instellingen de
-[officiële FlyByWire Installer](https://flybywiresim.com/downloads/). Installeer
-alleen **FSLTL Traffic Base Models**, niet FSLTL Injector.
-Voor een echte wereldweergave toont **OpenSky echt verkeer** anonieme
-ADS-B-statussen binnen 100 NM rond het vliegtuig en injecteert die via FSLTL.
-Als het ADS-B-type eerst onbekend is, verschijnt een veilig algemeen model dat
-wordt vervangen zodra het vliegtuigregister het exacte type heeft gevonden.
-De actieve bron kan rechtstreeks vanuit de kaart- of taxibalk worden gewijzigd;
-beide keuzelijsten blijven gesynchroniseerd en de keuze wordt lokaal bewaard.
+De knop **Verkeer** op Kaart of Taxi bestuurt weergave en injectie in MSFS; hij
+staat standaard uit. Bronnen zijn VATSIM, IVAO, OpenSky (echt ADS-B-verkeer) en
+statisch verkeer. De keuzelijsten delen dezelfde lokale instelling; het venster
+leest wijzigingen vanuit het MSFS-paneel elke drie seconden.
+
+Een instelling zonder verband met verkeer wijzigen herstart de injectie of
+bestaande vliegtuigen niet meer. Wijzigingen aan bron, modellen en actief
+statisch verkeer blijven van toepassing. Modules delen een MSFS-meting met
+tijdstempel maximaal 250 ms; injectie gebruikt positie en hoogte van de speler
+uit dezelfde toestand. Een verlopen meting of mislukte verbinding presenteert
+geen oude positie als actueel.
+
+Instellingen biedt **FSLTL Base Models** of **AIG AI Traffic**, één set
+tegelijk. Beide installaties worden gedetecteerd; FSLTL-, AIG- en
+Community-paden zijn handmatig in te voeren. NaviXav leest `aircraft.cfg` en
+VMR-regels zonder bibliotheken te installeren of wijzigen. FSLTL opent de
+[FlyByWire-download](https://flybywiresim.com/downloads/) voor **FSLTL Traffic
+Base Models**; AIG opent de [officiële website](https://www.alpha-india.net/).
+AI Manager installeert `aig-aitraffic-oci`; ontbrekende aanvullende pakketten
+worden gemeld.
+
+OpenSky zoekt echt verkeer binnen de ingestelde straal. Anonieme toegang wordt elke vier minuten vernieuwd om binnen het dagelijkse openbare quotum te blijven. Bij HTTP 429 toont NaviXav in beide interfaces duidelijk **Dagquotum van OpenSky opgebruikt** en respecteert het de opgegeven wachttijd in plaats van voortdurend opnieuw te proberen; bestaand verkeer blijft geanimeerd tot de bron herstelt. Injectie hangt af van beschikbare
+modellen: FSLTL kan een generiek model gebruiken bij een onbekend type; AIG
+biedt deze terugval niet. Een vliegtuig op de kaart is dus niet noodzakelijk
+geïnjecteerd. NaviXav blokkeert of stopt zijn injectie bij detectie van FSLTL
+Traffic Injector of AIG Traffic Controller. Sluit die injector en schakel
+Verkeer uit en weer in; hervatten gebeurt niet automatisch.
+
+Instellingen tonen voor elke bron altijd de verkeersstraal en het maximumaantal vliegtuigen. Standaardwaarden zijn **40 NM** en **10 vliegtuigen**, instelbaar van 1 tot 100 NM en van 1 tot 200 vliegtuigen. De dichtstbijzijnde vliegtuigen krijgen voorrang.
+
+**Statisch verkeer** gebruikt alleen parkeerplaatsen die al in de
+MSFS-navigatiecache staan. Een geladen vlucht en parkeergegevens zijn nodig; de
+bron kiezen downloadt geen ontbrekende voorzieningen. Nabije plaatsen worden
+eerst bezet. Kaart en injectie delen de
+cache; een leeg resultaat wordt na drie seconden opnieuw geprobeerd. Statische
+vliegtuigen blijven geparkeerd en taxiën of vertrekken niet.
+
+Kaart en Taxi onderscheiden laden, door MSFS bevestigde aanmaak, geen geschikt
+verkeer, fouten en verouderde status. De tooltip vermeldt geselecteerde en
+overgeslagen vliegtuigen. Bevestiging betreft objectaanmaak, niet zichtbaarheid
+of gegarandeerde vloeiendheid. Aanmaak gebeurt in groepen; de catalogus wordt
+bij snelle wisselingen tot een minuut hergebruikt. Een aparte
+SimConnect-verbinding animeert met een streeffrequentie van 30 updates per
+seconde; Taxiposities worden geïnterpoleerd. Lokale logboeken meten frequentie
+en pauzes. Uitschakelen en sluiten geven verbindingen vrij en verwijderen alleen
+door NaviXav aangemaakte objecten.
+
+De volgfunctie gebruikt geldige tijdstempels van afzonderlijke OpenSky-posities: ontvangst maakt een oude meting niet actueel en posities die in verkeerde volgorde binnenkomen worden genegeerd. Zonder bruikbare individuele tijdstempel behoudt NaviXav zijn voorzichtige lokale schatting. Verborgen kaart- en taxiweergaven pauzeren hun verkeersmetingen en tekenwerk; bij het tonen hervatten ze de metingen en passen ze hun afmetingen aan. Vluchtregistratie en MSFS-injectie blijven actief.
+
+Periodieke metingen van positie, verkeer, VATSIM-verkeersleiders en simulatorstatus voorkomen overlappende aanvragen voor dezelfde meting en negeren antwoorden die door een contextwijziging achterhaald zijn. In de taxiweergave blijven bij een tijdelijke fout de laatste posities maximaal tien seconden na de laatste geslaagde meting zichtbaar, met een waarschuwing. Een bevestigde lege meting of het uitschakelen van verkeer wist de posities onmiddellijk.
+
+Op de grond beëindigt een stilstandmelding de voorspelling en brengt de vloeiende overgang het vliegtuig zonder resterende vaart naar de gemelde parkeerpositie. Zonder nieuwe bewegingsmelding vertraagt de voorspelling en blijft het tijdvenster beperkt tot vijf seconden; overgangen blijven geleidelijk. Kleine positieschommelingen van een al geparkeerd vliegtuig worden gefilterd. Deze regels gebruiken bronposities, zonder gebouwen te detecteren.
+
+Het MSFS-paneel toont nu Mijn vlucht: volgend punt en afstand, resterende tijd, volgende beperking en TOD, gesynchroniseerd met het NaviXav-venster en de taal daarvan. Vluchtwaarden verdwijnen na tien seconden zonder update. Verkeer toont bevestigde, geselecteerde en overgeslagen vliegtuigen, laden, fouten en verouderde toestanden; de groene stip vereist bevestigde creaties. De terugkeerknop opent het venster voor details. Installeer paneel 1.2.1 opnieuw via Instellingen en herstart MSFS om de nieuwe bestanden te laden.
+
+MSFS-paneel 1.2.1 herstelt automatisch de verbinding met NaviXav na een onderbreking of poortwijziging. Een onbereikbare verbinding wordt niet langer als een afgesloten toepassing weergegeven. Verzoeken hebben een echte time-out en weergavefouten stoppen het herstel niet meer. Start MSFS opnieuw na het bijwerken van het paneel via de instellingen.
+
+**Het MSFS-paneel installeren** kopieert
+alleen dat pakket naar Community; **Verwijderen** wist het. Verschillen
+geïnstalleerde en meegeleverde versies, dan biedt Instellingen herinstallatie.
+Knoppen blijven tijdens de bewerking vergrendeld en geanimeerd. Herstart MSFS zo
+nodig om het pakket opnieuw te laden. Terugkeer naar het venster werkt in
+venster- of randloze modus; exclusief volledig scherm kan de focus behouden.
 
 De simulator moet draaien met een geladen vlucht om nieuwe gegevens op te
 halen. Reeds gecachete informatie blijft offline beschikbaar.
@@ -186,6 +253,12 @@ De kaart omvat:
 - een spoor van de verplaatsing;
 - een automatische volgmodus;
 - zoomen, verschuiven en aanpassen aan de luchthaven of de route.
+
+De werkbalken voor Kaart en Taxi groeperen weergave, kaartlagen en verkeer. Knoppen zijn 40 pixels hoog, zoomknoppen blijven bij elkaar en de bediening past zich aan compacte vensters aan. Taxiklaring en routeacties blijven bij elkaar.
+
+In brede vensters blijven kaart- en taxibediening tijdens het scrollen onder de vluchtbalk, op basis van de gemeten hoogte. Bij een modulewisseling worden de maten vóór het scrollen bijgewerkt. In compacte vensters scrollen balk en bediening normaal mee.
+
+De animatie behoudt haar ritme na een laat beeld zonder een volledige extra wachttijd. Nabije vliegtuigen krijgen voorrang op 30 Hz; verder dan 10 NM geldt 15 Hz en verder dan 40 NM 5 Hz. Stilstaande geparkeerde vliegtuigen worden niet elk beeld herberekend. Versnelling wordt afgevlakt, koersen volgen de kortste draai en stoppen blijft onmiddellijk. De voorspellingsgrenzen bij parkeren blijven behouden.
 
 ### Taxiën op de grond
 
@@ -411,6 +484,8 @@ laatst beschikbare OFP op. Bij elke volgende start wordt dat laatste plan
 automatisch geladen.
 
 ### Beschikbare instellingen
+
+Tijdens het opslaan van instellingen toont de knop een animatie en “Opslaan…”. De knop blijft uitgeschakeld tot de bewerking klaar is om dubbele verzendingen te voorkomen en wordt ook na een fout weer beschikbaar. De animatie respecteert de voorkeur voor minder beweging.
 
 De interface laat ook toe om in te stellen:
 

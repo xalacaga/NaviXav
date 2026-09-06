@@ -203,7 +203,15 @@ const MAP = (() => {
     ];
   }
 
-  function fit() {
+  /**
+   * Cadre la carte sur son contenu.
+   *
+   * `keepFollow` sépare les deux gestes que cette fonction sert : le cadrage
+   * automatique d'une carte qu'on vient de recevoir, qui ne doit rien décider
+   * à la place du pilote, et le bouton Cadrer, par lequel il demande
+   * justement à voir l'ensemble plutôt que son appareil.
+   */
+  function fit(keepFollow = false) {
     if (!chart) return;
     if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) {
       fitPending = true;
@@ -219,7 +227,7 @@ const MAP = (() => {
       canvas.clientHeight / height
     ) * 0.92;
     fitPending = false;
-    view.follow = false;
+    if (!keepFollow) view.follow = false;
     syncFollowButton();
     draw();
   }
@@ -233,13 +241,14 @@ const MAP = (() => {
     canvas.height = canvas.clientHeight * ratio;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     if (chart && (fitPending || !Number.isFinite(view.scale) || view.scale <= 0)) {
-      fit();
+      fit(true);
       return;
     }
     draw();
   }
 
   function draw() {
+    if (document.hidden || !canvas?.getClientRects().length) return;
     context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (!chart) return;
 
@@ -941,7 +950,7 @@ const MAP = (() => {
       routeSegments = [];
       calculatedPoints = [];
       fitPending = true;
-      fit();
+      fit(true);
     },
     setAircraft(position) {
       aircraft = position;

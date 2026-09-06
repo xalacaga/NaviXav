@@ -167,6 +167,11 @@ class CompletionEngine:
         self._check_airac_alignment(ofp)
 
         route_legs = [dict(leg) for leg in ofp.enroute_route]
+        for leg in route_legs:
+            # A boundary fix may be unflagged in the navlog while its inbound
+            # leg still names the SID. Keep the fix, not a SID disguised as an airway.
+            if leg.get("via") in {ofp.simbrief_sid, ofp.simbrief_star}:
+                leg["via"] = ""
         route_path: list[dict] = []
         origin = self.provider.airport(ofp.origin_icao)
         destination = self.provider.airport(ofp.destination_icao)
@@ -419,6 +424,12 @@ class CompletionEngine:
         # Le point que la SID doit atteindre : celui filé par SimBrief en fin
         # de bloc SID, sinon le premier point en route.
         target_fix = ofp.sid_exit_hint or ofp.first_enroute_fix
+        named_sid = _find_by_ident(sids, overrides.sid or ofp.simbrief_sid or "")
+        if named_sid and ofp.first_enroute_fix and (
+            named_sid.exit_fix == ofp.first_enroute_fix
+            or named_sid.connecting_transitions(ofp.first_enroute_fix, use_exit_fix=True)
+        ):
+            target_fix = ofp.first_enroute_fix
         block.sid, block.sid_transition = self._choose_departure_procedure(
             sids=sids,
             runway_name=runway_name,
@@ -430,6 +441,11 @@ class CompletionEngine:
 
         selected = _find_by_ident(sids, block.sid.value) if block.sid.value else None
         if selected is not None:
+            transition = selected.find_transition(block.sid_transition.value or "")
+            endpoint = (transition.exit_fix if transition else None) or selected.exit_fix
+            if target_fix and endpoint and endpoint != target_fix:
+                self._warn(f"Raccord SID {endpoint} → {target_fix} non vérifié.")
+                block.sid_transition.confidence = Confidence.LOW
             # La transition d'une SID se parcourt après la procédure ; la
             # branche de la piste retenue, elle, la précède.
             block.sid_constraints = procedure_constraints(
@@ -550,30 +566,23 @@ class CompletionEngine:
         sid_choice = Choice(procedure.ident, confidence, source, reason)
 
         if forced_transition:
-            return sid_choice, Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
-                _transition_alternatives(procedure, forced_transition),
-            )
+            return sid_choice, self._validated_transition(procedure, forced_transition)
 
         # Cas 1 : la SID publie des transitions explicites.
         if procedure.transitions:
-            idents = procedure.transition_idents()
-            if target_fix and target_fix in idents:
+            if target_fix and target_fix == procedure.exit_fix:
+                return sid_choice, Choice(None, Confidence.HIGH, "moteur", "point de sortie de la SID ; rejoint la route")
+            connections = procedure.connecting_transitions(target_fix, use_exit_fix=True)
+            if connections:
+                picked = connections[0].ident
                 return sid_choice, Choice(
-                    target_fix, Confidence.HIGH, "moteur",
+                    picked, Confidence.HIGH, "moteur",
                     "transition rejoignant le premier point en route",
-                    _transition_alternatives(procedure, target_fix),
-                )
-            picked = self._nearest_transition(procedure, target_fix)
-            if picked:
-                return sid_choice, Choice(
-                    picked, Confidence.MEDIUM, "moteur",
-                    "transition la plus proche du premier point en route",
                     _transition_alternatives(procedure, picked),
                 )
             return sid_choice, Choice(
-                idents[0], Confidence.LOW, "moteur", "première transition publiée",
-                _transition_alternatives(procedure, idents[0]),
+                None, Confidence.LOW, "moteur", "aucun raccord publié : transition à confirmer",
+                _transition_alternatives(procedure, None),
             )
 
         # Cas 2 : SID sans transition publiée (usage européen courant).
@@ -636,10 +645,17 @@ class CompletionEngine:
         stars = self.provider.procedures(icao, ProcedureKind.STAR)
         star_exit_fix: str | None = None
         if stars:
+            target_fix = ofp.star_entry_hint or ofp.last_enroute_fix
+            named_star = _find_by_ident(stars, overrides.star or ofp.simbrief_star or "")
+            if named_star and ofp.last_enroute_fix and (
+                named_star.entry_fix == ofp.last_enroute_fix
+                or named_star.connecting_transitions(ofp.last_enroute_fix)
+            ):
+                target_fix = ofp.last_enroute_fix
             block.star, block.star_transition, star_exit_fix = self._choose_star(
                 stars=stars,
                 runway_name=runway_name,
-                target_fix=ofp.star_entry_hint or ofp.last_enroute_fix,
+                target_fix=target_fix,
                 simbrief_name=ofp.simbrief_star,
                 forced_name=overrides.star,
                 forced_transition=overrides.star_transition,
@@ -648,6 +664,11 @@ class CompletionEngine:
                 _find_by_ident(stars, block.star.value) if block.star.value else None
             )
             if selected_star is not None:
+                runway_legs = selected_star.effective_runway_legs(runway_name)
+                branch_exit = next((leg.fix_ident for leg in reversed(runway_legs)
+                                    if leg.fix_ident and not leg.is_missed), None)
+                if branch_exit:
+                    star_exit_fix = branch_exit
                 # Une transition de STAR précède la procédure ; la branche de
                 # la piste retenue la termine.
                 block.star_constraints = procedure_constraints(
@@ -734,7 +755,9 @@ class CompletionEngine:
         if approach is None or not star_exit_fix:
             return
         transition = block.approach_transition.value if block.approach_transition else None
-        if transition in {star_exit_fix, VECTORS}:
+        connected = approach.connecting_transitions(star_exit_fix)
+        if (any(t.ident == transition for t in connected)
+                or (transition is None and approach.entry_fix == star_exit_fix)):
             return
         if approach.is_vectors_entry:
             # Variante prévue pour le guidage radar : la rupture est normale.
@@ -889,6 +912,11 @@ class CompletionEngine:
             alternatives = _procedure_alternatives(compatible, picked)
         star_choice = Choice(picked.ident, confidence, source, reason, alternatives)
         transition_choice = self._star_transition(picked, target_fix, forced_transition)
+        transition = picked.find_transition(transition_choice.value or "")
+        endpoint = (transition.entry_fix if transition else None) or picked.entry_fix
+        if target_fix and endpoint and endpoint != target_fix:
+            self._warn(f"Raccord STAR {target_fix} → {endpoint} non vérifié.")
+            transition_choice.confidence = Confidence.LOW
         return star_choice, transition_choice, picked.exit_fix
 
     def _star_transition(
@@ -898,29 +926,22 @@ class CompletionEngine:
         forced_transition: str | None,
     ) -> Choice:
         if forced_transition:
-            return Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
-                _transition_alternatives(procedure, forced_transition),
-            )
+            return self._validated_transition(procedure, forced_transition)
 
         if procedure.transitions:
-            idents = procedure.transition_idents()
-            if target_fix and target_fix in idents:
+            if target_fix and target_fix == procedure.entry_fix:
+                return Choice(None, Confidence.HIGH, "moteur", "point d'entrée de la STAR ; enchaîne avec la route")
+            connections = procedure.connecting_transitions(target_fix)
+            if connections:
+                picked = connections[0].ident
                 return Choice(
-                    target_fix, Confidence.HIGH, "moteur",
+                    picked, Confidence.HIGH, "moteur",
                     "transition partant du dernier point en route",
-                    _transition_alternatives(procedure, target_fix),
-                )
-            picked = self._nearest_transition(procedure, target_fix)
-            if picked:
-                return Choice(
-                    picked, Confidence.MEDIUM, "moteur",
-                    "transition la plus proche du dernier point en route",
                     _transition_alternatives(procedure, picked),
                 )
             return Choice(
-                idents[0], Confidence.LOW, "moteur", "première transition publiée",
-                _transition_alternatives(procedure, idents[0]),
+                None, Confidence.LOW, "moteur", "aucun raccord publié : transition à confirmer",
+                _transition_alternatives(procedure, None),
             )
 
         entry_fix = procedure.entry_fix
@@ -1008,7 +1029,7 @@ class CompletionEngine:
             #    STAR, ou dernier point de la route quand aucune STAR ne dessert
             #    la piste.
             connects = (
-                0 if link_fix and link_fix in procedure.transition_idents() else 1
+                0 if procedure.connects_from(link_fix) else 1
             )
 
             # 3. Cohérence du mode d'arrivée. Un raccord publié tranche à lui
@@ -1033,7 +1054,7 @@ class CompletionEngine:
 
         ordered = sorted(compatible, key=rank)
         best = ordered[0]
-        connects = bool(link_fix and link_fix in best.transition_idents())
+        connects = best.connects_from(link_fix)
         blocked_by_rnp = [
             p for p in compatible if p.requires_rnp and not rnp_capable
         ]
@@ -1080,42 +1101,38 @@ class CompletionEngine:
         forced_transition: str | None,
     ) -> Choice:
         if forced_transition:
-            return Choice(
-                forced_transition, Confidence.HIGH, "utilisateur", "transition imposée",
-                _transition_alternatives(procedure, forced_transition),
-            )
+            choice = self._validated_transition(procedure, forced_transition)
+            transition = procedure.find_transition(forced_transition)
+            endpoint = transition.entry_fix if transition else procedure.entry_fix
+            if forced_transition != VECTORS and link_fix and endpoint and link_fix != endpoint:
+                choice.confidence = Confidence.LOW
+                choice.reason = "transition imposée non vérifiée"
+            return choice
 
         idents = procedure.transition_idents()
+        if link_fix and procedure.entry_fix == link_fix:
+            return Choice(None, Confidence.HIGH, "moteur", "entrée unique publiée")
         if not idents:
             return Choice(
                 VECTORS, Confidence.MEDIUM, "moteur",
                 "aucune transition publiée : guidage radar attendu",
             )
 
-        if link_fix and link_fix in idents:
+        connections = procedure.connecting_transitions(link_fix)
+        if connections:
+            picked = connections[0].ident
             return Choice(
-                link_fix, Confidence.HIGH, "moteur",
+                picked, Confidence.HIGH, "moteur",
                 "transition partant du point de sortie de la STAR"
                 if via_star
                 else "transition partant du dernier point en route",
-                _transition_alternatives(procedure, link_fix),
-            )
-
-        picked = self._nearest_transition(procedure, link_fix)
-        if picked:
-            return Choice(
-                picked, Confidence.MEDIUM, "moteur",
-                "transition la plus proche de la fin de la STAR"
-                if via_star
-                else "transition la plus proche du dernier point en route",
                 _transition_alternatives(procedure, picked),
             )
+
         return Choice(
-            idents[0], Confidence.LOW, "moteur",
-            "première transition publiée, aucun lien avec la STAR"
-            if via_star
-            else "première transition publiée, aucun lien avec la route",
-            _transition_alternatives(procedure, idents[0]),
+            VECTORS, Confidence.LOW, "moteur",
+            "aucun raccord publié : guidage radar à confirmer",
+            _transition_alternatives(procedure, VECTORS),
         )
 
     # ------------------------------------------------------------------ #
@@ -1269,12 +1286,13 @@ class CompletionEngine:
                 )
                 continue
 
-            if target_fix in procedure.transition_idents():
+            transitions = procedure.connecting_transitions(target_fix, use_exit_fix=use_exit_fix)
+            if transitions:
                 candidates.append(
                     _Candidate(
                         procedure, 0.5,
                         f"transition publiée vers {target_fix}",
-                        Confidence.HIGH, link, target_fix,
+                        Confidence.HIGH, link, transitions[0].ident,
                     )
                 )
                 continue
@@ -1306,26 +1324,16 @@ class CompletionEngine:
         candidates.sort(key=lambda c: (c.score, c.procedure.ident))
         return candidates
 
-    def _nearest_transition(
-        self, procedure: Procedure, target_fix: str | None
-    ) -> str | None:
-        idents = procedure.transition_idents()
-        if not idents or not target_fix:
-            return None
-        target_position = self.provider.fix_position(target_fix)
-        if not target_position:
-            return None
-
-        best_ident: str | None = None
-        best_gap = float("inf")
-        for ident in idents:
-            position = self.provider.fix_position(ident)
-            if not position:
-                continue
-            gap = distance_nm(*target_position, *position)
-            if gap < best_gap:
-                best_ident, best_gap = ident, gap
-        return best_ident if best_gap <= 150 else None
+    def _validated_transition(self, procedure: Procedure, ident: str) -> Choice:
+        valid = procedure.find_transition(ident) is not None
+        if not procedure.transitions:
+            valid = valid or ident == (procedure.exit_fix if procedure.kind is ProcedureKind.SID else procedure.entry_fix)
+        valid = valid or (procedure.kind is ProcedureKind.APPROACH and ident == VECTORS)
+        if not valid:
+            self._warn(f"Transition {ident} non publiée pour {procedure.ident}.")
+        return Choice(ident, Confidence.HIGH if valid else Confidence.LOW, "utilisateur",
+                      "transition imposée" if valid else "transition imposée non vérifiée",
+                      _transition_alternatives(procedure, ident))
 
     def _frequencies(
         self, icao: str, chain: Sequence[str]
@@ -1543,9 +1551,7 @@ def _approach_alternative(
         "transitions": list(procedure.transition_idents()),
         "requires_rnp": procedure.requires_rnp,
         "disqualified": procedure.requires_rnp and not rnp_capable,
-        "connects_to_star": bool(
-            link_fix and link_fix in procedure.transition_idents()
-        ),
+        "connects_to_star": procedure.connects_from(link_fix),
     }
 
 

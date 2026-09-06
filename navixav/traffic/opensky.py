@@ -16,13 +16,26 @@ from navixav.traffic.registry import AircraftRegistry
 DATA_URL = "https://opensky-network.org/api/states/all"
 USER_AGENT = "NaviXav/0.1 (local non-commercial flight simulation tool)"
 DEFAULT_TIMEOUT = 10
-CACHE_TTL_S = 60.0
+# Anonymous access receives 400 state-vector credits per day. One bounded
+# request still costs at least one credit, so a one-minute refresh exhausts the
+# allowance. Four minutes leaves a small margin while the local animation keeps
+# moving the last observations between two snapshots.
+CACHE_TTL_S = 240.0
+ERROR_RETRY_S = 30.0
+RATE_LIMIT_RETRY_S = 300.0
 RADIUS_NM = 100.0
 MAX_TRAFFIC = 500
 
 
 class OpenSkyError(RuntimeError):
     """Flux OpenSky injoignable, limité ou inexploitable."""
+
+    def __init__(
+        self, message: str, *, code: str = "", retry_after_s: float | None = None
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retry_after_s = retry_after_s
 
 
 def _number(value: object) -> float | None:
@@ -53,6 +66,9 @@ class OpenSkyClient:
         self._aircraft: list[TrafficAircraft] | None = None
         self._updated_at = ""
         self._fetched_at = 0.0
+        self._retry_at = 0.0
+        self._last_error = ""
+        self._last_error_code = ""
 
     @property
     def name(self) -> str:
@@ -63,6 +79,12 @@ class OpenSkyClient:
             now = time.monotonic()
             if self._aircraft is not None and now - self._fetched_at < self._ttl_s:
                 return
+            if now < self._retry_at:
+                raise OpenSkyError(
+                    self._last_error or "OpenSky temporairement indisponible.",
+                    code=self._last_error_code,
+                    retry_after_s=max(0.0, self._retry_at - now),
+                )
             try:
                 latitude, longitude = self._position()
                 latitude = float(latitude)
@@ -87,7 +109,30 @@ class OpenSkyClient:
                 response.raise_for_status()
                 payload = response.json()
             except (requests.RequestException, ValueError) as exc:
-                raise OpenSkyError(f"Relevé OpenSky injoignable : {exc}") from exc
+                response = getattr(exc, "response", None)
+                if response is not None and response.status_code == 429:
+                    raw_retry = response.headers.get(
+                        "X-Rate-Limit-Retry-After-Seconds", ""
+                    )
+                    try:
+                        retry_s = max(60.0, float(raw_retry))
+                    except (TypeError, ValueError):
+                        retry_s = RATE_LIMIT_RETRY_S
+                    self._retry_at = now + retry_s
+                    self._last_error = (
+                        "Quota public OpenSky atteint ; NaviXav attend le délai "
+                        "de reprise indiqué par le service."
+                    )
+                    self._last_error_code = "opensky_daily_quota"
+                else:
+                    self._retry_at = now + ERROR_RETRY_S
+                    self._last_error = f"Relevé OpenSky injoignable : {exc}"
+                    self._last_error_code = "opensky_unavailable"
+                raise OpenSkyError(
+                    self._last_error,
+                    code=self._last_error_code,
+                    retry_after_s=max(0.0, self._retry_at - now),
+                ) from exc
             states = payload.get("states") if isinstance(payload, dict) else None
             if states is None:
                 states = []
@@ -102,6 +147,9 @@ class OpenSkyClient:
             self._aircraft = found
             self._updated_at = str(timestamp or "")
             self._fetched_at = now
+            self._retry_at = 0.0
+            self._last_error = ""
+            self._last_error_code = ""
 
     def _parse(self, state: object) -> TrafficAircraft | None:
         if not isinstance(state, list) or len(state) < 12:
@@ -149,6 +197,7 @@ class OpenSkyClient:
             if heading is None:
                 heading = 0.0
         vertical_ms = _number(state[11])
+        position_timestamp = _number(state[3])
         return TrafficAircraft(
             uid=f"opensky:{icao24}",
             callsign=callsign,
@@ -161,6 +210,8 @@ class OpenSkyClient:
             heading_deg=heading,
             vertical_speed_fpm=vertical_ms * 196.8504 if vertical_ms is not None else None,
             on_ground=on_ground,
+            # OpenSky state[3] is time_position; state[4] also includes non-position messages.
+            position_timestamp=position_timestamp if position_timestamp and position_timestamp > 0 else None,
         )
 
     def traffic(self, limit: int | None = MAX_TRAFFIC) -> list[TrafficAircraft]:

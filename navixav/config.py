@@ -10,6 +10,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from navixav.paths import user_data_path
+# Les valeurs acceptées appartiennent au domaine du trafic, pas aux
+# réglages : elles sont définies là où les jeux de modèles vivent.
+from navixav.traffic.selection import CHOICES as MODEL_CHOICES
+
+# Sources de trafic acceptées : trois réseaux et le trafic statique, qui
+# n'interroge personne et garnit les postes de stationnement.
+TRAFFIC_SOURCES = ("vatsim", "ivao", "opensky", "static")
 
 DEFAULT_APPROACH_PREFERENCE = (
     "ILS",
@@ -40,6 +47,21 @@ USER_SETTINGS_FILE = user_data_path("user_settings.json")
 
 def _env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
+
+
+def _clamp_float(value: object, default: float, low: float, high: float) -> float:
+    """Valeur numérique bornée, ou la précédente si elle n'en est pas une.
+
+    Les réglages venus de l'interface sont des chaînes ; une saisie vide ou
+    fantaisiste ne doit pas casser l'enregistrement, seulement être ignorée.
+    """
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    if number != number:  # NaN
+        return default
+    return min(max(number, low), high)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -116,10 +138,21 @@ class Settings:
     # L'affichage et l'injection restent deux consentements distincts : activer
     # la carte ne doit jamais créer silencieusement des objets dans MSFS.
     traffic_source: str = "vatsim"
+    # Limites communes au trafic réseau, réel et statique. Les appareils les
+    # plus proches sont retenus en premier afin que réduire le nombre allège
+    # le rendu sans vider la zone immédiate du joueur.
+    traffic_radius_nm: float = 40.0
+    traffic_max_aircraft: int = 10
+    # Jeu de modèles injecté : « fsltl » ou « aig », jamais les deux — deux
+    # bibliothèques pour un même vol changeraient la livrée d'un appareil d'un
+    # relevé au suivant.
     aircraft_models: str = "fsltl"
     # Dossier FSLTL Base Models imposé depuis l'interface. Il peut désigner
     # directement le paquet ou son dossier Community ; None garde la détection.
     fsltl_path: Path | None = None
+    # Même chose pour les modèles AIG, dont le paquet OCI vit lui aussi dans
+    # Community. None garde la détection automatique.
+    aig_path: Path | None = None
     # Dossier Community imposé depuis l'interface. None conserve la détection
     # automatique via les UserCfg.opt de MSFS.
     aircraft_community_path: Path | None = None
@@ -168,8 +201,11 @@ class Settings:
             vatsim_enabled=_env_bool("VATSIM_ENABLED", False),
             traffic_enabled=_env_bool("TRAFFIC_ENABLED", False),
             traffic_source="vatsim",
+            traffic_radius_nm=40.0,
+            traffic_max_aircraft=10,
             aircraft_models="fsltl",
             fsltl_path=None,
+            aig_path=None,
             aircraft_community_path=None,
             lan_enabled=False,
         )
@@ -234,10 +270,11 @@ class Settings:
             or ""
         ).strip()
         raw_fsltl = str(values.get("fsltl_path", self.fsltl_path or "") or "").strip()
+        raw_aig = str(values.get("aig_path", self.aig_path or "") or "").strip()
         raw_traffic_source = str(
             values.get("traffic_source", self.traffic_source) or self.traffic_source
         ).strip().lower()
-        if raw_traffic_source not in {"vatsim", "ivao", "opensky"}:
+        if raw_traffic_source not in TRAFFIC_SOURCES:
             raw_traffic_source = self.traffic_source
         return Settings(
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
@@ -268,12 +305,21 @@ class Settings:
                 values.get("traffic_enabled", self.traffic_enabled)
             ),
             traffic_source=raw_traffic_source,
+            traffic_radius_nm=_clamp_float(
+                values.get("traffic_radius_nm", self.traffic_radius_nm),
+                self.traffic_radius_nm, 1.0, 100.0,
+            ),
+            traffic_max_aircraft=int(_clamp_float(
+                values.get("traffic_max_aircraft", self.traffic_max_aircraft),
+                self.traffic_max_aircraft, 1, 200,
+            )),
             aircraft_models=(
                 str(values.get("aircraft_models", self.aircraft_models)).strip().lower()
                 if str(values.get("aircraft_models", self.aircraft_models)).strip().lower()
-                in {"fsltl"} else self.aircraft_models
+                in MODEL_CHOICES else self.aircraft_models
             ),
             fsltl_path=Path(raw_fsltl).expanduser() if raw_fsltl else None,
+            aig_path=Path(raw_aig).expanduser() if raw_aig else None,
             aircraft_community_path=(
                 Path(raw_community).expanduser() if raw_community else None
             ),
@@ -299,8 +345,11 @@ class Settings:
             "vatsim_enabled": self.vatsim_enabled,
             "traffic_enabled": self.traffic_enabled,
             "traffic_source": self.traffic_source,
+            "traffic_radius_nm": self.traffic_radius_nm,
+            "traffic_max_aircraft": self.traffic_max_aircraft,
             "aircraft_models": self.aircraft_models,
             "fsltl_path": str(self.fsltl_path) if self.fsltl_path else "",
+            "aig_path": str(self.aig_path) if self.aig_path else "",
             "aircraft_community_path": (
                 str(self.aircraft_community_path) if self.aircraft_community_path else ""
             ),

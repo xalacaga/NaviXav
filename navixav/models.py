@@ -398,7 +398,17 @@ class FlightPlan:
                 parts.append(self.departure.sid.value)
             if self.departure.sid_transition.value:
                 parts.append(self.departure.sid_transition.value)
-        parts.extend(self.enroute.waypoints)
+        if self.enroute.route_legs:
+            for leg in self.enroute.route_legs:
+                target = leg.get("to")
+                if not target or (parts and parts[-1] == target):
+                    continue
+                via = leg.get("via")
+                if via and (not parts or parts[-1] != via):
+                    parts.append(via)
+                parts.append(target)
+        else:
+            parts.extend(self.enroute.waypoints)
         if self.arrival:
             if self.arrival.star_transition.value:
                 parts.append(self.arrival.star_transition.value)

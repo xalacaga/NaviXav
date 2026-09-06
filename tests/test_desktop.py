@@ -160,11 +160,15 @@ def test_interface_can_return_to_the_classic_layout_without_restart():
     assert '<option value="guided">' in html
     assert '<option value="classic">' in html
     assert 'id="flight-context"' in html
+    assert 'id="context-time-value"' in html
     assert 'body[data-interface="classic"] .flight-context' in css
     assert 'const INTERFACE_MODE_KEY = "navixav-interface-mode"' in javascript
     assert "localStorage.setItem(INTERFACE_MODE_KEY, interfaceMode)" in javascript
     assert 'applyInterfaceMode($("settings-interface").value)' in javascript
-    for key in ("interface_guided", "interface_classic", "context_next_action"):
+    assert "function remainingFlightSeconds(" in javascript
+    assert 'remainingFlightSeconds(aircraft, resolvedProjection)' in javascript
+    assert '"#context-time-label": "context_time_remaining"' in translations
+    for key in ("interface_guided", "interface_classic", "context_next_action", "context_time_remaining"):
         assert translations.count(f"{key}:") >= 8
 
 
@@ -456,8 +460,9 @@ def test_the_traffic_button_commands_the_setting_itself():
 
     toggle = javascript.split("function toggleTraffic()")[1]
     toggle = toggle.split("function syncTrafficButtons")[0]
-    assert "latestStatus.traffic_enabled = !latestStatus.traffic_enabled" in toggle
-    assert 'persistSetting({ traffic_enabled: latestStatus.traffic_enabled })' in toggle
+    assert "latestStatus.traffic_enabled = !previous" in toggle
+    assert "saved ? saved.traffic_enabled : previous" in toggle
+    assert 'persistSetting({ traffic_enabled: !previous })' in toggle
     assert "startTrafficLoop()" in toggle
     # Les réglages du poste ne se commandent pas depuis un téléphone.
     assert "remote_client" in toggle
@@ -680,12 +685,143 @@ def test_settings_are_compact_and_fsltl_can_be_configured_or_downloaded():
     assert "position: sticky" in css
     assert 'fetch("/api/fsltl/download"' in javascript
     assert '"X-NaviXav-External": "fsltl"' in javascript
-    assert 'fetch("/api/traffic")' in javascript
-    assert 'value === "opensky"' in javascript
+    assert 'poll.json("/api/traffic")' in javascript
+    assert 'source === "opensky"' in javascript
     assert '"/api/fsltl/download",' in server_source
     assert "https://flybywiresim.com/downloads/" in desktop_source
     assert translations.count("settings_fsltl_path:") >= 8
     assert translations.count("fsltl_download:") >= 8
+
+
+def test_saving_settings_closes_before_the_flight_plan_refresh_finishes():
+    """Un nouveau plan lent ne doit pas faire croire que la sauvegarde bloque."""
+    javascript = (
+        Path(desktop.__file__).parent / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+    save_body = javascript.split("async function saveSettings(event)", 1)[1].split(
+        "/* ------------------------------------------------- premier lancement */", 1
+    )[0]
+
+    close = 'setTimeout(() => $("settings-dialog").close(), 500);'
+    refresh = "if (status.simbrief_configured) void buildPlan();"
+    assert close in save_body
+    assert refresh in save_body
+    assert save_body.index(close) < save_body.index(refresh)
+    assert "await buildPlan()" not in save_body
+
+
+def test_settings_expose_the_aig_model_set_alongside_fsltl():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    server_source = (Path(desktop.__file__).parent / "web" / "app.py").read_text(encoding="utf-8")
+    desktop_source = Path(desktop.__file__).read_text(encoding="utf-8")
+
+    assert '<option value="aig">' in html
+    assert 'id="settings-aig-path"' in html
+    assert 'id="settings-aig-download"' in html
+    assert 'fetch("/api/aig/download"' in javascript
+    assert '"X-NaviXav-External": "aig"' in javascript
+    assert '"/api/aig/download",' in server_source
+    assert "https://www.alpha-india.net/" in desktop_source
+    for key in (
+        "settings_aig_path:", "aig_download:", "aig_download_help:",
+        "aig_detected:", "aig_not_detected:", "aig_companions_missing:",
+        "traffic_map_only_models:",
+    ):
+        assert translations.count(key) >= 8, key
+
+
+def test_the_layer_says_which_competing_injector_holds_the_place():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    server_source = (Path(desktop.__file__).parent / "web" / "app.py").read_text(encoding="utf-8")
+
+    assert '"traffic_conflict": list(traffic.conflicts),' in server_source
+    assert 'tf("traffic_map_only_conflict"' in javascript
+    assert translations.count("traffic_map_only_conflict:") >= 8
+
+
+def test_every_traffic_source_reads_in_the_interface_language():
+    """« Trafic réel · OpenSky » restait en français dans les huit langues."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert html.count('<option value="static">') == 3, "carte, roulage et réglages"
+    # Les trois sélecteurs sont parcourus : `querySelector` n'en verrait qu'un.
+    assert "#map-traffic-source, #ground-traffic-source, #settings-traffic-source" in translations
+    for key in ("traffic_source_opensky:", "traffic_source_static:"):
+        assert translations.count(key) >= 8, key
+
+
+def test_traffic_limits_stay_visible_for_every_source_and_use_requested_defaults():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    application = (static / "app.js").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    assert 'id="settings-traffic-radius"' in html
+    assert 'id="settings-traffic-max-aircraft"' in html
+    assert 'class="field settings-static-traffic"' not in html
+    assert 'values.traffic_radius_nm ?? 40' in application
+    assert 'values.traffic_max_aircraft ?? 10' in application
+    assert 'traffic_radius_nm: Number($("settings-traffic-radius").value) || 40' in application
+    assert 'traffic_max_aircraft: Number($("settings-traffic-max-aircraft").value) || 10' in application
+    assert translations.count("settings_traffic_radius:") >= 8
+    assert translations.count("settings_traffic_max_aircraft:") >= 8
+
+
+def test_opensky_daily_quota_is_explicit_in_every_interface_language():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+
+    assert translations.count("traffic_state_opensky_quota:") == 8
+    assert translations.count("traffic_state_opensky_quota_detail:") == 8
+    assert 'injection.error_code === "opensky_daily_quota"' in javascript
+
+
+def test_the_settings_offer_the_msfs_panel_without_ever_imposing_it():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+    server_source = (Path(desktop.__file__).parent / "web" / "app.py").read_text(encoding="utf-8")
+
+    assert 'id="settings-msfs-panel-install"' in html
+    assert 'id="settings-msfs-panel-remove"' in html
+    # Le panneau a sa propre rubrique : il ne dépend pas du trafic, il le
+    # commande, et il vaut aussi pour qui n'injecte jamais rien.
+    assert 'id="settings-section-msfs-panel"' in html
+    panel_section = html.split('id="settings-section-msfs-panel"')[1]
+    assert 'id="settings-msfs-panel-install"' in panel_section
+    traffic_section = html.split('id="settings-section-traffic"')[1].split("</details>")[0]
+    assert "settings-msfs-panel" not in traffic_section
+    for key in ("settings_section_msfs_panel:", "settings_section_msfs_panel_help:"):
+        assert translations.count(key) >= 8, key
+    # Le dossier Community n'est touché que sur confirmation explicite.
+    assert '"X-NaviXav-External": "msfs-panel"' in javascript
+    assert 't("msfs_panel_confirm_remove")' in javascript
+    # L'appel HTTP attend la fin réelle de la copie/suppression. Pendant cette
+    # attente le bouton reste verrouillé, animé et décrit aux lecteurs d'écran.
+    assert "if (msfsPanelActionPending) return;" in javascript
+    assert 'button.classList.add("is-busy")' in javascript
+    assert 'button.setAttribute("aria-busy", "true")' in javascript
+    assert '.icon-btn.is-busy::before' in css
+    assert "@keyframes msfs-panel-spin" in css
+    assert '@app.post("/api/msfs-panel/install")' in server_source
+    assert '@app.post("/api/msfs-panel/uninstall")' in server_source
+    for key in (
+        "settings_msfs_panel_install:", "settings_msfs_panel_remove:",
+        "settings_msfs_panel_help:", "msfs_panel_installed:",
+        "msfs_panel_not_installed:", "msfs_panel_unavailable:",
+        "msfs_panel_failed:", "msfs_panel_confirm_remove:",
+        "msfs_panel_installing:", "msfs_panel_removing:",
+    ):
+        assert translations.count(key) >= 8, key
 
 
 def test_windows_process_uses_stable_navixav_identity(monkeypatch):
@@ -1127,7 +1263,7 @@ def test_the_top_of_descent_prefers_a_valid_simbrief_performance_point():
     assert 'stages.has("enroute")' in simbrief
     assert "simbriefTodFromDestination(plan)" in guidance
     assert "simbriefAnchor ?? geometricAnchor" in guidance
-    assert 'source: simbriefAnchor === null ? "calculated" : "simbrief"' in guidance
+    assert 'source: simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated"' in guidance
     assert "profileGradientFtPerNm" in guidance
 
 
@@ -1729,7 +1865,8 @@ def test_the_ground_view_has_its_own_tab_and_panel():
     assert "/static/ground.js" in markup
     assert '"ground", "procedures", "flight"' in javascript
     # Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
-    assert 'if (name === "ground") window.requestAnimationFrame(() => GROUND.resize());' in javascript
+    assert 'if (name === "map" || name === "ground") window.requestAnimationFrame(refreshVisibleTraffic);' in javascript
+    assert 'if (trafficViewVisible("ground")) {\n    GROUND.resize();' in javascript
 
 
 def test_the_ground_canvas_fills_its_stage_and_stays_decluttered():
@@ -1988,7 +2125,8 @@ def test_hidden_map_waits_for_a_real_canvas_size_before_loading_tiles():
     javascript = (static / "app.js").read_text(encoding="utf-8")
     map_javascript = (static / "map.js").read_text(encoding="utf-8")
 
-    assert "window.requestAnimationFrame(() => MAP.resize())" in javascript
+    assert "window.requestAnimationFrame(refreshVisibleTraffic)" in javascript
+    assert 'if (trafficViewVisible("map")) {\n    MAP.resize();' in javascript
     assert "canvas.clientWidth <= 0 || canvas.clientHeight <= 0" in map_javascript
     assert "fitPending = true;" in map_javascript
     assert "!Number.isFinite(screenPixelsPerTile)" in map_javascript

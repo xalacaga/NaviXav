@@ -204,8 +204,7 @@ def _ordered_legs(
         procedure.find_transition(transition_ident) if transition_ident else None
     )
     transition_legs: Sequence[ProcedureLeg] = transition.legs if transition else ()
-    runway = procedure.find_runway_transition(runway_ident)
-    runway_legs: Sequence[ProcedureLeg] = runway.legs if runway else ()
+    runway_legs: Sequence[ProcedureLeg] = procedure.effective_runway_legs(runway_ident)
 
     if transition_first:
         return [*transition_legs, *procedure.legs, *runway_legs]

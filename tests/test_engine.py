@@ -62,7 +62,7 @@ def test_wind_is_read_from_the_ofp_metar(provider, settings, ofp):
 
 def test_atc_route_is_rebuilt(provider, settings, ofp):
     plan = _plan(provider, settings, ofp)
-    assert plan.atc_route() == "EPIK8M EPIKO LIRKO MOKIP GERVA AFRIC AFRI8N"
+    assert plan.atc_route() == "EPIK8M EPIKO DCT LIRKO DCT MOKIP DCT GERVA AFRIC AFRI8N"
     first_leg = plan.enroute.route_legs[0]
     assert first_leg["via"] == "DCT"
     assert first_leg["to"] == "LIRKO"

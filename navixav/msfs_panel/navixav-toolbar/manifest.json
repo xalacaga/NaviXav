@@ -1,0 +1,15 @@
+{
+  "dependencies": [],
+  "content_type": "MISC",
+  "title": "NaviXav Toolbar",
+  "manufacturer": "NaviXav",
+  "creator": "Xalacaga",
+  "package_version": "1.2.2",
+  "minimum_game_version": "1.32.7",
+  "release_notes": {
+    "neutral": {
+      "LastUpdate": "",
+      "OlderHistory": ""
+    }
+  }
+}

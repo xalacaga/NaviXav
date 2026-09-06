@@ -1,0 +1,191 @@
+/**
+ * Panneau NaviXav de la barre d'outils MSFS.
+ *
+ * Le panneau emprunte la feuille de style du simulateur : ses boutons sont
+ * ceux de MSFS, et rien ici ne cherche à les redessiner. La seule chose qui
+ * s'ajoute est la lecture — des colonnes plutôt que des phrases, et la source
+ * active reconnaissable sans lire son nom.
+ */
+
+ingame-ui#NaviXavPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100% !important;
+  width: 100% !important;
+  min-width: 460px;
+}
+
+ingame-ui#NaviXavPanel .panelHidden {
+  display: none;
+}
+
+ingame-ui#NaviXavPanel #MainDisplay.hidden {
+  display: none;
+}
+
+ingame-ui#NaviXavPanel #Footer.hidden {
+  display: none;
+}
+
+ingame-ui#NaviXavPanel .ingameNaviXavContent {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  min-width: 440px !important;
+  overflow-y: auto !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+ingame-ui#NaviXavPanel .sectionPad {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+/* ------------------------------------------------------------- identité */
+
+ingame-ui#NaviXavPanel .navixavHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+ingame-ui#NaviXavPanel .navixavTitle {
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+
+ingame-ui#NaviXavPanel .navixavModels {
+  font-size: small;
+  opacity: 0.75;
+  text-align: right;
+}
+
+/* ---------------------------------------------------------------- états */
+
+ingame-ui#NaviXavPanel .navixavStatus {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+ingame-ui#NaviXavPanel .navixavRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 3px 0;
+  font-size: small;
+}
+
+/* Une colonne fixe : les trois valeurs commencent au même endroit, et l'œil
+   n'a plus qu'une seule ligne verticale à suivre. */
+ingame-ui#NaviXavPanel .navixavLabel {
+  width: 92px;
+  flex: 0 0 92px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: x-small;
+  opacity: 0.6;
+}
+
+ingame-ui#NaviXavPanel .navixavValue {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  font-weight: bold;
+}
+
+/* La pastille dit en une couleur ce que la phrase met une ligne à dire :
+   vert, des appareils entrent dans le simulateur ; orange, la carte seule ;
+   éteinte, le trafic est coupé. */
+ingame-ui#NaviXavPanel .navixavDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  border-radius: 50%;
+  margin-right: 8px;
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
+ingame-ui#NaviXavPanel .navixavDotLive {
+  background-color: #3ddc84;
+}
+
+ingame-ui#NaviXavPanel .navixavDotWarn {
+  background-color: #ffb020;
+}
+
+/* Une explication, jamais une alarme : elle dit pourquoi rien n'entre dans
+   le simulateur, sans crier. */
+ingame-ui#NaviXavPanel .navixavNotice,
+ingame-ui#NaviXavPanel .navixavHint {
+  font-style: italic;
+  font-size: small;
+  opacity: 0.8;
+  margin: 4px 0 0 0;
+}
+
+ingame-ui#NaviXavPanel .navixavLegend {
+  margin: 10px 0 0 0;
+  font-size: x-small;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+/* -------------------------------------------------------------- boutons */
+
+ingame-ui#NaviXavPanel .btn-container {
+  display: flex;
+  width: 100%;
+  flex-direction: row;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+ingame-ui#NaviXavPanel .triggerButton {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  flex: 1 1 0;
+  margin-right: 6px;
+}
+
+ingame-ui#NaviXavPanel .triggerButton:last-child {
+  margin-right: 0;
+}
+
+/* Quatre sources, une seule active. Aucune n'est pâlie : les quatre restent
+   cliquables, et un bouton éteint se lirait comme un bouton refusé — ce que
+   le simulateur, lui, dessine ainsi. Le choix courant porte donc un cadre,
+   seul repère qui ne suppose rien de la structure interne du gabarit MSFS :
+   repeindre le fond du bouton obligerait à la deviner. */
+ingame-ui#NaviXavPanel .sourceButton {
+  border: 3px solid transparent;
+  border-radius: 5px;
+}
+
+ingame-ui#NaviXavPanel .sourceButton.sourceActive {
+  border-color: #ffffff;
+}
+
+ingame-ui#NaviXavPanel .navixavFlight {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 8px 0;
+}
+ingame-ui#NaviXavPanel .navixavFlight h2 { font-size: medium; margin: 0; }
+ingame-ui#NaviXavPanel .navixavFlight p { font-size: small; margin: 4px 0; }
+ingame-ui#NaviXavPanel .navixavFlight .navixavRow { justify-content: space-between; }
+ingame-ui#NaviXavPanel .navixavFlight .navixavValue {
+  text-align: right; display: block; overflow-wrap: break-word; margin-left: 8px;
+}
+ingame-ui#NaviXavPanel #navixavInjectionDetail { margin-bottom: 8px; }

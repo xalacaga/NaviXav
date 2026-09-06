@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Iterable, Protocol, runtime_checkable
 
 # Un appareil posé à l'endroit exact du joueur est presque toujours le joueur
 # lui-même, rendu par le réseau auquel il est connecté. L'afficher doublerait
@@ -59,6 +59,8 @@ class TrafficAircraft:
     on_ground: bool | None = None
     departure: str = ""
     arrival: str = ""
+    # Unix seconds. Position age must not be inferred from the feed publication time.
+    position_timestamp: float | None = None
 
     @property
     def aircraft(self) -> str:
@@ -92,12 +94,21 @@ def is_own_position(
 
 
 class TrafficProvider(Protocol):
-    """Une source produit des appareils sans connaître leur modèle MSFS."""
+    """Une source produit des appareils sans connaître leur modèle MSFS.
+
+    L'injection ne demande que `traffic()`, mais la carte et la fiche d'un
+    appareil réclament les deux autres à n'importe quelle source : une source
+    qui ne les porte pas se voit injectée sans jamais s'afficher.
+    """
 
     @property
     def name(self) -> str: ...
 
     def traffic(self, limit: int | None = None) -> list[TrafficAircraft]: ...
+
+    def updated_at(self) -> str: ...
+
+    def detail(self, callsign: str) -> TrafficAircraft | None: ...
 
     def close(self) -> None: ...
 
@@ -122,3 +133,53 @@ class ResolvedAircraftModel:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+class InstallationStatus(StrEnum):
+    """État d'un jeu de modèles sur le disque, quel qu'en soit le fournisseur.
+
+    Un paquet peut manquer, être présent mais inutilisable, ou prêt à servir.
+    La distinction vaut pour tous les jeux de modèles, et c'est elle que
+    l'interface affiche : elle n'appartient donc à aucun d'eux en propre.
+    """
+
+    DETECTED = "detected"
+    NOT_DETECTED = "not_detected"
+    INCOMPLETE = "incomplete"
+
+
+class ModelInstallation(Protocol):
+    """Ce que le service a besoin de savoir d'un jeu de modèles installé."""
+
+    status: InstallationStatus
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]: ...
+
+
+class ModelIndex(Protocol):
+    """Un jeu de modèles interrogé sans que l'appelant sache lequel c'est.
+
+    Le gestionnaire n'a jamais besoin de plus : il donne un appareil, il
+    reçoit un titre spawnable et la raison de ce choix. Tout le reste — nom
+    du paquet, règles VMR, conventions de titres — appartient au fournisseur.
+    """
+
+    def match(
+        self, aircraft: TrafficAircraft, msfs_fallback_titles: Iterable[str] = ()
+    ) -> ResolvedAircraftModel | None: ...
+
+
+@runtime_checkable
+class GenericFallbackIndex(ModelIndex, Protocol):
+    """Jeu de modèles sachant proposer un appareil neutre faute de type.
+
+    Le repli tient à une convention propre au fournisseur — chez FSLTL, la
+    compagnie « ZZZZ » des modèles génériques. Un jeu qui n'en a pas reste un
+    `ModelIndex` valide : le trafic sans type resté sur la carte vaut mieux
+    qu'un monocouloir posé au hasard.
+    """
+
+    def generic_fallback(
+        self, aircraft: TrafficAircraft
+    ) -> ResolvedAircraftModel | None: ...

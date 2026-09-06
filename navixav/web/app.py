@@ -18,7 +18,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Annotated, Any, AsyncIterator
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
@@ -46,6 +46,7 @@ from navixav.ground import (
 )
 
 from navixav.config import (
+    TRAFFIC_SOURCES,
     Settings,
     load_user_settings,
     save_user_settings,
@@ -66,8 +67,11 @@ from navixav.preferences import AirportPreferences
 from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 from navixav.sia import SiaClient, SiaError
-from navixav.traffic.base import is_own_position
-from navixav.traffic.fsltl import detect_fsltl
+from navixav.traffic.base import distance_nm, is_own_position
+from navixav import msfs_panel
+from navixav.navdata import msfs_store
+from navixav.traffic.static_traffic import StaticTrafficProvider
+from navixav.traffic.selection import CHOICES as MODEL_CHOICES, build_index, detect_models
 from navixav.traffic.ivao import IvaoClient, IvaoError
 from navixav.traffic.opensky import OpenSkyClient, OpenSkyError
 from navixav.traffic.service import TrafficService
@@ -82,6 +86,14 @@ FAA_ICAO_PREFIXES = {
 }
 LOGGER = logging.getLogger(__name__)
 WEATHER_REFRESH_SECONDS = 300
+
+
+class PanelFlightSummary(BaseModel):
+    revision: int = 0
+    connected: bool = False
+    route: str = Field(default="", max_length=40)
+    values: dict[str, Annotated[str, Field(max_length=240)]] = Field(default_factory=dict, max_length=8)
+    labels: dict[str, Annotated[str, Field(max_length=400)]] = Field(default_factory=dict, max_length=32)
 
 
 class PlanRequest(BaseModel):
@@ -132,9 +144,16 @@ class SettingsRequest(BaseModel):
     taxi_speed_alarm_sound: bool = True
     vatsim_enabled: bool = False
     traffic_enabled: bool = False
-    traffic_source: str = Field(default="vatsim", pattern="^(vatsim|ivao|opensky)$")
-    aircraft_models: str = Field(default="fsltl", pattern="^fsltl$")
+    traffic_source: str = Field(
+        default="vatsim", pattern=f"^({'|'.join(TRAFFIC_SOURCES)})$"
+    )
+    traffic_radius_nm: float = Field(default=40.0, ge=1.0, le=100.0)
+    traffic_max_aircraft: int = Field(default=10, ge=1, le=200)
+    aircraft_models: str = Field(
+        default="fsltl", pattern=f"^({'|'.join(MODEL_CHOICES)})$"
+    )
     fsltl_path: str = Field(default="", max_length=1000)
+    aig_path: str = Field(default="", max_length=1000)
     aircraft_community_path: str = Field(default="", max_length=1000)
     lan_enabled: bool = False
 
@@ -198,24 +217,46 @@ def create_app(
         lambda: (lambda state: (state.latitude, state.longitude))(tracker.read())
     )
     current_plan_state: dict[str, Any] = {}
+    panel_summary: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
     aircraft_matcher = AircraftMatcher()
 
-    def detect_configured_fsltl():
+    def detect_configured_models():
         folders = (
             community_folders(explicit=[settings.aircraft_community_path])
             if settings.aircraft_community_path
             else None
         )
-        return detect_fsltl(folders, explicit_path=settings.fsltl_path)
+        return detect_models(
+            settings.aircraft_models,
+            folders,
+            fsltl_path=settings.fsltl_path,
+            aig_path=settings.aig_path,
+        )
 
     resources_closed = False
 
+    static_provider = None
+    static_options = None
+
     def selected_traffic_provider():
+        nonlocal static_provider, static_options
         if settings.traffic_source == "ivao":
             return ivao
         if settings.traffic_source == "opensky":
             return opensky
+        if settings.traffic_source == "static":
+            options = (settings.navdata_store, settings.traffic_radius_nm,
+                       settings.traffic_max_aircraft)
+            if static_provider is None or options != static_options:
+                static_provider = StaticTrafficProvider(
+                    player_position,
+                    lambda: msfs_store.connect(settings.navdata_store or None),
+                    radius_nm=settings.traffic_radius_nm,
+                    max_aircraft=settings.traffic_max_aircraft,
+                )
+                static_options = options
+            return static_provider
         return vatsim
 
     def player_position() -> tuple[float, float]:
@@ -226,18 +267,41 @@ def create_app(
         return tracker.read().altitude_ft
 
     # L'injection possède son état plutôt que de le partager par fermeture :
-    # son fil, son gestionnaire et sa détection FSLTL restent interrogeables,
-    # au lieu d'être invisibles depuis l'extérieur de create_app.
-    traffic = TrafficService(detect_configured_fsltl, player_position, player_altitude)
+    # son fil, son gestionnaire et sa détection de modèles restent
+    # interrogeables, au lieu d'être invisibles depuis l'extérieur de create_app.
+    traffic = TrafficService(
+        detect_configured_models,
+        player_position,
+        player_altitude,
+        models_factory=build_index,
+        state=lambda: tracker.read(),
+    )
+
+    def traffic_configuration(values: Settings) -> tuple:
+        return (
+            values.traffic_enabled, values.traffic_source, values.aircraft_models,
+            values.fsltl_path, values.aig_path, values.aircraft_community_path,
+            values.traffic_radius_nm, values.traffic_max_aircraft,
+            values.navdata_store if values.traffic_source == "static" else None,
+        )
+
+    configured_traffic: tuple | None = None
 
     def configure_traffic_injection() -> None:
+        nonlocal configured_traffic
+        requested = traffic_configuration(settings)
+        if requested == configured_traffic:
+            return
         # Choisir une source de trafic, c'est demander à la voir voler : le
         # calque de la carte est le seul interrupteur, et ce qu'il montre entre
         # dans le simulateur. Aucun second réglage ne vient le contredire.
         traffic.configure(
             enabled=settings.traffic_enabled,
             provider=selected_traffic_provider(),
+            radius_nm=settings.traffic_radius_nm,
+            max_aircraft=settings.traffic_max_aircraft,
         )
+        configured_traffic = requested
 
     def close_resources() -> None:
         """Ferme une seule fois toutes les connexions détenues par l'API."""
@@ -305,9 +369,12 @@ def create_app(
                 "/api/simbrief/new",
                 "/api/support/open",
                 "/api/fsltl/download",
+                "/api/aig/download",
                 "/api/update/install",
                 "/api/shutdown",
-            } or (
+            } or request.url.path.startswith("/api/panel/") or (
+                request.url.path.startswith("/api/msfs-panel/")
+            ) or (
                 request.url.path == "/api/plan" and request.method == "POST"
             ):
                 return PlainTextResponse(
@@ -408,9 +475,11 @@ def create_app(
             "vatsim_enabled": settings.vatsim_enabled,
             "traffic_enabled": settings.traffic_enabled,
             "traffic_injection_active": traffic.active,
+            "traffic_injection": traffic.status,
+            "traffic_conflict": list(traffic.conflicts),
             "traffic_source": settings.traffic_source,
             "aircraft_models": settings.aircraft_models,
-            "fsltl": traffic.fsltl.to_dict(),
+            "models": traffic.installation.to_dict(),
             "chartfox_connected": bool(chartfox.status().get("connected")),
             "navdata": navdata,
         }
@@ -670,6 +739,9 @@ def create_app(
             plan = engine.complete(ofp, request.to_overrides())
             payload = plan.to_dict()
             payload["atc_route"] = plan.atc_route()
+            payload["panel_revision"] = current_plan_state.get("panel_revision", 0) + 1
+            current_plan_state["panel_revision"] = payload["panel_revision"]
+            panel_summary.clear()
             current_plan_state["payload"] = copy.deepcopy(payload)
             current_plan_state["ofp"] = ofp
             LOGGER.info(
@@ -1211,10 +1283,11 @@ def create_app(
         """
         if not settings.traffic_enabled:
             return {"enabled": False, "traffic": []}
-        return {
-            "enabled": True,
-            "traffic": [report.to_dict() for report in tracker.traffic()],
-        }
+        try:
+            reports = tracker.traffic(strict=True)
+        except PositionUnavailable as exc:
+            raise HTTPException(503, "Lecture du trafic temporairement indisponible.") from exc
+        return {"enabled": True, "traffic": [report.to_dict() for report in reports]}
 
     @app.get("/api/vatsim/aircraft/{callsign}")
     def vatsim_aircraft(callsign: str) -> dict[str, Any]:
@@ -1314,15 +1387,28 @@ def create_app(
             }
 
         centre, own_altitude = own_aircraft_position()
+        visible = [
+            entry for entry in aircraft
+            if not is_own_position(entry, centre, own_altitude)
+        ]
+        if centre is not None:
+            visible = sorted(
+                (
+                    entry for entry in visible
+                    if distance_nm(centre, (entry.latitude, entry.longitude))
+                    <= settings.traffic_radius_nm
+                ),
+                key=lambda entry: distance_nm(
+                    centre, (entry.latitude, entry.longitude)
+                ),
+            )
+        visible = visible[:settings.traffic_max_aircraft]
         return {
             "enabled": True,
             "available": True,
             "source": provider.name,
             "updated_at": updated_at,
-            "traffic": [
-                entry.to_dict() for entry in aircraft
-                if not is_own_position(entry, centre, own_altitude)
-            ],
+            "traffic": [entry.to_dict() for entry in visible],
         }
 
     @app.get("/api/vatsim")
@@ -1429,6 +1515,135 @@ def create_app(
             raise HTTPException(
                 409,
                 "Le téléchargement FSLTL est disponible dans l’application Windows.",
+            )
+        callback()
+        return {"opened": True}
+
+    # ---------------------------------------------------------------- panneau
+    # Le panneau de la barre d'outils MSFS vit dans le simulateur, sur une
+    # autre origine : ses appels sont donc des requêtes croisées. Elles restent
+    # locales — le pare-feu du service n'ouvre rien de plus —, n'emploient que
+    # des GET simples pour éviter une requête de contrôle préalable, et ne
+    # rendent rien qu'un pilote ne voie déjà sur sa propre carte.
+
+    @app.middleware("http")
+    async def allow_the_msfs_panel(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/panel/"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    def _panel_state() -> dict[str, object]:
+        models = traffic.installation.to_dict()
+        snapshot = panel_summary.get("snapshot", {})
+        fresh = time.monotonic() - panel_summary.get("received_at", float("-inf")) <= 10
+        return {
+            "running": True,
+            "version": __version__,
+            "traffic_enabled": settings.traffic_enabled,
+            "traffic_source": settings.traffic_source,
+            "aircraft_models": settings.aircraft_models,
+            "models_detected": bool(models.get("detected")),
+            "models_version": models.get("version", ""),
+            "models_count": models.get("models", 0),
+            "injection_active": traffic.active,
+            "injection": traffic.status,
+            "flight": {**snapshot, "fresh": fresh,
+                       "connected": bool(fresh and snapshot.get("connected"))},
+            "conflict": list(traffic.conflicts),
+        }
+
+    def _apply_panel_values(values: dict[str, object]) -> dict[str, object]:
+        nonlocal settings
+        # Le panneau ne transmet que la commande qu'il vient de recevoir. Une
+        # mise à jour partielle ne doit donc jamais faire passer les champs
+        # absents par les valeurs par défaut de ``with_user_values`` : c'est
+        # ainsi qu'un clic sur Trafic effaçait les identifiants SimBrief.
+        settings = settings.with_user_values({**settings.user_values(), **values})
+        try:
+            save_user_settings(settings)
+        except OSError as exc:
+            # Un réglage non enregistré vaut mieux qu'un panneau en erreur :
+            # il tiendra jusqu'à la fermeture, et le journal garde la trace.
+            LOGGER.warning("Réglage du panneau non enregistré : %s", exc)
+        configure_traffic_injection()
+        return _panel_state()
+
+    @app.get("/api/panel/state")
+    def panel_state() -> dict[str, object]:
+        return _panel_state()
+
+    @app.post("/api/panel/flight")
+    def publish_panel_flight(summary: PanelFlightSummary) -> dict[str, bool]:
+        if summary.revision != current_plan_state.get("panel_revision", 0):
+            raise HTTPException(409, "Le plan a changé.")
+        panel_summary.update(snapshot=summary.model_dump(), received_at=time.monotonic())
+        return {"ok": True}
+
+    @app.get("/api/panel/traffic/{state}")
+    def panel_set_traffic(state: str) -> dict[str, object]:
+        if state not in {"on", "off"}:
+            raise HTTPException(400, "État de trafic inattendu.")
+        return _apply_panel_values({"traffic_enabled": state == "on"})
+
+    @app.get("/api/panel/source/{name}")
+    def panel_set_source(name: str) -> dict[str, object]:
+        # La liste vient des réglages plutôt que d'être recopiée ici : une
+        # source ajoutée à l'application et refusée par le panneau laisserait
+        # le pilote devant un bouton sans effet.
+        if name not in TRAFFIC_SOURCES:
+            raise HTTPException(400, "Source de trafic inconnue.")
+        return _apply_panel_values({"traffic_source": name})
+
+    @app.get("/api/panel/show")
+    def panel_show_window() -> dict[str, bool]:
+        """Ramène la fenêtre NaviXav au premier plan depuis le simulateur."""
+        callback = getattr(app.state, "request_show_window", None)
+        if not callable(callback):
+            raise HTTPException(
+                409, "La fenêtre n'est disponible que dans l'application Windows."
+            )
+        callback()
+        return {"shown": True}
+
+    def _panel_community_folders():
+        if settings.aircraft_community_path:
+            return community_folders(explicit=[settings.aircraft_community_path])
+        return None
+
+    @app.get("/api/msfs-panel/status")
+    def msfs_panel_status() -> dict[str, object]:
+        return msfs_panel.status(_panel_community_folders()).to_dict()
+
+    @app.post("/api/msfs-panel/install")
+    def msfs_panel_install(request: Request) -> dict[str, object]:
+        if request.headers.get("X-NaviXav-External") != "msfs-panel":
+            raise HTTPException(403, "Confirmation d’installation absente.")
+        try:
+            msfs_panel.install(_panel_community_folders())
+        except (FileNotFoundError, FileExistsError, OSError) as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return msfs_panel.status(_panel_community_folders()).to_dict()
+
+    @app.post("/api/msfs-panel/uninstall")
+    def msfs_panel_uninstall(request: Request) -> dict[str, object]:
+        if request.headers.get("X-NaviXav-External") != "msfs-panel":
+            raise HTTPException(403, "Confirmation de retrait absente.")
+        try:
+            msfs_panel.uninstall(_panel_community_folders())
+        except (FileExistsError, OSError) as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return msfs_panel.status(_panel_community_folders()).to_dict()
+
+    @app.post("/api/aig/download")
+    def open_aig_download(request: Request) -> dict[str, bool]:
+        if request.headers.get("X-NaviXav-External") != "aig":
+            raise HTTPException(403, "Confirmation d’ouverture absente.")
+        callback = getattr(app.state, "request_open_aig_download", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "Le téléchargement AIG est disponible dans l’application Windows.",
             )
         callback()
         return {"opened": True}

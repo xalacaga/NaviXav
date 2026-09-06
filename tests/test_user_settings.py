@@ -65,6 +65,8 @@ def test_settings_request_accepts_interface_values():
         aircraft_community_path=r"D:\MSFS\Community",
         fsltl_path=r"D:\MSFS\Community\fsltl-traffic-base",
         traffic_source="ivao",
+        traffic_radius_nm=55,
+        traffic_max_aircraft=24,
         lan_enabled=True,
     )
 
@@ -74,6 +76,8 @@ def test_settings_request_accepts_interface_values():
     assert request.aircraft_community_path == r"D:\MSFS\Community"
     assert request.fsltl_path == r"D:\MSFS\Community\fsltl-traffic-base"
     assert request.traffic_source == "ivao"
+    assert request.traffic_radius_nm == 55
+    assert request.traffic_max_aircraft == 24
     assert request.lan_enabled is True
 
 
@@ -117,6 +121,18 @@ def test_settings_request_rejects_invalid_limits():
         SettingsRequest(traffic_source="unknown")
     with pytest.raises(ValidationError):
         SettingsRequest(aircraft_models="unknown")
+    with pytest.raises(ValidationError):
+        SettingsRequest(traffic_radius_nm=0)
+    with pytest.raises(ValidationError):
+        SettingsRequest(traffic_max_aircraft=201)
+
+
+def test_default_traffic_limits_are_ten_aircraft_within_forty_nm():
+    settings = Settings()
+    assert settings.traffic_max_aircraft == 10
+    assert settings.traffic_radius_nm == 40
+    assert SettingsRequest().traffic_max_aircraft == 10
+    assert SettingsRequest().traffic_radius_nm == 40
 
 
 def test_taxi_speed_limits_survive_both_validation_paths(tmp_path):

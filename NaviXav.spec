@@ -88,6 +88,12 @@ datas = [
     (str(project_root / "aircraft_db" / "aircraft"), "aircraft_db/aircraft"),
     (str(project_root / "aircraft_db" / "VERSION.json"), "aircraft_db"),
     (str(project_root / "data" / "airport_preferences.json"), "data"),
+    # Paquet du panneau de la barre d'outils MSFS. Il voyage avec la
+    # distribution mais n'est copié dans Community que sur demande.
+    (
+        str(project_root / "navixav" / "msfs_panel" / "navixav-toolbar"),
+        "navixav/msfs_panel/navixav-toolbar",
+    ),
 ]
 datas += webview_datas
 

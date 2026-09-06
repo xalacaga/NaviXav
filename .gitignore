@@ -77,3 +77,8 @@ docker-compose*.yml
 DOCKER_*.md
 docker/
 navixav/web/container.py
+
+# Sortie de construction du panneau MSFS : seul le .spb est versionne, et il
+# vit dans le paquet livre.
+msfs-panel/build/Packages/
+msfs-panel/build/_Temp/

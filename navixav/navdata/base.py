@@ -179,6 +179,17 @@ class Procedure:
     def transition_idents(self) -> tuple[str, ...]:
         return tuple(t.ident for t in self.transitions)
 
+    def connecting_transitions(self, fix: str | None, *, use_exit_fix: bool = False) -> tuple[Transition, ...]:
+        """Match the flown endpoint, which need not be the transition's name."""
+        if not fix:
+            return ()
+        return tuple(t for t in self.transitions
+                     if (t.exit_fix if use_exit_fix else t.entry_fix) == fix
+                     or ((t.exit_fix if use_exit_fix else t.entry_fix) is None and t.ident == fix))
+
+    def connects_from(self, fix: str | None) -> bool:
+        return bool(fix and (self.entry_fix == fix or self.connecting_transitions(fix)))
+
     def find_transition(self, ident: str) -> Transition | None:
         for transition in self.transitions:
             if transition.ident == ident:
@@ -200,6 +211,16 @@ class Procedure:
             if _normalise_runway(transition.ident) == wanted:
                 return transition
         return None
+
+    def effective_runway_legs(self, runway_name: str | None) -> tuple[ProcedureLeg, ...]:
+        transition = self.find_runway_transition(runway_name)
+        legs = transition.legs if transition else ()
+        # Some Facilities/cache records repeat only the common STAR prefix in
+        # a runway branch. Appending that exact duplicate invents a return to
+        # the entry fix. Compare complete legs, including their constraints.
+        if self.kind is ProcedureKind.STAR and legs and legs == self.legs[:len(legs)]:
+            return ()
+        return legs
 
 
 @dataclass(frozen=True)

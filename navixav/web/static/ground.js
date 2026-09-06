@@ -36,6 +36,32 @@ const GROUND = (() => {
   let plan = null;
   let aircraft = null;
   let traffic = [];
+  let trafficFrom = new Map();
+  let trafficReceivedAt = 0;
+  let trafficFrame = null;
+
+  function trafficPosition(entry, now = performance.now()) {
+    const previous = trafficFrom.get(entry.object_id);
+    if (!previous) return entry;
+    const factor = Math.min(1, Math.max(0, (now - trafficReceivedAt) / 2000));
+    const heading = previous.heading_true_deg ?? entry.heading_true_deg ?? 0;
+    const turn = ((entry.heading_true_deg ?? heading) - heading + 540) % 360 - 180;
+    const longitude = (entry.longitude - previous.longitude + 540) % 360 - 180;
+    return { ...entry,
+      latitude: previous.latitude + (entry.latitude - previous.latitude) * factor,
+      longitude: (previous.longitude + longitude * factor + 540) % 360 - 180,
+      heading_true_deg: (heading + turn * factor + 360) % 360,
+    };
+  }
+
+  function animateTraffic() {
+    trafficFrame = null;
+    if (!traffic.length || document.hidden || !canvas?.getClientRects().length) return;
+    draw();
+    if (performance.now() - trafficReceivedAt < 2000) {
+      trafficFrame = requestAnimationFrame(animateTraffic);
+    }
+  }
   let travelled = 0;
   let dragging = null;
   let fitPending = false;
@@ -98,7 +124,14 @@ const GROUND = (() => {
     );
   }
 
-  function fit() {
+  /**
+   * Cadre le plan sur tout le terrain.
+   *
+   * `keepFollow` distingue le cadrage automatique — un terrain qu'on vient de
+   * recevoir, une fenêtre redimensionnée — du bouton Cadrer, par lequel le
+   * pilote demande l'ensemble et donc renonce au suivi.
+   */
+  function fit(keepFollow = false) {
     if (!chart || !canvas) return;
     if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) {
       fitPending = true;
@@ -113,16 +146,28 @@ const GROUND = (() => {
       canvas.clientWidth / width,
       canvas.clientHeight / height
     ) * 0.92;
-    view.follow = false;
+    if (!keepFollow) view.follow = false;
     fitPending = false;
     syncButtons();
     draw();
   }
 
+  /** L'appareil est-il sur le terrain affiché, à une marge près ? */
+  function withinChart(position, margin = 0.2) {
+    const bounds = chart?.bounds;
+    if (!bounds) return false;
+    const padX = (bounds.max_x - bounds.min_x) * margin;
+    const padY = (bounds.max_y - bounds.min_y) * margin;
+    return (
+      position.x >= bounds.min_x - padX && position.x <= bounds.max_x + padX
+      && position.y >= bounds.min_y - padY && position.y <= bounds.max_y + padY
+    );
+  }
+
   /** Cadre sur l'itinéraire plutôt que sur tout le terrain. */
-  function fitPlan() {
+  function fitPlan(keepFollow = false) {
     const points = planPolyline();
-    if (points.length < 2 || !canvas.clientWidth) return fit();
+    if (points.length < 2 || !canvas.clientWidth) return fit(keepFollow);
     const xs = points.map((point) => point.x);
     const ys = points.map((point) => point.y);
     const width = Math.max(300, Math.max(...xs) - Math.min(...xs));
@@ -133,7 +178,7 @@ const GROUND = (() => {
       canvas.clientWidth / width,
       canvas.clientHeight / height
     ) * 0.82;
-    view.follow = false;
+    if (!keepFollow) view.follow = false;
     syncButtons();
     draw();
   }
@@ -147,13 +192,14 @@ const GROUND = (() => {
     canvas.height = canvas.clientHeight * ratio;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     if (chart && (fitPending || !Number.isFinite(view.scale) || view.scale <= 0)) {
-      fit();
+      fit(true);
       return;
     }
     draw();
   }
 
   function draw() {
+    if (document.hidden || !canvas?.getClientRects().length) return;
     if (!context) return;
     context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     context.fillStyle = css("--ground-bg");
@@ -572,7 +618,8 @@ const GROUND = (() => {
     const labelled = view.scale >= 0.9;
 
     context.save();
-    for (const entry of traffic) {
+    for (const report of traffic) {
+      const entry = trafficPosition(report);
       if ((entry.height_above_ground_ft ?? 0) > TRAFFIC_CEILING_FT) continue;
       const position = toLocal(entry.latitude, entry.longitude);
       if (!position) continue;
@@ -799,7 +846,7 @@ const GROUND = (() => {
       aircraft = null;
       travelled = 0;
       fitPending = true;
-      fit();
+      fit(true);
     },
     /** Itinéraire de roulage à suivre, ou null pour l'effacer. */
     setPlan(data) {
@@ -819,21 +866,32 @@ const GROUND = (() => {
       draw();
     },
     /** Trafic voisin, en latitude/longitude, tel que le simulateur le voit. */
-    setTraffic(list) {
-      traffic = (Array.isArray(list) ? list : []).filter((entry) => (
+      setTraffic(list) {
+        const now = performance.now();
+        trafficFrom = new Map(traffic.map((entry) => [entry.object_id, trafficPosition(entry, now)]));
+        trafficReceivedAt = now;
+        traffic = (Array.isArray(list) ? list : []).filter((entry) => (
         Number.isFinite(entry?.latitude) && Number.isFinite(entry?.longitude)
       ));
-      draw();
-    },
-    clearTraffic() {
-      traffic = [];
+        draw();
+        if (trafficFrame !== null) cancelAnimationFrame(trafficFrame);
+        trafficFrame = requestAnimationFrame(animateTraffic);
+      },
+      clearTraffic() {
+        traffic = [];
+        trafficFrom.clear();
+        if (trafficFrame !== null) cancelAnimationFrame(trafficFrame);
+        trafficFrame = null;
       draw();
     },
     setAircraft(state) {
       aircraft = state?.latitude != null ? state : null;
       if (aircraft && view.follow) {
         const position = toLocal(aircraft.latitude, aircraft.longitude);
-        if (position) {
+        // Le suivi ne vaut que sur le terrain affiché : en croisière, le plan
+        // de roulage de l'arrivée se viderait à suivre un appareil qui en est
+        // à trois cents milles. Il reste alors cadré sur l'aérodrome.
+        if (position && withinChart(position)) {
           view.centerX = position.x;
           view.centerY = position.y;
         }

@@ -32,7 +32,33 @@ class SimConnectTrafficInjector:
         self._client_factory = client_factory
         self._client: SimConnectClient | None = None
         self._owned: dict[str, OwnedAircraft] = {}
+        self._positions: dict[str, dict[str, object]] = {}
         self._lock = threading.RLock()
+        self._motion_lock = threading.RLock()
+        self._motion_client: SimConnectClient | None = None
+        self._motion_objects: dict[str, OwnedAircraft] = {}
+        self._motion_positions: dict[str, dict[str, object]] = {}
+        self._closed = False
+
+    def animate(self, aircraft: TrafficAircraft) -> None:
+        """Write motion on a separate connection, without a lifecycle wait."""
+        with self._motion_lock:
+            owned = self._motion_objects.get(aircraft.uid)
+            if self._closed or owned is None:
+                return
+            position = self._position(aircraft)
+            if self._motion_positions.get(aircraft.uid) == position:
+                return
+            if self._motion_client is None:
+                self._motion_client = self._client_factory()
+            try:
+                self._motion_client.update_ai_aircraft(owned.object_id, **position)
+            except SimConnectError:
+                self._motion_client.close()
+                self._motion_client = None
+                self._motion_positions.clear()
+                raise
+            self._motion_positions[aircraft.uid] = position
 
     @property
     def owned(self) -> dict[str, OwnedAircraft]:
@@ -62,6 +88,8 @@ class SimConnectTrafficInjector:
 
     def upsert(self, aircraft: TrafficAircraft, model: ResolvedAircraftModel) -> OwnedAircraft:
         with self._lock:
+            if self._closed:
+                raise RuntimeError("Injecteur fermé")
             client = self._client_or_open()
             previous = self._owned.get(aircraft.uid)
             if previous and previous.model_title != model.title:
@@ -76,13 +104,23 @@ class SimConnectTrafficInjector:
                     aircraft.uid, request_id, object_id, model.title
                 )
                 self._owned[aircraft.uid] = previous
+                self._positions[aircraft.uid] = position
+                with self._motion_lock:
+                    self._motion_objects[aircraft.uid] = previous
                 LOGGER.info(
-                    "%s %s/%s → %s FSLTL → %s",
+                    "%s %s/%s → %s %s → %s",
                     aircraft.callsign, aircraft.aircraft_type or "?",
-                    aircraft.airline_icao or "?", model.match_kind.value, model.title,
+                    aircraft.airline_icao or "?", model.match_kind.value,
+                    model.provider, model.title,
                 )
             else:
-                client.update_ai_aircraft(previous.object_id, **position)
+                with self._motion_lock:
+                    # Once animation owns movement, a slow sync result must not
+                    # overwrite its newer position with a quarter-second step.
+                    if (aircraft.uid not in self._motion_positions
+                            and self._positions.get(aircraft.uid) != position):
+                        client.update_ai_aircraft(previous.object_id, **position)
+                        self._positions[aircraft.uid] = position
             return previous
 
     def reconcile(self, radius_m: int) -> list[str]:
@@ -116,16 +154,13 @@ class SimConnectTrafficInjector:
                 if owned.object_id not in live
             ]
             for uid in lost:
-                owned = self._owned.pop(uid, None)
-                if owned is None:
-                    continue
                 # Une énumération tronquée par son délai rendrait un objet
                 # bien vivant pour disparu. Le supprimer avant de l'oublier
                 # rend l'opération sûre dans les deux cas : sans effet s'il
                 # n'existe plus, et sans laisser d'orphelin que plus personne
                 # ne posséderait s'il existait encore.
                 try:
-                    self._client.remove_ai_object(owned.object_id)
+                    self._remove_locked(uid)
                 except SimConnectError:
                     pass
             if lost:
@@ -135,9 +170,13 @@ class SimConnectTrafficInjector:
             return lost
 
     def _remove_locked(self, uid: str) -> None:
-        owned = self._owned.pop(uid, None)
-        if owned is not None and self._client is not None:
-            self._client.remove_ai_object(owned.object_id)
+        with self._motion_lock:
+            self._motion_objects.pop(uid, None)
+            self._motion_positions.pop(uid, None)
+            owned = self._owned.pop(uid, None)
+            self._positions.pop(uid, None)
+            if owned is not None and self._client is not None:
+                self._client.remove_ai_object(owned.object_id)
 
     def remove(self, uid: str) -> None:
         with self._lock:
@@ -145,12 +184,20 @@ class SimConnectTrafficInjector:
 
     def close(self) -> None:
         with self._lock:
+            with self._motion_lock:
+                self._closed = True
+                self._motion_objects.clear()
+                self._motion_positions.clear()
+                if self._motion_client is not None:
+                    self._motion_client.close()
+                    self._motion_client = None
             for uid in list(self._owned):
                 try:
                     self._remove_locked(uid)
                 except SimConnectError as exc:
                     LOGGER.warning("Objet AI %s non retiré à la fermeture : %s", uid, exc)
             self._owned.clear()
+            self._positions.clear()
             if self._client is not None:
                 self._client.close()
                 self._client = None

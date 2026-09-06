@@ -116,6 +116,10 @@
       <strong id="context-phase-value">Hors connexion</strong>
       <span id="context-operation-value">—</span>
     </div>
+    <div class="flight-context-time">
+      <small id="context-time-label">Temps restant</small>
+      <strong id="context-time-value">—</strong>
+    </div>
     <div class="flight-context-next">
       <small id="context-next-label">Prochaine action</small>
       <strong id="context-next-value">—</strong>
@@ -169,12 +173,26 @@
   </nav>
 
   <section id="panel-map" class="panel hidden panel-map">
-    <div class="map-bar">
-      <div class="map-airports" id="map-airports"></div>
-      <div class="map-actions">
+    <div class="map-bar map-toolbar">
+      <div class="map-toolbar-main">
+        <div class="map-airports" id="map-airports"></div>
+        <div class="map-actions map-primary-actions">
+        <div class="map-control-group" role="group" aria-labelledby="map-view-label">
+        <span class="map-group-label" id="map-view-label">Vue</span>
+        <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
+        <button id="map-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
+        <button id="map-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
+        <div class="map-zoom-controls">
+        <button id="map-zoom-out" class="icon-btn" title="Dézoomer">−</button>
+        <button id="map-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div></div>
         <span class="live-pill" id="live-pill">
-          <span class="live-dot"></span><span id="live-text">Recherche du simulateur…</span>
+          <span class="live-dot"></span>
+        <span id="live-text">Recherche du simulateur…</span>
         </span>
+      </div>
+      <div class="map-actions map-toolbar-options">
+        <div class="map-control-group" role="group" aria-labelledby="map-layers-label">
+        <span class="map-group-label" id="map-layers-label">Affichage</span>
         <button id="map-basemap" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer le fond OpenStreetMap">Fond carte</button>
         <select id="map-basemap-style" class="map-basemap-style"
@@ -185,6 +203,10 @@
         </select>
         <button id="map-constraints" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
+        <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
+                title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button></div>
+        <div class="map-control-group" role="group" aria-labelledby="map-traffic-group-label">
+        <span class="map-group-label" id="map-traffic-group-label">Trafic</span>
         <button id="map-traffic" class="icon-btn" type="button" aria-pressed="false"
                 title="Afficher ou masquer le trafic du réseau VATSIM">Trafic VATSIM</button>
         <select id="map-traffic-source" class="traffic-source-select"
@@ -193,18 +215,11 @@
           <option value="vatsim">VATSIM</option>
           <option value="ivao">IVAO</option>
           <option value="opensky">Trafic réel · OpenSky</option>
+          <option value="static">Trafic statique · MSFS</option>
         </select>
-        <span id="map-traffic-injection" class="traffic-map-only hidden"></span>
+        <span id="map-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span>
         <a id="map-traffic-source-credit" class="traffic-source-credit hidden"
-           href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a>
-        <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
-                title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button>
-        <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
-        <button id="map-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
-        <button id="map-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
-        <button id="map-zoom-out" class="icon-btn" title="Dézoomer">−</button>
-        <button id="map-zoom-in" class="icon-btn" title="Zoomer">+</button>
-      </div>
+           href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a></div></div>
     </div>
     <div class="map-stage">
       <canvas id="chart-canvas"></canvas>
@@ -243,12 +258,12 @@
     qu'on regarde en roulant, et tout le reste y nuirait.
   -->
   <section id="panel-ground" class="panel hidden panel-map">
-    <div class="map-bar">
-      <div class="map-airports" id="ground-airports"></div>
-      <div class="map-actions">
-        <span class="live-pill" id="ground-live-pill">
-          <span class="live-dot"></span><span id="ground-live-text">Recherche du simulateur…</span>
-        </span>
+    <div class="map-bar map-toolbar">
+      <div class="map-toolbar-main">
+        <div class="map-airports" id="ground-airports"></div>
+        <div class="map-actions map-primary-actions">
+        <div class="map-control-group" role="group" aria-labelledby="ground-clearance-group-label">
+        <span class="map-group-label" id="ground-clearance-group-label">Clairance</span>
         <span class="ground-clearance-field">
           <input id="ground-clearance" class="ground-clearance" type="text"
                  autocomplete="off" spellcheck="false" placeholder="Clairance : N D B"
@@ -259,10 +274,28 @@
                   aria-label="Appliquer la clairance saisie">→</button>
         </span>
         <button id="ground-plan" class="icon-btn" title="Cadrer sur l'itinéraire de roulage">Itinéraire</button>
-        <button id="ground-clear" class="icon-btn" title="Effacer l'itinéraire de roulage">Effacer</button>
+        <button id="ground-clear" class="icon-btn" title="Effacer l'itinéraire de roulage">Effacer</button></div>
+        <div class="map-control-group" role="group" aria-labelledby="ground-view-label">
+        <span class="map-group-label" id="ground-view-label">Vue</span>
         <button id="ground-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
+        <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
+        <div class="map-zoom-controls">
+        <button id="ground-zoom-out" class="icon-btn" title="Dézoomer">−</button>
+        <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div></div>
+        <span class="live-pill" id="ground-live-pill">
+          <span class="live-dot"></span>
+        <span id="ground-live-text">Recherche du simulateur…</span>
+        </span>
+      </div>
+      <div class="map-actions map-toolbar-options">
+        <div class="map-control-group" role="group" aria-labelledby="ground-layers-label">
+        <span class="map-group-label" id="ground-layers-label">Affichage</span>
         <button id="ground-secondary" class="icon-btn" type="button"
                 aria-pressed="false" title="Afficher les voies secondaires et les accès aux postes">Secondaires</button>
+        <button id="ground-alarm" class="icon-btn active" type="button"
+                aria-pressed="true" title="Alarme sonore de vitesse de roulage">Alarme</button></div>
+        <div class="map-control-group" role="group" aria-labelledby="ground-traffic-group-label">
+        <span class="map-group-label" id="ground-traffic-group-label">Trafic</span>
         <button id="ground-traffic" class="icon-btn" type="button" aria-pressed="false"
                 title="Afficher ou masquer le trafic lu dans le simulateur">Trafic simulateur</button>
         <select id="ground-traffic-source" class="traffic-source-select"
@@ -271,13 +304,10 @@
           <option value="vatsim">VATSIM</option>
           <option value="ivao">IVAO</option>
           <option value="opensky">Trafic réel · OpenSky</option>
+          <option value="static">Trafic statique · MSFS</option>
         </select>
-        <button id="ground-alarm" class="icon-btn active" type="button"
-                aria-pressed="true" title="Alarme sonore de vitesse de roulage">Alarme</button>
-        <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
-        <button id="ground-zoom-out" class="icon-btn" title="Dézoomer">−</button>
-        <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button>
-      </div>
+        <span id="ground-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span>
+        <span id="ground-traffic-freshness" class="traffic-map-only hidden" role="status" aria-live="polite"></span></div></div>
     </div>
     <div class="map-stage ground-stage">
       <canvas id="ground-canvas"></canvas>
@@ -470,11 +500,24 @@
           <option value="vatsim">VATSIM</option>
           <option value="ivao">IVAO</option>
           <option value="opensky">Trafic réel · OpenSky</option>
+          <option value="static">Trafic statique · MSFS</option>
         </select>
       </label>
+      <label class="field" for="settings-traffic-radius">
+        <span id="settings-traffic-radius-label">Rayon du trafic (NM)</span>
+        <input id="settings-traffic-radius" type="number" min="1" max="100" step="1" value="40" />
+      </label>
+      <label class="field" for="settings-traffic-max-aircraft">
+        <span id="settings-traffic-max-aircraft-label">Nombre maximal d’avions</span>
+        <input id="settings-traffic-max-aircraft" type="number" min="1" max="200" step="1" value="10" />
+      </label>
+      <small id="settings-static-traffic-note" class="settings-note hidden"><span id="settings-static-traffic-help">Le trafic statique ne vient d’aucun réseau : NaviXav gare des appareils aux postes de stationnement que MSFS lui a donnés, avec les livrées du jeu de modèles choisi. Personne ne roule ni ne décolle.</span></small>
       <label class="field" for="settings-aircraft-models">
         <span id="settings-aircraft-models-label">Modèles d’avions</span>
-        <select id="settings-aircraft-models"><option value="fsltl">FSLTL Base Models</option></select>
+        <select id="settings-aircraft-models">
+          <option value="fsltl">FSLTL Base Models</option>
+          <option value="aig">AIG AI Traffic</option>
+        </select>
       </label>
       <label class="field settings-wide" for="settings-fsltl-path">
         <span id="settings-fsltl-path-label">Chemin FSLTL Base Models (facultatif)</span>
@@ -485,7 +528,33 @@
         <button id="settings-fsltl-download" class="icon-btn" type="button">Télécharger l’installateur officiel</button>
       </div>
       <small id="settings-fsltl-download-help" class="settings-note">Installe uniquement FSLTL Traffic Base Models avec l’installateur FlyByWire ; NaviXav n’utilise pas FSLTL Injector.</small>
+      <label class="field settings-wide" for="settings-aig-path">
+        <span id="settings-aig-path-label">Chemin des modèles AIG (facultatif)</span>
+        <input id="settings-aig-path" autocomplete="off" placeholder="Détection automatique depuis MSFS" />
+      </label>
+      <div class="fsltl-status-row settings-wide">
+        <p id="settings-aig-status" class="settings-message" aria-live="polite">AIG AI Traffic</p>
+        <button id="settings-aig-download" class="icon-btn" type="button">Ouvrir le site officiel AIG</button>
+      </div>
+      <small id="settings-aig-download-help" class="settings-note">Installe les modèles AIG avec AI Manager ou le pack OCI ; NaviXav n’utilise pas AIG Traffic Controller.</small>
       <small id="settings-real-traffic-note" class="settings-note hidden"><span id="settings-real-traffic-help">Le trafic OpenSky est réel : ce sont les avions effectivement en vol autour de toi. Leur type est résolu depuis le registre OpenSky, puis ils sont injectés dans MSFS comme les réseaux de simulation.</span> <a href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a></small>
+      </div>
+    </details>
+    <details class="settings-section" name="settings-group">
+      <summary class="settings-section-summary">
+        <span>
+          <strong id="settings-section-msfs-panel">Panneau MSFS</strong>
+          <small id="settings-section-msfs-panel-help">Icône NaviXav dans la barre d’outils du simulateur</small>
+        </span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body settings-grid">
+      <div class="fsltl-status-row settings-wide">
+        <p id="settings-msfs-panel-status" class="settings-message" aria-live="polite">Panneau MSFS</p>
+        <button id="settings-msfs-panel-install" class="icon-btn" type="button">Installer le panneau MSFS</button>
+        <button id="settings-msfs-panel-remove" class="icon-btn hidden" type="button">Retirer le panneau MSFS</button>
+      </div>
+      <small id="settings-msfs-panel-help" class="settings-note">Ajoute une icône NaviXav dans la barre d’outils de MSFS pour commander le trafic sans quitter le simulateur. Le paquet est copié dans Community sur ce seul geste, et le bouton Retirer l’enlève.</small>
       </div>
     </details>
     <details class="settings-section" name="settings-group">
@@ -570,10 +639,10 @@
         </aside>
       </div>
     </details>
-    <p id="settings-message" class="settings-message"></p>
+    <p id="settings-message" class="settings-message" role="status" aria-live="polite"></p>
     <div class="settings-actions">
       <button type="button" id="settings-cancel" class="icon-btn">Annuler</button>
-      <button type="submit" class="btn-primary">Enregistrer</button>
+      <button type="submit" id="settings-submit" class="btn-primary" aria-busy="false">Enregistrer</button>
     </div>
   </form>
 </dialog>

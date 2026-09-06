@@ -9,7 +9,7 @@
 
     Instant traffic-source switching from the Map and Taxi toolbars: the VATSIM, IVAO and OpenSky selectors stay synchronized, restart traffic collection cleanly and save the choice locally.
 
-    OpenSky real traffic: NaviXav can display public ADS-B state vectors within 100 NM of the aircraft, with source attribution and API-friendly caching; this real-world view remains strictly separate from MSFS injection.
+    OpenSky real traffic: NaviXav can display and inject public ADS-B state vectors within the configured traffic radius, with source attribution and API-friendly caching.
 
     Settings reorganized into collapsible categories suited to compact windows, with a manual FSLTL path, access to the official FlyByWire Installer when models are missing, and IVAO as a second free public network traffic source alongside VATSIM.
 

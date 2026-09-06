@@ -49,6 +49,18 @@ PERIOD_ONCE = 1
 OBJECT_ID_USER = 0
 SIMCONNECT_UNUSED = 0xFFFFFFFF
 SIMCONNECT_OPEN_CONFIGINDEX_LOCAL = 0xFFFFFFFF
+SIMCONNECT_GROUP_PRIORITY_HIGHEST = 1
+SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY = 0x00000010
+
+# Après AIReleaseControl, le moteur de simulation continue sinon à intégrer la
+# physique de l'objet pendant que NaviXav lui donne une position. Les deux
+# contrôleurs se corrigent alors mutuellement, ce qui fait vibrer surtout les
+# appareils posés sur leur train.
+AI_POSITION_FREEZE_EVENTS = (
+    "FREEZE_LATITUDE_LONGITUDE_SET",
+    "FREEZE_ALTITUDE_SET",
+    "FREEZE_ATTITUDE_SET",
+)
 
 # Catégories d'objets énumérables autour de l'avion. Le trafic réseau et le
 # trafic généré par le simulateur arrivent tous deux en AIRCRAFT : SimConnect
@@ -252,6 +264,7 @@ class SimConnectClient:
         self._string_simvar_definitions: dict[str, int] = {}
         self._object_definitions: dict[tuple[Any, str | None], int] = {}
         self._ai_position_definition: int | None = None
+        self._client_events: dict[str, int] = {}
         # Identifiant réel de l'avion du joueur, appris au premier relevé.
         # SimConnect l'inclut dans ses énumérations sans le distinguer : c'est
         # le seul moyen sûr de ne pas le compter deux fois.
@@ -667,6 +680,11 @@ class SimConnectClient:
                     raise SimConnectError(
                         f"Impossible de prendre le contrôle de l'appareil AI {callsign}."
                     )
+                try:
+                    self.freeze_ai_aircraft(object_id)
+                except SimConnectError:
+                    self.remove_ai_object(object_id)
+                    raise
                 return request_id, object_id
             if recv.dwID == RECV_ID_EXCEPTION:
                 exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
@@ -675,6 +693,38 @@ class SimConnectClient:
             if recv.dwID == RECV_ID_QUIT:
                 raise SimConnectError("Le simulateur s'est fermé.")
         raise SimConnectError(f"Aucun ObjectID reçu pour l'appareil AI {callsign}.")
+
+    def _client_event(self, name: str) -> int:
+        """Associe une seule fois un événement MSFS à cette connexion."""
+        existing = self._client_events.get(name)
+        if existing is not None:
+            return existing
+        self._next_id += 1
+        event_id = self._next_id
+        result = self._dll.SimConnect_MapClientEventToSimEvent(
+            self._handle, event_id, name.encode("ascii")
+        )
+        if result != 0:
+            raise SimConnectError(f"Impossible de déclarer l'événement AI {name}.")
+        self._client_events[name] = event_id
+        return event_id
+
+    def freeze_ai_aircraft(self, object_id: int) -> None:
+        """Empêche MSFS et NaviXav de déplacer simultanément le même objet."""
+        for name in AI_POSITION_FREEZE_EVENTS:
+            event_id = self._client_event(name)
+            result = self._dll.SimConnect_TransmitClientEvent(
+                self._handle,
+                int(object_id),
+                event_id,
+                1,
+                SIMCONNECT_GROUP_PRIORITY_HIGHEST,
+                SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY,
+            )
+            if result != 0:
+                raise SimConnectError(
+                    f"Impossible de stabiliser l'objet AI {object_id} ({name})."
+                )
 
     def update_ai_aircraft(
         self,
@@ -824,6 +874,7 @@ class SimConnectClient:
         self._string_simvar_definitions.clear()
         self._object_definitions.clear()
         self._ai_position_definition = None
+        self._client_events.clear()
 
     def __enter__(self) -> "SimConnectClient":
         return self
@@ -874,6 +925,11 @@ def _declare(dll) -> None:
           _DATA_INITPOSITION, ct.c_ulong]),
         ("SimConnect_AIReleaseControl",
          [ct.c_void_p, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_MapClientEventToSimEvent",
+         [ct.c_void_p, ct.c_ulong, ct.c_char_p]),
+        ("SimConnect_TransmitClientEvent",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
+          ct.c_ulong]),
         ("SimConnect_SetDataOnSimObject",
          [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
           ct.c_ulong, ct.c_void_p]),

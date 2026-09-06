@@ -158,14 +158,22 @@ _CAPABILITY_VARIABLES = (
     ("FLAPS NUM HANDLE POSITIONS", "Number"),
 )
 
-# Le cockpit commun FNX_32X des A319/A320/A321 pilote ses leviers avec ces
+# Le cockpit commun FNX_32X des A319/A320/A321 pilote ses commandes avec ces
 # LVars. Elles sont lues dans un bloc séparé et seulement lorsque le plan chargé
 # identifie un Fenix, afin de ne jamais créer/interpréter ces variables sur un
 # autre appareil.
+# B_ is the actual barometric state. S_ is the push/pull input and can be 0
+# while both EFIS displays are already in STD (verified on the live Fenix).
+_FENIX_BARO_VARIABLES = (("L:B_FCU_EFIS1_BARO_STD", "Number"),)
+_FENIX_ILS_VARIABLES = (("NAV ACTIVE FREQUENCY:3", "MHz"),)
+_NAV_SELECTION_VARIABLES = (("AUTOPILOT NAV SELECTED", "Number"),)
+
 _FENIX_CONTROL_VARIABLES = (
     ("L:S_FC_FLAPS", "Number"),
     ("L:A_FC_SPEEDBRAKE", "Number"),
     ("L:S_MIP_PARKING_BRAKE", "Number"),
+    ("L:S_OH_PNEUMATIC_ENG1_ANTI_ICE", "Number"),
+    ("L:S_OH_PNEUMATIC_ENG2_ANTI_ICE", "Number"),
 )
 
 # Une connexion qui vient d'échouer n'est pas retentée immédiatement.
@@ -234,6 +242,39 @@ class SimConnectSource:
             model in identity for model in ("A319", "A320", "A321")
         )
 
+    def _read_ils_receiver(self, client, values) -> tuple[int | None, float | None]:
+        # Loaded aircraft takes precedence over an unrelated planned model.
+        identity = (self._aircraft_title or self._aircraft_hint).upper()
+        dedicated = (
+            ("FENIX" in identity and any(m in identity for m in ("A319", "A320", "A321")))
+            or "A32NX" in identity
+            or ("FLYBYWIRE" in identity and "A320" in identity)
+        )
+        receiver = None
+        try:
+            if dedicated:
+                # Confirmed captain ILS mapping; NAV1/2 remain independent VORs.
+                receiver = 3
+            else:
+                selected = client.read_simvars(
+                    _NAV_SELECTION_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+                ).get("AUTOPILOT NAV SELECTED")
+                if selected not in (1, 2, 3, 4):
+                    return None, None
+                receiver = int(selected)
+            if receiver == 1:
+                frequency = values["NAV ACTIVE FREQUENCY:1"]
+            else:
+                name = f"NAV ACTIVE FREQUENCY:{receiver}"
+                frequency = client.read_simvars(
+                    ((name, "MHz"),), timeout_s=_OPTIONAL_TIMEOUT_S
+                ).get(name)
+            if frequency is not None and 108 <= frequency <= 117.95:
+                return receiver, frequency
+        except SimConnectError as exc:
+            logger.info("ILS receiver unavailable (%s)", exc)
+        return receiver, None
+
     # ------------------------------------------------------------------ #
 
     def _connect(self) -> SimConnectClient:
@@ -284,7 +325,7 @@ class SimConnectSource:
                 configuration=self._read_configuration(client),
             )
 
-    def traffic(self, radius_m: int = _TRAFFIC_RADIUS_M) -> list[TrafficReport]:
+    def traffic(self, radius_m: int = _TRAFFIC_RADIUS_M, *, strict: bool = False) -> list[TrafficReport]:
         """Appareils présents autour de l'avion du joueur.
 
         Le simulateur inclut le joueur dans sa propre énumération : il est
@@ -297,6 +338,8 @@ class SimConnectSource:
         simulateur.
         """
         if time.monotonic() < self._traffic_disabled_until:
+            if strict:
+                raise PositionUnavailable("Lecture du trafic temporairement indisponible.")
             return []
 
         with self._lock:
@@ -308,6 +351,8 @@ class SimConnectSource:
             except SimConnectError as exc:
                 self._traffic_disabled_until = time.monotonic() + _TRAFFIC_RETRY_DELAY_S
                 logger.info("Trafic du simulateur indisponible : %s", exc)
+                if strict:
+                    raise PositionUnavailable("Lecture du trafic temporairement indisponible.") from exc
                 return []
 
             own = client.user_object_id
@@ -449,8 +494,13 @@ class SimConnectSource:
             values["BRAKE PARKING POSITION"],
             values["BRAKE PARKING INDICATOR"],
         )
+        engine_anti_ice: bool | None = bool(values["ENG ANTI ICE:1"])
 
         if self._is_fenix_family():
+            # Sur Fenix la SimVar standard n'est pas une source de repli
+            # fiable. Si le bloc propre à l'addon manque momentanément, un
+            # état inconnu vaut mieux qu'un faux OFF susceptible d'alarmer.
+            engine_anti_ice = None
             try:
                 fenix = client.read_simvars(
                     _FENIX_CONTROL_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
@@ -463,8 +513,39 @@ class SimConnectSource:
                 spoilers_armed = speedbrake < 0.5
                 spoilers_pct = max(0.0, (speedbrake - 1.0) * 50.0)
                 parking_brake = bool(fenix["L:S_MIP_PARKING_BRAKE"])
+                # Le Fenix anime son panneau pneumatique avec une LVar et peut
+                # laisser la SimVar standard ENG ANTI ICE à zéro. Lire la
+                # commande du cockpit empêche alors une fausse alarme qui
+                # apparaissait et disparaissait au gré de la valeur standard.
+                engine_anti_ice = all(
+                    bool(fenix[name])
+                    for name in (
+                        "L:S_OH_PNEUMATIC_ENG1_ANTI_ICE",
+                        "L:S_OH_PNEUMATIC_ENG2_ANTI_ICE",
+                    )
+                )
 
         modern = self._read_modern_configuration(client)
+        altimeter_hpa = modern.get("KOHLSMAN SETTING MB EX1:1", values["KOHLSMAN SETTING MB"])
+        altimeter_std = (bool(modern["KOHLSMAN SETTING STD:1"])
+                         if "KOHLSMAN SETTING STD:1" in modern else None)
+        if self._is_fenix_family():
+            # Read the captain's EFIS mode, not the generic SimVar mirror.
+            # Keeping an old QNH value while STD is selected is legitimate.
+            altimeter_std = None
+            try:
+                baro = client.read_simvars(_FENIX_BARO_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S)
+                mode = baro.get("L:B_FCU_EFIS1_BARO_STD")
+                if mode in (0, 1):
+                    altimeter_std = bool(mode)
+            except SimConnectError as exc:
+                logger.info("Mode altimétrique Fenix indisponible (%s)", exc)
+            if altimeter_std is None:
+                # Both alarm rules must remain unknown, including their pressure fallback.
+                altimeter_hpa = None
+            elif altimeter_std:
+                altimeter_hpa = 1013.25
+        ils_receiver, ils_frequency = self._read_ils_receiver(client, values)
         lights = self._read_lights(client, values)
         return AircraftConfiguration(
             gear_handle_down=bool(values["GEAR HANDLE POSITION"]),
@@ -483,14 +564,8 @@ class SimConnectSource:
             spoilers_armed=spoilers_armed,
             parking_brake=parking_brake,
             lights=lights,
-            altimeter_hpa=modern.get(
-                "KOHLSMAN SETTING MB EX1:1", values["KOHLSMAN SETTING MB"]
-            ),
-            altimeter_std=(
-                bool(modern["KOHLSMAN SETTING STD:1"])
-                if "KOHLSMAN SETTING STD:1" in modern
-                else None
-            ),
+            altimeter_hpa=altimeter_hpa,
+            altimeter_std=altimeter_std,
             indicated_altitude_ft=values["INDICATED ALTITUDE"],
             pressure_altitude_ft=values["PRESSURE ALTITUDE"],
             autopilot_master=bool(values["AUTOPILOT MASTER"]),
@@ -502,6 +577,8 @@ class SimConnectSource:
             selected_heading_deg=values["AUTOPILOT HEADING LOCK DIR"] % 360,
             com1_frequency_mhz=values["COM ACTIVE FREQUENCY:1"],
             nav1_frequency_mhz=values["NAV ACTIVE FREQUENCY:1"],
+            ils_frequency_mhz=ils_frequency,
+            ils_receiver_index=ils_receiver,
             nav1_course_deg=values["NAV LOCALIZER:1"] % 360,
             nav1_has_localizer=bool(values["NAV HAS LOCALIZER:1"]),
             nav1_has_glide_slope=bool(values["NAV HAS GLIDE SLOPE:1"]),
@@ -511,7 +588,7 @@ class SimConnectSource:
             wind_speed_kt=values["AMBIENT WIND VELOCITY"],
             total_air_temperature_c=values["TOTAL AIR TEMPERATURE"],
             in_cloud=bool(values["AMBIENT IN CLOUD"]),
-            engine_anti_ice=bool(values["ENG ANTI ICE:1"]),
+            engine_anti_ice=engine_anti_ice,
             stall_warning=bool(values["STALL WARNING"]),
             overspeed_warning=bool(values["OVERSPEED WARNING"]),
             flap_speed_exceeded=bool(values["FLAP SPEED EXCEEDED"]),

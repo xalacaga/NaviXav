@@ -32,6 +32,7 @@ WEBVIEW2_CLIENT_ID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 APP_USER_MODEL_ID = "Galvo.NaviXav"
 SUPPORT_URL = "https://buymeacoffee.com/xalacaga"
 FSLTL_DOWNLOAD_URL = "https://flybywiresim.com/downloads/"
+AIG_DOWNLOAD_URL = "https://www.alpha-india.net/"
 
 
 def _powershell_literal(value: str) -> str:
@@ -325,6 +326,30 @@ def _run_desktop_window(url: str, server: object) -> None:
             """Ouvre l'installateur officiel après une action explicite."""
             webbrowser.open(FSLTL_DOWNLOAD_URL, new=2)
 
+        def open_aig_download() -> None:
+            """Ouvre le site officiel d'AIG après une action explicite."""
+            webbrowser.open(AIG_DOWNLOAD_URL, new=2)
+
+        def show_window() -> None:
+            """Ramène la fenêtre au premier plan depuis le panneau MSFS.
+
+            Le simulateur garde le focus tant qu'il tourne en plein écran
+            exclusif ; le passage par-dessus n'a d'effet qu'en fenêtré, sans
+            bordure, ou sur un second écran. La fenêtre est d'abord restaurée
+            au cas où elle serait réduite, puis brièvement épinglée au-dessus
+            pour franchir la fenêtre active.
+            """
+            for gesture in ("restore", "show"):
+                try:
+                    getattr(window, gesture)()
+                except Exception:
+                    pass
+            try:
+                window.on_top = True
+                window.on_top = False
+            except Exception:
+                pass
+
         def open_chartfox_auth(authorization_url: str) -> None:
             """Confie l'identification ChartFox au navigateur système."""
             if not authorization_url.startswith(
@@ -357,6 +382,8 @@ def _run_desktop_window(url: str, server: object) -> None:
         server.config.app.state.request_open_simbrief = open_simbrief
         server.config.app.state.request_open_support = open_support
         server.config.app.state.request_open_fsltl_download = open_fsltl_download
+        server.config.app.state.request_open_aig_download = open_aig_download
+        server.config.app.state.request_show_window = show_window
         server.config.app.state.request_open_chartfox_auth = open_chartfox_auth
         server.config.app.state.request_aircraft_folder = select_aircraft_folder
         watcher = threading.Thread(

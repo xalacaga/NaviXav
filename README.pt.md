@@ -12,11 +12,11 @@ Flight Simulator. Obtém o último plano de voo do SimBrief, completa as
 informações terminais com os dados do simulador e apresenta tudo numa interface
 concebida para a preparação do voo e a introdução no MCDU.
 
-A aplicação possui a sua própria janela do Windows. A interface é apresentada
-pelo Microsoft WebView2 e comunica apenas com um serviço local associado a
-`127.0.0.1`. Um navegador externo só é aberto quando o utilizador seleciona
-**Criar plano SimBrief** para abrir o editor oficial. As definições, a base de
-navegação e as caches permanecem no computador.
+A aplicação tem uma janela Windows própria, apresentada pelo Microsoft WebView2
+e ligada ao serviço local em `127.0.0.1`. Definições, dados de navegação e
+caches ficam no computador. O navegador do sistema abre apenas por pedido
+explícito, por exemplo para SimBrief, autenticação ChartFox, transferências
+FSLTL/AIG e apoio ao projeto.
 
 A janela é totalmente redimensionável. A interface reorganiza os seus painéis,
 comandos, separadores e a altura do mapa consoante o espaço disponível, até um
@@ -37,6 +37,12 @@ tamanho mínimo de 720 × 560 píxeis.
   atenuação dos pontos já ultrapassados;
 - massas, combustível, tempo de voo, alternante e dados de despacho;
 - informações sobre a aeronave, matrícula e equipamento declarado.
+O painel do voo ativo mostra o tempo restante a partir da distância e velocidade
+no solo quando utilizáveis, ou do ETE SimBrief antes da descolagem. Após guardar
+as definições, o plano atualiza-se em segundo plano sem manter o diálogo aberto.
+Os comandos do painel MSFS preservam outras definições, incluindo
+identificadores SimBrief.
+
 
 ### Meteorologia do voo
 
@@ -64,6 +70,8 @@ O NaviXav completa e apresenta:
 
 Os blocos **Partida · Rota · Chegada** podem ser recolhidos para libertar
 espaço na interface.
+
+Cada importação SimBrief e recálculo verifica as ligações SID–rota–STAR–aproximação pelos extremos efetivamente percorridos nos dados MSFS, mesmo quando o nome da transição difere do ponto de ligação. As ligações ausentes exigem confirmação; nenhuma transição é escolhida arbitrariamente. Os ramos de pista que duplicam exatamente o início da STAR deixam de criar um regresso à entrada; as restrições distintas são preservadas. A rota mantém os DCT e as aerovias do OFP. As transições escolhidas ausentes da base são indicadas como não verificadas.
 
 ### Seguimento do voo
 
@@ -116,6 +124,20 @@ Um adaptador dedicado aos Fenix A319/A320/A321 lê diretamente os três comandos
 do cockpit, pelo que alterações nos flaps, spoilers e travão de estacionamento
 são registadas mesmo com os motores e sistemas hidráulicos desligados.
 
+Nos Fenix A319/A320/A321, o NaviXav lê o modo STD do EFIS do comandante para a apresentação e os alertas QNH/STD. Uma SimVar genérica MSFS contraditória já não substitui esse modo. Se a leitura Fenix estiver indisponível ou for inválida, a regulação permanece desconhecida e estes alertas não são ativados a partir da pressão genérica. Esta leitura não monitoriza o lado do copiloto.
+
+Nestes Fenix são também lidos diretamente ambos os comandos de antigelo dos
+motores. Se a leitura não estiver disponível, o estado fica desconhecido em vez
+de gerar um falso alarme pela SimVar padrão.
+
+Nos Fenix A319/A320/A321, a deteção STD lê o estado real do barómetro do comandante (B_FCU_EFIS1_BARO_STD), em vez da entrada S_FCU_EFIS1_BARO_STD. Uma entrada que regressa a zero deixa de provocar falsos alarmes com STD apresentado. As leituras ausentes ou inválidas permanecem indeterminadas.
+
+A monitorização ILS usa o recetor atribuído pela aeronave carregada. Fenix A319/A320/A321 e FlyByWire A32NX usam o NAV3 do comandante; as restantes aeronaves usam o índice NAV1 a NAV4 selecionado pelo MSFS. Se o índice ou a frequência não estiver disponível, o alerta fica silencioso em vez de comparar outro recetor.
+
+O TOD apresentado é uma estimativa SimBrief ou NaviXav, não uma leitura do MCDU. O perfil FMS pode indicar outro ponto com a mesma rota e nível. Se as restrições anteciparem o ponto SimBrief, a fonte passa a estimativa calculada.
+
+O acompanhamento e o painel no simulador mostram «Descida em curso» em vez do TOD durante a descida e depois «Aproximação». Os patamares mantêm a indicação se a perda de altitude confirmar a descida. O estado vem da telemetria, não do modo DES do FMS.
+
 ### Ficha MCDU
 
 O separador **Ficha MCDU** adapta as páginas ao tipo de aeronave: MCDU Airbus,
@@ -146,24 +168,67 @@ O NaviXav utiliza o SimConnect para:
   pontos de notificação e radioajudas;
 - construir progressivamente uma base local em `data/navixav.sqlite`.
 
-A definição opcional **Injetar tráfego VATSIM no MSFS** deteta o **FSLTL Base
-Models** na pasta Community do MSFS e utiliza os seus modelos para o tráfego de
-rede próximo. O NaviXav apenas lê os ficheiros `aircraft.cfg` e VMR do FSLTL;
-não instala, atualiza nem modifica o FSLTL. A definição está desativada por
-omissão, limita o número e o raio das aeronaves injetadas e, ao ser desligada
-ou ao fechar a aplicação, remove apenas os objetos SimConnect criados pelo
-NaviXav.
-A fonte de rede pública e gratuita pode ser VATSIM ou IVAO. O FSLTL é detetado
-automaticamente, mas também é possível indicar manualmente o caminho do pacote
-ou da pasta Community. Se estiver ausente, as definições abrem o
-[instalador oficial FlyByWire](https://flybywiresim.com/downloads/). Instala
-apenas **FSLTL Traffic Base Models**, não o FSLTL Injector.
-Para uma vista do mundo real, o **tráfego real OpenSky** mostra vetores ADS-B
-anónimos num raio de 100 NM em redor da aeronave e injeta-os através do FSLTL.
-Se o tipo ADS-B for inicialmente desconhecido, aparece um modelo genérico
-seguro, substituído quando o registo resolver o tipo exato.
-A fonte ativa pode ser alterada diretamente na barra do Mapa ou da Rolagem; os
-dois seletores permanecem sincronizados e a escolha é guardada localmente.
+O botão **Tráfego** no Mapa ou Rolagem controla a visualização e a injeção no
+MSFS; está desativado por predefinição. As fontes são VATSIM, IVAO, OpenSky
+(tráfego ADS-B real) e tráfego estático. Os seletores partilham a definição
+local; a janela lê também as alterações do painel MSFS a cada três segundos.
+
+Alterar uma definição sem relação com o tráfego já não reinicia a injeção nem os
+aviões presentes. As alterações de fonte, modelos e tráfego estático ativo
+continuam a ser aplicadas. Os módulos partilham uma leitura MSFS datada durante
+no máximo 250 ms; posição e altitude do jogador vêm do mesmo estado para a
+injeção. Uma leitura expirada ou ligação em falha não apresenta uma posição
+antiga como atual.
+
+As definições oferecem **FSLTL Base Models** ou **AIG AI Traffic**, um conjunto
+de cada vez. Ambas as instalações são detetadas; os caminhos FSLTL, AIG e
+Community podem ser indicados manualmente. O NaviXav lê `aircraft.cfg` e regras
+VMR sem instalar ou modificar bibliotecas. FSLTL abre a [transferência
+FlyByWire](https://flybywiresim.com/downloads/) para **FSLTL Traffic Base
+Models**; AIG abre o [site oficial](https://www.alpha-india.net/). O AI Manager
+instala `aig-aitraffic-oci`; pacotes complementares em falta são assinalados.
+
+O OpenSky procura tráfego real no raio configurado. O acesso anónimo é atualizado a cada quatro minutos para respeitar a quota pública diária. Se o OpenSky devolver HTTP 429, o NaviXav mostra explicitamente **Quota diária do OpenSky esgotada** nas duas interfaces e respeita o prazo de nova tentativa em vez de repetir pedidos continuamente; a animação do tráfego existente continua até a fonte recuperar. A injeção depende dos modelos
+disponíveis: FSLTL pode usar um genérico quando o tipo é desconhecido; AIG não
+oferece esse recurso. Um avião no mapa não está necessariamente injetado. O
+NaviXav bloqueia ou interrompe a sua injeção se detetar FSLTL Traffic Injector
+ou AIG Traffic Controller. Depois de fechar esse injetor, desligar e voltar a
+ligar Tráfego; a retoma não é automática.
+
+As definições mostram sempre o raio e o número máximo de aeronaves para todas as fontes. Os valores predefinidos são **40 NM** e **10 aeronaves**, ajustáveis de 1 a 100 NM e de 1 a 200 aeronaves. As aeronaves mais próximas têm prioridade.
+
+O **tráfego estático** usa apenas posições já presentes na cache de navegação
+MSFS. Requer um voo carregado e dados de estacionamento; selecionar a fonte não
+transfere instalações em falta. Os postos próximos são ocupados primeiro. Mapa
+e injeção partilham a cache; um resultado vazio é
+repetido após três segundos. Os aviões estáticos ficam estacionados: não rolam
+nem descolam.
+
+Mapa e Rolagem distinguem carregamento, criações confirmadas pelo MSFS, ausência
+de tráfego injetável, erro e estado antigo. A dica detalha aviões selecionados e
+ignorados. A confirmação refere-se à criação do objeto, não à visibilidade ou
+fluidez garantida. As criações são feitas em grupos; o catálogo é reutilizado
+até um minuto em mudanças rápidas. Uma ligação SimConnect independente anima com
+um objetivo de 30 atualizações por segundo; as posições na Rolagem são
+interpoladas. Os registos locais medem frequência e pausas. Desligar e fechar
+liberta ligações e remove apenas objetos criados pelo NaviXav.
+
+O acompanhamento utiliza marcas temporais individuais válidas das posições OpenSky: receber uma leitura antiga não a torna recente e as posições recebidas fora de ordem são ignoradas. Sem uma marca temporal individual utilizável, o NaviXav mantém a sua estimativa local prudente. As vistas Mapa e Rolagem ocultas suspendem as leituras de tráfego e o desenho; ao mostrá-las, a leitura e o redimensionamento são retomados. O acompanhamento do voo e a injeção MSFS continuam ativos.
+
+As leituras periódicas de posição, tráfego, controladores VATSIM e estado do simulador evitam pedidos simultâneos para a mesma leitura e descartam respostas desatualizadas após uma mudança de contexto. Na Rolagem, um erro temporário conserva as últimas posições durante no máximo dez segundos após a última leitura bem-sucedida, com um aviso. Uma leitura vazia confirmada ou a desativação do tráfego apaga imediatamente as posições.
+
+No solo, um registo de paragem cancela a previsão e a suavização converge para a posição de estacionamento recebida sem conservar inércia. Sem um novo registo de movimento, a previsão abranda e a sua janela fica limitada a cinco segundos; as transições continuam graduais. As pequenas variações de posição de um avião já estacionado são filtradas. Estas regras usam as posições da fonte, sem deteção de edifícios.
+
+O painel MSFS apresenta agora O meu voo: próximo ponto e distância, tempo restante, próxima restrição e TOD, sincronizados com a janela NaviXav e o seu idioma. Os valores são ocultados após dez segundos sem atualização. O tráfego mostra aviões confirmados, selecionados e ignorados, carregamento, erros e estados antigos; o indicador verde exige criações confirmadas. O botão de retorno abre a janela para os detalhes. Reinstalar o painel 1.2.1 nas definições e reiniciar o MSFS para carregar os novos ficheiros.
+
+O painel MSFS 1.2.1 volta a ligar-se automaticamente ao NaviXav após uma interrupção ou mudança de porta. Uma ligação indisponível deixa de ser apresentada como aplicação encerrada. Os pedidos têm um tempo limite efetivo e os erros de apresentação não interrompem a ligação automática. Após atualizar o painel nas definições, reiniciar o MSFS.
+
+**Instalar o painel MSFS** copia apenas esse
+pacote para Community; **Remover** elimina-o. Se as versões instalada e
+fornecida diferirem, as definições oferecem reinstalação. Os botões ficam
+bloqueados e animados durante a operação. Reiniciar MSFS para recarregar o
+pacote se necessário. O regresso à janela funciona em modo janela ou sem
+margens; ecrã inteiro exclusivo pode manter o foco.
 
 O simulador deve estar iniciado com um voo carregado para obter novos dados. As
 informações já colocadas em cache permanecem disponíveis sem ligação.
@@ -187,6 +252,12 @@ O mapa inclui:
 - um rasto do deslocamento;
 - um modo de seguimento automático;
 - o zoom, o deslocamento e o ajuste ao aeroporto ou à rota.
+
+As barras de Mapa e Táxi agrupam os controlos de vista, apresentação e tráfego. Os botões têm 40 píxeis de altura, o zoom permanece agrupado e os controlos adaptam-se a janelas compactas. A autorização de táxi e as ações do percurso permanecem juntas.
+
+Nas janelas largas, os controlos de Mapa e Táxi permanecem sob a faixa de voo durante o deslocamento, conforme a sua altura real. A mudança de módulo atualiza as medidas antes do deslocamento. Nas janelas compactas, a faixa e os controlos deslocam-se normalmente.
+
+A animação mantém a cadência após um fotograma atrasado sem acrescentar uma espera completa. Os aviões próximos têm prioridade a 30 Hz; além de 10 NM são usados 15 Hz e além de 40 NM, 5 Hz. Os aviões estacionados e estáveis deixam de ser recalculados em cada fotograma. A aceleração é suavizada, os rumos seguem a curva mais curta e as paragens são imediatas. Mantêm-se os limites de previsão no estacionamento.
 
 ### Rolagem no solo
 
@@ -411,6 +482,8 @@ O Pilot ID é recomendado. Após a gravação, o NaviXav obtém imediatamente o
 automaticamente.
 
 ### Definições disponíveis
+
+Durante a gravação das definições, o botão apresenta um indicador animado e «A guardar…». Permanece desativado até ao fim para evitar envios duplicados e volta a estar disponível mesmo após um erro. A animação respeita a preferência de movimento reduzido.
 
 A interface permite igualmente configurar:
 

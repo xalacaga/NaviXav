@@ -1,6 +1,8 @@
 import requests
+from unittest.mock import patch
 
 from navixav.config import Settings
+from navixav.live.base import AircraftState
 from navixav.traffic.ivao import IvaoClient, IvaoError
 from navixav.web.app import create_app
 
@@ -106,3 +108,57 @@ def test_generic_traffic_endpoint_uses_the_selected_network():
     assert payload["source"] == "IVAO"
     assert payload["traffic"][0]["aircraft"] == "A320"
     app.state.close_resources()
+
+
+def test_generic_traffic_endpoint_caps_the_displayed_aircraft_count():
+    feed = _feed()
+    template = feed["clients"]["pilots"][0]
+    feed["clients"]["pilots"] = [
+        {**template, "id": index, "callsign": f"TST{index}"}
+        for index in range(15)
+    ]
+    app = create_app(
+        Settings(
+            traffic_enabled=True, traffic_source="ivao",
+            traffic_max_aircraft=10, traffic_radius_nm=40,
+        ),
+        ivao_client=IvaoClient(session=_Session(feed)),
+    )
+    endpoint = next(route.endpoint for route in app.routes
+                    if getattr(route, "path", "") == "/api/traffic")
+    try:
+        assert len(endpoint()["traffic"]) == 10
+    finally:
+        app.state.close_resources()
+
+
+def test_generic_traffic_endpoint_keeps_nearest_aircraft_inside_radius():
+    feed = _feed()
+    template = feed["clients"]["pilots"][0]
+    feed["clients"]["pilots"] = [
+        {**template, "id": 1, "callsign": "NEAR", "lastTrack": {
+            **template["lastTrack"], "latitude": 48.1, "longitude": 2.0,
+        }},
+        {**template, "id": 2, "callsign": "FAR", "lastTrack": {
+            **template["lastTrack"], "latitude": 49.0, "longitude": 2.0,
+        }},
+    ]
+
+    class Tracker:
+        def read(self):
+            return AircraftState(latitude=48.0, longitude=2.0, altitude_ft=10000)
+        def close(self): pass
+        def set_aircraft_hint(self, _hint): pass
+
+    with patch("navixav.web.app.LiveTracker", return_value=Tracker()):
+        app = create_app(
+            Settings(traffic_enabled=True, traffic_source="ivao",
+                     traffic_max_aircraft=10, traffic_radius_nm=40),
+            ivao_client=IvaoClient(session=_Session(feed)),
+        )
+    endpoint = next(route.endpoint for route in app.routes
+                    if getattr(route, "path", "") == "/api/traffic")
+    try:
+        assert [item["callsign"] for item in endpoint()["traffic"]] == ["NEAR"]
+    finally:
+        app.state.close_resources()

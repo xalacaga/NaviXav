@@ -51,6 +51,25 @@ def _missing():
     return FsltlInstallation(FsltlStatus.NOT_DETECTED, reason="FSLTL Base Models absent")
 
 
+def test_late_animation_keeps_cadence_without_burst_or_extra_full_delay(monkeypatch):
+    from navixav.traffic import service as module
+    clock = [0.0]
+    starts = []
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+    class Manager:
+        def render_once(self):
+            starts.append(clock[0])
+            clock[0] += 0.04 if len(starts) == 1 else 0.001
+    class Stop:
+        def wait(self, delay):
+            assert delay >= 0
+            clock[0] += delay
+            return len(starts) == 3
+    _service(_missing)._animate(Manager(), Stop())
+    assert abs(starts[1] - 2 / 30) < 1e-9
+    assert abs(starts[2] - 3 / 30) < 1e-9
+
+
 def _service(detect, injector=None):
     return TrafficService(
         detect,
@@ -84,8 +103,32 @@ def test_the_service_reports_whether_injection_actually_runs():
         service.close()
 
 
-def test_production_injection_updates_smoothed_positions_each_second():
-    assert DEFAULT_INTERVAL_S == 1.0
+def test_production_injection_updates_smoothed_positions_four_times_each_second():
+    assert DEFAULT_INTERVAL_S == 0.25
+
+
+def test_configured_limits_are_passed_to_the_traffic_manager(monkeypatch):
+    from navixav.traffic import service as module
+    received = {}
+
+    class Manager:
+        def __init__(self, *args, **kwargs):
+            received.update(kwargs)
+            self.progress = lambda value: None
+            self.cancelled = lambda: False
+        def close(self): pass
+        def sync_once(self):
+            return {"created_or_updated": 0, "recreated": 0, "removed": 0, "skipped": 0}
+        def render_once(self): pass
+
+    monkeypatch.setattr(module, "TrafficManager", Manager)
+    service = _service(_detected)
+    try:
+        service.configure(enabled=True, provider=_Provider(), radius_nm=32, max_aircraft=7)
+        assert received["radius_nm"] == 32
+        assert received["max_aircraft"] == 7
+    finally:
+        service.close()
 
 
 def test_a_missing_fsltl_package_leaves_the_service_idle():
@@ -133,6 +176,58 @@ def test_stopping_twice_is_harmless():
     service.stop()
     service.stop()
     assert service.active is False
+
+
+def test_empty_source_is_not_reported_as_confirmed_traffic():
+    service = _service(_detected)
+    try:
+        service.configure(enabled=True, provider=_Provider())
+        assert _wait_until(lambda: service.status['state'] == 'empty')
+        assert service.status['confirmed'] == 0
+    finally:
+        service.close()
+    assert service.status['state'] == 'off'
+
+
+def test_source_failure_is_visible_and_can_recover():
+    class Provider(_Provider):
+        failed = True
+
+        def traffic(self, limit=None):
+            if self.failed:
+                raise RuntimeError('unavailable')
+            return []
+
+    provider = Provider()
+    service = _service(_detected)
+    try:
+        service.configure(enabled=True, provider=provider)
+        assert _wait_until(lambda: service.status['state'] == 'error')
+        assert service.status['reason'] == 'unavailable'
+        assert service.status['age_s'] is not None
+        provider.failed = False
+        assert _wait_until(lambda: service.status['state'] == 'empty')
+    finally:
+        service.close()
+
+
+def test_structured_source_failure_reaches_both_interfaces():
+    class QuotaError(RuntimeError):
+        code = "opensky_daily_quota"
+        retry_after_s = 87.2
+
+    class Provider(_Provider):
+        def traffic(self, limit=None):
+            raise QuotaError("quota")
+
+    service = _service(_detected)
+    try:
+        service.configure(enabled=True, provider=Provider())
+        assert _wait_until(lambda: service.status['state'] == 'error')
+        assert service.status['error_code'] == 'opensky_daily_quota'
+        assert service.status['retry_after_s'] == 88
+    finally:
+        service.close()
 
 
 def test_reconfiguring_never_leaves_two_threads_behind():

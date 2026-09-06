@@ -13,11 +13,11 @@ Terminalinformationen mit Daten aus dem Simulator und stellt alles in einer
 Oberfläche dar, die auf die Flugvorbereitung und die MCDU-Eingabe zugeschnitten
 ist.
 
-Die Anwendung besitzt ein eigenes Windows-Fenster. Ihre Oberfläche wird von
-Microsoft WebView2 dargestellt und kommuniziert ausschließlich mit einem
-lokalen Dienst auf `127.0.0.1`. Ein externer Browser wird nur geöffnet, wenn
-der Benutzer **SimBrief-Plan erstellen** anklickt, um den offiziellen Editor zu öffnen.
-Einstellungen, Navigationsdatenbank und Caches verbleiben auf dem Rechner.
+Die Anwendung besitzt ein eigenes Windows-Fenster mit Microsoft WebView2 und
+Verbindung zum lokalen Dienst auf `127.0.0.1`. Einstellungen, Navigationsdaten
+und Cache bleiben auf dem Computer. Der Systembrowser öffnet sich nur auf
+ausdrücklichen Wunsch, etwa für SimBrief, ChartFox-Anmeldung,
+FSLTL/AIG-Downloads oder Projektunterstützung.
 
 Das Fenster ist vollständig skalierbar. Die Oberfläche ordnet Bereiche,
 Bedienelemente, Registerkarten und die Kartenhöhe je nach verfügbarem Platz neu
@@ -38,6 +38,13 @@ an, bis zu einer Mindestgröße von 720 × 560 Pixeln.
   Flugzeugposition, bereits überflogene Punkte werden abgeschwächt;
 - Massen, Kraftstoff, Flugzeit, Ausweichflughafen und Dispatch-Daten;
 - Angaben zum Luftfahrzeug, Kennzeichen und gemeldete Ausrüstung.
+Das Banner des aktiven Flugs zeigt die Restzeit aus Reststrecke und
+Geschwindigkeit über Grund, sofern nutzbar, sonst vor dem Start die
+SimBrief-ETE. Nach dem Speichern der Einstellungen wird der Flugplan im
+Hintergrund aktualisiert, ohne den Dialog offen zu halten. Verkehrssteuerungen
+im MSFS-Panel erhalten andere Einstellungen einschließlich der
+SimBrief-Kennungen.
+
 
 ### Flugwetter
 
@@ -65,6 +72,8 @@ NaviXav ergänzt und zeigt:
 
 Die Blöcke **Abflug · Route · Ankunft** lassen sich einklappen, um Platz in der
 Oberfläche zu gewinnen.
+
+Bei jedem SimBrief-Import und jeder Neuberechnung werden SID–Route–STAR–Anflug-Verbindungen anhand der tatsächlich durchflogenen Endpunkte in den MSFS-Daten geprüft, auch wenn Transitionsnamen von den Wegpunkten abweichen. Fehlende Verbindungen müssen bestätigt werden; keine Transition wird willkürlich gewählt. Pistenäste, die den STAR-Anfang exakt wiederholen, erzeugen keinen Rückweg zum Einstieg mehr; abweichende Beschränkungen bleiben erhalten. Die Route behält DCT und Luftstraßen des OFP bei. Gewählte Transitionen ohne Datenbankeintrag werden als nicht verifiziert markiert.
 
 ### Flugverfolgung
 
@@ -117,6 +126,12 @@ Ein eigener Adapter für die Fenix A319/A320/A321 liest alle drei Cockpithebel
 direkt aus. Änderungen an Klappen, Bremsklappen und Parkbremse werden daher auch
 bei abgeschalteten Triebwerken und Hydrauliksystemen gemeldet.
 
+Bei Fenix A319/A320/A321 liest NaviXav den STD-Modus des Kapitäns-EFIS für Anzeige und QNH/STD-Warnungen. Eine widersprüchliche generische MSFS-SimVar überschreibt diesen Modus nicht mehr. Ist die Fenix-Abfrage nicht verfügbar oder ungültig, bleibt die Einstellung unbekannt; diese Warnungen werden nicht aus dem generischen Druck ausgelöst. Die Kopilotenseite wird dabei nicht überwacht.
+
+Bei diesen Fenix-Flugzeugen werden auch beide Bedienelemente der
+Triebwerksenteisung direkt gelesen. Ist die Abfrage nicht verfügbar, bleibt der
+Zustand unbekannt, statt durch die Standard-SimVar einen Fehlalarm auszulösen.
+
 #### Visuelle Warnungen
 
 NaviXav überwacht diese Konfiguration und meldet Versäumnisse: Fahrwerk im
@@ -151,6 +166,14 @@ gespeichert und in der aktuell gewählten Sprache wiedergegeben. Alle
 Zusammenfassungen können in der Oberfläche gelöscht werden; Flugdaten werden
 nicht an externe Dienste gesendet.
 
+Bei Fenix A319/A320/A321 liest die STD-Erkennung den tatsächlichen Zustand des Kapitänsbarometers (B_FCU_EFIS1_BARO_STD) statt des Eingabewerts S_FCU_EFIS1_BARO_STD. Ein Eingabewert von null löst bei angezeigtem STD keinen Fehlalarm mehr aus. Fehlende oder ungültige Werte bleiben unbekannt.
+
+Die ILS-Überwachung verwendet den vom geladenen Flugzeug zugewiesenen Empfänger. Fenix A319/A320/A321 und FlyByWire A32NX verwenden NAV3 des Kapitäns; andere Flugzeuge verwenden den von MSFS gewählten Index NAV1 bis NAV4. Fehlen Index oder Frequenz, bleibt die Warnung stumm, statt einen anderen Empfänger zu vergleichen.
+
+Der angezeigte TOD ist eine SimBrief- oder NaviXav-Schätzung, kein MCDU-Messwert. Das FMS-Profil kann trotz gleicher Route und Flughöhe einen anderen Punkt ergeben. Ziehen Beschränkungen den SimBrief-Punkt vor, wird die Quelle als berechnete Schätzung angezeigt.
+
+Flugverfolgung und Ingame-Panel zeigen im Sinkflug „Sinkflug läuft“ statt TOD, danach „Anflug“. Bei Zwischenhöhen bleibt die Anzeige erhalten, wenn der Höhenverlust den Sinkflug bestätigt. Der Status stammt aus der Telemetrie, nicht aus dem FMS-DES-Modus.
+
 ### MCDU-Blatt
 
 Die Registerkarte **MCDU-Blatt** passt ihre Seiten an den Flugzeugtyp an:
@@ -181,24 +204,72 @@ NaviXav nutzt SimConnect, um:
   Wegpunkte und Funknavigationsanlagen abzurufen;
 - schrittweise eine lokale Datenbank in `data/navixav.sqlite` aufzubauen.
 
-Die optionale Einstellung **VATSIM-Verkehr in MSFS injizieren** erkennt
-**FSLTL Base Models** im MSFS-Community-Ordner und verwendet dessen Modelle
-für nahen Netzwerkverkehr. NaviXav liest lediglich FSLTLs `aircraft.cfg`- und
-VMR-Dateien; es installiert, aktualisiert oder verändert FSLTL nicht. Die
-Einstellung ist standardmäßig deaktiviert, begrenzt Anzahl und Radius der
-injizierten Flugzeuge und entfernt beim Abschalten oder Beenden ausschließlich
-die von NaviXav erstellten SimConnect-Objekte.
-Als kostenlose öffentliche Netzwerkquelle kann VATSIM oder IVAO gewählt
-werden. FSLTL wird automatisch erkannt; alternativ kann der Paket- oder
-Community-Pfad manuell eingetragen werden. Fehlt FSLTL, öffnen die Einstellungen
-den [offiziellen FlyByWire-Installer](https://flybywiresim.com/downloads/).
-Installiere nur **FSLTL Traffic Base Models**, nicht FSLTL Injector.
-Für eine reale Ansicht zeigt **OpenSky-Echtverkehr** anonyme ADS-B-Zustände
-im Umkreis von 100 NM um das Flugzeug und injiziert sie über FSLTL. Ist der
-ADS-B-Typ zunächst unbekannt, erscheint zuerst ein sicheres generisches Modell,
-das nach Auflösung des exakten Typs durch das Flugzeugregister ersetzt wird.
-Die aktive Quelle kann direkt in der Karten- oder Rollleiste gewechselt werden;
-beide Auswahlfelder bleiben synchron und die Wahl wird lokal gespeichert.
+Die Schaltfläche **Verkehr** auf Karte oder Rollplan steuert Anzeige und
+Einspeisung in MSFS; sie ist standardmäßig ausgeschaltet. Quellen sind VATSIM,
+IVAO, OpenSky (realer ADS-B-Verkehr) und statischer Verkehr. Die Auswahl
+verwendet dieselbe lokale Einstellung; Änderungen im MSFS-Panel werden alle drei
+Sekunden eingelesen.
+
+Eine verkehrsfremde Einstellung startet Einspeisung und vorhandene Flugzeuge
+nicht mehr neu. Änderungen an Quelle, Modellen und aktivem statischem Verkehr
+werden weiterhin angewendet. Module teilen eine zeitgestempelte MSFS-Messung
+höchstens 250 ms; Position und Höhe des Spielers stammen für die Einspeisung aus
+demselben Zustand. Abgelaufene Messungen oder Verbindungsfehler liefern keine
+alte Position als aktuell.
+
+Die Einstellungen bieten **FSLTL Base Models** oder **AIG AI Traffic**, jeweils
+einen Satz. Beide Installationen werden erkannt; FSLTL-, AIG- und
+Community-Pfade lassen sich manuell angeben. NaviXav liest `aircraft.cfg` und
+VMR-Regeln, ohne die Bibliotheken zu installieren oder zu ändern. FSLTL öffnet
+den [FlyByWire-Download](https://flybywiresim.com/downloads/) für **FSLTL
+Traffic Base Models**; AIG öffnet die [offizielle
+Website](https://www.alpha-india.net/). AI Manager installiert
+`aig-aitraffic-oci`; fehlende Zusatzpakete werden gemeldet.
+
+OpenSky sucht realen Verkehr innerhalb des eingestellten Radius. Der anonyme Zugriff wird alle vier Minuten aktualisiert, um das tägliche öffentliche Kontingent einzuhalten. Bei HTTP 429 zeigt NaviXav in beiden Oberflächen ausdrücklich **OpenSky-Tageskontingent erschöpft** an und beachtet die von OpenSky angegebene Wartezeit, statt ständig neu anzufragen; vorhandener Verkehr wird bis zur Erholung der Quelle weiter animiert. Die Einspeisung hängt von
+verfügbaren Modellen ab: FSLTL kann bei unbekanntem Typ ein generisches Modell
+verwenden, AIG bietet diesen Ersatz nicht. Ein Flugzeug auf der Karte ist daher
+nicht zwingend eingespeist. Wird FSLTL Traffic Injector oder AIG Traffic
+Controller erkannt, blockiert oder stoppt NaviXav seine Einspeisung. Nach dem
+Schließen des anderen Injektors Verkehr aus- und wieder einschalten; die
+Wiederaufnahme erfolgt nicht automatisch.
+
+In den Einstellungen sind Verkehrsradius und maximale Flugzeugzahl für jede Quelle immer sichtbar. Standardwerte sind **40 NM** und **10 Flugzeuge**, einstellbar von 1 bis 100 NM und von 1 bis 200 Flugzeugen. Die nächsten Flugzeuge haben Vorrang.
+
+**Statischer Verkehr** nutzt nur bereits im MSFS-Navigationscache vorhandene
+Parkpositionen. Ein geladener Flug und Parkdaten sind erforderlich; die
+Quellenauswahl lädt keine fehlenden Facilities. Nahe Positionen werden zuerst
+besetzt. Karte und Einspeisung teilen den Cache; leere
+Ergebnisse werden nach drei Sekunden erneut geprüft. Statische Flugzeuge bleiben
+geparkt und rollen oder starten nicht.
+
+Karte und Rollplan unterscheiden Laden, von MSFS bestätigte Erstellungen,
+fehlenden geeigneten Verkehr, Fehler und veralteten Status. Der Tooltip nennt
+ausgewählte und übersprungene Flugzeuge. Bestätigt wird die Objekterstellung,
+nicht Sichtbarkeit oder garantierte Flüssigkeit. Die Erstellung erfolgt in
+Gruppen; der Modellkatalog wird bei raschen Änderungen bis zu einer Minute
+wiederverwendet. Eine eigene SimConnect-Verbindung animiert mit einer Zielrate
+von 30 Aktualisierungen pro Sekunde; Rollplanpositionen werden interpoliert.
+Lokale Protokolle messen Rate und Pausen. Ausschalten und Schließen geben
+Verbindungen frei und entfernen nur von NaviXav erstellte Objekte.
+
+Die Verfolgung nutzt gültige Zeitstempel einzelner OpenSky-Positionen: Der Empfang einer alten Meldung macht sie nicht aktuell, und verspätete ältere Positionen werden ignoriert. Ohne nutzbaren individuellen Zeitstempel behält NaviXav seine vorsichtige lokale Schätzung bei. Ausgeblendete Karten- und Rollplanansichten pausieren ihre Verkehrsabfragen und Zeichnungen; beim Einblenden werden Abfragen und Größenanpassung fortgesetzt. Flugverfolgung und MSFS-Einspeisung bleiben aktiv.
+
+Periodische Abfragen von Position, Verkehr, VATSIM-Lotsen und Simulatorstatus verhindern überlappende Anfragen derselben Abfrage und verwerfen durch Kontextwechsel überholte Antworten. Im Rollplan bleiben die letzten Positionen bei einem vorübergehenden Fehler höchstens zehn Sekunden nach der letzten erfolgreichen Meldung mit einem Hinweis erhalten. Eine bestätigte leere Meldung oder das Abschalten des Verkehrs löscht die Positionen sofort.
+
+Am Boden beendet eine Stillstandsmeldung die Vorausberechnung; die Glättung führt ohne Restbewegung zur gemeldeten Parkposition. Ohne neue Bewegungsmeldung wird die Vorausberechnung abgebremst und auf ein Zeitfenster von fünf Sekunden begrenzt; Übergänge bleiben sanft. Kleine Positionsschwankungen bereits geparkter Flugzeuge werden gefiltert. Grundlage sind die Positionen der Quelle, ohne Gebäudeerkennung.
+
+Das MSFS-Panel zeigt jetzt Mein Flug: nächsten Wegpunkt und Entfernung, Restzeit, nächste Beschränkung und TOD, synchronisiert mit dem NaviXav-Fenster und dessen Sprache. Flugwerte werden nach zehn Sekunden ohne Aktualisierung ausgeblendet. Der Verkehr zeigt bestätigte, ausgewählte und übersprungene Flugzeuge sowie Laden, Fehler und veraltete Zustände; der grüne Punkt erfordert bestätigte Erstellungen. Die Rückkehrtaste öffnet das Fenster für Details. Panel 1.2.1 in den Einstellungen neu installieren und MSFS zum Laden der neuen Dateien neu starten.
+
+Das MSFS-Panel 1.2.1 verbindet sich nach einer Unterbrechung oder einem Portwechsel automatisch wieder mit NaviXav. Eine fehlende Verbindung wird nicht mehr als beendete Anwendung gemeldet. Anfragen werden bei Zeitüberschreitung beendet; Anzeigefehler stoppen die Wiederverbindung nicht mehr. Nach dem Panel-Update in den Einstellungen MSFS neu starten.
+
+**MSFS-Panel
+installieren** kopiert nur dieses Paket nach Community, **Entfernen** löscht es.
+Unterschiedliche installierte und mitgelieferte Versionen ermöglichen eine
+Neuinstallation in den Einstellungen. Währenddessen bleiben die Schaltflächen
+gesperrt und animiert. MSFS bei Bedarf zum Neuladen neu starten. Die
+Fensterrückkehr funktioniert im Fenster- oder randlosen Modus; exklusives
+Vollbild kann den Fokus behalten.
 
 Der Simulator muss mit geladenem Flug laufen, um neue Daten abzurufen. Bereits
 zwischengespeicherte Informationen bleiben offline verfügbar.
@@ -226,6 +297,12 @@ Die Karte umfasst:
 - eine frei wählbare Farbe der Flugspur;
 - die Wahl zwischen OpenStreetMap Standard und OpenTopoMap – direkt in der
   Kartenleiste oder in den Einstellungen.
+
+Die Werkzeugleisten für Karte und Rollen gruppieren Ansicht, Anzeige und Verkehr. Die Schaltflächen sind 40 Pixel hoch, die Zoomtasten bleiben zusammen und die Anordnung passt sich kompakten Fenstern an. Rollfreigabe und Routenaktionen bleiben zusammen.
+
+In breiten Fenstern bleiben Karten- und Rollbefehle beim Scrollen unter der Flugleiste; deren tatsächliche Höhe bestimmt den Abstand. Beim Modulwechsel werden die Maße vor dem Scrollen aktualisiert. In kompakten Fenstern scrollen Leiste und Befehle normal mit.
+
+Die Animation behält nach verspäteten Bildern ihren Takt ohne zusätzliche volle Wartezeit. Nahe Flugzeuge haben bei 30 Hz Vorrang; über 10 NM gelten 15 Hz, über 40 NM 5 Hz. Stabil geparkte Flugzeuge werden nicht jedes Bild neu berechnet. Beschleunigung wird geglättet, Kurse folgen dem kürzesten Weg und Stopps bleiben unmittelbar. Vorhersagegrenzen am Parkplatz bleiben erhalten.
 
 ### Rollen am Boden
 
@@ -455,6 +532,8 @@ verfügbaren OFP ab. Bei jedem weiteren Start wird dieser letzte Plan
 automatisch geladen.
 
 ### Verfügbare Einstellungen
+
+Beim Speichern der Einstellungen zeigt die Schaltfläche eine Animation und „Speichern…“. Sie bleibt bis zum Abschluss deaktiviert, um doppelte Übermittlungen zu verhindern, und ist auch nach Fehlern wieder verfügbar. Die Animation berücksichtigt reduzierte Bewegung.
 
 In der Oberfläche lassen sich außerdem einstellen:
 

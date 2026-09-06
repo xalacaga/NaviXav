@@ -414,7 +414,7 @@ main {
   top: calc(var(--topbar-height) + 8px);
   z-index: 19;
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.9fr) minmax(220px, 1.5fr) auto;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.9fr) minmax(110px, 0.55fr) minmax(220px, 1.5fr) auto;
   align-items: stretch;
   gap: 1px;
   overflow: hidden;
@@ -452,6 +452,7 @@ main {
   white-space: nowrap;
 }
 .flight-context-state,
+.flight-context-time,
 .flight-context-next {
   display: grid;
   align-content: center;
@@ -460,6 +461,7 @@ main {
 }
 .flight-context-state strong { color: var(--accent); font-size: 0.82rem; }
 .flight-context-state span,
+.flight-context-time strong,
 .flight-context-next strong {
   overflow: hidden;
   color: var(--text-dim);
@@ -467,6 +469,7 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.flight-context-time strong { color: var(--high); font-size: 0.82rem; }
 .flight-context-next strong { color: var(--text); font-family: var(--font); }
 .flight-context-actions {
   display: flex;
@@ -1378,15 +1381,81 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 .map-airports { display: flex; gap: 6px; flex-wrap: wrap; }
 .map-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
+/* Keep navigation together and separate it from display preferences. */
+.map-bar.map-toolbar {
+  display: grid; justify-content: stretch; gap: 8px; min-width: 0; width: 100%;
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--flight-context-height) + 16px);
+  z-index: 18;
+  padding-bottom: 8px;
+  background: var(--surface-solid);
+  border-radius: 10px;
+}
+.map-toolbar-main { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.map-primary-actions { flex: 1 1 auto; }
+.map-toolbar-main > .live-pill { margin-left: auto; }
+.map-toolbar-options { padding-top: 8px; border-top: 1px solid var(--border); gap: 8px; }
+.map-control-group {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  min-width: 0; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface);
+}
+.map-group-label { color: var(--text-dim); font-size: 0.72rem; font-weight: 600; margin-right: 4px; }
+.map-toolbar .icon-btn, .map-toolbar select { min-height: 40px; }
+.map-toolbar .icon-btn { padding-inline: 13px; }
+.map-toolbar .icon-btn:focus-visible, .map-toolbar select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px;
+}
+.map-zoom-controls { display: inline-flex; gap: 0; flex: 0 0 auto; }
+.map-toolbar .map-zoom-controls .icon-btn { width: 42px; min-width: 42px; font-size: 1.1rem; }
+.map-zoom-controls .icon-btn:first-child { border-radius: 9px 0 0 9px; }
+.map-zoom-controls .icon-btn:last-child { border-radius: 0 9px 9px 0; margin-left: -1px; }
+.map-toolbar .traffic-source-select { max-width: 220px; min-width: 0; }
+.map-toolbar .traffic-map-only { max-width: 100%; white-space: normal; }
+.map-toolbar .ground-clearance { min-height: 40px; }
+.map-toolbar .ground-clearance-apply { width: 34px; height: 34px; }
+@media (max-width: 900px) {
+  .map-toolbar-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .map-toolbar-main > .map-airports { grid-column: 1; grid-row: 1; }
+  .map-toolbar-main > .live-pill { grid-column: 2; grid-row: 1; }
+  .map-toolbar-main > .map-primary-actions { grid-column: 1 / -1; grid-row: 2; }
+  .map-toolbar-options > .map-control-group { flex: 1 1 280px; }
+  .map-toolbar .map-primary-actions { flex: 1 1 auto; }
+  .map-toolbar .map-group-label { flex: 0 0 100%; }
+  .map-toolbar .map-basemap-style { flex: 1 1 150px; max-width: 220px; }
+  .map-toolbar .map-zoom-controls .icon-btn { flex: 0 0 42px; }
+}
+
 /* Le calque du réseau peut être allumé sans que le simulateur reçoive quoi
    que ce soit — source réelle, FSLTL absent, injection retirée. Sans ce
    repère, la carte laisserait croire que les appareils sont dans MSFS. */
+.traffic-map-only[data-state="active"] { color: var(--success, #238753); }
+.traffic-map-only[data-state="error"],
+.traffic-map-only[data-state="stale"] { color: var(--danger, #c64b42); }
+.traffic-map-only[data-state="loading"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.4em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: traffic-loading 0.8s linear infinite;
+}
+@keyframes traffic-loading { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .traffic-map-only[data-state="loading"]::before { animation: none; }
+}
 .traffic-map-only {
   padding: 3px 7px;
   border: 1px solid var(--warning, #d98324);
   border-radius: 999px;
   font-size: 0.68rem;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--warning, #d98324);
   cursor: help;
 }
@@ -1425,6 +1494,38 @@ tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 55%, trans
 }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
 .icon-btn.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.icon-btn:disabled { cursor: default; opacity: 0.58; }
+.icon-btn.is-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon-btn.is-busy:disabled { cursor: progress; opacity: 1; }
+.icon-btn.is-busy::before,
+.btn-primary.is-busy::before {
+  content: "";
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: msfs-panel-spin 700ms linear infinite;
+}
+@keyframes msfs-panel-spin { to { transform: rotate(360deg); } }
+.btn-primary.is-busy:disabled { cursor: progress; opacity: 0.9; }
+.btn-primary.is-busy::before {
+  border-color: currentColor;
+  border-right-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn.is-busy::before, .btn-primary.is-busy::before { animation: none; }
+}
 .toolbar-exit-actions {
   display: flex;
   align-items: center;
@@ -3723,8 +3824,11 @@ pre {
   main { padding: 12px 12px 32px; }
   .flight-context {
     position: static;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(100px, 0.7fr);
   }
+  /* In a compact window the tall controls scroll with the map, leaving room
+     for the map itself; the flight context is also in normal flow here. */
+  .map-bar.map-toolbar { position: static; }
   .strip,
   .grid-terminal,
   .panel { scroll-margin-top: calc(var(--topbar-height) + 12px); }
