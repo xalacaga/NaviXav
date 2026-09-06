@@ -39,7 +39,7 @@ def test_fastapi_uses_its_supported_lifespan_lifecycle():
     assert "app.state.close_resources = close_resources" in application
 
 
-def test_release_version_check_ignores_license_and_historical_tag_versions():
+def test_release_version_check_ignores_license_historical_tags_and_ipv4_addresses():
     prepare = (PROJECT_ROOT / "scripts" / "prepare_release.ps1").read_text(
         encoding="utf-8"
     )
@@ -47,6 +47,7 @@ def test_release_version_check_ignores_license_and_historical_tag_versions():
     assert '"(?<!v)" + [regex]::Escape($Current)' in prepare
     assert "$Content[$Match.Index - 1] -eq 'v'" in prepare
     assert "PolyForm\\s+Noncommercial(?:\\s+License)?\\s*$" in prepare
+    assert "$Suffix -match '^\\.\\d{1,3}(?!\\d)'" in prepare
     assert "if ($Match.Value -ne $Next)" not in prepare
 
 

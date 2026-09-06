@@ -369,6 +369,16 @@
       "pl": "monitorowanie ILS porównuje teraz częstotliwość odbiornika faktycznie przypisanego przez samolot: kapitański NAV3 w Fenix A319/A320/A321 i FlyByWire A32NX albo indeks NAV1–NAV4 wybrany przez MSFS w pozostałych samolotach. Niedostępne dane pozostają nieznane i nie wywołują fałszywego alarmu"
     },
     {
+      "fr": "la préparation d’une version ne confond plus l’adresse locale 127.0.0.1 des textes de publication avec une ancienne version de NaviXav",
+      "en": "release preparation no longer mistakes the local 127.0.0.1 address in publishing copy for an old NaviXav version",
+      "de": "die Release-Vorbereitung verwechselt die lokale Adresse 127.0.0.1 in Veröffentlichungstexten nicht mehr mit einer alten NaviXav-Version",
+      "es": "la preparación de una versión ya no confunde la dirección local 127.0.0.1 de los textos de publicación con una versión antigua de NaviXav",
+      "it": "la preparazione di una versione non confonde più l’indirizzo locale 127.0.0.1 nei testi di pubblicazione con una vecchia versione di NaviXav",
+      "pt": "a preparação de uma versão deixa de confundir o endereço local 127.0.0.1 dos textos de publicação com uma versão antiga do NaviXav",
+      "nl": "de releasevoorbereiding verwart het lokale adres 127.0.0.1 in publicatieteksten niet meer met een oude NaviXav-versie",
+      "pl": "przygotowanie wydania nie myli już lokalnego adresu 127.0.0.1 w tekstach publikacji ze starą wersją NaviXav"
+    },
+    {
       "fr": "les paramètres de trafic proposent à nouveau, pour toutes les sources, un rayon et un nombre maximal d’avions. Les valeurs par défaut sont 40 NM et 10 avions ; les avions les plus proches sont retenus en priorité et toute modification relance proprement la sélection et l’injection",
       "en": "Traffic settings again provide a radius and maximum aircraft count for every source. Defaults are 40 NM and 10 aircraft; nearest aircraft are retained first and every change cleanly restarts selection and injection",
       "de": "die Verkehrseinstellungen bieten wieder für jede Quelle einen Radius und eine maximale Flugzeugzahl. Standardwerte sind 40 NM und 10 Flugzeuge; die nächsten Flugzeuge haben Vorrang und jede Änderung startet Auswahl und Einspeisung sauber neu",

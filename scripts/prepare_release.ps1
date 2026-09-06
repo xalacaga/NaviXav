@@ -115,6 +115,16 @@ function Update-PublishingVersions([string]$Current, [string]$Next) {
         foreach ($Match in [regex]::Matches($Content, '\d+\.\d+\.\d+')) {
             if ($Match.Value -eq $Next) { continue }
 
+            # Une adresse IPv4 contient elle aussi un triplet qui ressemble à
+            # une version (127.0.0 dans 127.0.0.1). Le quatrième octet la rend
+            # sans ambiguïté et ne doit jamais être réécrit ni signalé.
+            $AfterMatch = $Match.Index + $Match.Length
+            $SuffixLength = [Math]::Min(5, $Content.Length - $AfterMatch)
+            $Suffix = $Content.Substring($AfterMatch, $SuffixLength)
+            if ($Suffix -match '^\.\d{1,3}(?!\d)') {
+                continue
+            }
+
             # « v1.4.12 » peut être une Release historique citée à dessein.
             if ($Match.Index -gt 0 -and $Content[$Match.Index - 1] -eq 'v') {
                 continue
