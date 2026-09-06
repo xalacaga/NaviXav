@@ -2,6 +2,87 @@
 
     🔒 Security Note: Starting from version 1.4.11, the installer is systematically verified against its SHA-256 checksum before any automatic update.
 
+🚀 [1.7.0] - 2026-09-06
+✨ Added
+
+    AIG AI Traffic models join FSLTL for traffic injection: Settings offers one set or the other, never both at once; the package installed by AI Manager is detected automatically, with a manual path as a fallback, and NaviXav never writes to it.
+
+    The active-flight banner now shows the remaining flight time, recalculated from ground speed in flight and based on the SimBrief ETE before takeoff.
+
+    After closing FSLTL Traffic Injector or AIG Traffic Controller, switching Traffic off and on restarts NaviXav injection; closing the other program does not trigger automatic resumption.
+
+    A NaviXav panel can be added to the MSFS toolbar: it shows the detected model set, the traffic state and the injection state, switches traffic on or off, changes source and brings the window back — without leaving the simulator; the package is copied into Community only by pressing “Install the MSFS panel” in Settings, and Remove takes it away.
+
+    The MSFS panel install and remove button now shows an animated spinner and the operation in progress until it actually completes; it remains locked while waiting to prevent double clicks.
+
+    A fourth traffic source needs no network at all: static traffic parks aircraft on the stands MSFS itself reports, with the liveries of the selected model set and a plausible aircraft for each stand category; the radius and the number of parked aircraft are set in Settings.
+
+    The MSFS panel offers four sources including static traffic and shows versions and general service status; its green dot indicates an active manager, not a confirmed creation count.
+
+    Settings now offers to update an already installed MSFS panel: the package copied into Community keeps the content of the version that wrote it, and the status line now shows the installed version next to the one shipped here.
+
+    Static traffic uses the common limits, initially 40 NM and 10 aircraft, prioritising nearby stands already available in the MSFS cache; performance depends on scenery and models.
+
+    The MSFS panel now shows My flight: next waypoint and distance, time remaining, next constraint and TOD, synchronized with the NaviXav window and its language. Flight values are hidden after ten seconds without an update. Traffic shows confirmed, selected and skipped aircraft, loading, errors and stale states; the green dot requires confirmed creations. The return button opens the window for details. Reinstall panel 1.2.0 from Settings, then restart MSFS to load the new files.
+
+    The Map and Taxi toolbars group view, display and traffic controls. Buttons provide a 40-pixel-high target, zoom controls stay together and controls adapt to compact windows. Taxi clearance and route actions remain together.
+
+    While settings are being saved, the Save button shows an animated indicator and “Saving…”. It stays disabled until the operation finishes to prevent duplicate submissions, then becomes available again, including after errors. The animation respects reduced-motion preferences.
+
+    The map and the taxi chart follow the aircraft from the moment they open: framing a chart on arrival no longer cancels Follow, which only the Fit and Route buttons give up — those exist precisely to show the whole picture. The taxi chart stays framed on the airfield until the aircraft is there: in cruise, the arrival taxi chart no longer wanders off after an aircraft three hundred miles away.
+
+🛠️ Fixed
+
+    The active-flight banner also shows remaining time: remaining distance and ground speed when usable, otherwise the SimBrief ETE before takeoff. After saving Settings, flight-plan refresh continues in the background without holding the dialog open. MSFS-panel traffic commands preserve other settings, including SimBrief identifiers.
+
+    The engine anti-ice alert no longer flickers incorrectly on the Fenix A319, A320 and A321: NaviXav now reads both Fenix cockpit engine anti-ice controls directly instead of its unstable standard SimVar.
+
+    Traffic filters parking-position noise and joins reports with independent animation targeting 30 updates per second; the actual rate depends on MSFS and the computer.
+
+    Static traffic shows on the map again: the source did not answer the call that feeds it, so parked aircraft entered the simulator without ever appearing on screen; their details now open on click as well.
+
+    The NaviXav window and the MSFS panel no longer announce two different traffic sources: the window re-reads the real setting every three seconds and follows what the service injects, instead of keeping the one it showed before the change made in the simulator.
+
+    Traffic shows progress, confirmed MSFS creations and errors on the map and taxi chart; static traffic shares its cache and quickly retries unavailable stands; dedicated animation smooths movement.
+
+    Traffic animation uses a dedicated SimConnect connection: position reads, presence checks and aircraft creation no longer suspend movement of existing aircraft; diagnostics record the achieved update rate and longest interval between updates.
+
+    Documentation in all eight languages now matches controls, traffic limits, MSFS-panel updates, remaining time and Fenix readings; older presentation copy is clarified.
+
+    Changing a setting unrelated to traffic no longer restarts injection or existing aircraft. Source, model and active static-traffic settings still take effect. Modules share a timestamped MSFS sample for at most 250 ms; injection takes the player position and altitude from the same state. An expired sample or failed connection does not supply an old position as if it were current.
+
+    On the ground, a stop report cancels prediction and smoothing converges on the reported parking position without retaining momentum. Without a new motion report, prediction slows down and its window is limited to five seconds; transitions remain gradual. Small position variations of an already parked aircraft are filtered. These rules use source positions, without building detection.
+
+    Periodic position, traffic, VATSIM controller and simulator status reads prevent overlapping requests for the same read and discard responses made obsolete by a context change. On the Taxi view, a temporary error retains the last positions for at most ten seconds after the last successful report, with a warning. A confirmed empty report or disabling traffic clears positions immediately.
+
+    Tracking uses individual OpenSky position timestamps when valid: receiving an old report does not make it fresh, and out-of-order positions are ignored. Without a usable individual timestamp, NaviXav retains its conservative local estimate. Hidden Map and Taxi views suspend their traffic reads and drawing; showing them resumes reading and resizing. Flight tracking and MSFS injection remain active.
+
+    On Fenix A319/A320/A321 aircraft, NaviXav reads the captain EFIS STD mode for the display and QNH/STD alerts. A conflicting generic MSFS SimVar no longer overrides that mode. If the Fenix read is unavailable or invalid, the setting remains unknown and these alerts are not triggered from generic pressure. This read does not monitor the first officer side.
+
+    Every SimBrief import and recalculation checks SID–route–STAR–approach connections against the actual flown endpoints in MSFS data, even when transition names differ from connecting fixes. Missing connections require confirmation; no arbitrary transition is selected. Runway branches that exactly duplicate the STAR start no longer create a return to its entry; distinct constraints are preserved. The resulting route retains OFP DCT segments and airways. User-selected transitions absent from the database are marked unverified.
+
+    MSFS panel 1.2.1 automatically reconnects to NaviXav after an interruption or port change. An unavailable connection is no longer reported as a stopped application. Requests have a real timeout, and display errors no longer stop reconnection. After updating the panel from Settings, restart MSFS to load its new files.
+
+    In wide windows, Map and Taxi controls stay below the flight strip while scrolling, using its measured height. Module changes update these measurements before scrolling. In compact windows, the strip and controls scroll normally to preserve map space.
+
+    On Fenix A319/A320/A321 aircraft, STD detection reads the actual captain barometer state (B_FCU_EFIS1_BARO_STD), rather than the S_FCU_EFIS1_BARO_STD input. An input returning to zero no longer causes a false alarm while STD is displayed. Unavailable or invalid readings remain unknown.
+
+    Animation keeps its cadence after a late frame without adding a full extra wait. Nearby aircraft retain priority at 30 Hz; beyond 10 NM updates use 15 Hz, then 5 Hz beyond 40 NM. Settled parked aircraft are no longer recalculated every frame. Ground acceleration is smoothed, heading follows the shortest turn and stops remain immediate. Parking prediction limits remain in place.
+
+    The displayed TOD is a SimBrief or NaviXav estimate, not a reading from the MCDU. The FMS profile can place it elsewhere even with the same route and flight level. If constraints move the SimBrief point earlier, its displayed source becomes “Calculated estimate”.
+
+    Flight tracking and the in-game panel show “Descent in progress” instead of TOD during descent, then “Approach”. Level segments retain this indication when altitude loss confirms descent. This status comes from telemetry, not the FMS DES mode.
+
+    Saving a setting no longer re-reads the model package for nothing: the in-memory index was only valid for a minute, so a save spaced from the previous one spent three seconds re-reading thousands of liveries. It now stays valid as long as package detection returns the same thing, and an install or an update rebuilds it.
+
+    ILS monitoring now compares the frequency of the receiver actually assigned by the aircraft: captain NAV3 on Fenix A319/A320/A321 and FlyByWire A32NX, or the NAV1–NAV4 index selected by MSFS on other aircraft. Unavailable data remains unknown and no longer triggers a false warning.
+
+    Release preparation no longer mistakes the local 127.0.0.1 address in publishing copy for an old NaviXav version.
+
+    Traffic settings again provide a radius and maximum aircraft count for every source. Defaults are 40 NM and 10 aircraft; nearest aircraft are retained first and every change cleanly restarts selection and injection.
+
+    OpenSky real-world traffic no longer exhausts its public quota with one-minute refreshes: anonymous snapshots are spaced four minutes apart, an HTTP 429 response suspends requests for OpenSky’s requested delay, and identical errors no longer fill the log several times per second. The window and MSFS panel then explicitly show “OpenSky daily quota exhausted” and explain the automatic retry.
+
 🚀 [1.6.0] - 2026-08-30
 ✨ Added
 
@@ -9,7 +90,7 @@
 
     Instant traffic-source switching from the Map and Taxi toolbars: the VATSIM, IVAO and OpenSky selectors stay synchronized, restart traffic collection cleanly and save the choice locally.
 
-    OpenSky real traffic: NaviXav can display and inject public ADS-B state vectors within the configured traffic radius, with source attribution and API-friendly caching.
+    OpenSky real traffic: NaviXav can display public ADS-B state vectors within 100 NM of the aircraft, with source attribution and API-friendly caching; this real-world view remains strictly separate from MSFS injection.
 
     Settings reorganized into collapsible categories suited to compact windows, with a manual FSLTL path, access to the official FlyByWire Installer when models are missing, and IVAO as a second free public network traffic source alongside VATSIM.
 
