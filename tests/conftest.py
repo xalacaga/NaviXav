@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from navixav.config import Settings
+from navixav.live.base import PositionUnavailable
 from navixav.navdata.msfs import MsfsProvider
 from navixav.simbrief.parser import parse_ofp
 
@@ -15,6 +17,16 @@ DATA_DIR = Path(__file__).parent / "data"
 # leurs repères et installations déjà résolus. Elle rend la suite de tests
 # indépendante du simulateur.
 TEST_STORE = DATA_DIR / "navdata_test.sqlite"
+
+
+@pytest.fixture
+def traffic_endpoint_environment(monkeypatch):
+    """Endpoint tests own their position and never start a real injector."""
+    tracker = Mock()
+    tracker.read.side_effect = PositionUnavailable("No simulator in this test")
+    monkeypatch.setattr("navixav.web.app.LiveTracker", lambda: tracker)
+    monkeypatch.setattr("navixav.web.app.TrafficService.configure", lambda *a, **k: None)
+    return tracker
 
 
 @pytest.fixture(scope="session")

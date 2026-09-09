@@ -1,10 +1,19 @@
 import requests
+import pytest
 from unittest.mock import patch
 
 from navixav.config import Settings
 from navixav.live.base import AircraftState
 from navixav.traffic.ivao import IvaoClient, IvaoError
 from navixav.web.app import create_app
+
+
+@pytest.fixture(autouse=True)
+def fixed_player_position(traffic_endpoint_environment):
+    traffic_endpoint_environment.read.side_effect = None
+    traffic_endpoint_environment.read.return_value = AircraftState(
+        latitude=48.0, longitude=2.0, altitude_ft=10000,
+    )
 
 
 class _Response:

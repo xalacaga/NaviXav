@@ -29,6 +29,16 @@
   ],
   "fixed": [
     {
+      "fr": "La validation avant construction ne dépend plus du vol MSFS en cours ni des réglages personnels pour les tests de trafic IVAO et VATSIM.",
+      "en": "Pre-build validation no longer depends on the current MSFS flight or personal settings for IVAO and VATSIM traffic tests.",
+      "de": "Die Prüfung vor dem Build hängt bei IVAO- und VATSIM-Verkehrstests nicht mehr vom aktuellen MSFS-Flug oder persönlichen Einstellungen ab.",
+      "es": "La validación previa a la compilación ya no depende del vuelo MSFS actual ni de los ajustes personales en las pruebas de tráfico IVAO y VATSIM.",
+      "it": "La verifica prima della compilazione non dipende più dal volo MSFS corrente o dalle impostazioni personali nei test del traffico IVAO e VATSIM.",
+      "nl": "De controle vóór het bouwen is voor IVAO- en VATSIM-verkeerstests niet meer afhankelijk van de huidige MSFS-vlucht of persoonlijke instellingen.",
+      "pl": "Testy ruchu IVAO i VATSIM wykonywane przed budowaniem nie zależą już od bieżącego lotu MSFS ani ustawień osobistych.",
+      "pt": "A validação antes da compilação já não depende do voo MSFS atual nem das definições pessoais nos testes de tráfego IVAO e VATSIM."
+    },
+    {
       "fr": "Le trafic statique réserve la zone proche du joueur avant de limiter le nombre d’avions, pour utiliser les autres parkings disponibles. Le message signalant l’absence de postes MSFS repose désormais sur le nombre de postes réellement lus.",
       "en": "Static traffic reserves the area around the player before limiting aircraft numbers, allowing other available stands to be used. The missing MSFS stands message now uses the actual number of stands read.",
       "de": "Der statische Verkehr hält den Bereich um den Spieler frei, bevor die Flugzeugzahl begrenzt wird, sodass andere verfügbare Stellplätze genutzt werden. Die Meldung über fehlende MSFS-Stellplätze berücksichtigt nun die tatsächlich gelesene Anzahl.",

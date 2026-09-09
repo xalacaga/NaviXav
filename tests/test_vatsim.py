@@ -13,6 +13,9 @@ import requests
 from navixav.vatsim import TRAFFIC_TTL_S, VatsimClient, VatsimError
 
 
+pytestmark = pytest.mark.usefixtures("traffic_endpoint_environment")
+
+
 class _FakeResponse:
     def __init__(self, payload, status: int = 200) -> None:
         self._payload = payload
@@ -180,14 +183,10 @@ def _endpoint(app, path: str):
 
 
 def _app(enabled: bool, client: VatsimClient, traffic: bool = False):
-    from dataclasses import replace
-
     from navixav.config import Settings
     from navixav.web.app import create_app
 
-    settings = replace(
-        Settings.load(), vatsim_enabled=enabled, traffic_enabled=traffic
-    )
+    settings = Settings(vatsim_enabled=enabled, traffic_enabled=traffic)
     return create_app(settings=settings, vatsim_client=client)
 
 
