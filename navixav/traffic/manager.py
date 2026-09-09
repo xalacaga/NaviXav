@@ -482,6 +482,7 @@ class TrafficManager:
                     LOGGER.warning("Trafic %s non retiré : %s", uid, exc)
             self.progress({"state": "error" if failed else ("loading" if pending else ("active" if updated else "empty")),
                            "confirmed": len(self.injector.owned), "selected": len(selected),
+                           "stands": getattr(self.provider, "stand_count", None),
                            "skipped": skipped, "failed": failed})
             return {
                 "created_or_updated": updated,

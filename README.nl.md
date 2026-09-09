@@ -115,6 +115,14 @@ Vanaf 50 NM vóór de TOD vraagt het normale waarschuwingssysteem om de daling
 voor te bereiden; op 10 NM verschijnt een afzonderlijke TOD-waarschuwing die
 actief blijft totdat de daling is ingezet.
 
+In **Aircraft** verschijnt **PDF-documentatie** alleen als Community-handleidingen
+passen bij het toestel in het SimBrief-plan, ook zonder MSFS-verbinding. De profielnaam
+kan de aanbieder aangeven, zoals Fenix; bij een dubbelzinnig algemeen profiel wordt geen
+aanbieder willekeurig gekozen. Alleen de PDFs van dat toestel worden getoond. De lezer
+vervangt de informatie op de Aircraft-pagina; **Terug naar Aircraft** herstelt deze.
+Zoeken toont fragmenten met directe paginatoegang. Gescande PDFs zonder tekst blijven
+leesbaar, maar kunnen zo niet worden doorzocht.
+
 Voor flaps, spoilers en parkeerrem vergelijkt NaviXav de officiële SimVars voor
 hendel, effectieve stand, klepstand en cockpitindicator. Vliegtuigconfiguratie
 en vluchtgebeurtenissen blijven daardoor bijwerken als een toestel van derden

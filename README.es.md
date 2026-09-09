@@ -116,6 +116,14 @@ A partir de 50 NM antes del TOD, el sistema normal de alertas pide preparar el
 descenso; a 10 NM aparece una alerta TOD inminente independiente que permanece
 activa hasta iniciar el descenso.
 
+En **Aircraft**, **Documentación PDF** aparece solo si los manuales Community
+corresponden a la aeronave del plan SimBrief, incluso sin conexión a MSFS. El nombre del
+perfil puede indicar el proveedor, como Fenix; un perfil genérico ambiguo no selecciona
+un proveedor al azar. Solo se muestran los PDF de esa aeronave. El lector sustituye la
+información en la página Aircraft; **Volver a Aircraft** la restablece. La búsqueda
+muestra extractos con acceso directo a la página. Los PDF escaneados sin texto se pueden
+leer, pero no permiten esta búsqueda.
+
 Para flaps, spoilers y freno de estacionamiento, NaviXav compara las SimVars
 oficiales de palanca, posición efectiva, superficie e indicador de cabina. La
 configuración del avión y los eventos de vuelo siguen actualizándose aunque un

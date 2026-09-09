@@ -113,6 +113,13 @@ From 50 NM before the TOD, the standard alert engine asks the pilot to prepare
 the descent; at 10 NM it raises a separate imminent-TOD caution that remains
 active until the descent is engaged.
 
+In **Aircraft**, **PDF documentation** appears only when Community manuals match the
+aircraft in the SimBrief plan, even without MSFS connected. The profile name can specify
+the provider, such as Fenix; an ambiguous generic profile never selects a provider at
+random. Only that aircraft’s PDFs are listed. The reader replaces the information within
+the Aircraft page; **Back to Aircraft** restores it. Search shows snippets with direct
+page access. Scanned PDFs without text remain readable but cannot be searched this way.
+
 For flaps, spoilers and the parking brake, NaviXav cross-checks the official
 handle, effective-position, surface-position and cockpit-indicator SimVars.
 This keeps both Aircraft configuration and Flight events live when a third-party

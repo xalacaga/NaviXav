@@ -6263,7 +6263,7 @@ function renderTrafficInjectionBadge(badge) {
       badge.title = t("traffic_state_opensky_quota_detail");
       return;
     }
-    const key = state === "empty" && status.traffic_source === "static" && !injection.selected
+    const key = state === "empty" && status.traffic_source === "static" && injection.stands === 0
       ? "traffic_state_no_stands" : `traffic_state_${state}`;
     badge.textContent = tf(key, { count: injection.confirmed || 0 });
     badge.title = tf("traffic_state_detail", {
@@ -7167,12 +7167,13 @@ function aircraftVisual(
 
 function renderAircraft(plan, aircraft = latestAircraft) {
   const panel = $("panel-aircraft");
-  panel.innerHTML = "";
   const d = plan.dispatch || {};
   const unit = { KGS: "kg", LBS: "lb", kgs: "kg", lbs: "lb" }[d.units] || d.units || "";
   const loadedTitle = String(aircraft?.title || "").trim();
   const plannedTitle = plan.aircraft_name || plan.aircraft || "";
   renderedAircraftTitle = loadedTitle;
+  if (window.AircraftDocuments.keepOpen(panel, { title: plannedTitle, icao: plan.aircraft || "" })) return;
+  panel.innerHTML = "";
 
   const identity = el("div", "aircraft-identity");
   const title = el("div");
@@ -7187,6 +7188,16 @@ function renderAircraft(plan, aircraft = latestAircraft) {
   title.append(badges);
   identity.append(aircraftVisual(plan, aircraft), title);
   panel.append(identity);
+
+  const documentation = el("button", "icon-btn", t("acf_docs_title"));
+  documentation.type = "button";
+  window.AircraftDocuments.bindButton(documentation, {
+    panel,
+    title: plannedTitle,
+    icao: plan.aircraft || "",
+    onClose: () => renderAircraft(currentPlan || plan, latestAircraft),
+  });
+  panel.append(documentation);
 
   const blocks = [
     group(t("acf_group_identification"), [

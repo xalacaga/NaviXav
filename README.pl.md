@@ -115,6 +115,14 @@ Od 50 NM przed TOD standardowy system alarmów prosi o przygotowanie zniżania;
 przy 10 NM pojawia się osobne ostrzeżenie o bliskim TOD, aktywne aż do
 rozpoczęcia zniżania.
 
+W **Aircraft** przycisk **Dokumentacja PDF** pojawia się tylko wtedy, gdy instrukcje
+Community pasują do samolotu z planu SimBrief, także bez połączenia z MSFS. Nazwa
+profilu może wskazywać dostawcę, np. Fenix; niejednoznaczny profil ogólny nie wybiera
+dostawcy losowo. Lista zawiera tylko pliki PDF tego samolotu. Czytnik zastępuje
+informacje na stronie Aircraft; **Powrót do Aircraft** je przywraca. Wyszukiwanie
+pokazuje fragmenty z bezpośrednim dostępem do strony. Zeskanowane pliki PDF bez tekstu
+można czytać, ale nie można ich w ten sposób przeszukiwać.
+
 Dla klap, spoilerów i hamulca postojowego NaviXav porównuje oficjalne SimVars
 dźwigni, pozycji efektywnej, powierzchni i wskaźnika kokpitu. Konfiguracja
 samolotu i zdarzenia lotu są dzięki temu aktualizowane nawet wtedy, gdy samolot

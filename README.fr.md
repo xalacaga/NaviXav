@@ -115,6 +115,14 @@ officielle `ATC MODEL` à la place.
 la descente ; à 10 NM, une alarme TOD imminent distincte reste active jusqu’à
 l’engagement de la descente.
 
+Dans **Aircraft**, **Documentation PDF** apparaît uniquement si des manuels Community
+correspondent à l’avion du plan SimBrief, même sans connexion à MSFS. Le nom du profil
+permet de préciser le fournisseur, par exemple Fenix ; un profil générique ambigu ne
+sélectionne pas un autre fournisseur au hasard. Seule la liste des PDF de cet avion est
+proposée. Le lecteur remplace les informations dans la page Aircraft ; **Retour à
+Aircraft** les rétablit. La recherche affiche des extraits avec accès direct à la page.
+Les PDF scannés sans texte restent lisibles mais ne permettent pas cette recherche.
+
 Pour les volets, les aérofreins et le frein de parc, NaviXav recoupe les SimVars
 officielles de poignée, de position effective, de surface et d’indicateur
 cockpit. Configuration avion et Flight events restent ainsi actifs lorsqu’un

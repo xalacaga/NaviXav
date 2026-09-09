@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from navixav import __version__
 from navixav.aircraft import AircraftMatcher
 from navixav.aircraft.community import community_folders, scan, survey
+from navixav.aircraft.documents import checked_document, document_inventory, search_document
 from navixav.aircraft.scaffold import write_entry
 from navixav.aircraft.procedures import procedure_payload
 from navixav.changelog import load_changelog
@@ -552,6 +553,44 @@ def create_app(
 
     def aircraft_inventory(explicit_path: str = "") -> dict[str, object]:
         return survey(aircraft_matcher, aircraft_folders(explicit_path)).to_dict()
+
+    aircraft_document_files: dict[str, tuple[Path, Path]] = {}
+
+    @app.get("/api/aircraft/documents")
+    def aircraft_documents(title: str = "", icao: str = "") -> dict[str, object]:
+        nonlocal aircraft_document_files
+        folders = aircraft_folders()
+        packages, files = document_inventory(folders, title=title, icao=icao)
+        aircraft_document_files = files
+        return {"community_found": bool(folders), "packages": packages}
+
+    @app.api_route("/api/aircraft/documents/{document_id}", methods=["GET", "HEAD"])
+    def aircraft_document(document_id: str) -> FileResponse:
+        location = aircraft_document_files.get(document_id)
+        if location is None:
+            raise HTTPException(404, "Documentation introuvable. Actualisez la liste.")
+        try:
+            path = checked_document(*location)
+        except (OSError, RuntimeError, ValueError) as exc:
+            LOGGER.warning("Ouverture d'un PDF avion impossible : %s", type(exc).__name__)
+            raise HTTPException(404, "Ce PDF n’est plus disponible ou est illisible.") from exc
+        return FileResponse(path, media_type="application/pdf", filename=path.name,
+                            content_disposition_type="inline",
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @app.get("/api/aircraft/documents/{document_id}/search")
+    def search_aircraft_document(document_id: str, q: str = "") -> dict[str, object]:
+        if not 2 <= len(q.strip()) <= 120:
+            raise HTTPException(400, "Saisissez entre 2 et 120 caractères.")
+        location = aircraft_document_files.get(document_id)
+        if location is None:
+            raise HTTPException(404, "Documentation introuvable. Actualisez la liste.")
+        try:
+            return search_document(checked_document(*location), q.strip())
+        except Exception as exc:
+            # Les PDF tiers peuvent être chiffrés, mal formés ou sans texte.
+            LOGGER.warning("Recherche PDF avion impossible : %s", type(exc).__name__)
+            raise HTTPException(422, "Recherche indisponible pour ce PDF.") from exc
 
     @app.get("/api/aircraft/survey")
     def get_aircraft_survey(community: str = "") -> dict[str, object]:

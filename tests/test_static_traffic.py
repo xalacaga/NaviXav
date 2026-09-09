@@ -54,7 +54,7 @@ class _Index:
 
 def _provider(path, **kwargs) -> StaticTrafficProvider:
     return StaticTrafficProvider(
-        lambda: LFPG, lambda: sqlite3.connect(path), **kwargs
+        lambda: (LFPG[0] - 0.005, LFPG[1]), lambda: sqlite3.connect(path), **kwargs
     )
 
 
@@ -115,6 +115,22 @@ def test_the_catalogue_of_the_installed_models_restricts_the_choice(tmp_path):
 def test_the_density_setting_caps_the_fleet(tmp_path):
     connection = _database(tmp_path, tuple(("porte moyenne", i * 60.0, 0.0) for i in range(30)))
     assert len(_provider(connection, max_aircraft=7).traffic()) == 7
+
+
+def test_nearby_stands_do_not_consume_the_density_limit(tmp_path):
+    path = _database(tmp_path, tuple(
+        ("porte moyenne", float(x), 0.0)
+        for x in [*range(0, 100, 10), 300, 400, 500]
+    ))
+    provider = StaticTrafficProvider(
+        lambda: LFPG, lambda: sqlite3.connect(path), max_aircraft=3,
+    )
+    fleet = provider.traffic()
+    assert len(fleet) == 3
+    assert provider.stand_count == 13
+    assert {a.uid for a in fleet} == {
+        "STATIC-LFPG-stand 10", "STATIC-LFPG-stand 11", "STATIC-LFPG-stand 12",
+    }
 
 
 def test_empty_parking_cache_retries_when_facilities_arrive(tmp_path):

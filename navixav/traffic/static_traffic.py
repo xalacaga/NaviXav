@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable, Iterable
 
-from navixav.traffic.base import TrafficAircraft, distance_nm
+from navixav.traffic.base import OWN_AIRCRAFT_RADIUS_NM, TrafficAircraft, distance_nm
 
 LOGGER = logging.getLogger(__name__)
 
@@ -181,6 +181,7 @@ class StaticTrafficProvider:
         self._built_at: float | None = None
         self._built_cell: tuple[int, int] | None = None
         self._updated_at = ""
+        self.stand_count = 0
 
     # ------------------------------------------------------------- modèles
 
@@ -244,6 +245,7 @@ class StaticTrafficProvider:
         return (int(centre[0] * 20), int(centre[1] * 20))
 
     def _build(self, centre: tuple[float, float]) -> list[TrafficAircraft]:
+        self.stand_count = 0
         try:
             connection = self._connect()
         except (OSError, sqlite3.Error) as exc:
@@ -251,6 +253,7 @@ class StaticTrafficProvider:
             return []
         try:
             stands = read_stands(connection, centre, self.radius_nm)
+            self.stand_count = len(stands)
         finally:
             try:
                 connection.close()
@@ -261,7 +264,13 @@ class StaticTrafficProvider:
             centre, (stand.latitude, stand.longitude)
         ))
         fleet: list[TrafficAircraft] = []
-        for stand in stands[: self.max_aircraft]:
+        for stand in stands:
+            # Reserve the player's surroundings before applying the density
+            # limit, otherwise nearby stands can consume every available slot.
+            if distance_nm(centre, (stand.latitude, stand.longitude)) <= OWN_AIRCRAFT_RADIUS_NM:
+                continue
+            if len(fleet) >= self.max_aircraft:
+                break
             aircraft_type, airline = self._choose(stand)
             if not aircraft_type:
                 continue

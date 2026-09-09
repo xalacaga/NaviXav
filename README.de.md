@@ -118,6 +118,14 @@ Ab 50 NM vor dem TOD fordert das normale Warnsystem zur Vorbereitung des
 Sinkflugs auf; bei 10 NM erscheint eine eigene TOD-Warnung, die bis zum
 Einleiten des Sinkflugs aktiv bleibt.
 
+Unter **Aircraft** erscheint **PDF-Dokumentation** nur, wenn Community-Handbücher zum
+Flugzeug im SimBrief-Plan passen, auch ohne MSFS-Verbindung. Der Profilname kann den
+Anbieter angeben, etwa Fenix; bei einem mehrdeutigen allgemeinen Profil wird kein
+Anbieter zufällig gewählt. Nur die PDFs dieses Flugzeugs werden aufgelistet. Der Leser
+ersetzt die Informationen auf der Aircraft-Seite; **Zurück zu Aircraft** stellt sie
+wieder her. Die Suche zeigt Auszüge mit direktem Seitenzugriff. Gescannte PDFs ohne Text
+bleiben lesbar, können aber so nicht durchsucht werden.
+
 Für Klappen, Bremsklappen und Parkbremse vergleicht NaviXav die offiziellen
 SimVars für Hebel, effektive Position, Flächenposition und Cockpitanzeige.
 Flugzeugkonfiguration und Flugereignisse bleiben dadurch aktiv, wenn ein
