@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from navixav import desktop
 from navixav.config import Settings
@@ -53,6 +54,17 @@ def test_fastapi_lifespan_closes_live_resources_once(monkeypatch):
     app.state.close_resources()
 
     assert closed == ["tracker"]
+
+
+def test_interface_sends_the_referrer_osm_requires_without_exposing_api_urls():
+    app = create_app(Settings(metar_source="simbrief"))
+
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+        interface = client.get("/")
+        api = client.get("/api/status")
+
+    assert interface.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert api.headers["Referrer-Policy"] == "no-referrer"
 
 
 class _Window:

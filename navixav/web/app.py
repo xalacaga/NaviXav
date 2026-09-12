@@ -403,11 +403,19 @@ def create_app(
                 response.status_code,
                 elapsed,
             )
-        if request.url.path == "/" or request.url.path.startswith("/static/"):
+        interface_asset = request.url.path == "/" or request.url.path.startswith(
+            "/static/"
+        )
+        if interface_asset:
             response.headers["Cache-Control"] = "no-store, max-age=0"
             response.headers["Pragma"] = "no-cache"
+            # Le fond OSM exige que les pages web transmettent leur origine.
+            # Cette politique moderne ne livre que l'origine aux sites tiers,
+            # tout en conservant l'URL complète pour les requêtes locales.
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        else:
+            response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
     def official_chart_backend(

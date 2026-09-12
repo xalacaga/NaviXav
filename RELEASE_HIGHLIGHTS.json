@@ -16,5 +16,16 @@
     "history the application reads, then resets this file."
   ],
   "added": [],
-  "fixed": []
+  "fixed": [
+    {
+      "fr": "Le fond de carte OpenStreetMap transmet désormais l’origine locale requise et ne reste plus bloqué par une erreur 403.",
+      "en": "The OpenStreetMap basemap now sends the required local origin and is no longer blocked by a 403 error.",
+      "de": "Die OpenStreetMap-Grundkarte übermittelt nun den erforderlichen lokalen Ursprung und wird nicht mehr durch einen 403-Fehler blockiert.",
+      "es": "El mapa base de OpenStreetMap ahora envía el origen local requerido y ya no queda bloqueado por un error 403.",
+      "it": "La mappa di base OpenStreetMap ora invia l’origine locale richiesta e non viene più bloccata da un errore 403.",
+      "nl": "De OpenStreetMap-achtergrondkaart stuurt nu de vereiste lokale oorsprong mee en wordt niet langer geblokkeerd door een 403-fout.",
+      "pl": "Mapa bazowa OpenStreetMap przekazuje teraz wymagane lokalne źródło i nie jest już blokowana błędem 403.",
+      "pt": "O mapa base do OpenStreetMap agora envia a origem local exigida e já não é bloqueado por um erro 403."
+    }
+  ]
 }
