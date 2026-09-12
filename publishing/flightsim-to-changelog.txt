@@ -2,6 +2,11 @@
 
     🔒 Security Note: Starting from version 1.4.11, the installer is systematically verified against its SHA-256 checksum before any automatic update.
 
+🚀 [1.7.2] - 2026-09-12
+🛠️ Fixed
+
+    The OpenStreetMap basemap now sends the required local origin and is no longer blocked by a 403 error.
+
 🚀 [1.7.1] - 2026-09-09
 ✨ Added
 
