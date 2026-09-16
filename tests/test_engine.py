@@ -86,6 +86,26 @@ def test_simbrief_tod_is_forwarded_to_the_operational_plan(provider, settings, o
     }
 
 
+def test_simbrief_toc_is_forwarded_to_the_operational_plan(provider, settings, ofp):
+    positioned = deepcopy(ofp)
+    positioned.simbrief_toc_lat = 48.5
+    positioned.simbrief_toc_lon = 6.25
+
+    plan = _plan(provider, settings, positioned)
+
+    assert plan.enroute.simbrief_toc == {"lat": 48.5, "lon": 6.25}
+    assert plan.to_dict()["enroute"]["simbrief_toc"] == {"lat": 48.5, "lon": 6.25}
+
+
+def test_plan_fingerprint_is_forwarded_to_the_operational_plan(provider, settings, ofp):
+    fingerprinted = deepcopy(ofp)
+    fingerprinted.plan_fingerprint = "abc123def456"
+
+    plan = _plan(provider, settings, fingerprinted)
+
+    assert plan.to_dict()["source"]["plan_fingerprint"] == "abc123def456"
+
+
 class _RecordingProvider:
     def __init__(self, inner) -> None:
         self._inner = inner

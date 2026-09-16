@@ -40,6 +40,10 @@
   --route-approach: #34d399;
   --route-toc: #ec4899;
   --route-tod: #ef4444;
+  /* Route du FMS de l'avion : un jaune franc, seule teinte encore libre
+     entre SID, route, STAR, approche, TOC, TOD, trace et trafic. */
+  --route-fms: #fde047;
+  --route-fms-alternate: #94a3b8;
 
   /* Trafic environnant. Une teinte neutre, volontairement plus sourde que
      l'accent : le seul appareil qui doit sauter aux yeux est celui qu'on
@@ -117,6 +121,8 @@
     --route-approach: #047857;
     --route-toc: #be185d;
     --route-tod: #b91c1c;
+    --route-fms: #a16207;
+    --route-fms-alternate: #64748b;
     --traffic: #5b6b86;
     --traffic-label: #334155;
 
@@ -2147,6 +2153,7 @@ body.remote-client .mobile-theme {
   background: var(--accent-soft);
 }
 .welcome-simbrief small { color: var(--text-dim); line-height: 1.45; font-size: 0.76rem; }
+.settings-help { grid-column: 1 / -1; margin: 0; color: var(--text-dim); line-height: 1.45; font-size: 0.76rem; }
 .welcome-dialog .settings-actions { justify-content: space-between; }
 .welcome-dialog .btn-primary[disabled] { cursor: not-allowed; }
 
@@ -2466,6 +2473,69 @@ body.remote-client .mobile-theme {
 .key.route-enroute { background: var(--route-enroute); }
 .key.route-star { background: var(--route-star); }
 .key.route-approach { background: var(--route-approach); }
+.key.route-fms {
+  background: repeating-linear-gradient(90deg, var(--route-fms) 0 4px, transparent 4px 7px);
+}
+.key.route-fms-alternate {
+  background: repeating-linear-gradient(90deg, var(--route-fms-alternate) 0 3px, transparent 3px 6px);
+}
+
+/* Vérification FMGC et miroir MCDU, dans la fiche MCDU. */
+.fms-check, .fms-mirror { padding: 14px 16px; margin-bottom: 12px; }
+.fms-check-note { color: var(--text-muted); font-size: 0.76rem; margin: 4px 0 10px; }
+.fms-check-rows { display: grid; gap: 4px; font-size: 0.8rem; }
+.fms-check-row {
+  display: grid; grid-template-columns: minmax(110px, 1.2fr) 1fr 1fr auto;
+  gap: 10px; align-items: baseline;
+  padding: 4px 8px; border-radius: var(--radius-sm);
+}
+.fms-check-header { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.fms-check-label { color: var(--text-muted); }
+.fms-check-actual, .fms-check-expected { font-family: var(--mono); }
+.fms-check-status { font-size: 0.72rem; font-weight: 600; }
+.fms-check-ok .fms-check-status { color: var(--high); }
+.fms-check-differs { background: color-mix(in srgb, var(--medium) 12%, transparent); }
+.fms-check-differs .fms-check-status, .fms-check-differs .fms-check-actual { color: var(--medium); }
+.fms-check-missing .fms-check-status { color: var(--text-dim); }
+.fms-mirror-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fms-mirror-switch { display: flex; gap: 6px; }
+.mcdu-mirror {
+  margin: 10px 0 6px;
+  font-family: var(--mono);
+  background: #06110c;
+  border: 1px solid rgba(80, 220, 140, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+}
+/* Une grille de 24 colonnes : petite et grande police gardent la même chasse,
+   sinon les colonnes SPD/ALT ne s'alignent plus. Le petit texte est simplement
+   plus léger, comme sur l'écran réel où il est aussi moins lumineux. */
+.mcdu-mirror { width: max-content; max-width: 100%; }
+.mcdu-mirror-scratchpad { margin-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 4px; }
+.mcdu-mirror .mcdu-large { font-weight: 600; }
+.mcdu-mirror .mcdu-small { font-weight: 400; opacity: 0.82; }
+.mcdu-mirror .mcdu-green { color: #62f19a; }
+.mcdu-mirror .mcdu-white { color: #ffffff; }
+.mcdu-mirror .mcdu-magenta { color: #ff7ce0; }
+.mcdu-mirror .mcdu-amber { color: #ffb454; }
+.mcdu-mirror .mcdu-cyan { color: #6ee7ff; }
+.mcdu-mirror .mcdu-yellow { color: #ffe86b; }
+.mcdu-mirror .mcdu-red { color: #ff6b6b; }
+/* Sur téléphone : le libellé et le verdict d'abord, puis « NaviXav → FMGC ». */
+@media (max-width: 720px) {
+  .fms-check-row { grid-template-columns: 1fr auto; row-gap: 2px; }
+  .fms-check-header { display: none; }
+  .fms-check-label { order: 1; }
+  .fms-check-status { order: 2; text-align: right; }
+  .fms-check-expected { order: 3; }
+  .fms-check-actual { order: 4; text-align: right; }
+  .fms-check-actual::before { content: "→ "; color: var(--text-dim); }
+}
 
 .stat-grid {
   display: grid;

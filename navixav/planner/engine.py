@@ -149,10 +149,12 @@ class CompletionEngine:
 
         plan = FlightPlan(
             source={
-                "simbrief": True,
+                "simbrief": ofp.plan_source == "simbrief",
+                "plan_source": ofp.plan_source,
                 "simbrief_generated_at": ofp.generated_at.isoformat()
                 if ofp.generated_at
                 else None,
+                "plan_fingerprint": ofp.plan_fingerprint,
                 "simbrief_airac": ofp.airac or None,
                 "navdata_source": self.provider.source_name,
                 "navdata_airac": self.provider.airac_cycle,
@@ -248,6 +250,12 @@ class CompletionEngine:
                 {"lat": ofp.simbrief_tod_lat, "lon": ofp.simbrief_tod_lon}
                 if ofp.simbrief_tod_lat is not None
                 and ofp.simbrief_tod_lon is not None
+                else None
+            ),
+            simbrief_toc=(
+                {"lat": ofp.simbrief_toc_lat, "lon": ofp.simbrief_toc_lon}
+                if ofp.simbrief_toc_lat is not None
+                and ofp.simbrief_toc_lon is not None
                 else None
             ),
         )

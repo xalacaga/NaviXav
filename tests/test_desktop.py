@@ -715,7 +715,7 @@ def test_saving_settings_closes_before_the_flight_plan_refresh_finishes():
     )[0]
 
     close = 'setTimeout(() => $("settings-dialog").close(), 500);'
-    refresh = "if (status.simbrief_configured) void buildPlan();"
+    refresh = "if (status.plan_configured) void buildPlan();"
     assert close in save_body
     assert refresh in save_body
     assert save_body.index(close) < save_body.index(refresh)
@@ -1232,7 +1232,7 @@ def test_the_top_of_descent_is_anchored_on_the_cruise_level():
     guidance = _descent_guidance_source()
 
     assert "cruiseAltitude === null ? currentAltitude : cruiseAltitude" in guidance
-    assert "const todInNm = projection.remainingNm - anchorFromDestination;" in guidance
+    assert "let todInNm = projection.remainingNm - anchorFromDestination;" in guidance
     # L'ancienne origine ne doit jamais revenir.
     assert "altitudeToLose" not in guidance
     assert "Number(aircraft.altitude_ft" not in guidance
@@ -1275,7 +1275,10 @@ def test_the_top_of_descent_prefers_a_valid_simbrief_performance_point():
     assert 'stages.has("enroute")' in simbrief
     assert "simbriefTodFromDestination(plan)" in guidance
     assert "simbriefAnchor ?? geometricAnchor" in guidance
-    assert 'source: simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated"' in guidance
+    assert 'let source = simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated"' in guidance
+    # Le T/D publié par le FMGC de l'avion prime sur toute estimation.
+    assert "fmsPointDistanceNm(aircraft, latestFms?.tod)" in guidance
+    assert 'source = "fms"' in guidance
     assert "profileGradientFtPerNm" in guidance
 
 
@@ -1307,9 +1310,11 @@ def test_the_tod_preparation_uses_the_existing_alert_engine():
         )) == 8
 
 
-def test_top_of_climb_uses_live_climb_data_and_latches_at_cruise():
+def test_top_of_climb_uses_live_climb_data_and_latches_at_level_off():
     """Le TOC part d'un gradient stable, s'affine en montée et cesse de suivre
-    l'avion une fois le niveau de croisière atteint."""
+    l'avion dès que la montée s'arrête : au niveau prévu ou à tout palier tenu,
+    puisque le contrôle donne souvent un autre niveau que celui du plan. Une
+    montée qui reprend (step climb) libère le repère."""
     javascript = (
         Path(desktop.__file__).parent / "web" / "static" / "app.js"
     ).read_text(encoding="utf-8")
@@ -1318,9 +1323,100 @@ def test_top_of_climb_uses_live_climb_data_and_latches_at_cruise():
 
     assert "verticalSpeed * 60 / groundSpeed" in guidance
     assert "gradientFtPerNm * 0.88 + observedGradient * 0.12" in guidance
-    assert "currentAltitude >= cruiseAltitude - 500" in guidance
+    assert "currentAltitude >= cruiseAltitude - 500 || heldLevel" in guidance
+    assert "now - climbGuidanceState.levelSinceMs >= TOC_LEVEL_LATCH_MS" in guidance
+    assert "climbGuidanceState.levelStartNm)" in guidance
+    assert "latchedAltitudeFt + TOC_STEP_CLIMB_FT" in guidance
     assert "topOfClimbDistanceNm - travelledNm" in guidance
+    # Relancé en croisière, NaviXav n'invente pas un TOC sous l'avion : il
+    # prend celui du profil SimBrief ou n'affiche rien.
+    assert "!climbGuidanceState.climbSeen" in guidance
+    assert "climbGuidanceState.recoveredToc" in guidance
+    assert "if (knownToc === null) knownToc = simbriefTocDistanceNm(plan)" in guidance
+    assert "if (knownToc === null) return null" in guidance
+    assert "simbrief_toc" in javascript
+    assert "recoveredToc: recoverTopOfClimbFromStoredLog(plan)" in javascript
+    assert "plan.source?.plan_fingerprint" in javascript
+    assert "|| plan.source?.simbrief_generated_at" in javascript
+    assert "if (climbGuidanceState.planKey !== climbPlanKey)" in javascript
     assert 'phaseKey === "phase_descent" || phaseKey === "phase_approach"' in guidance
+
+
+def test_the_aircraft_fms_plan_feeds_the_map_the_profile_and_the_panel():
+    """Quand l'avion publie son plan FMGC (Fenix), NaviXav le dessine, prend son
+    T/C et son T/D, et affiche le point actif du FMGC à côté du sien."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    application = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    stylesheet = (static / "app.css").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    assert 'poll.json("/api/fms")' in application
+    assert "fmsTimer = setInterval(pollFms, FMS_INTERVAL_MS)" in application
+    assert "MAP.setFmsRoute(visible ? points : [])" in application
+    # Seuls les segments qui s'écartent de la route NaviXav sont tracés.
+    assert "function fmsRouteDivergence(" in application
+    assert "!previous.onRoute || !current.onRoute || skips(previous, current)" in application
+    assert 'show($("legend-fms"), visible)' in application
+    assert 'id="legend-fms"' in (static / "index.html").read_text(encoding="utf-8")
+    assert "if (index === 0 || !fmsRoute[index].divergent) return;" in map_javascript
+    assert 'if (climb?.source === "fms") addFms("TOC", latestFms.toc, "toc")' in application
+    assert 'if (descent?.source === "fms") addFms("TOD", latestFms.tod, "tod")' in application
+    assert 'item(t("flight_fms_active"), "flight-fms-active", t("flight_fms_active_note"))' in application
+    assert "setFmsRoute(points)" in map_javascript
+    assert "drawFmsRoute();" in map_javascript
+    assert stylesheet.count("--route-fms:") == 2
+    for key in ("tod_source_fms", "flight_fms_active", "flight_fms_active_note", "fms_active_differs", "legend_fms"):
+        assert len(re.findall(rf"^\s+{re.escape(key)}:", translations, re.MULTILINE)) == 8
+
+
+def test_the_fmgc_feeds_phase_checks_mirror_alerts_alternate_and_logbook():
+    """Le plan FMGC lisible sert au-delà de la carte : phase de vol, fiche MCDU
+    vérifiée ligne à ligne, miroir des écrans MCDU, alertes (LIM)/(DECEL), plan de
+    dégagement et journal de bord."""
+    static = Path(desktop.__file__).parent / "web" / "static"
+    application = (static / "app.js").read_text(encoding="utf-8")
+    map_javascript = (static / "map.js").read_text(encoding="utf-8")
+    markup = (static / "index.html").read_text(encoding="utf-8")
+    translations = (static / "i18n.js").read_text(encoding="utf-8")
+
+    # Phase : celle du FMGC prime en vol, jamais au sol.
+    phase = application[application.index("function detectFlightPhaseKey(") :]
+    phase = phase[: phase.index("\n}\n")]
+    assert phase.index("if (aircraft.on_ground)") < phase.index("const fmgcPhase = fmgcPhaseKey()")
+    assert phase.index("const fmgcPhase = fmgcPhaseKey()") < phase.index("if (verticalSpeed > 300)")
+    assert 'if (phase.includes("descent")) return "phase_descent"' in application
+
+    # Fiche MCDU vérifiée et miroir.
+    assert "function fmsChecks()" in application
+    assert 'stage("fms_check_star", "star")' in application
+    assert 'compare("fms_check_arr_runway", plan.arrival?.runway?.value, fms.destination_runway)' in application
+    assert "function renderFmsMirror()" in application
+    # Le miroir MCDU suit directement la vérification FMGC, en tête de la fiche.
+    assert "panel.append(fmsCheckCard, mirror);" in application
+    assert 'el("span", `mcdu-${segment.color} mcdu-${segment.size}`, segment.text)' in application
+
+    # Alertes sur les pseudo-points du profil.
+    assert 'id: "fms_speed_limit"' in application
+    assert 'id: "fms_decel"' in application
+    assert "fmsSpeedLimitNm: fmsPointDistanceNm(aircraft, latestFms?.speed_limit)" in application
+
+    # ETA, masses, dégagement, journal.
+    assert 'item(t("flight_fms_eta"), "flight-fms-eta", t("flight_fms_eta_note"))' in application
+    assert 'item(t("flight_fms_weights"), "flight-fms-weights", t("flight_fms_weights_note"))' in application
+    assert "MAP.setFmsAlternate(drawn ?" in application
+    assert 'id="map-fms-alternate"' in markup
+    assert "function drawFmsAlternate()" in map_javascript
+    assert "flight_number: latestFms?.available ? latestFms.flight_number" in application
+    assert '[t("eta_fmgc"), entry.fmgc_eta]' in application
+
+    for key in (
+        "legend_fms_alternate", "map_fms_alternate", "flight_fms_eta", "flight_fms_weights",
+        "fms_check_title", "fms_check_ok", "fms_check_differs", "fms_check_missing",
+        "fms_mirror_title", "alert_fms_speed_limit", "alert_fms_speed_limit_action",
+        "alert_fms_decel", "alert_fms_decel_action", "eta_fmgc",
+    ):
+        assert len(re.findall(rf"^\s+{re.escape(key)}:", translations, re.MULTILINE)) == 8, key
 
 
 def test_calculated_toc_and_tod_are_map_markers_not_route_waypoints():
@@ -1422,16 +1518,17 @@ def test_corrected_alert_is_acknowledged_and_rearmed_automatically():
     assert "state.acknowledged = false;" in javascript
 
 
-def test_recent_msfs_safety_alert_and_explicit_std_setting_are_used():
+def test_explicit_std_setting_is_used_and_the_opening_alert_is_gone():
+    """L'alerte « ouverture dangereuse » de MSFS se déclenchait sur des portes
+    que le pilote ouvre volontairement au sol : retirée à la demande."""
     static = Path(desktop.__file__).parent / "web" / "static"
     javascript = (static / "app.js").read_text(encoding="utf-8")
     translations = (static / "i18n.js").read_text(encoding="utf-8")
 
-    assert 'id: "interactive_points_crash_risk"' in javascript
-    assert "configuration.interactive_points_crash_risk === true" in javascript
+    assert 'id: "interactive_points_crash_risk"' not in javascript
+    assert "alert_interactive_points_crash_risk" not in translations
     assert "configuration.altimeter_std === true" in javascript
     assert "configuration.altimeter_std === false" in javascript
-    assert translations.count("alert_interactive_points_crash_risk:") == 8
     assert "EDGE ${edgeLights}" in javascript
     assert "CL ${centerLights}" in javascript
 

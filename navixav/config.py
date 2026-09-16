@@ -104,8 +104,15 @@ def default_navdata_store() -> Path:
     return user_data_path("navixav.sqlite")
 
 
+PLAN_SOURCES = ("simbrief", "msfs")
+
+
 @dataclass(frozen=True)
 class Settings:
+    # D'où vient le plan de vol : le dernier OFP SimBrief du compte, ou le
+    # plan préparé dans MSFS (fichier .PLN). Un plan MSFS n'apporte pas de
+    # météo : la source METAR en direct s'impose alors d'elle-même.
+    plan_source: str = "simbrief"
     simbrief_pilot_id: str = ""
     simbrief_username: str = ""
     # Chemin de la base NaviXav ; None = emplacement par défaut.
@@ -174,7 +181,10 @@ class Settings:
             else DEFAULT_APPROACH_PREFERENCE
         )
 
+        raw_plan_source = _env("PLAN_SOURCE", "simbrief").lower()
+
         return cls(
+            plan_source=raw_plan_source if raw_plan_source in PLAN_SOURCES else "simbrief",
             simbrief_pilot_id=_env("SIMBRIEF_PILOT_ID"),
             simbrief_username=_env("SIMBRIEF_USERNAME"),
             navdata_store=Path(raw_store).expanduser() if raw_store else None,
@@ -216,6 +226,18 @@ class Settings:
         if self.simbrief_username:
             return f"username={self.simbrief_username}"
         return "(non configuré)"
+
+    @property
+    def plan_configured(self) -> bool:
+        """Un plan peut être importé : compte SimBrief renseigné, ou plan MSFS."""
+        if self.plan_source == "msfs":
+            return True
+        return bool(self.simbrief_pilot_id or self.simbrief_username)
+
+    @property
+    def effective_metar_source(self) -> str:
+        """Source METAR réellement appliquée : un plan MSFS n'en porte aucune."""
+        return "live" if self.plan_source == "msfs" else self.metar_source
 
     def with_user_values(self, values: dict[str, object]) -> "Settings":
         """Retourne une configuration validée avec les valeurs de l'interface."""
@@ -276,7 +298,13 @@ class Settings:
         ).strip().lower()
         if raw_traffic_source not in TRAFFIC_SOURCES:
             raw_traffic_source = self.traffic_source
+        raw_plan_source = str(
+            values.get("plan_source", self.plan_source) or self.plan_source
+        ).strip().lower()
+        if raw_plan_source not in PLAN_SOURCES:
+            raw_plan_source = self.plan_source
         return Settings(
+            plan_source=raw_plan_source,
             simbrief_pilot_id=str(values.get("simbrief_pilot_id", "") or "").strip(),
             simbrief_username=str(values.get("simbrief_username", "") or "").strip(),
             navdata_store=Path(raw_store).expanduser() if raw_store else self.navdata_store,
@@ -328,6 +356,7 @@ class Settings:
 
     def user_values(self) -> dict[str, object]:
         return {
+            "plan_source": self.plan_source,
             "simbrief_pilot_id": self.simbrief_pilot_id,
             "simbrief_username": self.simbrief_username,
             "navdata_store": str(self.navdata_store) if self.navdata_store else "",

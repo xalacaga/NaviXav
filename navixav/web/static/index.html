@@ -54,6 +54,13 @@
       </svg>
       <span>Créer un plan SimBrief</span>
     </button>
+    <button id="msfs-plan-open" class="icon-btn toolbar-secondary hidden" type="button"
+            title="Choisir un fichier .PLN enregistré depuis MSFS">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h6l2 2h8v14H4V4zm2 4v10h12V8H6zm5 1h2v3h3l-4 4-4-4h3V9z"/>
+      </svg>
+      <span>Ouvrir un fichier .PLN</span>
+    </button>
     <button id="sim-status" class="sim-status offline" type="button"
             title="État de la connexion à Microsoft Flight Simulator">
       <span class="sim-status-dot"></span>
@@ -203,6 +210,8 @@
         </select>
         <button id="map-constraints" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
+        <button id="map-fms-alternate" class="icon-btn hidden" aria-pressed="false"
+                title="Afficher le plan de dégagement du FMGC">Dégagement FMGC</button>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button></div>
         <div class="map-control-group" role="group" aria-labelledby="map-traffic-group-label">
@@ -246,6 +255,8 @@
         <span><i class="key route-enroute"></i>route</span>
         <span><i class="key route-star"></i>STAR</span>
         <span><i class="key route-approach"></i>approche</span>
+        <span id="legend-fms" class="hidden"><i class="key route-fms"></i>route FMGC</span>
+        <span id="legend-fms-alternate" class="hidden"><i class="key route-fms-alternate"></i>dégagement FMGC</span>
       </div>
       <a id="map-attribution" class="map-attribution"
          href="https://www.openstreetmap.org/copyright"
@@ -398,14 +409,22 @@
           <option value="classic">Classique</option>
         </select>
       </label>
-      <label class="field" for="settings-pilot-id">
+      <label class="field" for="settings-plan-source">
+        <span>Source du plan de vol</span>
+        <select id="settings-plan-source">
+          <option value="simbrief">SimBrief</option>
+          <option value="msfs">Plan de vol MSFS (.PLN)</option>
+        </select>
+      </label>
+      <label class="field settings-simbrief-only" for="settings-pilot-id">
         <span>SimBrief Pilot ID</span>
         <input id="settings-pilot-id" autocomplete="off" placeholder="ex. 123456" />
       </label>
-      <label class="field" for="settings-username">
+      <label class="field settings-simbrief-only" for="settings-username">
         <span>SimBrief username</span>
         <input id="settings-username" autocomplete="off" placeholder="alternative au Pilot ID" />
       </label>
+      <p id="settings-msfs-plan-help" class="settings-help settings-msfs-only hidden">NaviXav lit le vol chargé dans MSFS (CustomFlight.PLN) ; le bouton « Ouvrir un fichier .PLN » de la barre d’outils permet d’en choisir un autre. La météo est prise en direct.</p>
       </div>
     </details>
     <details class="settings-section" name="settings-group">
@@ -414,7 +433,7 @@
         <span class="settings-section-chevron" aria-hidden="true"></span>
       </summary>
       <div class="settings-section-body settings-grid">
-      <label class="field" for="settings-metar">
+      <label class="field settings-simbrief-only" for="settings-metar">
         <span>Source METAR</span>
         <select id="settings-metar">
           <option value="simbrief">SimBrief</option>
@@ -680,6 +699,13 @@
           <option value="pl">Polski</option>
         </select>
       </label>
+      <label class="field" for="welcome-plan-source">
+        <span id="welcome-plan-source-label">Source du plan de vol</span>
+        <select id="welcome-plan-source">
+          <option value="simbrief">SimBrief</option>
+          <option value="msfs">Plan de vol MSFS (.PLN)</option>
+        </select>
+      </label>
       <div id="welcome-simbrief" class="welcome-simbrief">
         <label class="field" for="welcome-pilot-id">
           <span id="welcome-pilot-label">SimBrief Pilot ID</span>
@@ -690,6 +716,9 @@
           <input id="welcome-username" autocomplete="off" placeholder="alternative au Pilot ID" />
         </label>
         <small id="welcome-simbrief-help">Renseigne au moins l’un des deux identifiants : NaviXav s’en sert pour récupérer ton dernier OFP.</small>
+      </div>
+      <div id="welcome-msfs" class="welcome-simbrief hidden">
+        <small id="welcome-msfs-help">NaviXav lira le vol que tu charges depuis le planificateur de MSFS, ou un fichier .PLN que tu choisis. La météo sera prise en direct.</small>
       </div>
     </div>
     <p id="welcome-message" class="settings-message"></p>

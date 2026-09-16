@@ -47,6 +47,7 @@ from navixav.ground import (
 )
 
 from navixav.config import (
+    PLAN_SOURCES,
     TRAFFIC_SOURCES,
     Settings,
     load_user_settings,
@@ -54,6 +55,7 @@ from navixav.config import (
 )
 from navixav.faa import FaaClient, FaaError
 from navixav.live import LiveTracker, PositionUnavailable
+from navixav.live.fms_hub import FmsHub
 from navixav.national_aip import (
     NATIONAL_AIP_SOURCES,
     NationalAipClient,
@@ -65,8 +67,9 @@ from navixav.navdata.msfs import MsfsProvider
 from navixav.paths import resource_path
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.preferences import AirportPreferences
+from navixav.msfs.flightplan import MsfsPlanError, current_flight_plan, load_pln
 from navixav.simbrief.client import SimBriefClient, SimBriefError
-from navixav.simbrief.parser import parse_ofp
+from navixav.simbrief.parser import OfpSummary, parse_ofp
 from navixav.sia import SiaClient, SiaError
 from navixav.traffic.base import distance_nm, is_own_position
 from navixav import msfs_panel
@@ -129,6 +132,9 @@ class PlanRequest(BaseModel):
 
 
 class SettingsRequest(BaseModel):
+    plan_source: str = Field(
+        default="simbrief", pattern=f"^({'|'.join(PLAN_SOURCES)})$"
+    )
     simbrief_pilot_id: str = Field(default="", max_length=32)
     simbrief_username: str = Field(default="", max_length=80)
     navdata_store: str = Field(default="", max_length=500)
@@ -201,10 +207,12 @@ def create_app(
     vatsim_client: VatsimClient | None = None,
     ivao_client: IvaoClient | None = None,
     opensky_client: OpenSkyClient | None = None,
+    fms_reader: FmsHub | None = None,
 ) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
     tracker = LiveTracker()
+    fms_reader = fms_reader or FmsHub()
     sia = SiaClient()
     faa = FaaClient()
     national_aip = {
@@ -313,6 +321,7 @@ def create_app(
         LOGGER.info("Fermeture des connexions et sessions NaviXav")
         traffic.close()
         tracker.close()
+        fms_reader.close()
         vatsim.close()
         ivao.close()
         opensky.close()
@@ -468,7 +477,12 @@ def create_app(
                 settings.simbrief_pilot_id or settings.simbrief_username
             ),
             "simbrief_target": settings.describe_simbrief_target(),
-            "metar_source": settings.metar_source,
+            "plan_source": settings.plan_source,
+            "plan_configured": settings.plan_configured,
+            # Le plan MSFS retenu pour la session : fichier choisi à la main,
+            # sinon le vol courant que MSFS a écrit, sinon rien.
+            "msfs_plan_file": _msfs_plan_name(),
+            "metar_source": settings.effective_metar_source,
             "rnp_capable": settings.aircraft_rnp_capable,
             "remote_client": remote_client,
             "lan_active": lan_active,
@@ -739,19 +753,30 @@ def create_app(
                 500, f"Impossible d'enregistrer les paramètres : {exc}"
             ) from exc
         LOGGER.info(
-            "Paramètres enregistrés (SimBrief configuré=%s, source METAR=%s)",
+            "Paramètres enregistrés (source plan=%s, SimBrief configuré=%s, "
+            "source METAR=%s)",
+            settings.plan_source,
             bool(settings.simbrief_pilot_id or settings.simbrief_username),
-            settings.metar_source,
+            settings.effective_metar_source,
         )
         configure_traffic_injection()
         values = settings.user_values()
         values["lan_restart_required"] = settings.lan_enabled != lan_active
         return values
 
-    @app.post("/api/plan")
-    def build_plan(request: PlanRequest) -> dict[str, Any]:
-        total_started = time.monotonic()
-        LOGGER.info("Calcul du plan démarré")
+    def _msfs_plan_path() -> Path | None:
+        selected = current_plan_state.get("msfs_plan_path")
+        if selected and Path(selected).is_file():
+            return Path(selected)
+        return current_flight_plan()
+
+    def _msfs_plan_name() -> str:
+        if settings.plan_source != "msfs":
+            return ""
+        path = _msfs_plan_path()
+        return path.name if path else ""
+
+    def _load_simbrief_ofp() -> OfpSummary:
         simbrief_started = time.monotonic()
         try:
             raw = SimBriefClient(
@@ -769,8 +794,33 @@ def create_app(
             "OFP SimBrief reçu en %.2f s",
             time.monotonic() - simbrief_started,
         )
+        return parse_ofp(raw)
 
-        ofp = parse_ofp(raw)
+    def _load_msfs_plan() -> OfpSummary:
+        path = _msfs_plan_path()
+        if path is None:
+            raise HTTPException(
+                404,
+                "Aucun plan de vol MSFS trouvé. Charge un vol depuis le "
+                "planificateur de MSFS, ou ouvre un fichier .PLN.",
+            )
+        try:
+            ofp = load_pln(path)
+        except MsfsPlanError as exc:
+            LOGGER.warning("Plan MSFS refusé (%s)", type(exc).__name__)
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        LOGGER.info("Plan MSFS lu (%s point(s))", len(ofp.navlog))
+        return ofp
+
+    @app.post("/api/plan")
+    def build_plan(request: PlanRequest) -> dict[str, Any]:
+        total_started = time.monotonic()
+        LOGGER.info("Calcul du plan démarré (source %s)", settings.plan_source)
+        ofp = (
+            _load_msfs_plan()
+            if settings.plan_source == "msfs"
+            else _load_simbrief_ofp()
+        )
         if not ofp.origin_icao or not ofp.destination_icao:
             raise HTTPException(422, "OFP inexploitable : origine ou destination absente.")
 
@@ -811,6 +861,33 @@ def create_app(
         finally:
             provider.close()
 
+    @app.post("/api/plan/select-file")
+    def select_plan_file(request: Request) -> dict[str, object]:
+        """Choisit un `.PLN` à la main ; le fichier sert jusqu'au prochain choix."""
+        if request.headers.get("X-NaviXav-Plan") != "browse":
+            raise HTTPException(403, "Confirmation de sélection absente.")
+        callback = getattr(app.state, "request_plan_file", None)
+        if not callable(callback):
+            raise HTTPException(
+                409,
+                "Le sélecteur de fichier est disponible dans l’application Windows.",
+            )
+        current = _msfs_plan_path()
+        selected = callback(str(current.parent) if current else "")
+        if not selected:
+            return {"cancelled": True}
+        path = Path(selected)
+        try:
+            ofp = load_pln(path)
+        except MsfsPlanError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        current_plan_state["msfs_plan_path"] = str(path)
+        return {
+            "selected_file": path.name,
+            "origin": ofp.origin_icao,
+            "destination": ofp.destination_icao,
+        }
+
     @app.get("/api/plan/current")
     def current_plan() -> dict[str, Any]:
         payload = current_plan_state.get("payload")
@@ -829,7 +906,7 @@ def create_app(
         if payload is None or ofp is None:
             raise HTTPException(404, "Aucun vol chargé pour actualiser la météo.")
 
-        if settings.metar_source != "live":
+        if settings.effective_metar_source != "live":
             return {
                 "weather": copy.deepcopy(payload.get("weather") or {}),
                 "enabled": False,
@@ -1318,6 +1395,11 @@ def create_app(
             "aircraft": state.to_dict(),
             "procedures": procedure_payload(match, state),
         }
+
+    @app.get("/api/fms")
+    def fms() -> dict[str, Any]:
+        """Le FMS de l'avion par le premier connecteur qui répond, sinon indisponible."""
+        return fms_reader.read()
 
     @app.get("/api/live/traffic")
     def live_traffic() -> dict[str, Any]:

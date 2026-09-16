@@ -16,6 +16,7 @@ from navixav.navdata.base import NavdataError, ProcedureKind
 from navixav.mcdu import render_mcdu_card
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.render import render_plan
+from navixav.msfs.flightplan import MsfsPlanError, current_flight_plan, load_pln
 from navixav.simbrief.client import SimBriefClient, SimBriefError
 from navixav.simbrief.parser import parse_ofp
 
@@ -47,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--username", help="alias SimBrief (sinon .env)")
     plan.add_argument(
         "--ofp", metavar="FICHIER", help="lire un OFP JSON local au lieu d'appeler SimBrief"
+    )
+    plan.add_argument(
+        "--pln",
+        metavar="FICHIER",
+        nargs="?",
+        const="",
+        help="lire un plan de vol MSFS (.PLN) ; sans fichier, le vol courant de MSFS",
     )
     plan.add_argument(
         "--store", metavar="FICHIER", help="base NaviXav à utiliser"
@@ -130,6 +138,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="écrire dans la base utilisateur un canevas pour chaque avion non couvert",
     )
 
+    probe = subparsers.add_parser(
+        "probe-fms",
+        parents=[common],
+        help="relever ce que l'avion chargé expose de son FMS (diagnostic)",
+    )
+    probe.add_argument(
+        "--out",
+        metavar="DOSSIER",
+        help="dossier du rapport (défaut : diagnostics/ des données utilisateur)",
+    )
+
     return parser
 
 
@@ -139,26 +158,43 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_plan(args: argparse.Namespace, settings: Settings) -> int:
-    try:
-        raw = (
-            SimBriefClient.from_file(args.ofp)
-            if args.ofp
-            else SimBriefClient(
-                pilot_id=args.pilot_id or settings.simbrief_pilot_id,
-                username=args.username or settings.simbrief_username,
-            ).fetch_latest()
-        )
-    except SimBriefError as exc:
-        error_console.print(f"[red]SimBrief :[/red] {exc}")
-        return 2
+    use_msfs_plan = args.pln is not None or (
+        not args.ofp and settings.plan_source == "msfs"
+    )
+    if use_msfs_plan:
+        pln_path = Path(args.pln) if args.pln else current_flight_plan()
+        if pln_path is None:
+            error_console.print(
+                "[red]Plan MSFS :[/red] aucun vol courant trouvé ; indique un fichier .PLN."
+            )
+            return 2
+        try:
+            ofp = load_pln(pln_path)
+        except MsfsPlanError as exc:
+            error_console.print(f"[red]Plan MSFS :[/red] {exc}")
+            return 2
+        console.print(f"[dim]Plan MSFS lu depuis {pln_path.name}[/dim]")
+    else:
+        try:
+            raw = (
+                SimBriefClient.from_file(args.ofp)
+                if args.ofp
+                else SimBriefClient(
+                    pilot_id=args.pilot_id or settings.simbrief_pilot_id,
+                    username=args.username or settings.simbrief_username,
+                ).fetch_latest()
+            )
+        except SimBriefError as exc:
+            error_console.print(f"[red]SimBrief :[/red] {exc}")
+            return 2
 
-    if args.save_ofp:
-        Path(args.save_ofp).write_text(
-            json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        console.print(f"[dim]OFP brut enregistré dans {args.save_ofp}[/dim]")
+        if args.save_ofp:
+            Path(args.save_ofp).write_text(
+                json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            console.print(f"[dim]OFP brut enregistré dans {args.save_ofp}[/dim]")
 
-    ofp = parse_ofp(raw)
+        ofp = parse_ofp(raw)
     if not ofp.origin_icao or not ofp.destination_icao:
         error_console.print("[red]OFP inexploitable : origine ou destination absente.[/red]")
         return 2
@@ -427,7 +463,7 @@ def _open_provider(store: str | None, allow_fetch: bool = True) -> "MsfsProvider
     return MsfsProvider(store, allow_fetch=allow_fetch)
 
 
-COMMANDS = ("plan", "navdata", "airport", "web", "import", "aircraft")
+COMMANDS = ("plan", "navdata", "airport", "web", "import", "aircraft", "probe-fms")
 
 
 def cmd_aircraft(args, settings) -> int:
@@ -486,6 +522,18 @@ def cmd_aircraft(args, settings) -> int:
     return 0
 
 
+def cmd_probe_fms(args, settings) -> int:
+    """Relève les canaux FMS disponibles et écrit un rapport de diagnostic."""
+    from navixav.fms_probe import run_probe, summarize, write_report
+
+    report = run_probe()
+    path = write_report(report, Path(args.out) if args.out else None)
+    for line in summarize(report):
+        console.print(line, highlight=False)
+    console.print(f"Rapport complet : {path}", highlight=False)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     # « navixav --json » équivaut à « navixav plan --json ».
@@ -505,6 +553,7 @@ def main(argv: list[str] | None = None) -> int:
         "web": cmd_web,
         "import": cmd_import,
         "aircraft": cmd_aircraft,
+        "probe-fms": cmd_probe_fms,
     }
     handler = handlers.get(args.command or "plan")
     if handler is None:  # pragma: no cover - argparse couvre déjà ce cas

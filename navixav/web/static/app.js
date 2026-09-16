@@ -238,6 +238,9 @@ let currentTaxiClearance = "";
 let taxiRouteRevision = 0;
 let taxiRouteRequestController = null;
 let liveTimer = null;
+let fmsTimer = null;
+// Plan actif du FMS de l'avion, quand il le publie (Fenix). Null sinon.
+let latestFms = null;
 let simulatorTimer = null;
 let weatherTimer = null;
 let vatsimTimer = null;
@@ -262,8 +265,14 @@ let renderedAircraftTitle = "";
 let flightGeometry = [];
 let flightRouteTotalNm = 0;
 let climbGuidanceState = {
+  planKey: "",
   gradientFtPerNm: 450,
   topOfClimbDistanceNm: null,
+  levelSinceMs: null,
+  levelStartNm: null,
+  latchedAltitudeFt: null,
+  climbSeen: false,
+  recoveredToc: null,
 };
 let currentFlightTrail = [];
 let currentFlightTrailPlanKey = "";
@@ -297,6 +306,7 @@ let siaOverlayKey = null;
 
 const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
+const FMS_INTERVAL_MS = 4000;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 /* Le réseau demande de ne pas interroger son flux plus d'une fois par quart de
@@ -424,10 +434,24 @@ async function loadStatus() {
   latestStatus = status;
 
   $("footer-version").textContent = `NaviXav ${status.version}`;
-  $("footer-source").textContent = `SimBrief ${status.simbrief_target} · METAR ${status.metar_source}`;
+  const msfsPlan = status.plan_source === "msfs";
+  $("footer-source").textContent = msfsPlan
+    ? `${t("plan_source_msfs_short")} ${status.msfs_plan_file || "—"} · METAR ${status.metar_source}`
+    : `SimBrief ${status.simbrief_target} · METAR ${status.metar_source}`;
 
-  if (!status.simbrief_configured) {
+  // Un seul point d'entrée vers le plan : SimBrief en ligne, ou un fichier
+  // .PLN sur ce PC. Le client distant n'a ni l'un ni l'autre.
+  show($("simbrief-create"), !msfsPlan && !status.remote_client);
+  show($("msfs-plan-open"), msfsPlan && !status.remote_client);
+
+  if (msfsPlan) {
+    $("empty-hint").textContent = status.msfs_plan_file
+      ? t("empty_hint_msfs")
+      : t("no_msfs_plan");
+  } else if (!status.simbrief_configured) {
     $("empty-hint").textContent = t("no_simbrief");
+  } else {
+    $("empty-hint").textContent = t("loading_latest");
   }
   document.body.classList.toggle("remote-client", Boolean(status.remote_client));
   show($("mobile-mode"), Boolean(status.remote_client));
@@ -660,6 +684,28 @@ async function openSimBriefPlanner() {
     ]);
   } catch (error) {
     showBanner("error", t("simbrief_open_failed"), [String(error)]);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function openMsfsPlanFile() {
+  const button = $("msfs-plan-open");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/plan/select-file", {
+      method: "POST",
+      headers: { "X-NaviXav-Plan": "browse" },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || t("msfs_plan_open_failed"));
+    if (payload.cancelled) return;
+    showBanner("info", t("msfs_plan_selected"), [
+      `${payload.selected_file} · ${payload.origin} → ${payload.destination}`,
+    ]);
+    await buildPlan();
+  } catch (error) {
+    showBanner("error", t("msfs_plan_open_failed"), [String(error)]);
   } finally {
     button.disabled = false;
   }
@@ -955,6 +1001,8 @@ async function openSettings() {
     const response = await fetch("/api/settings");
     if (!response.ok) throw new Error(t("err_settings_unavailable"));
     const values = await response.json();
+    $("settings-plan-source").value = values.plan_source || "simbrief";
+    applyPlanSourceFields($("settings-plan-source").value);
     $("settings-pilot-id").value = values.simbrief_pilot_id || "";
     $("settings-username").value = values.simbrief_username || "";
     $("settings-metar").value = values.metar_source || "simbrief";
@@ -1039,6 +1087,7 @@ async function saveSettings(event) {
   message.className = "settings-message";
   try {
     const payload = {
+      plan_source: $("settings-plan-source").value,
       simbrief_pilot_id: $("settings-pilot-id").value.trim(),
       simbrief_username: $("settings-username").value.trim(),
       // Vide : la base NaviXav garde son emplacement par défaut.
@@ -1089,7 +1138,7 @@ async function saveSettings(event) {
     // il continue en arrière-plan sans retenir la boîte de dialogue ni donner
     // l'impression que le bouton Enregistrer n'a rien fait.
     setTimeout(() => $("settings-dialog").close(), 500);
-    if (status.simbrief_configured) void buildPlan();
+    if (status.plan_configured) void buildPlan();
   } catch (error) {
     message.textContent = String(error);
     message.className = "settings-message error";
@@ -1111,15 +1160,31 @@ async function saveSettings(event) {
 function needsOnboarding(status) {
   if (status.remote_client) return !window.I18N.hasLanguage();
   if (localStorage.getItem(ONBOARDING_KEY)) return false;
-  return !window.I18N.hasLanguage() || !status.simbrief_configured;
+  return !window.I18N.hasLanguage() || !status.plan_configured;
+}
+
+/** Les champs SimBrief ne servent qu'à un plan SimBrief. */
+function applyPlanSourceFields(source) {
+  const msfs = source === "msfs";
+  for (const node of document.querySelectorAll(".settings-simbrief-only")) {
+    show(node, !msfs);
+  }
+  for (const node of document.querySelectorAll(".settings-msfs-only")) {
+    show(node, msfs);
+  }
 }
 
 function welcomeNeedsSimbrief() {
-  return !$("welcome-simbrief").classList.contains("hidden");
+  return welcomeAsksPlanSource() && $("welcome-plan-source").value !== "msfs";
+}
+
+function welcomeAsksPlanSource() {
+  return !$("welcome-plan-source").closest("label").classList.contains("hidden");
 }
 
 function welcomeIdentifiers() {
   return {
+    plan_source: $("welcome-plan-source").value,
     simbrief_pilot_id: $("welcome-pilot-id").value.trim(),
     simbrief_username: $("welcome-username").value.trim(),
   };
@@ -1127,12 +1192,17 @@ function welcomeIdentifiers() {
 
 function refreshWelcomeSubmit() {
   const { simbrief_pilot_id, simbrief_username } = welcomeIdentifiers();
+  const needsSimbrief = welcomeNeedsSimbrief();
+  show($("welcome-simbrief"), needsSimbrief);
+  show($("welcome-msfs"), welcomeAsksPlanSource() && !needsSimbrief);
   $("welcome-submit").disabled =
-    welcomeNeedsSimbrief() && !simbrief_pilot_id && !simbrief_username;
+    needsSimbrief && !simbrief_pilot_id && !simbrief_username;
 }
 
 function openWelcome(status) {
-  show($("welcome-simbrief"), !status.simbrief_configured && !status.remote_client);
+  const asksPlan = !status.plan_configured && !status.remote_client;
+  show($("welcome-plan-source").closest("label"), asksPlan);
+  $("welcome-plan-source").value = status.plan_source || "simbrief";
   if (!window.I18N.hasLanguage()) {
     $("welcome-language").value = window.I18N.suggestedLanguage();
   }
@@ -1163,7 +1233,7 @@ async function submitWelcome(event) {
     message.className = "settings-message error";
     return;
   }
-  if (!welcomeNeedsSimbrief()) {
+  if (!welcomeAsksPlanSource()) {
     closeWelcome();
     return;
   }
@@ -1210,7 +1280,9 @@ async function buildPlan(nextOverride = null) {
 
   const button = $("refresh");
   button.disabled = true;
-  button.querySelector("span").textContent = t("loading_plan");
+  button.querySelector("span").textContent = t(
+    latestStatus?.plan_source === "msfs" ? "loading_plan_msfs" : "loading_plan"
+  );
   showBanner("info", t("cache_title"), [t("cache_body")], { busy: true });
 
   try {
@@ -1722,10 +1794,22 @@ function renderPlan(plan) {
   // y compris les points de SID, STAR et d'approche.
   flightGeometry = buildFlightGeometry(plan);
   flightRouteTotalNm = routeLengthNm(flightGeometry);
-  climbGuidanceState = {
-    gradientFtPerNm: 450,
-    topOfClimbDistanceNm: null,
-  };
+  // Un changement de langue ou un rechargement du même OFP ne doit pas faire
+  // oublier le TOC figé : l'état de montée n'est remis à zéro qu'avec un
+  // nouveau plan.
+  const climbPlanKey = flightSummaryPlanKey(plan);
+  if (climbGuidanceState.planKey !== climbPlanKey) {
+    climbGuidanceState = {
+      planKey: climbPlanKey,
+      gradientFtPerNm: 450,
+      topOfClimbDistanceNm: null,
+      levelSinceMs: null,
+      levelStartNm: null,
+      latchedAltitudeFt: null,
+      climbSeen: false,
+      recoveredToc: recoverTopOfClimbFromStoredLog(plan),
+    };
+  }
   renderStrip(plan);
   renderTerminal(plan);
   renderConstraints(plan);
@@ -2355,6 +2439,10 @@ function detectFlightPhaseKey(aircraft, projection) {
     if (projection?.remainingNm < 5) return speed > 35 ? "phase_landing" : "phase_taxi_in";
     return speed > 45 ? "phase_takeoff" : "phase_taxi_out";
   }
+  // En vol, la phase du FMGC de l'avion, quand il la publie, vaut mieux que
+  // toute déduction du vario : elle sait qu'un palier reste une descente.
+  const fmgcPhase = fmgcPhaseKey();
+  if (fmgcPhase) return fmgcPhase;
   if (projection?.activePoint?.stage === "approach" || projection?.remainingNm < 25) {
     return "phase_approach";
   }
@@ -2372,6 +2460,17 @@ function detectFlightPhaseKey(aircraft, projection) {
 
 function detectFlightPhase(aircraft, projection) {
   return t(detectFlightPhaseKey(aircraft, projection));
+}
+
+/* La phase FMGC ramenée aux phases de NaviXav ; null si elle ne dit rien d'utile en vol. */
+function fmgcPhaseKey() {
+  const phase = String(latestFms?.available ? latestFms.phase || "" : "").toLowerCase().replace(/[\s_-]/g, "");
+  if (!phase) return null;
+  if (phase.includes("approach")) return "phase_approach";
+  if (phase.includes("descent")) return "phase_descent";
+  if (phase.includes("cruise")) return "phase_cruise";
+  if (phase.includes("climb") || phase.includes("goaround")) return "phase_climb";
+  return null;
 }
 
 function contextStage(phaseKey) {
@@ -2572,6 +2671,66 @@ function simbriefTodFromDestination(plan) {
 }
 
 /*
+ * Retrouve la fin de montée dans le journal de vol conservé pour ce plan.
+ *
+ * Le simulateur ne garde aucun passé ; NaviXav, lui, a enregistré le vol tant
+ * qu'il tournait. Relancé en croisière, il relit ces relevés avant que le
+ * premier nouveau point ne les remplace, et repère le dernier relevé en
+ * montée : le TOC est juste après. Si NaviXav a été fermé alors que l'avion
+ * montait encore, la fin de montée est prolongée au gradient nominal jusqu'à
+ * l'altitude retrouvée au redémarrage.
+ */
+const RECOVERED_TOC_MAX_AGE_MS = 6 * 3_600_000;
+
+function recoverTopOfClimbFromStoredLog(plan) {
+  if (!plan || flightGeometry.length < 2) return null;
+  const points = loadFlightLog(plan);
+  const last = points[points.length - 1];
+  const lastAt = Date.parse(last?.recorded_at || "");
+  if (!Number.isFinite(lastAt) || Date.now() - lastAt > RECOVERED_TOC_MAX_AGE_MS) return null;
+
+  let climbIndex = -1;
+  let takeoffSeen = false;
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index];
+    if (point?.on_ground) {
+      takeoffSeen = true;
+      climbIndex = -1;
+      continue;
+    }
+    if (
+      finiteOr(point?.vertical_speed_fpm, 0) >= 300
+      && finiteOr(point?.ground_speed_kt, 0) >= 80
+    ) {
+      climbIndex = index;
+    }
+  }
+  if (!takeoffSeen || climbIndex < 0) return null;
+  const stillClimbing = climbIndex === points.length - 1;
+  const point = points[stillClimbing ? climbIndex : climbIndex + 1];
+  const projection = projectPointOnFlightPath(point);
+  if (!projection || projection.crossTrackNm > 5) return null;
+  return {
+    distanceNm: Math.max(0, flightRouteTotalNm - projection.remainingNm),
+    altitudeFt: finiteOr(standardAltitude(point)),
+    stillClimbing,
+  };
+}
+
+/* Distance parcourue au TOC du profil SimBrief, s'il tombe sur la route. */
+function simbriefTocDistanceNm(plan) {
+  const point = plan.enroute?.simbrief_toc;
+  const projection = projectPointOnFlightPath(point);
+  if (!projection || projection.crossTrackNm > 5) return null;
+  const stages = new Set([
+    flightGeometry[projection.segmentIndex]?.stage,
+    flightGeometry[projection.activeIndex]?.stage,
+  ]);
+  if (!stages.has("enroute") && !stages.has("sid")) return null;
+  return Math.max(0, flightRouteTotalNm - projection.remainingNm);
+}
+
+/*
  * Le TOD est un point de la route, pas un écart recalculé à chaque image.
  *
  * L'ancienne formule retranchait de la distance restante la descente qui reste
@@ -2635,7 +2794,16 @@ function descentGuidance(plan, aircraft, projection) {
       );
     }
   }
-  const todInNm = projection.remainingNm - anchorFromDestination;
+  let todInNm = projection.remainingNm - anchorFromDestination;
+  let source = simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated";
+  // Le T/D du FMGC, quand l'avion le publie, prime sur toute estimation : c'est
+  // le point que l'avion suivra réellement.
+  const fmsTod = fmsPointDistanceNm(aircraft, latestFms?.tod);
+  if (fmsTod !== null) {
+    todInNm = fmsTod;
+    anchorFromDestination = projection.remainingNm - todInNm;
+    source = "fms";
+  }
 
   const groundSpeed = Math.max(120, Number(aircraft.ground_speed_kt || 0));
   const requiredVsFpm = -Math.round(
@@ -2655,7 +2823,7 @@ function descentGuidance(plan, aircraft, projection) {
 
   return {
     anchorFromDestination,
-    source: simbriefAnchor !== null && anchorFromDestination === simbriefAnchor ? "simbrief" : "calculated",
+    source,
     targetAltitude,
     todInNm,
     requiredVsFpm,
@@ -2668,10 +2836,31 @@ function descentGuidance(plan, aircraft, projection) {
 /*
  * Estimation du TOC propre à NaviXav. Le gradient initial donne un repère dès
  * le départ ; en montée, le couple vario/vitesse sol l'affine progressivement.
- * Une fois le niveau de croisière atteint, le repère est figé sur la route.
+ *
+ * Le repère est figé sur la route dès que la montée s'arrête : au niveau de
+ * croisière du plan, ou à toute mise en palier tenue quelques dizaines de
+ * secondes, car le contrôle donne souvent un niveau différent de celui prévu.
+ * Sans cela le TOC restait accroché devant l'avion, à distance constante,
+ * pendant tout un palier. Une montée qui reprend franchement (step climb)
+ * libère le repère : le nouveau TOC est estimé, puis figé au palier suivant.
+ *
+ * NaviXav relancé en croisière n'a rien observé de la montée : le point où
+ * l'avion se trouve alors n'est pas un TOC. Le repère est retrouvé dans le
+ * journal de vol de ce plan, à défaut pris au TOC du profil SimBrief s'il
+ * tombe sur la route, sinon il n'est pas affiché.
  */
+const TOC_LEVEL_LATCH_MS = 45000;
+const TOC_STEP_CLIMB_FT = 1000;
+
 function climbGuidance(plan, aircraft, projection, phaseKey) {
   if (!aircraft || !projection) return null;
+  // Le T/C du FMGC, quand l'avion le publie, remplace l'estimation. Une fois
+  // franchi il disparaît du plan actif ; l'estimation figée reprend alors.
+  const fmsToc = fmsPointDistanceNm(aircraft, latestFms?.toc);
+  if (fmsToc !== null) {
+    const travelled = Math.max(0, flightRouteTotalNm - projection.remainingNm);
+    return { tocInNm: fmsToc, topOfClimbDistanceNm: travelled + fmsToc, source: "fms" };
+  }
   const cruiseAltitude = finiteOr(plan.enroute?.cruise_altitude_ft);
   const currentAltitude = finiteOr(standardAltitude(aircraft));
   if (cruiseAltitude === null || currentAltitude === null) return null;
@@ -2679,17 +2868,58 @@ function climbGuidance(plan, aircraft, projection, phaseKey) {
   const travelledNm = Math.max(0, flightRouteTotalNm - projection.remainingNm);
   const verticalSpeed = finiteOr(aircraft.vertical_speed_fpm, 0);
   const groundSpeed = finiteOr(aircraft.ground_speed_kt, 0);
+  const airborne = !aircraft.on_ground && groundSpeed >= 80;
   if (
     climbGuidanceState.topOfClimbDistanceNm === null
     && (phaseKey === "phase_descent" || phaseKey === "phase_approach")
   ) {
     return null;
   }
-  if (!aircraft.on_ground && verticalSpeed >= 300 && groundSpeed >= 80) {
+  if (aircraft.on_ground) climbGuidanceState.climbSeen = true;
+  if (airborne && verticalSpeed >= 300) {
+    climbGuidanceState.climbSeen = true;
     const observedGradient = Math.max(180, Math.min(900, verticalSpeed * 60 / groundSpeed));
     climbGuidanceState.gradientFtPerNm = (
       climbGuidanceState.gradientFtPerNm * 0.88 + observedGradient * 0.12
     );
+  }
+  if (climbGuidanceState.topOfClimbDistanceNm === null && !climbGuidanceState.climbSeen) {
+    if (!airborne) return null;
+    const recovered = climbGuidanceState.recoveredToc;
+    let knownToc = recovered ? recovered.distanceNm : null;
+    if (recovered?.stillClimbing) {
+      const altitudeGained = Math.max(0, currentAltitude - finiteOr(recovered.altitudeFt, currentAltitude));
+      knownToc = Math.min(
+        travelledNm,
+        recovered.distanceNm + altitudeGained / climbGuidanceState.gradientFtPerNm
+      );
+    }
+    if (knownToc === null) knownToc = simbriefTocDistanceNm(plan);
+    if (knownToc === null) return null;
+    climbGuidanceState.topOfClimbDistanceNm = knownToc;
+    climbGuidanceState.latchedAltitudeFt = currentAltitude;
+  }
+
+  const now = Date.now();
+  const level = airborne && Math.abs(verticalSpeed) < 300;
+  if (!level) {
+    climbGuidanceState.levelSinceMs = null;
+    climbGuidanceState.levelStartNm = null;
+  } else if (climbGuidanceState.levelSinceMs === null) {
+    climbGuidanceState.levelSinceMs = now;
+    climbGuidanceState.levelStartNm = travelledNm;
+  }
+  const heldLevel = level && now - climbGuidanceState.levelSinceMs >= TOC_LEVEL_LATCH_MS;
+
+  if (
+    climbGuidanceState.topOfClimbDistanceNm !== null
+    && climbGuidanceState.latchedAltitudeFt !== null
+    && airborne
+    && verticalSpeed >= 300
+    && currentAltitude >= climbGuidanceState.latchedAltitudeFt + TOC_STEP_CLIMB_FT
+  ) {
+    climbGuidanceState.topOfClimbDistanceNm = null;
+    climbGuidanceState.latchedAltitudeFt = null;
   }
 
   let topOfClimbDistanceNm = climbGuidanceState.topOfClimbDistanceNm;
@@ -2699,8 +2929,14 @@ function climbGuidance(plan, aircraft, projection, phaseKey) {
       flightRouteTotalNm,
       travelledNm + altitudeRemaining / climbGuidanceState.gradientFtPerNm
     );
-    if (!aircraft.on_ground && currentAltitude >= cruiseAltitude - 500) {
+    if (airborne && (currentAltitude >= cruiseAltitude - 500 || heldLevel)) {
+      // Le palier a commencé quelques dizaines de secondes plus tôt : le
+      // repère se pose là où la montée s'est réellement arrêtée.
+      if (heldLevel) {
+        topOfClimbDistanceNm = Math.min(flightRouteTotalNm, climbGuidanceState.levelStartNm);
+      }
       climbGuidanceState.topOfClimbDistanceNm = topOfClimbDistanceNm;
+      climbGuidanceState.latchedAltitudeFt = currentAltitude;
     }
   }
 
@@ -2718,11 +2954,445 @@ function updateCalculatedMapPoints(climb, descent) {
     const projected = projectToChart(position.lat, position.lon);
     points.push({ ...projected, ident, kind });
   };
-  if (climb) add("TOC", climb.topOfClimbDistanceNm, "toc");
-  if (descent) {
+  // Un point lu dans le FMS se pose à sa position exacte, pas sur la route
+  // NaviXav : après une modification au MCDU les deux peuvent différer.
+  const addFms = (ident, point, kind) => {
+    points.push({ ...projectToChart(point.lat, point.lon), ident, kind });
+  };
+  if (climb?.source === "fms") addFms("TOC", latestFms.toc, "toc");
+  else if (climb) add("TOC", climb.topOfClimbDistanceNm, "toc");
+  if (descent?.source === "fms") addFms("TOD", latestFms.tod, "tod");
+  else if (descent) {
     add("TOD", flightRouteTotalNm - descent.anchorFromDestination, "tod");
   }
   MAP.setCalculatedPoints(points);
+}
+
+/* ------------------------------------------------------------ FMS de l'avion */
+
+/*
+ * Distance de l'avion à un pseudo-point du plan actif du FMS, le long des
+ * segments : de l'avion au point actif (distance tenue par le FMGC, sinon à
+ * vol d'oiseau), puis les distances de segment en segment.
+ */
+function fmsPointDistanceNm(aircraft, point) {
+  const active = latestFms?.active;
+  if (!aircraft || !point || !active || !latestFms?.available) return null;
+  if (!Number.isFinite(aircraft.latitude) || !Number.isFinite(aircraft.longitude)) return null;
+  // `finiteOr` lirait null comme 0 : une distance absente est bien absente.
+  const toActive = typeof point.to_distance_nm === "number"
+    ? point.to_distance_nm
+    : haversineNm(aircraft, active);
+  return toActive + (typeof point.distance_from_active_nm === "number" ? point.distance_from_active_nm : 0);
+}
+
+/* Distance au point actif du FMS : celle du FMGC, sinon la directe. */
+function fmsActiveDistanceNm(aircraft, active) {
+  if (!aircraft || !Number.isFinite(aircraft.latitude)) return null;
+  return typeof active.distance_nm === "number" ? active.distance_nm : haversineNm(aircraft, active);
+}
+
+function fmsRouteIdents(plan) {
+  return new Set(
+    flightStagePaths(plan).flatMap((segment) => segment.points.map((point) => point.ident))
+  );
+}
+
+/*
+ * La route restante du FMS sur la carte — seulement là où elle s'écarte de la
+ * route NaviXav. Là où les deux coïncident, le tracé principal suffit ; un
+ * segment est jugé divergent si l'un de ses bouts est à plus d'un mille de la
+ * route, ou si le FMS saute un repère que NaviXav attend (DIRECT TO). Les
+ * pseudo-points du profil ((LIM), (DECEL)…) sont toujours posés : NaviXav ne
+ * les connaît pas.
+ */
+const FMS_ON_ROUTE_NM = 1;
+
+function fmsRouteDivergence(points) {
+  const geometryRemaining = [];
+  let remaining = 0;
+  for (let index = flightGeometry.length - 1; index > 0; index -= 1) {
+    remaining += haversineNm(flightGeometry[index - 1], flightGeometry[index]);
+    geometryRemaining.push(remaining);
+  }
+  const place = (point) => {
+    const projection = projectPointOnFlightPath(point);
+    if (!projection) return { onRoute: false, remainingNm: null };
+    return {
+      onRoute: projection.crossTrackNm <= FMS_ON_ROUTE_NM,
+      remainingNm: projection.remainingNm,
+    };
+  };
+  const skips = (from, to) => (
+    from.onRoute && to.onRoute
+    && geometryRemaining.some((value) => (
+      value < from.remainingNm - 0.5 && value > to.remainingNm + 0.5
+    ))
+  );
+  let previous = place(points[0]);
+  const flags = [false];
+  for (let index = 1; index < points.length; index += 1) {
+    const current = place(points[index]);
+    flags.push(
+      points[index].discontinuity
+        ? false
+        : !previous.onRoute || !current.onRoute || skips(previous, current)
+    );
+    previous = current;
+  }
+  return flags;
+}
+
+function syncFmsRoute() {
+  if (!currentChart) return;
+  if (!latestFms?.available) {
+    MAP.setFmsRoute([]);
+    show($("legend-fms"), false);
+    return;
+  }
+  const known = currentPlan ? fmsRouteIdents(currentPlan) : new Set();
+  // La première ligne est le point FROM, derrière l'avion : le tracé part de
+  // l'avion vers le point actif.
+  const legs = latestFms.legs.slice(1).filter((leg) => leg.lat !== null && leg.lon !== null);
+  const aircraft = latestAircraft && Number.isFinite(latestAircraft.latitude)
+    ? { lat: latestAircraft.latitude, lon: latestAircraft.longitude, aircraft: true }
+    : null;
+  const chain = aircraft ? [aircraft, ...legs] : legs;
+  const divergent = chain.length ? fmsRouteDivergence(chain) : [];
+  const points = [];
+  chain.forEach((entry, index) => {
+    if (entry.aircraft) {
+      points.push({ ...projectToChart(entry.lat, entry.lon), ident: "", aircraft: true, divergent: false });
+      return;
+    }
+    points.push({
+      ...projectToChart(entry.lat, entry.lon),
+      ident: entry.ident,
+      pseudo: entry.pseudo,
+      discontinuity: entry.after_discontinuity,
+      divergent: divergent[index],
+      labelled: entry.pseudo || !known.has(entry.ident),
+    });
+  });
+  const visible = points.some((point, index) => (
+    point.divergent || point.pseudo || points[index + 1]?.divergent
+  ));
+  MAP.setFmsRoute(visible ? points : []);
+  show($("legend-fms"), visible);
+}
+
+function updateFmsPanel(aircraft, projection) {
+  const node = $("flight-fms-active");
+  if (!node) return;
+  const active = latestFms?.available ? latestFms.active : null;
+  if (!active) {
+    liveValue("flight-fms-active", "—");
+    node.title = "";
+    return;
+  }
+  const activeDistance = fmsActiveDistanceNm(aircraft, active);
+  const distance = activeDistance !== null ? ` · ${activeDistance.toFixed(1)} NM` : "";
+  const phase = latestFms.phase ? ` · ${latestFms.phase}` : "";
+  const expected = projection?.activePoint?.ident;
+  const differs = Boolean(expected) && !active.pseudo && active.ident !== expected;
+  liveValue("flight-fms-active", `${active.ident}${distance}${phase}`, differs ? "warning" : "good");
+  node.title = differs ? tf("fms_active_differs", { expected }) : "";
+}
+
+/* « 1000 » du FMGC → « 10:00 Z ». */
+function fmgcTimeLabel(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length !== 4) return "";
+  return `${digits.slice(0, 2)}:${digits.slice(2)} Z`;
+}
+
+function utcLabelFromNow(seconds) {
+  if (seconds === null || !Number.isFinite(seconds)) return "";
+  const date = new Date(Date.now() + seconds * 1000);
+  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")} Z`;
+}
+
+function updateFmsEta(aircraft, projection) {
+  const node = $("flight-fms-eta");
+  if (!node) return;
+  const eta = latestFms?.available ? fmgcTimeLabel(latestFms.destination_eta) : "";
+  if (!eta) {
+    liveValue("flight-fms-eta", "—");
+    node.title = "";
+    return;
+  }
+  const own = utcLabelFromNow(remainingFlightSeconds(aircraft, projection));
+  const destination = latestFms.destination || currentPlan?.arrival?.icao || "";
+  liveValue("flight-fms-eta", `${destination} ${eta}`.trim(), "good");
+  node.title = own ? tf("fms_eta_navixav", { time: own }) : "";
+  if (activeFlightSummary) activeFlightSummary.fmgc_eta = eta;
+}
+
+/* Un nombre du FMS, ou null : `finiteOr` lirait null comme 0, ce qui ferait
+   d'une V1 absente une V1 à zéro. */
+function fmsNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/* ZFW du plan opérationnel en kilogrammes, quelle que soit l'unité de l'OFP. */
+function plannedZfwKg(plan) {
+  const dispatch = plan?.dispatch || {};
+  const zfw = finiteOr(dispatch.zfw);
+  if (zfw === null) return null;
+  return String(dispatch.units || "").toLowerCase().startsWith("lb") ? zfw * LBS_TO_KG : zfw;
+}
+
+function formatKg(value) {
+  return `${Math.round(value).toLocaleString(displayLocale())} kg`;
+}
+
+function updateFmsWeights() {
+  const node = $("flight-fms-weights");
+  if (!node) return;
+  const weights = latestFms?.available ? latestFms.weights : null;
+  const zfw = fmsNumber(weights?.zfw_kg);
+  if (zfw === null) {
+    liveValue("flight-fms-weights", "—");
+    node.title = "";
+    return;
+  }
+  const parts = [`ZFW ${formatKg(zfw)}`];
+  const fuel = fmsNumber(weights.fuel_kg);
+  if (fuel !== null) parts.push(`FOB ${formatKg(fuel)}`);
+  const planned = plannedZfwKg(currentPlan);
+  const differs = planned !== null && Math.abs(planned - zfw) > 300;
+  liveValue("flight-fms-weights", parts.join(" · "), differs ? "warning" : "good");
+  node.title = planned !== null ? tf("fms_zfw_ofp", { weight: formatKg(planned) }) : "";
+}
+
+async function pollFms() {
+  const poll = beginPoll("pollFms");
+  if (!poll) return;
+  try {
+    const data = await poll.json("/api/fms");
+    const changed = JSON.stringify(data.legs || null) !== JSON.stringify(latestFms?.legs || null)
+      || Boolean(data.available) !== Boolean(latestFms?.available);
+    latestFms = data.available ? data : null;
+    // Le tracé part de l'avion : il suit chaque relevé, pas seulement un
+    // changement de plan.
+    if (changed || latestFms) syncFmsRoute();
+    if (changed) syncFmsAlternate();
+    renderFmsCheck();
+    renderFmsMirror();
+  } catch (_error) {
+    if (latestFms) {
+      latestFms = null;
+      syncFmsRoute();
+      syncFmsAlternate();
+      renderFmsCheck();
+      renderFmsMirror();
+    }
+  } finally {
+    poll.finish();
+  }
+}
+
+/* Le plan de dégagement du FMGC, en gris, sur demande. */
+let fmsAlternateVisible = localStorage.getItem("navixav-fms-alternate") === "1";
+
+function syncFmsAlternate() {
+  const button = $("map-fms-alternate");
+  const legs = latestFms?.available
+    ? latestFms.alternate_legs.filter((leg) => leg.lat !== null && leg.lon !== null)
+    : [];
+  if (button) {
+    show(button, legs.length > 1);
+    button.classList.toggle("active", fmsAlternateVisible);
+    button.setAttribute("aria-pressed", String(fmsAlternateVisible));
+  }
+  const drawn = fmsAlternateVisible && legs.length > 1 && currentChart;
+  MAP.setFmsAlternate(drawn ? legs.map((leg) => ({
+    ...projectToChart(leg.lat, leg.lon),
+    ident: leg.ident,
+    discontinuity: leg.after_discontinuity,
+  })) : []);
+  show($("legend-fms-alternate"), Boolean(drawn));
+}
+
+function toggleFmsAlternate() {
+  fmsAlternateVisible = !fmsAlternateVisible;
+  try {
+    localStorage.setItem("navixav-fms-alternate", fmsAlternateVisible ? "1" : "0");
+  } catch (_error) {
+    // Le choix vaut pour la session si le stockage local est indisponible.
+  }
+  syncFmsAlternate();
+}
+
+/* ---------------------------------------------- vérification et miroir MCDU */
+
+const STAGE_RANK = { sid: 0, enroute: 1, star: 2, approach: 3 };
+
+/*
+ * Compare, ligne à ligne, ce que NaviXav prévoit et ce que le FMGC contient.
+ * Les procédures se reconnaissent à leurs points : une STAR saisie au MCDU
+ * met ses repères dans le plan actif. Seuls les points encore devant l'avion
+ * comptent, un repère franchi n'a plus à figurer au FMGC.
+ */
+function fmsChecks() {
+  const plan = currentPlan;
+  const fms = latestFms;
+  // Sans plan actif (FMGC vide, ou connecteur qui ne donne que l'écran), il
+  // n'y a rien à comparer.
+  if (!plan || !fms?.available || !fms.legs?.length) return [];
+  const fmsIdents = new Set(fms.legs.map((leg) => leg.ident));
+  const projection = latestAircraft ? projectAircraftOnFlightPath(latestAircraft) : null;
+  const aheadFrom = projection && !latestAircraft.on_ground ? projection.activeIndex : 0;
+  const ahead = new Set(flightGeometry.slice(aheadFrom).map((point) => point.ident));
+
+  const same = (left, right) => String(left || "").toUpperCase() === String(right || "").toUpperCase();
+  const line = (key, expected, actual, status, detail = "") => ({ key, expected, actual, status, detail });
+  const compare = (key, expected, actual) => {
+    if (!expected && !actual) return null;
+    if (!actual) return line(key, expected, "—", "missing");
+    return line(key, expected || "—", actual, !expected || same(expected, actual) ? "ok" : "differs");
+  };
+  const stage = (key, name) => {
+    const points = flightStagePaths(plan)
+      .filter((segment) => segment.stage === name)
+      .flatMap((segment) => segment.points.map((point) => point.ident))
+      .filter((ident) => ident && ahead.has(ident));
+    if (!points.length) return null;
+    const missing = points.filter((ident) => !fmsIdents.has(ident));
+    if (!missing.length) return line(key, `${points.length} pts`, `${points.length} pts`, "ok");
+    if (missing.length === points.length) return line(key, `${points.length} pts`, "—", "missing");
+    return line(
+      key, `${points.length} pts`, `${points.length - missing.length} pts`, "differs",
+      missing.join(" ")
+    );
+  };
+
+  const rows = [
+    compare("fms_check_from_to",
+      `${plan.departure?.icao || "----"}/${plan.arrival?.icao || "----"}`,
+      fms.origin || fms.destination ? `${fms.origin || "----"}/${fms.destination || "----"}` : ""),
+    compare("fms_check_altn", plan.alternate_icao, fms.alternate),
+    compare("fms_check_flight_number", plan.callsign, fms.flight_number),
+    compare("fms_check_cruise",
+      plan.enroute?.cruise_altitude_ft ? `FL${Math.round(plan.enroute.cruise_altitude_ft / 100)}` : "",
+      fms.cruise_level_ft ? `FL${Math.round(fms.cruise_level_ft / 100)}` : ""),
+    compare("fms_check_dep_runway", plan.departure?.runway?.value, fms.origin_runway),
+    stage("fms_check_sid", "sid"),
+    stage("fms_check_route", "enroute"),
+    stage("fms_check_star", "star"),
+    stage("fms_check_approach", "approach"),
+    compare("fms_check_arr_runway", plan.arrival?.runway?.value, fms.destination_runway),
+  ];
+  const zfw = fmsNumber(fms.weights?.zfw_kg);
+  const plannedZfw = plannedZfwKg(plan);
+  if (plannedZfw !== null || zfw !== null) {
+    rows.push(line(
+      "fms_check_zfw",
+      plannedZfw !== null ? formatKg(plannedZfw) : "—",
+      zfw !== null ? formatKg(zfw) : "—",
+      zfw === null ? "missing" : plannedZfw === null || Math.abs(plannedZfw - zfw) <= 300 ? "ok" : "differs"
+    ));
+  }
+  const perf = fms.perf_takeoff || {};
+  const speeds = [perf.v1, perf.vr, perf.v2].map((value) => fmsNumber(value));
+  rows.push(line(
+    "fms_check_vspeeds", "V1/VR/V2",
+    speeds.every((value) => value !== null) ? speeds.map((value) => Math.round(value)).join("/") : "—",
+    speeds.every((value) => value !== null) ? "ok" : "missing"
+  ));
+  return rows.filter(Boolean);
+}
+
+function renderFmsCheck() {
+  const host = $("fms-check");
+  if (!host) return;
+  host.innerHTML = "";
+  const rows = fmsChecks();
+  if (!rows.length) {
+    host.classList.add("hidden");
+    return;
+  }
+  host.classList.remove("hidden");
+  host.append(
+    el("div", "card-kicker", t("fms_check_title")),
+    el("p", "fms-check-note", t("fms_check_note"))
+  );
+  const table = el("div", "fms-check-rows");
+  const header = el("div", "fms-check-row fms-check-header");
+  header.append(el("span", null, ""), el("span", null, "NaviXav"), el("span", null, "FMGC"), el("span", null, ""));
+  table.append(header);
+  for (const row of rows) {
+    const node = el("div", `fms-check-row fms-check-${row.status}`);
+    node.append(
+      el("span", "fms-check-label", t(row.key)),
+      el("span", "fms-check-expected", row.expected),
+      el("span", "fms-check-actual", row.actual + (row.detail ? ` · ${row.detail}` : "")),
+      el("span", "fms-check-status", t(`fms_check_${row.status}`))
+    );
+    table.append(node);
+  }
+  host.append(table);
+}
+
+let fmsMirrorUnit = "1";
+// Noms de produits : pas de traduction.
+const FMS_SOURCE_LABELS = { fenix: "Fenix EFB", fbw: "FlyByWire SimBridge", pmdg: "PMDG SDK" };
+
+function renderFmsMirror() {
+  const host = $("fms-mirror");
+  if (!host) return;
+  const displays = latestFms?.available ? latestFms.mcdu || {} : {};
+  const units = Object.keys(displays);
+  if (!units.length) {
+    host.classList.add("hidden");
+    host.innerHTML = "";
+    return;
+  }
+  host.classList.remove("hidden");
+  if (!displays[fmsMirrorUnit]) fmsMirrorUnit = units[0];
+  // La structure est bâtie une fois ; seul l'écran est réécrit à chaque relevé,
+  // pour que le choix MCDU 1 / 2 ne saute pas sous la souris.
+  if (!host.querySelector(".mcdu-mirror")) {
+    host.innerHTML = "";
+    const head = el("div", "fms-mirror-head");
+    const kicker = el("div", "card-kicker", t("fms_mirror_title"));
+    kicker.id = "fms-mirror-kicker";
+    head.append(kicker);
+    const switcher = el("div", "fms-mirror-switch");
+    for (const unit of ["1", "2"]) {
+      const button = el("button", "icon-btn", `MCDU ${unit}`);
+      button.type = "button";
+      button.dataset.unit = unit;
+      button.addEventListener("click", () => {
+        fmsMirrorUnit = unit;
+        renderFmsMirror();
+      });
+      switcher.append(button);
+    }
+    head.append(switcher);
+    host.append(head, el("pre", "mcdu-mirror"), el("p", "fms-check-note", t("fms_mirror_note")));
+  }
+  for (const button of host.querySelectorAll(".fms-mirror-switch button")) {
+    const available = Boolean(displays[button.dataset.unit]);
+    button.disabled = !available;
+    button.classList.toggle("active", button.dataset.unit === fmsMirrorUnit);
+  }
+  const sourceLabel = FMS_SOURCE_LABELS[latestFms.source] || "";
+  const kicker = host.querySelector("#fms-mirror-kicker");
+  if (kicker) kicker.textContent = sourceLabel ? `${t("fms_mirror_title")} · ${sourceLabel}` : t("fms_mirror_title");
+  const screen = host.querySelector(".mcdu-mirror");
+  screen.innerHTML = "";
+  const display = displays[fmsMirrorUnit];
+  const row = (segments, className) => {
+    const node = el("div", className);
+    for (const segment of segments) {
+      node.append(el("span", `mcdu-${segment.color} mcdu-${segment.size}`, segment.text));
+    }
+    return node;
+  };
+  screen.append(row(display.title, "mcdu-mirror-title"));
+  for (const segments of display.lines) screen.append(row(segments, "mcdu-mirror-line"));
+  screen.append(row(display.scratchpad, "mcdu-mirror-scratchpad"));
 }
 
 /* --------------------------------------------- configuration avion et alarmes */
@@ -2790,6 +3460,9 @@ function flightContext(aircraft, projection, phase, constraint, descent = null) 
     phase,
     constraint,
     descent,
+    // Pseudo-points du FMGC, en NM devant l'avion ; null sans plan lisible.
+    fmsSpeedLimitNm: fmsPointDistanceNm(aircraft, latestFms?.speed_limit),
+    fmsDecelNm: fmsPointDistanceNm(aircraft, latestFms?.decel),
     onGround: Boolean(aircraft?.on_ground),
     groundSpeed: finiteOr(aircraft?.ground_speed_kt, 0),
     verticalSpeed: finiteOr(aircraft?.vertical_speed_fpm, 0),
@@ -2829,10 +3502,23 @@ const ALERT_RULES = [
     ),
   },
   {
-    id: "interactive_points_crash_risk",
-    severity: "danger",
-    armed: () => true,
-    when: (c) => c.configuration.interactive_points_crash_risk === true,
+    id: "fms_speed_limit",
+    severity: "warning",
+    armed: (c) => (
+      !c.onGround && c.fmsSpeedLimitNm !== null
+      && c.fmsSpeedLimitNm <= 5 && c.fmsSpeedLimitNm > -1
+    ),
+    when: (c) => c.airspeed > 255,
+    detail: (c) => `${Math.max(0, Math.round(c.fmsSpeedLimitNm))} NM`,
+  },
+  {
+    id: "fms_decel",
+    severity: "info",
+    armed: (c) => (
+      !c.onGround && c.fmsDecelNm !== null && c.fmsDecelNm <= 3 && c.fmsDecelNm > -1
+    ),
+    when: () => true,
+    detail: (c) => `${Math.max(0, Math.round(c.fmsDecelNm))} NM`,
   },
   {
     id: "parking_brake",
@@ -3149,13 +3835,27 @@ function resetAlertStates() {
   alertPhaseMemory = null;
 }
 
+/*
+ * Ce qui identifie un vol d'une session à l'autre : la date de génération de
+ * l'OFP SimBrief, ou l'empreinte du contenu d'un plan MSFS — MSFS réécrit son
+ * CustomFlight.PLN à chaque chargement, sa date ne vaut donc rien. Sans l'un ni
+ * l'autre, le vol n'existe que pour cette session.
+ */
+function planIdentity(plan) {
+  return (
+    plan.source?.plan_fingerprint
+    || plan.source?.simbrief_generated_at
+    || APP_SESSION_ID
+  );
+}
+
 function flightLogStorageKey(plan) {
   return [
     "navixav-flight-log",
     plan.departure?.icao || "----",
     plan.arrival?.icao || "----",
     plan.callsign || "flight",
-    plan.source?.simbrief_generated_at || APP_SESSION_ID,
+    planIdentity(plan),
   ].join(":");
 }
 
@@ -3778,7 +4478,7 @@ function flightSummaryPlanKey(plan) {
     plan.departure?.icao || "----",
     plan.arrival?.icao || "----",
     plan.callsign || "flight",
-    plan.source?.simbrief_generated_at || APP_SESSION_ID,
+    planIdentity(plan),
   ].join(":");
 }
 
@@ -3899,6 +4599,7 @@ function updateFlightSummary(aircraft) {
       departure: currentPlan.departure?.icao || "----",
       arrival: currentPlan.arrival?.icao || "----",
       callsign: currentPlan.callsign || "",
+      flight_number: latestFms?.available ? latestFms.flight_number || "" : "",
       started_at: startedAt,
       ended_at: startedAt,
       duration_seconds: 0,
@@ -3972,7 +4673,12 @@ function renderFlightSummaries() {
       el(
         "span",
         null,
-        [entry.callsign, entry.ended_at ? new Date(entry.ended_at).toLocaleString(displayLocale()) : ""]
+        [
+          entry.callsign,
+          entry.flight_number && entry.flight_number !== entry.callsign
+            ? `FMGC ${entry.flight_number}` : "",
+          entry.ended_at ? new Date(entry.ended_at).toLocaleString(displayLocale()) : "",
+        ]
           .filter(Boolean)
           .join(" · ")
       )
@@ -3982,6 +4688,7 @@ function renderFlightSummaries() {
       [t("duration"), formatFlightSummaryDuration(entry.duration_seconds || 0)],
       [t("distance"), `${finiteOr(entry.distance_nm, 0).toFixed(1)} NM`],
       [t("max_altitude"), `${Math.round(finiteOr(entry.max_altitude_ft, 0))} ft`],
+      ...(entry.fmgc_eta ? [[t("eta_fmgc"), entry.fmgc_eta]] : []),
     ]) {
       const metric = el("span");
       metric.append(el("small", null, label), el("b", null, value));
@@ -5051,7 +5758,10 @@ function updateTodDisplay(descent, phaseKey) {
   // rester en croisière au-delà du point qui doit alerter.
   liveValue(
     "flight-tod",
-    `${todText} · ${t(descent.source === "simbrief" ? "tod_source_simbrief" : "tod_source_estimated")}`,
+    `${todText} · ${t(
+      descent.source === "fms" ? "tod_source_fms"
+        : descent.source === "simbrief" ? "tod_source_simbrief" : "tod_source_estimated"
+    )}`,
     descent.leftCruise
       ? "good"
       : descent.todInNm > 50
@@ -5062,7 +5772,9 @@ function updateTodDisplay(descent, phaseKey) {
             ? "tod-imminent"
             : "warning"
   );
-  $("flight-tod").title = t("tod_fms_difference");
+  $("flight-tod").title = t(
+    descent.source === "fms" ? "flight_fms_active_note" : "tod_fms_difference"
+  );
 }
 
 function updateFlightPanel(aircraft) {
@@ -5081,6 +5793,9 @@ function updateFlightPanel(aircraft) {
   updateGuidedContext(aircraft, phaseKey, projection, constraint);
 
   liveValue("flight-phase", phase);
+  updateFmsPanel(aircraft, projection);
+  updateFmsEta(aircraft, projection);
+  updateFmsWeights();
   liveValue("flight-radio", tunedRadioLabel(currentPlan, aircraft));
   updateExpectedFrequency(aircraft, phaseKey);
   liveValue(
@@ -5395,6 +6110,9 @@ function renderFlightPanel(plan) {
   };
   item(t("flight_next_fix"), "flight-next-fix");
   item(t("flight_fix_distance"), "flight-next-distance");
+  item(t("flight_fms_active"), "flight-fms-active", t("flight_fms_active_note"));
+  item(t("flight_fms_eta"), "flight-fms-eta", t("flight_fms_eta_note"));
+  item(t("flight_fms_weights"), "flight-fms-weights", t("flight_fms_weights_note"));
   item(t("flight_lateral_deviation"), "flight-deviation", t("flight_lateral_deviation_note"));
   item(t("flight_remaining_distance"), "flight-remaining");
   item(t("ground_speed"), "flight-ground-speed", t("ground_speed_note"));
@@ -8005,6 +8723,13 @@ function renderMcdu(plan) {
   panel.innerHTML = "";
   const minima = loadMinima(plan);
   const profile = aircraftFmsProfile(plan);
+  // Ce que l'avion contient, avant ce qu'il faudrait y saisir : la
+  // vérification FMGC puis le miroir de son écran ouvrent la fiche.
+  const fmsCheckCard = el("section", "card fms-check hidden");
+  fmsCheckCard.id = "fms-check";
+  const mirror = el("section", "card fms-mirror hidden");
+  mirror.id = "fms-mirror";
+  panel.append(fmsCheckCard, mirror);
   panel.append(siaApproachCard(plan));
   panel.append(minimaEditor(plan, minima));
   const profileHeader = el("div", "mcdu-profile");
@@ -8111,6 +8836,8 @@ function renderMcdu(plan) {
   }
 
   panel.append(screen);
+  renderFmsCheck();
+  renderFmsMirror();
 }
 
 /* ------------------------------------------------------------------ carte */
@@ -8207,6 +8934,7 @@ async function loadChart(icao, runway, mapRole) {
     }));
     MAP.setRouteSegments(routeSegments);
     syncMapTrail();
+    syncFmsRoute();
     MAP.resize();
     updateHud(null);
 
@@ -8922,6 +9650,10 @@ function startLiveLoop() {
   if (liveTimer) return;
   pollLive();
   liveTimer = setInterval(pollLive, LIVE_INTERVAL_MS);
+  if (!fmsTimer) {
+    pollFms();
+    fmsTimer = setInterval(pollFms, FMS_INTERVAL_MS);
+  }
 }
 
 /* ---------------------------------------------------------------- weather */
@@ -9443,6 +10175,7 @@ $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
+$("map-fms-alternate").addEventListener("click", toggleFmsAlternate);
 MAP.onTrafficSelect((entry, x, y) => { void showTrafficCard(entry, x, y); });
 $("map-traffic").addEventListener("click", () => toggleTraffic());
 $("ground-traffic").addEventListener("click", () => toggleTraffic());
@@ -9551,6 +10284,11 @@ $("welcome-language").addEventListener("change", (event) => {
 for (const id of ["welcome-pilot-id", "welcome-username"]) {
   $(id).addEventListener("input", refreshWelcomeSubmit);
 }
+$("welcome-plan-source").addEventListener("change", refreshWelcomeSubmit);
+$("settings-plan-source").addEventListener("change", (event) => {
+  applyPlanSourceFields(event.target.value);
+});
+$("msfs-plan-open").addEventListener("click", openMsfsPlanFile);
 $("settings-lan-enabled").addEventListener("change", (event) => {
   show($("settings-lan-access"), event.target.checked);
 });
@@ -9604,7 +10342,7 @@ async function initialiseApplication() {
       await loadCurrentPlan();
     } else {
       checkForUpdates();
-      if (status.simbrief_configured) await buildPlan();
+      if (status.plan_configured) await buildPlan();
       await openVersionHistoryAfterUpdate(status);
     }
   } catch (error) {

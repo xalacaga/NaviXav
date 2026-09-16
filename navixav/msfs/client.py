@@ -34,6 +34,7 @@ RECV_ID_QUIT = 3
 RECV_ID_SIMOBJECT_DATA = 8
 RECV_ID_SIMOBJECT_DATA_BYTYPE = 9
 RECV_ID_ASSIGNED_OBJECT_ID = 12
+RECV_ID_CLIENT_DATA = 16
 RECV_ID_FACILITY_DATA = 28
 RECV_ID_FACILITY_DATA_END = 29
 
@@ -262,6 +263,7 @@ class SimConnectClient:
         # lecture les accumulerait côté simulateur pour toute la connexion.
         self._simvar_definitions: dict[tuple[tuple[str, str], ...], int] = {}
         self._string_simvar_definitions: dict[str, int] = {}
+        self._client_data_definitions: dict[str, tuple[int, int]] = {}
         self._object_definitions: dict[tuple[Any, str | None], int] = {}
         self._ai_position_definition: int | None = None
         self._client_events: dict[str, int] = {}
@@ -458,6 +460,74 @@ class SimConnectClient:
                 f"SimConnect a refusé la demande ({names}).", exceptions
             )
         raise SimConnectError("Aucune donnée de vol reçue du simulateur.")
+
+    def read_client_data(self, name: str, size: int, timeout_s: float = 3.0) -> bytes:
+        """Lit une zone ClientData d'un tiers, par exemple le CDU diffusé par PMDG.
+
+        La zone est nommée par son créateur ; l'identifiant est local au
+        client et n'a pas à coïncider avec le sien. Une zone absente revient
+        en exception SimConnect, ce qui permet de sonder sans conséquence.
+        """
+        area_id, definition_id = self._client_data_definition_for(name, size)
+        self._next_id += 1
+        request_id = self._next_id
+        result = self._dll.SimConnect_RequestClientData(
+            self._handle, area_id, request_id, definition_id, PERIOD_ONCE, 0, 0, 0, 0,
+        )
+        if result != 0:
+            raise SimConnectError(f"Impossible de demander la zone {name}.")
+
+        pointer = ct.POINTER(_RECV)()
+        recv_size = wintypes.DWORD()
+        deadline = time.monotonic() + timeout_s
+        exceptions: list[int] = []
+        while time.monotonic() < deadline:
+            if self._dll.SimConnect_GetNextDispatch(
+                self._handle, ct.byref(pointer), ct.byref(recv_size)
+            ) != 0:
+                time.sleep(0.002)
+                continue
+            recv = pointer.contents
+            if recv.dwID == RECV_ID_CLIENT_DATA:
+                data = ct.cast(pointer, ct.POINTER(_RECV_SIMOBJECT_DATA)).contents
+                if data.dwRequestID != request_id:
+                    continue
+                payload = ct.string_at(pointer, recv.dwSize)[_PAYLOAD_OFFSET:]
+                if len(payload) < size:
+                    raise SimConnectError(
+                        f"Zone {name} : {len(payload)} octets pour {size} attendus."
+                    )
+                return payload[:size]
+            if recv.dwID == RECV_ID_EXCEPTION:
+                exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
+                if exception.dwException not in exceptions:
+                    exceptions.append(exception.dwException)
+                deadline = min(deadline, time.monotonic() + EXCEPTION_GRACE_S)
+            elif recv.dwID == RECV_ID_QUIT:
+                raise SimConnectError("Le simulateur s'est fermé.")
+        if exceptions:
+            names = ", ".join(EXCEPTION_NAMES.get(code, str(code)) for code in exceptions)
+            raise SimConnectRefused(f"SimConnect a refusé la zone {name} ({names}).", exceptions)
+        raise SimConnectError(f"Aucune donnée reçue pour la zone {name}.")
+
+    def _client_data_definition_for(self, name: str, size: int) -> tuple[int, int]:
+        existing = self._client_data_definitions.get(name)
+        if existing is not None:
+            return existing
+        self._next_id += 1
+        area_id = self._next_id
+        if self._dll.SimConnect_MapClientDataNameToID(self._handle, name.encode(), area_id) != 0:
+            raise SimConnectError(f"Impossible d'associer la zone {name}.")
+        self._next_id += 1
+        definition_id = self._next_id
+        result = self._dll.SimConnect_AddToClientDataDefinition(
+            self._handle, definition_id, 0, size, 0.0, SIMCONNECT_UNUSED,
+        )
+        if result != 0:
+            self._dll.SimConnect_ClearClientDataDefinition(self._handle, definition_id)
+            raise SimConnectError(f"Impossible de déclarer la zone {name}.")
+        self._client_data_definitions[name] = (area_id, definition_id)
+        return area_id, definition_id
 
     def read_string_simvar(self, name: str, timeout_s: float = 3.0) -> str:
         """Lit une SimVar texte fixe de l'avion du joueur.
@@ -936,6 +1006,13 @@ def _declare(dll) -> None:
         ("SimConnect_AIRemoveObject",
          [ct.c_void_p, ct.c_ulong, ct.c_ulong]),
         ("SimConnect_ClearDataDefinition", [ct.c_void_p, ct.c_ulong]),
+        ("SimConnect_MapClientDataNameToID", [ct.c_void_p, ct.c_char_p, ct.c_ulong]),
+        ("SimConnect_AddToClientDataDefinition",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_float, ct.c_ulong]),
+        ("SimConnect_RequestClientData",
+         [ct.c_void_p, ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong,
+          ct.c_ulong, ct.c_ulong, ct.c_ulong, ct.c_ulong]),
+        ("SimConnect_ClearClientDataDefinition", [ct.c_void_p, ct.c_ulong]),
         ("SimConnect_Close", [ct.c_void_p]),
     ]
     for name, argtypes in signatures:

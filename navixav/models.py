@@ -352,6 +352,7 @@ class EnrouteBlock:
     route_path: list[dict[str, Any]] = field(default_factory=list)
     cruise_altitude_ft: int | None = None
     simbrief_tod: dict[str, float] | None = None
+    simbrief_toc: dict[str, float] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

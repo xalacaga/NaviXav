@@ -28,6 +28,10 @@ const MAP = (() => {
   let route = [];
   let routeSegments = [];
   let calculatedPoints = [];
+  // Route restante du FMS de l'avion, quand il la publie : un tracé distinct
+  // de la route NaviXav, pour voir d'un coup d'œil où les deux divergent.
+  let fmsRoute = [];
+  let fmsAlternate = [];
   let dragging = null;
   let basemapVisible = true;
   let constraintsVisible = true;
@@ -254,7 +258,9 @@ const MAP = (() => {
 
     if (basemapVisible) drawBasemap();
     drawRunways();
+    drawFmsAlternate();
     drawRoute();
+    drawFmsRoute();
     drawTrail();
     drawTraffic();
     drawAircraft();
@@ -462,6 +468,92 @@ const MAP = (() => {
       drawing = true;
     });
     context.stroke();
+    context.restore();
+  }
+
+  /*
+   * La route du FMS, seulement là où elle s'écarte de la route NaviXav : le
+   * premier point est l'avion, chaque point suivant dit si le segment qui y
+   * mène est divergent. Les pseudo-points du profil sont posés même sur la
+   * route, avec leur nom.
+   */
+  function drawFmsRoute() {
+    if (fmsRoute.length < 2) return;
+    context.save();
+    const colour = css("--route-fms");
+    const joined = continuous(fmsRoute, view.centerX);
+    context.strokeStyle = colour;
+    context.lineWidth = 2.5;
+    context.lineJoin = "round";
+    context.setLineDash([9, 6]);
+    context.beginPath();
+    joined.forEach((point, index) => {
+      if (index === 0 || !fmsRoute[index].divergent) return;
+      const [fromX, fromY] = toScreen(joined[index - 1].x, joined[index - 1].y);
+      const [x, y] = toScreen(point.x, point.y);
+      context.moveTo(fromX, fromY);
+      context.lineTo(x, y);
+    });
+    context.stroke();
+    context.setLineDash([]);
+
+    const palette = {
+      background: css("--label-bg"),
+      border: colour,
+      text: css("--label-text"),
+    };
+    const boxes = [];
+    joined.forEach((point, index) => {
+      const source = fmsRoute[index];
+      if (source.aircraft) return;
+      const marked = source.pseudo || source.divergent || fmsRoute[index + 1]?.divergent;
+      if (!marked) return;
+      const [x, y] = toScreen(point.x, point.y);
+      if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) {
+        return;
+      }
+      context.fillStyle = css("--label-bg");
+      context.strokeStyle = colour;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(x, y, source.pseudo ? 3 : 4, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      if (source.labelled) {
+        drawRouteLabel({ x, y, point: source, colour, constraint: null }, boxes, palette);
+      }
+    });
+    context.restore();
+  }
+
+  /* Le plan de dégagement du FMGC : un trait gris fin, rompu aux discontinuités. */
+  function drawFmsAlternate() {
+    if (fmsAlternate.length < 2) return;
+    context.save();
+    const colour = css("--route-fms-alternate");
+    const joined = continuous(fmsAlternate, view.centerX);
+    context.strokeStyle = colour;
+    context.lineWidth = 2;
+    context.setLineDash([4, 6]);
+    context.beginPath();
+    joined.forEach((point, index) => {
+      const [x, y] = toScreen(point.x, point.y);
+      if (index === 0 || fmsAlternate[index].discontinuity) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.stroke();
+    context.setLineDash([]);
+    const palette = { background: css("--label-bg"), border: colour, text: css("--label-text") };
+    const boxes = [];
+    joined.forEach((point, index) => {
+      const [x, y] = toScreen(point.x, point.y);
+      if (x < -60 || y < -40 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 40) return;
+      context.fillStyle = colour;
+      context.beginPath();
+      context.arc(x, y, 3, 0, Math.PI * 2);
+      context.fill();
+      drawRouteLabel({ x, y, point: fmsAlternate[index], colour, constraint: null }, boxes, palette);
+    });
     context.restore();
   }
 
@@ -949,6 +1041,8 @@ const MAP = (() => {
       aircraft = null;
       routeSegments = [];
       calculatedPoints = [];
+      fmsRoute = [];
+      fmsAlternate = [];
       fitPending = true;
       fit(true);
     },
@@ -1024,6 +1118,18 @@ const MAP = (() => {
     setCalculatedPoints(points) {
       calculatedPoints = (points || []).filter((point) => (
         Number.isFinite(point?.x) && Number.isFinite(point?.y) && point.ident
+      ));
+      draw();
+    },
+    setFmsRoute(points) {
+      fmsRoute = (points || []).filter((point) => (
+        Number.isFinite(point?.x) && Number.isFinite(point?.y)
+      ));
+      draw();
+    },
+    setFmsAlternate(points) {
+      fmsAlternate = (points || []).filter((point) => (
+        Number.isFinite(point?.x) && Number.isFinite(point?.y)
       ));
       draw();
     },

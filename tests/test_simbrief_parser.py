@@ -68,6 +68,24 @@ def test_simbrief_tod_coordinates_are_kept_outside_the_navigable_route():
     assert summary.enroute_fixes == []
 
 
+def test_simbrief_toc_coordinates_are_kept_outside_the_navigable_route():
+    summary = parse_ofp(
+        {
+            "navlog": {"fix": [
+                {
+                    "ident": "TOC",
+                    "name": "TOP OF CLIMB",
+                    "pos_lat": "48.5",
+                    "pos_long": "6.25",
+                },
+            ]},
+        }
+    )
+
+    assert (summary.simbrief_toc_lat, summary.simbrief_toc_lon) == (48.5, 6.25)
+    assert summary.enroute_fixes == []
+
+
 def test_enroute_route_keeps_via_to_pairs(ofp: OfpSummary):
     assert ofp.enroute_route == [
         {"via": "DCT", "to": "LIRKO", "stage": "CRZ"},

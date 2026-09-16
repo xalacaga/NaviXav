@@ -165,6 +165,10 @@ class OfpSummary:
     # l'interface de préférer ce profil avion/masse/vent au secours géométrique.
     simbrief_tod_lat: float | None = None
     simbrief_tod_lon: float | None = None
+    # Point de fin de montée du même profil : seul repère possible quand
+    # NaviXav est relancé en croisière, sans avoir observé la montée.
+    simbrief_toc_lat: float | None = None
+    simbrief_toc_lon: float | None = None
 
     # Noms de procédures tels que SimBrief les a filés, s'ils existent.
     simbrief_sid: str | None = None
@@ -177,6 +181,17 @@ class OfpSummary:
     star_entry_hint: str | None = None
 
     dispatch: DispatchSummary = field(default_factory=DispatchSummary)
+
+    # « simbrief » ou « msfs » : d'où vient le plan. Le moteur ne s'en sert
+    # que pour le dire ; ce qui manque à un plan MSFS (dispatch, météo) est
+    # déjà optionnel champ par champ.
+    plan_source: str = "simbrief"
+
+    # Empreinte du contenu du plan, quand sa date ne suffit pas à le
+    # reconnaître : MSFS réécrit CustomFlight.PLN à chaque chargement du vol,
+    # et un plan identique doit retrouver son journal de vol après un
+    # redémarrage de NaviXav.
+    plan_fingerprint: str | None = None
 
     @property
     def enroute_fixes(self) -> list[str]:
@@ -243,6 +258,10 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         (fix for fix in navlog if fix.ident.upper() in {"TOD", "T/D"}),
         None,
     )
+    planned_toc = next(
+        (fix for fix in navlog if fix.ident.upper() in {"TOC", "T/C"}),
+        None,
+    )
     sid_block = _leading_procedure_block(navlog)
     star_block = _trailing_procedure_block(navlog)
     sid = _block_procedure_name(sid_block)
@@ -285,6 +304,8 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         navlog=navlog,
         simbrief_tod_lat=planned_tod.lat if planned_tod else None,
         simbrief_tod_lon=planned_tod.lon if planned_tod else None,
+        simbrief_toc_lat=planned_toc.lat if planned_toc else None,
+        simbrief_toc_lon=planned_toc.lon if planned_toc else None,
         simbrief_sid=sid,
         simbrief_star=star,
         sid_exit_hint=sid_block[-1].ident if sid_block else None,

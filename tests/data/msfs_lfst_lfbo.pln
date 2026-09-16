@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SimBase.Document Type="AceXML" version="1,0">
+    <Descr>AceXML Document</Descr>
+    <FlightPlan.FlightPlan>
+        <Title>LFST to LFBO</Title>
+        <FPType>IFR</FPType>
+        <RouteType>HighAlt</RouteType>
+        <CruisingAlt>34000</CruisingAlt>
+        <DepartureID>LFST</DepartureID>
+        <DepartureLLA>N48° 32' 17.00",E7° 38' 5.00",+000505.00</DepartureLLA>
+        <DestinationID>LFBO</DestinationID>
+        <DestinationLLA>N43° 37' 44.00",E1° 21' 50.00",+000499.00</DestinationLLA>
+        <Descr>LFST, LFBO</Descr>
+        <DeparturePosition>05</DeparturePosition>
+        <DepartureName>Strasbourg Entzheim</DepartureName>
+        <DestinationName>Toulouse Blagnac</DestinationName>
+        <AppVersion>
+            <AppVersionMajor>12</AppVersionMajor>
+            <AppVersionBuild>1</AppVersionBuild>
+        </AppVersion>
+        <ATCWaypoint id="LFST">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <WorldPosition>N48° 32' 17.00",E7° 38' 5.00",+000505.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <DepartureFP>EPIK8M</DepartureFP>
+            <RunwayNumberFP>5</RunwayNumberFP>
+            <RunwayDesignatorFP>NONE</RunwayDesignatorFP>
+            <ICAO>
+                <ICAOIdent>LFST</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="D308M">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N48° 37' 59.00",E7° 30' 19.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <DepartureFP>EPIK8M</DepartureFP>
+            <RunwayNumberFP>5</RunwayNumberFP>
+            <RunwayDesignatorFP>NONE</RunwayDesignatorFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>D308M</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="EPIKO">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N48° 26' 20.00",E7° 5' 53.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <DepartureFP>EPIK8M</DepartureFP>
+            <RunwayNumberFP>5</RunwayNumberFP>
+            <RunwayDesignatorFP>NONE</RunwayDesignatorFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>EPIKO</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="LIRKO">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N47° 59' 10.00",E6° 20' 30.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>LIRKO</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="MOKIP">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N46° 32' 4.00",E4° 41' 25.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ATCAirway>UN854</ATCAirway>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>MOKIP</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="GERVA">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N45° 17' 30.00",E3° 24' 21.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ATCAirway>UN854</ATCAirway>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>GERVA</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="AFRIC">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N44° 12' 5.00",E2° 17' 39.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ArrivalFP>AFRI8N</ArrivalFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>AFRIC</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="FARCI">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N43° 56' 44.00",E1° 57' 6.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ArrivalFP>AFRI8N</ArrivalFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>FARCI</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="ADIMO">
+            <ATCWaypointType>Intersection</ATCWaypointType>
+            <WorldPosition>N43° 46' 5.00",E1° 39' 3.00",+000000.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ArrivalFP>AFRI8N</ArrivalFP>
+            <ICAO>
+                <ICAORegion>LF</ICAORegion>
+                <ICAOIdent>ADIMO</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="LFBO">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <WorldPosition>N43° 37' 44.00",E1° 21' 50.00",+000499.00</WorldPosition>
+            <SpeedMaxFP>-1</SpeedMaxFP>
+            <ApproachTypeFP>ILS</ApproachTypeFP>
+            <RunwayNumberFP>32</RunwayNumberFP>
+            <RunwayDesignatorFP>RIGHT</RunwayDesignatorFP>
+            <SuffixFP>Z</SuffixFP>
+            <ICAO>
+                <ICAOIdent>LFBO</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+    </FlightPlan.FlightPlan>
+</SimBase.Document>

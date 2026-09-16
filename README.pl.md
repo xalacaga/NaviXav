@@ -44,6 +44,22 @@ zapisaniu ustawień plan odświeża się w tle bez zatrzymywania okna dialogoweg
 Polecenia panelu MSFS zachowują inne ustawienia, w tym identyfikatory SimBrief.
 
 
+### Plan lotu z MSFS (.PLN)
+
+Dla pilotów, którzy nie korzystają z SimBrief, NaviXav odczytuje także plan
+lotu przygotowany w planerze MSFS. Wybierz **Plan lotu z MSFS (.PLN)** jako
+źródło planu lotu w **Ustawieniach**:
+
+- lot wczytany w MSFS (`CustomFlight.PLN`) jest odczytywany automatycznie,
+  przy uruchomieniu i przy każdym **Uzupełnij plan**;
+- przycisk **Otwórz plik .PLN** na pasku narzędzi pozwala wybrać dowolny plik
+  `.PLN` zapisany z MSFS; obowiązuje on przez całą sesję;
+- lotniska, wysokość przelotowa, punkty trasy i drogi lotnicze, nazwy SID i
+  STAR oraz planowane pasy są wykorzystywane dokładnie jak OFP z SimBrief: te
+  same procedury, te same mapy, to samo śledzenie;
+- plik `.PLN` nie zawiera mas, paliwa, lotniska zapasowego ani pogody: sekcja
+  dispatch pozostaje pusta, a METAR/TAF pobierane są na żywo.
+
 ### Pogoda dla lotu
 
 - najważniejsze dane METAR i TAF dla odlotu, przylotu i lotniska zapasowego;
@@ -141,6 +157,10 @@ W Fenix A319/A320/A321 wykrywanie STD odczytuje rzeczywisty stan barometru kapit
 
 Monitorowanie ILS używa odbiornika przypisanego przez załadowany samolot. Fenix A319/A320/A321 i FlyByWire A32NX używają kapitańskiego NAV3; pozostałe samoloty używają indeksu NAV1–NAV4 wybranego przez MSFS. Gdy indeks lub częstotliwość są niedostępne, alarm pozostaje wyciszony zamiast porównywać inny odbiornik.
 
+W Fenix A320 NaviXav odczytuje aktywny plan lotu FMGC przez lokalną bramkę EFB Fenix (tylko do odczytu: do samolotu nigdy nic nie jest zapisywane). Na mapie trasa FMS jest rysowana żółtą linią przerywaną tylko tam, gdzie odbiega od trasy NaviXav — po DIRECT TO lub nowej STAR — wraz z pseudo-punktami profilu ((LIM), (DECEL)) i pozycją w legendzie; przycisk „Zapasowe FMGC” pokazuje plan na lotnisko zapasowe na szaro. T/C i T/D publikowane przez FMGC zastępują szacunki na mapie i w śledzeniu lotu, których źródłem staje się „FMGC samolotu”. W locie faza FMGC (wznoszenie, przelot, zniżanie, podejście) zastępuje fazę wyprowadzoną z telemetrii. Śledzenie lotu zyskuje wartość „Aktywny punkt FMGC” (punkt TO, odległość, faza; pomarańczowa, gdy FMGC leci do innego punktu niż trasa NaviXav), czas przylotu z FMGC i masy FMS (ZFW i paliwo, pomarańczowe, gdy ZFW różni się od OFP), a także dwa alerty: punkt ograniczenia prędkości 250 kt i punkt wytracania prędkości. Karta MCDU otwiera się „Kontrolą FMGC”, która porównuje wiersz po wierszu to, co planuje NaviXav, z tym, co zawiera FMGC — FROM/TO, lotnisko zapasowe, numer lotu, poziom przelotowy, pasy, SID, trasa, STAR i podejście rozpoznawane po ich punktach, ZFW, prędkości startowe — i kończy się lustrem MCDU 1 i 2 tylko do odczytu. Dziennik lotów zachowuje numer lotu i przewidywany czas przylotu z FMGC. Bez Fenixa lub gdy bramka zniknie, tego wszystkiego po prostu nie ma i obowiązują poniższe szacunki. To nieudokumentowany interfejs Fenixa, który może się zmienić po aktualizacji.
+
+Dwa kolejne łączniki zasilają ten sam ekran, mniejszą ilością danych. W **FlyByWire A32NX/A380X** NaviXav odczytuje ekrany MCDU przez SimBridge, opcjonalną lokalną usługę FlyByWire (jej kanał Remote MCDU), oraz fazę FMGC przez zmienną samolotu; sama trasa pozostaje w samolocie. W **PMDG 737/777** NaviXav odczytuje ekrany CDU, które SDK PMDG nadaje przez SimConnect po ustawieniu `EnableCDUBroadcast.0=1` (i `.1` dla pierwszego oficera) w pliku opcji samolotu; nic więcej z SDK nie jest dekodowane. Oba działają tylko do odczytu: nigdy nie jest wysyłane żadne naciśnięcie klawisza. Lustro MCDU podaje swoje źródło (Fenix EFB, FlyByWire SimBridge, PMDG SDK); kontrola FMGC i punkty profilu wymagają pełnego planu, więc istnieją tylko z Fenixem. `navixav probe-fms` wskazuje, który z trzech kanałów odpowiada w załadowanym samolocie.
+
 Wyświetlany TOD jest szacunkiem SimBrief lub NaviXav, a nie odczytem MCDU. Profil FMS może wskazać inny punkt przy tej samej trasie i poziomie lotu. Jeśli ograniczenia przyspieszą punkt SimBrief, źródło zmienia się na szacunek obliczony.
 
 Śledzenie lotu i panel w symulatorze pokazują „Zniżanie w toku” zamiast TOD podczas zniżania, a następnie „Podejście”. Odcinki poziome zachowują komunikat, jeśli utrata wysokości potwierdza zniżanie. Status pochodzi z telemetrii, nie z trybu DES FMS.
@@ -169,8 +189,7 @@ NaviXav wykorzystuje SimConnect, aby:
 - śledzić pozycję samolotu w czasie rzeczywistym;
 - odczytywać wysokość, wysokość nad terenem, kurs, prędkość względem ziemi i
   prędkość pionową;
-- rozróżniać STD od QNH zachowanego na wysokościomierzu i opcjonalnie ostrzegać
-  o niebezpiecznie otwartych drzwiach, luku lub osłonie kabiny;
+- rozróżniać STD od QNH zachowanego na wysokościomierzu;
 - pobierać lotniska, drogi startowe wraz z oświetleniem krawędzi i osi,
   procedury, punkty nawigacyjne i pomoce radionawigacyjne;
 - stopniowo budować lokalną bazę w pliku `data/navixav.sqlite`.
@@ -354,7 +373,8 @@ karty na oficjalny katalog i pozostanie w aplikacji.
 - Windows 10 lub Windows 11 w wersji 64-bitowej;
 - Microsoft WebView2 Runtime, instalowany automatycznie przez instalator;
 - Microsoft Flight Simulator dla danych i śledzenia w czasie rzeczywistym;
-- konto SimBrief z wygenerowanym OFP;
+- konto SimBrief z wygenerowanym OFP albo plan lotu przygotowany w MSFS
+  (`.PLN`);
 - połączenie internetowe dla SimBrief, podkładu mapowego oraz krajowych
   publikacji AIS lub FAA.
 
@@ -475,6 +495,15 @@ Usługa pozostaje wówczas dostępna wyłącznie pod adresem
 
 Bieżącą konfigurację przeprowadza się przyciskiem **Ustawienia** w interfejsie.
 
+### Źródło planu lotu
+
+**Źródło planu lotu** określa, skąd pochodzi plan:
+
+- **SimBrief**: ostatni OFP z konta podanego poniżej (domyślnie);
+- **Plan lotu z MSFS (.PLN)**: lot wczytany w MSFS albo plik `.PLN` otwarty z
+  paska narzędzi. Identyfikatory SimBrief nie są wtedy wymagane, a pogoda jest
+  zawsze pobierana na żywo.
+
 ### Konto SimBrief
 
 Należy wypełnić jedno z dwóch pól:
@@ -558,7 +587,9 @@ lotniskiem przylotu.
 Włącz **Dostęp z telefonu i tabletu** w **Ustawieniach**, zapisz i uruchom
 NaviXav ponownie. Otwórz chroniony adres wyświetlany na komputerze na urządzeniu
 podłączonym do tej samej sieci Wi-Fi. Interfejs mobilny udostępnia śledzenie na
-żywo, mapę, ograniczenia, dane MCDU, samolotu i oficjalne mapy. Ustawienia,
+żywo, mapę, ograniczenia, dane MCDU, samolotu i oficjalne mapy, a gdy samolot
+publikuje swój FMS — kontrolę FMGC, lustro MCDU tylko do odczytu (drugi ekran
+MCDU na tablecie), trasę FMGC na mapie i plan na lotnisko zapasowe. Ustawienia,
 zamykanie i aktualizacje pozostają dostępne tylko na komputerze. Jeśli Windows
 zapyta, zezwól NaviXav wyłącznie w sieciach prywatnych.
 
@@ -777,6 +808,13 @@ bez tego składnika należy użyć pliku `NaviXav-Setup-<wersja>.exe`.
 - sprawdzić Pilot ID lub nazwę użytkownika w **Ustawieniach**;
 - wygenerować OFP w SimBrief przed ponowną próbą pobrania;
 - sprawdzić połączenie internetowe.
+
+### Żaden plan MSFS nie jest wczytywany
+
+- wczytaj lot w planerze MSFS, aby istniał plik `CustomFlight.PLN`;
+- albo otwórz plik `.PLN` zapisany z MSFS przyciskiem na pasku narzędzi;
+- sprawdź, czy plik wskazuje zarówno lotnisko startu, jak i lotnisko
+  docelowe.
 
 ### Mapa oficjalna jest niedostępna
 

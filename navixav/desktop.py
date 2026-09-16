@@ -369,6 +369,18 @@ def _run_desktop_window(url: str, server: object) -> None:
                 return None
             return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
 
+        def select_plan_file(current_directory: str = "") -> str | None:
+            """Demande un fichier .PLN sans exposer le système de fichiers au WebView."""
+            selected = window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                directory=current_directory or "",
+                allow_multiple=False,
+                file_types=("Plan de vol MSFS (*.pln)", "Tous les fichiers (*.*)"),
+            )
+            if not selected:
+                return None
+            return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -386,6 +398,7 @@ def _run_desktop_window(url: str, server: object) -> None:
         server.config.app.state.request_show_window = show_window
         server.config.app.state.request_open_chartfox_auth = open_chartfox_auth
         server.config.app.state.request_aircraft_folder = select_aircraft_folder
+        server.config.app.state.request_plan_file = select_plan_file
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

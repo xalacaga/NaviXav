@@ -45,6 +45,7 @@ data/cache/
 # Base d'avions de l'utilisateur : ses appareils, sur sa machine.
 data/aircraft_db/
 data/logs/
+data/diagnostics/
 data/private_admin/
 data/developer/
 data/webview/
