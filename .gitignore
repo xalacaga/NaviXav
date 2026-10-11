@@ -2,6 +2,9 @@
 .env
 data/user_settings.json
 data/user_settings.tmp
+data/logbook.json
+data/logbook.tmp
+data/logbook.corrupt.json
 data/credentials/
 
 # Claude

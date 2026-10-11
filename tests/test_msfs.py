@@ -25,6 +25,7 @@ from navixav.msfs.client import (
     decode,
 )
 from navixav.navdata import base, msfs_store
+from navixav.navdata import msfs as msfs_module
 from navixav.navdata.base import ProcedureKind
 
 
@@ -341,6 +342,86 @@ def _minimal_airport() -> dict:
         "frequencies": [], "approaches": [], "departures": [], "arrivals": [],
         "taxi_points": [], "taxi_parkings": [], "taxi_paths": [],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Région d'un identifiant
+#
+# Une région erronée ne reçoit aucune réponse du simulateur : chaque essai
+# manqué coûte le délai d'attente entier. Chercher l'ILS d'EGCC dans les huit
+# régions de la base avant « EG » figeait le calcul du plan 54 s, puis classait
+# l'ILS introuvable.
+# --------------------------------------------------------------------------- #
+
+
+def _store_with_regions(path, regions_by_airport: dict[str, list[str]]):
+    connection = msfs_store.connect(path)
+    for icao, regions in regions_by_airport.items():
+        airport = _minimal_airport()
+        airport["icao"] = icao
+        msfs_store.store_airport(connection, airport)
+        procedure_id = msfs_store._insert_procedure(
+            connection, icao, "APPROACH", "I23R", proc_type="ILS", suffix=None,
+            runway_name="23", runways=["23"], missed_altitude_ft=None,
+            requires_rnp=False,
+        )
+        msfs_store._insert_legs(
+            connection, procedure_id, None,
+            [{"type": 15, "fix": f"FX{index:03d}", "region": region}
+             for index, region in enumerate(regions)],
+        )
+    connection.commit()
+    connection.close()
+
+
+def test_ils_is_looked_up_in_its_airport_region_only(tmp_path, monkeypatch):
+    path = tmp_path / "navixav.sqlite"
+    # La base est dominée par d'autres régions, comme après quelques vols.
+    _store_with_regions(path, {
+        "LFPO": ["LF"] * 30, "LEMD": ["LE"] * 20, "TEST": ["EG"] * 3,
+    })
+    tried: list[str] = []
+
+    def fake_extract(_client, ident, region):
+        tried.append(region)
+        return None
+
+    monkeypatch.setattr(msfs_module, "extract_navaid", fake_extract)
+    provider = msfs_module.MsfsProvider(path, client=object())
+    try:
+        assert provider.ils_frequency("TEST", "05") is None
+    finally:
+        provider.close()
+    assert tried == ["EG", ""]
+
+
+def test_airport_regions_come_most_frequent_first(tmp_path):
+    path = tmp_path / "navixav.sqlite"
+    _store_with_regions(path, {"LFSB": ["LS", "LF", "LF", "LF"]})
+    provider = msfs_module.MsfsProvider(path, allow_fetch=False)
+    try:
+        assert provider._candidate_regions("XXX", "LFSB") == ["LF", "LS", ""]
+        # Sans terrain, la recherche reste ouverte à toute la base.
+        assert provider._candidate_regions("XXX") == ["LF", "LS", ""]
+    finally:
+        provider.close()
+
+
+def test_schema_4_forgets_navaid_misses_left_by_wrong_regions(tmp_path):
+    path = tmp_path / "navixav.sqlite"
+    connection = msfs_store.connect(path)
+    msfs_store.store_miss(connection, "INN", "navaid")
+    msfs_store.store_miss(connection, "ODI1S", "waypoint")
+    with connection:
+        connection.execute(
+            "UPDATE meta SET value = '3' WHERE key = 'schema_version'"
+        )
+    connection.close()
+
+    connection = msfs_store.connect(path)
+    misses = connection.execute("SELECT ident, kind FROM lookup_miss").fetchall()
+    connection.close()
+    assert [tuple(row) for row in misses] == [("ODI1S", "waypoint")]
 
 
 # --------------------------------------------------------------------------- #

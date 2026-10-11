@@ -22,7 +22,7 @@ from navixav.paths import user_data_path
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_STORE = user_data_path("navixav.sqlite")
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Version de l'extraction enregistrée pour un terrain — géométrie du sol à
 # l'origine, découpage des procédures depuis. Elle est portée par l'aéroport
@@ -341,6 +341,12 @@ def _migrate(connection: sqlite3.Connection) -> None:
             # Colonne déjà présente : la base a été touchée par une version
             # intermédiaire, il n'y a rien à reprendre.
             continue
+    # Jusqu'au schéma 3, un ILS était cherché dans les régions des autres
+    # terrains avant la sienne : chaque essai restait sans réponse, et
+    # l'installation finissait déclarée introuvable. Ces échecs ne prouvent
+    # rien ; on les oublie pour que la fréquence soit de nouveau demandée.
+    if version and version < 4 and "lookup_miss" in existing:
+        connection.execute("DELETE FROM lookup_miss WHERE kind = 'navaid'")
     connection.commit()
     if version:
         LOGGER.info(

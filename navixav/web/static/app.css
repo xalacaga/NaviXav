@@ -3366,6 +3366,68 @@ body[data-interface="guided"] .light-chip[data-state="on"]::before {
   .flight-summary-metrics { grid-template-columns: repeat(3, 1fr); }
 }
 
+/* Statistiques du carnet : les totaux d'abord, puis les habitudes du pilote. */
+.flight-summary-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.logbook-stats {
+  display: grid; gap: 12px; margin: 10px 0 14px; padding: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+.logbook-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.logbook-lists h3 { margin: 0 0 6px; font-size: 0.72rem; color: var(--text-dim); }
+.logbook-lists ol { margin: 0; padding-left: 1.3em; display: grid; gap: 3px; font-size: 0.78rem; }
+.logbook-lists li { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .logbook-lists { grid-template-columns: 1fr; }
+}
+
+/* Analyse d'atterrissage : la vitesse au toucher d'abord, le détail ensuite.
+   Le cadre suit la boîte des paramètres, dans la fenêtre native de 720 × 560. */
+.landing-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  padding: 20px;
+}
+.landing-dialog .settings-head { position: static; margin: -20px -20px 14px; }
+.landing-body { overflow-y: auto; min-height: 0; display: grid; align-content: start; gap: 14px; }
+.landing-hero {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px;
+}
+.landing-rate, .landing-score { display: grid; gap: 2px; }
+.landing-rate small, .landing-score small { color: var(--text-faint); font-size: 0.7rem; }
+.landing-rate strong { font-size: 2rem; font-variant-numeric: tabular-nums; }
+.landing-score strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.landing-grade {
+  padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
+  border: 1px solid currentColor;
+}
+.landing-grade.is-good { color: var(--high); }
+.landing-grade.is-warning { color: var(--medium); }
+.landing-grade.is-danger { color: var(--low); }
+.landing-note { margin: 0; color: var(--text-dim); font-size: 0.78rem; }
+.landing-strip { display: block; width: 100%; height: 64px; }
+.landing-strip-runway { fill: var(--rwy); }
+.landing-strip-tdz { fill: color-mix(in srgb, var(--high) 30%, transparent); }
+.landing-strip-axis { stroke: var(--rwy-centreline); stroke-width: 1.5; stroke-dasharray: 10 8; }
+.landing-strip-point { stroke: var(--aircraft-outline); stroke-width: 2; }
+.landing-strip-point.is-good { fill: var(--high); }
+.landing-strip-point.is-warning { fill: var(--medium); }
+.landing-strip-point.is-danger { fill: var(--low); }
+.landing-section { margin: 0; font-size: 0.85rem; color: var(--text-dim); }
+.landing-stability { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.landing-stability li { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; }
+.landing-stability-mark { width: 1.2em; font-weight: 700; text-align: center; }
+.landing-stability .is-good .landing-stability-mark { color: var(--high); }
+.landing-stability .is-danger .landing-stability-mark { color: var(--low); }
+.landing-stability .is-unknown { color: var(--text-faint); }
+.landing-actions { margin-top: 12px; justify-content: flex-end; }
+@media (max-width: 620px) {
+  .landing-hero { grid-template-columns: 1fr auto; }
+  .landing-score { grid-column: 1 / -1; }
+}
+
 .meter { margin-top: 9px; height: 5px; border-radius: 999px; background: var(--surface-raised); overflow: hidden; }
 .meter span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--high)); }
 .meter.over span { background: linear-gradient(90deg, var(--medium), var(--low)); }

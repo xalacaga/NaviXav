@@ -22,6 +22,7 @@ from navixav.live.base import (
     AircraftConfiguration,
     AircraftState,
     PositionUnavailable,
+    TouchdownSample,
     TrafficReport,
 )
 from navixav.msfs.client import SimConnectClient, SimConnectError
@@ -150,6 +151,21 @@ _LIGHT_STATE_BITS = {
     "logo": 0x0100,
 }
 
+# Le dernier toucher, figé par MSFS au contact du sol. Le bloc n'est lu que
+# dans les secondes qui suivent un passage de l'air au sol : le reste du temps,
+# il décrirait un atterrissage passé et coûterait une requête pour rien.
+_TOUCHDOWN_VARIABLES = (
+    ("PLANE TOUCHDOWN NORMAL VELOCITY", "Feet per minute"),
+    ("PLANE TOUCHDOWN LATITUDE", "Degrees"),
+    ("PLANE TOUCHDOWN LONGITUDE", "Degrees"),
+    ("PLANE TOUCHDOWN HEADING DEGREES TRUE", "Degrees"),
+    ("PLANE TOUCHDOWN PITCH DEGREES", "Degrees"),
+    ("PLANE TOUCHDOWN BANK DEGREES", "Degrees"),
+)
+
+# Durée pendant laquelle un avion posé est encore « en train d'atterrir ».
+_TOUCHDOWN_WINDOW_S = 20.0
+
 # Bloc de capacités : lu une seule fois par avion chargé.
 _CAPABILITY_VARIABLES = (
     ("IS GEAR RETRACTABLE", "Bool"),
@@ -222,6 +238,8 @@ class SimConnectSource:
         self._aircraft_title_checked_at = 0.0
         self._aircraft_title_disabled_until = 0.0
         self._traffic_disabled_until = 0.0
+        self._touchdown_window_until = 0.0
+        self._touchdown_disabled_until = 0.0
 
     @property
     def name(self) -> str:
@@ -308,6 +326,7 @@ class SimConnectSource:
 
             self._failure_reason = ""
             title = self._read_aircraft_title(client)
+            on_ground = bool(values["SIM ON GROUND"])
             return AircraftState(
                 latitude=values["PLANE LATITUDE"],
                 longitude=values["PLANE LONGITUDE"],
@@ -318,11 +337,12 @@ class SimConnectSource:
                 ground_speed_kt=values["GROUND VELOCITY"],
                 indicated_airspeed_kt=values["AIRSPEED INDICATED"],
                 vertical_speed_fpm=values["VERTICAL SPEED"],
-                on_ground=bool(values["SIM ON GROUND"]),
+                on_ground=on_ground,
                 paused=self._read_paused(client),
                 title=title,
                 source=self.name,
                 configuration=self._read_configuration(client),
+                touchdown=self._read_touchdown(client, on_ground),
             )
 
     def traffic(self, radius_m: int = _TRAFFIC_RADIUS_M, *, strict: bool = False) -> list[TrafficReport]:
@@ -429,6 +449,35 @@ class SimConnectSource:
                     self._spoilers_pct = None
                 self._aircraft_title = title
         return self._aircraft_title
+
+    def _read_touchdown(
+        self, client: SimConnectClient, on_ground: bool
+    ) -> TouchdownSample | None:
+        """Le toucher figé par MSFS, juste après un passage de l'air au sol."""
+        now = time.monotonic()
+        if not on_ground:
+            self._touchdown_window_until = now + _TOUCHDOWN_WINDOW_S
+            return None
+        if now >= self._touchdown_window_until or now < self._touchdown_disabled_until:
+            return None
+        try:
+            values = client.read_simvars(
+                _TOUCHDOWN_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S
+            )
+        except SimConnectError as exc:
+            self._touchdown_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info("Valeurs de toucher indisponibles (%s)", exc)
+            return None
+        return TouchdownSample(
+            normal_velocity_fpm=values["PLANE TOUCHDOWN NORMAL VELOCITY"],
+            latitude=values["PLANE TOUCHDOWN LATITUDE"],
+            longitude=values["PLANE TOUCHDOWN LONGITUDE"],
+            heading_true_deg=values["PLANE TOUCHDOWN HEADING DEGREES TRUE"] % 360,
+            # MSFS compte le tangage positif nez en bas ; le rapport le donne
+            # dans le sens du pilote, positif nez en haut.
+            pitch_deg=-values["PLANE TOUCHDOWN PITCH DEGREES"],
+            bank_deg=values["PLANE TOUCHDOWN BANK DEGREES"],
+        )
 
     def _read_paused(self, client: SimConnectClient) -> bool | None:
         """Indique la pause normale ou active, si MSFS expose cet état."""
@@ -787,6 +836,8 @@ class SimConnectSource:
         self._aircraft_title_checked_at = 0.0
         self._aircraft_title_disabled_until = 0.0
         self._traffic_disabled_until = 0.0
+        self._touchdown_window_until = 0.0
+        self._touchdown_disabled_until = 0.0
 
     def close(self) -> None:
         with self._lock:

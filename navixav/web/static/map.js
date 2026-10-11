@@ -54,6 +54,25 @@ const MAP = (() => {
   // long de vingt-huit pixels. Réduite de moitié, elle reste reconnaissable
   // tout en laissant l'avion suivi dominer la carte.
   const TRAFFIC_SCALE = 0.5;
+  // Entre deux relevés, chaque appareil avance sur son dernier vecteur. Un
+  // relevé OpenSky anonyme peut avoir quatre minutes : sans cette estime, la
+  // carte le montrait figé puis le faisait sauter de trente nautiques. Au sol
+  // l'estime s'arrête vite — un roulage change de direction à chaque bretelle.
+  const TRAFFIC_ANIMATION_MS = 500;
+  const TRAFFIC_EXTRAPOLATION_S = 300;
+  const TRAFFIC_GROUND_EXTRAPOLATION_S = 3;
+  const TRAFFIC_STATIONARY_KT = 2;
+  // Le relevé suivant ne téléporte pas l'appareil : l'écart avec la position
+  // estimée se résorbe en quelques secondes. Au-delà d'un demi-degré, ce
+  // n'est plus une dérive mais un autre appareil, et il est posé d'emblée.
+  const TRAFFIC_BLEND_S = 3;
+  const TRAFFIC_BLEND_MAX_DEG = 0.5;
+  // Un virage mesuré entre deux relevés espacés ne dit pas s'il dure encore :
+  // il est prolongé en s'amortissant, jamais en boucle. À 3 °/s, 45° au plus.
+  const TRAFFIC_TURN_DECAY_S = 15;
+  const TRAFFIC_TURN_PHASE_S = 5 * TRAFFIC_TURN_DECAY_S;
+  const TRAFFIC_TURN_STEP_S = 2.5;
+  let trafficTimer = null;
   let fitPending = false;
   // Les fonds CARTO Positron et Dark Matter ont été retirés : leur service
   // gratuit sans clé renvoie désormais des tuiles tatouées « API KEY
@@ -80,6 +99,127 @@ const MAP = (() => {
 
   function css(name) {
     return getComputedStyle(document.body).getPropertyValue(name).trim();
+  }
+
+  function trafficKey(entry) {
+    return entry.uid || entry.callsign || "";
+  }
+
+  function wrapLongitude(value) {
+    return ((value + 540) % 360) - 180;
+  }
+
+  function wrapHeading(value) {
+    return ((value % 360) + 360) % 360;
+  }
+
+  /** Point atteint sur un grand cercle, en degrés. */
+  function destination(latitude, longitude, bearingDeg, distanceNm) {
+    if (!(distanceNm > 0)) return { latitude, longitude };
+    const angular = distanceNm / 3440.065;
+    const bearing = (bearingDeg * Math.PI) / 180;
+    const phi = (latitude * Math.PI) / 180;
+    const lambda = (longitude * Math.PI) / 180;
+    const nextPhi = Math.asin(
+      Math.sin(phi) * Math.cos(angular)
+      + Math.cos(phi) * Math.sin(angular) * Math.cos(bearing)
+    );
+    const nextLambda = lambda + Math.atan2(
+      Math.sin(bearing) * Math.sin(angular) * Math.cos(phi),
+      Math.cos(angular) - Math.sin(phi) * Math.sin(nextPhi)
+    );
+    return {
+      latitude: (nextPhi * 180) / Math.PI,
+      longitude: wrapLongitude((nextLambda * 180) / Math.PI),
+    };
+  }
+
+  /** Cap après un virage au taux mesuré, amorti en TRAFFIC_TURN_DECAY_S. */
+  function turnHeading(heading, rate, elapsed) {
+    return wrapHeading(
+      heading + rate * TRAFFIC_TURN_DECAY_S * (1 - Math.exp(-elapsed / TRAFFIC_TURN_DECAY_S))
+    );
+  }
+
+  /**
+   * Position et cap estimés d'un appareil, sans le fondu du dernier relevé.
+   *
+   * Arc de grand cercle, comme l'injection : sur cinq minutes à 480 kt, la
+   * ligne droite en Mercator s'écarterait déjà de la route réelle. Un virage
+   * mesuré entre deux relevés se poursuit en s'amortissant, puis l'appareil
+   * repart en ligne droite sur le nouveau cap — le même modèle que dans le
+   * simulateur, pour que la carte et la fenêtre montrent le même appareil.
+   */
+  function predictTraffic(entry, now) {
+    const speed = Number(entry.ground_speed_kt);
+    const heading = Number(entry.heading_deg);
+    let elapsed = Math.max(0, (now - entry.observedAt) / 1000);
+    if (entry.on_ground === true) {
+      elapsed = speed > TRAFFIC_STATIONARY_KT
+        ? Math.min(elapsed, TRAFFIC_GROUND_EXTRAPOLATION_S) : 0;
+    } else {
+      elapsed = Math.min(elapsed, TRAFFIC_EXTRAPOLATION_S);
+    }
+    let latitude = entry.baseLatitude;
+    let longitude = entry.baseLongitude;
+    if (!(elapsed > 0 && speed > 0 && Number.isFinite(heading))) {
+      return { latitude, longitude, heading: Number.isFinite(heading) ? heading : 0 };
+    }
+    let course = heading;
+    let straight = elapsed;
+    const rate = Number(entry.turn_rate_dps);
+    if (entry.on_ground !== true && Number.isFinite(rate) && rate !== 0) {
+      const turning = Math.min(elapsed, TRAFFIC_TURN_PHASE_S);
+      for (let done = 0; done < turning;) {
+        const step = Math.min(TRAFFIC_TURN_STEP_S, turning - done);
+        ({ latitude, longitude } = destination(
+          latitude, longitude, turnHeading(heading, rate, done + step / 2),
+          (speed * step) / 3600
+        ));
+        done += step;
+      }
+      course = turnHeading(heading, rate, turning);
+      straight = elapsed - turning;
+    }
+    ({ latitude, longitude } = destination(
+      latitude, longitude, course, (speed * straight) / 3600
+    ));
+    return { latitude, longitude, heading: course };
+  }
+
+  /** Place l'appareil à l'instant donné : estime plus reste du fondu. */
+  function placeTraffic(entry, now) {
+    const predicted = predictTraffic(entry, now);
+    const fade = Math.exp(-Math.max(0, now - entry.receivedAt) / 1000 / TRAFFIC_BLEND_S);
+    entry.displayLatitude = predicted.latitude + entry.offsetLatitude * fade;
+    entry.displayLongitude = wrapLongitude(
+      predicted.longitude + entry.offsetLongitude * fade
+    );
+    entry.displayHeading = wrapHeading(predicted.heading + entry.offsetHeading * fade);
+    Object.assign(entry, project(entry.displayLatitude, entry.displayLongitude));
+    return entry;
+  }
+
+  function animateTraffic() {
+    if (!traffic.length) {
+      stopTrafficAnimation();
+      return;
+    }
+    if (document.hidden || !canvas?.getClientRects().length) return;
+    const now = performance.now();
+    for (const entry of traffic) placeTraffic(entry, now);
+    draw();
+  }
+
+  function startTrafficAnimation() {
+    if (trafficTimer === null && traffic.length) {
+      trafficTimer = setInterval(animateTraffic, TRAFFIC_ANIMATION_MS);
+    }
+  }
+
+  function stopTrafficAnimation() {
+    if (trafficTimer !== null) clearInterval(trafficTimer);
+    trafficTimer = null;
   }
 
   /** Latitude/longitude vers le repère monde, en mètres Web Mercator. */
@@ -749,7 +889,7 @@ const MAP = (() => {
       const chosen = entry.callsign === selectedTraffic;
       context.save();
       context.translate(x, y);
-      context.rotate(((entry.heading_deg ?? 0) * Math.PI) / 180);
+      context.rotate(((entry.displayHeading ?? entry.heading_deg ?? 0) * Math.PI) / 180);
       context.scale(TRAFFIC_SCALE, TRAFFIC_SCALE);
       context.fillStyle = chosen ? highlight : colour;
       context.strokeStyle = css("--map-bg");
@@ -1059,19 +1199,61 @@ const MAP = (() => {
     /**
      * Trafic à afficher, en latitude/longitude.
      *
-     * La projection est faite une fois à la réception : un relevé de plusieurs
-     * centaines d'appareils serait autrement reprojeté à chaque déplacement de
-     * la carte.
+     * La projection est faite à la réception puis à chaque pas de l'estime,
+     * jamais à chaque déplacement de la carte.
+     *
+     * Le service rend le même relevé tant que sa source n'en a pas publié
+     * d'autre : un appareil revenu à l'identique garde donc son instant
+     * d'observation, sinon chaque interrogation le ramènerait en arrière.
      */
     setTraffic(list) {
+      const now = performance.now();
+      const wall = Date.now() / 1000;
+      const previous = new Map(traffic.map((entry) => [trafficKey(entry), entry]));
       traffic = (Array.isArray(list) ? list : [])
         .filter((entry) => (
           Number.isFinite(entry?.latitude) && Number.isFinite(entry?.longitude)
         ))
-        .map((entry) => ({ ...entry, ...project(entry.latitude, entry.longitude) }));
+        .map((entry) => {
+          const known = previous.get(trafficKey(entry));
+          const same = known
+            && known.baseLatitude === entry.latitude
+            && known.baseLongitude === entry.longitude;
+          const stamp = Number(entry.position_timestamp);
+          const age = stamp > 0
+            ? Math.min(Math.max(0, wall - stamp), TRAFFIC_EXTRAPOLATION_S) : 0;
+          const item = {
+            ...entry,
+            baseLatitude: entry.latitude,
+            baseLongitude: entry.longitude,
+            observedAt: same ? known.observedAt : now - age * 1000,
+            receivedAt: same ? known.receivedAt : now,
+            offsetLatitude: same ? known.offsetLatitude : 0,
+            offsetLongitude: same ? known.offsetLongitude : 0,
+            offsetHeading: same ? known.offsetHeading : 0,
+          };
+          if (known && !same && Number.isFinite(known.displayLatitude)) {
+            const target = predictTraffic(item, now);
+            const dLat = known.displayLatitude - target.latitude;
+            const dLon = wrapLongitude(known.displayLongitude - target.longitude);
+            if (Math.abs(dLat) <= TRAFFIC_BLEND_MAX_DEG
+                && Math.abs(dLon) <= TRAFFIC_BLEND_MAX_DEG) {
+              item.offsetLatitude = dLat;
+              item.offsetLongitude = dLon;
+              // Le cap aussi : sans cela la silhouette pivoterait d'un coup
+              // pendant que sa position glisse vers le nouveau relevé.
+              item.offsetHeading = Number.isFinite(known.displayHeading)
+                ? ((known.displayHeading - target.heading + 540) % 360) - 180 : 0;
+            }
+          }
+          return placeTraffic(item, now);
+        });
+      if (traffic.length) startTrafficAnimation();
+      else stopTrafficAnimation();
       draw();
     },
     clearTraffic() {
+      stopTrafficAnimation();
       traffic = [];
       selectedTraffic = "";
       draw();

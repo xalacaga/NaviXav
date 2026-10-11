@@ -29,7 +29,7 @@ from typing import Any, Iterable, Sequence
 
 import requests
 
-from navixav.traffic.base import TrafficAircraft
+from navixav.traffic.base import TrafficAircraft, TurnRateTracker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -150,6 +150,7 @@ class VatsimClient:
         self._lock = threading.Lock()
         self._feed: dict[str, Any] | None = None
         self._fetched_at = 0.0
+        self._turns = TurnRateTracker()
         self._transceivers: list[Any] | None = None
         self._transceivers_at = 0.0
 
@@ -190,6 +191,8 @@ class VatsimClient:
         l'affichage qui écarte ce qui sort du cadre.
         """
         feed = self._read(max_age_s=TRAFFIC_TTL_S)
+        # Le flux ne date pas chaque position : son téléchargement la date.
+        fetched_at = self._fetched_at
         aircraft: list[TrafficAircraft] = []
         for raw in feed.get("pilots") or ():
             entry = _aircraft(raw)
@@ -198,7 +201,7 @@ class VatsimClient:
             aircraft.append(entry)
             if limit is not None and len(aircraft) >= limit:
                 break
-        return aircraft
+        return self._turns.apply(aircraft, fetched_at)
 
     def close(self) -> None:
         closer = getattr(self._session, "close", None)

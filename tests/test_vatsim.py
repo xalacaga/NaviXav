@@ -512,3 +512,27 @@ def test_the_card_endpoint_answers_with_the_airport_fields():
     # Les noms sont présents même vides : l'interface distingue « inconnu de la
     # base » de « le service n'a rien dit ».
     assert "departure_name" in card and "arrival_name" in card
+
+
+def test_a_turn_is_measured_between_two_feeds(monkeypatch):
+    """Le virage se mesure d'un téléchargement du flux au suivant."""
+    clock = [1000.0]
+    monkeypatch.setattr("navixav.vatsim.time.monotonic", lambda: clock[0])
+    session = _FakeSession(_traffic_feed(
+        _pilot("AFR1", 48.0, 2.0, heading=270),
+        _pilot("TAXI", 48.1, 2.0, heading=90, groundspeed=15),
+    ))
+    client = VatsimClient(session=session)
+    assert all(entry.turn_rate_dps is None for entry in client.traffic())
+
+    clock[0] += 15
+    session.payload = _traffic_feed(
+        _pilot("AFR1", 48.0, 1.9, heading=300),
+        _pilot("TAXI", 48.1, 2.0, heading=180, groundspeed=15),
+    )
+    turned = {entry.callsign: entry for entry in client.traffic()}
+    # 270° → 300° en 15 s : 2 °/s à droite. Le roulage n'est pas anticipé.
+    assert turned["AFR1"].turn_rate_dps == pytest.approx(2.0)
+    assert turned["TAXI"].turn_rate_dps is None
+    # Relu dans le cache, le même flux garde sa mesure.
+    assert client.traffic()[0].turn_rate_dps == pytest.approx(2.0)

@@ -16,7 +16,7 @@ function setup() {
   const context = vm.createContext({
     AbortController, URLSearchParams, console,
     currentChart: {}, currentPlan: {},
-    setLiveState() {}, updateProcedures() {}, pollTaxiGuidance() {},
+    setLiveState() {}, updateProcedures() {}, pollTaxiGuidance() {}, handleLandingReport() {},
     applyAircraftState(aircraft) { state.aircraft = aircraft; },
     setTimeout(fn) { timers.set(++nextTimer, fn); return nextTimer; },
     clearTimeout(id) { timers.delete(id); },

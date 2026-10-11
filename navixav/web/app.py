@@ -55,6 +55,7 @@ from navixav.config import (
 )
 from navixav.faa import FaaClient, FaaError
 from navixav.live import LiveTracker, PositionUnavailable
+from navixav.live.landing import LandingMonitor
 from navixav.live.fms_hub import FmsHub
 from navixav.national_aip import (
     NATIONAL_AIP_SOURCES,
@@ -64,7 +65,8 @@ from navixav.national_aip import (
 )
 from navixav.navdata.base import NavdataError, ProcedureKind
 from navixav.navdata.msfs import MsfsProvider
-from navixav.paths import resource_path
+from navixav.logbook import LogbookStore
+from navixav.paths import resource_path, user_data_path
 from navixav.planner.engine import CompletionEngine, PlannerOverrides
 from navixav.preferences import AirportPreferences
 from navixav.msfs.flightplan import MsfsPlanError, current_flight_plan, load_pln
@@ -89,6 +91,8 @@ FAA_ICAO_PREFIXES = {
     "NS", "TI", "TJ",
 }
 LOGGER = logging.getLogger(__name__)
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 WEATHER_REFRESH_SECONDS = 300
 
 
@@ -208,10 +212,12 @@ def create_app(
     ivao_client: IvaoClient | None = None,
     opensky_client: OpenSkyClient | None = None,
     fms_reader: FmsHub | None = None,
+    logbook: LogbookStore | None = None,
 ) -> FastAPI:
     settings = settings or load_user_settings(Settings.load())
     lan_active = settings.lan_enabled
     tracker = LiveTracker()
+    logbook = logbook or LogbookStore(user_data_path("logbook.json"))
     fms_reader = fms_reader or FmsHub()
     sia = SiaClient()
     faa = FaaClient()
@@ -382,7 +388,12 @@ def create_app(
                 "/api/aig/download",
                 "/api/update/install",
                 "/api/shutdown",
-            } or request.url.path.startswith("/api/panel/") or (
+                "/api/landing/card",
+                "/api/logbook/import",
+                "/api/logbook/export",
+            } or (
+                request.url.path == "/api/logbook" and request.method != "GET"
+            ) or request.url.path.startswith("/api/panel/") or (
                 request.url.path.startswith("/api/msfs-panel/")
             ) or (
                 request.url.path == "/api/plan" and request.method == "POST"
@@ -1378,6 +1389,32 @@ def create_app(
             },
         )
 
+    def landing_runways():
+        """Pistes des terrains du plan : départ, arrivée et dégagement.
+
+        Lues dans le cache local seulement : l'analyse d'un atterrissage ne
+        déclenche jamais de requête vers le simulateur.
+        """
+        ofp = current_plan_state.get("ofp")
+        if ofp is None:
+            return []
+        airports = [
+            icao for icao in dict.fromkeys((
+                ofp.destination_icao, ofp.alternate_icao, ofp.origin_icao,
+            )) if icao
+        ]
+        provider = MsfsProvider(settings.navdata_store, allow_fetch=False)
+        try:
+            return [
+                (icao, runway)
+                for icao in airports
+                for runway in provider.runways(icao)
+            ]
+        finally:
+            provider.close()
+
+    landing_monitor = LandingMonitor(landing_runways)
+
     @app.get("/api/live")
     def live(
         aircraft: str | None = None,
@@ -1394,7 +1431,110 @@ def create_app(
             "connected": True,
             "aircraft": state.to_dict(),
             "procedures": procedure_payload(match, state),
+            "landing": landing_monitor.observe(state),
         }
+
+    def logbook_payload() -> dict[str, Any]:
+        entries = logbook.entries()
+        return {"entries": entries, "stats": logbook.stats()}
+
+    @app.get("/api/logbook")
+    def read_logbook() -> dict[str, Any]:
+        """Le carnet et ses statistiques, pour le PC comme pour la tablette."""
+        return logbook_payload()
+
+    @app.put("/api/logbook")
+    def replace_logbook(payload: dict[str, Any]) -> dict[str, Any]:
+        """La fenêtre du PC tient le carnet ; elle en envoie l'état complet."""
+        entries = payload.get("entries")
+        if not isinstance(entries, list):
+            raise HTTPException(422, "Liste de vols attendue.")
+        logbook.replace(entries)
+        return logbook_payload()
+
+    @app.post("/api/logbook/import")
+    def import_logbook(payload: dict[str, Any]) -> dict[str, Any]:
+        """Reprend les vols que l'ancien stockage du WebView conservait."""
+        entries = payload.get("entries")
+        if not isinstance(entries, list):
+            raise HTTPException(422, "Liste de vols attendue.")
+        before = len(logbook.entries())
+        logbook.merge(entries)
+        LOGGER.info("Carnet de vol : %d vol(s) repris", len(logbook.entries()) - before)
+        return logbook_payload()
+
+    @app.delete("/api/logbook")
+    def clear_logbook() -> dict[str, Any]:
+        logbook.clear()
+        LOGGER.info("Carnet de vol effacé")
+        return logbook_payload()
+
+    @app.get("/api/logbook.csv")
+    def logbook_csv_download() -> Response:
+        """Export tableur, pour un navigateur qui enregistre lui-même le fichier."""
+        return Response(
+            logbook.to_csv(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="NaviXav-logbook.csv"'},
+        )
+
+    @app.post("/api/logbook/export")
+    def export_logbook(request: Request) -> dict[str, Any]:
+        """Enregistre l'export là où le pilote le choisit, sur le PC."""
+        if request.headers.get("X-NaviXav-Logbook") != "export":
+            raise HTTPException(403, "Confirmation d’export absente.")
+        callback = getattr(app.state, "request_logbook_export_path", None)
+        if not callable(callback):
+            raise HTTPException(
+                409, "L’export est disponible dans l’application Windows."
+            )
+        selected = callback("NaviXav-logbook.csv")
+        if not selected:
+            return {"cancelled": True}
+        path = Path(selected)
+        if path.suffix.lower() != ".csv":
+            path = path.with_suffix(".csv")
+        path.write_text(logbook.to_csv(), encoding="utf-8", newline="")
+        LOGGER.info("Carnet de vol exporté")
+        return {"saved": True, "file": path.name}
+
+    @app.get("/api/landing")
+    def landing() -> dict[str, Any]:
+        """Le dernier atterrissage analysé depuis le lancement de NaviXav."""
+        return {"landing": landing_monitor.latest()}
+
+    @app.post("/api/landing/card")
+    async def save_landing_card(request: Request) -> dict[str, Any]:
+        """Enregistre l'image de partage là où le pilote le choisit.
+
+        L'image est dessinée par l'interface ; le service ne fait que proposer
+        la boîte d'enregistrement Windows et écrire le PNG reçu.
+        """
+        if request.headers.get("X-NaviXav-Landing") != "save":
+            raise HTTPException(403, "Confirmation d’enregistrement absente.")
+        callback = getattr(app.state, "request_landing_card_path", None)
+        if not callable(callback):
+            raise HTTPException(
+                409, "L’enregistrement est disponible dans l’application Windows."
+            )
+        data = await request.body()
+        if not data.startswith(PNG_SIGNATURE) or len(data) > 8_000_000:
+            raise HTTPException(400, "Image PNG attendue.")
+        name = request.query_params.get("name") or "NaviXav-landing.png"
+        safe_name = "".join(
+            char for char in name if char.isalnum() or char in "-_."
+        ) or "NaviXav-landing.png"
+        if not safe_name.lower().endswith(".png"):
+            safe_name += ".png"
+        selected = callback(safe_name)
+        if not selected:
+            return {"cancelled": True}
+        path = Path(selected)
+        if path.suffix.lower() != ".png":
+            path = path.with_suffix(".png")
+        path.write_bytes(data)
+        LOGGER.info("Image d’atterrissage enregistrée")
+        return {"saved": True, "file": path.name}
 
     @app.get("/api/fms")
     def fms() -> dict[str, Any]:

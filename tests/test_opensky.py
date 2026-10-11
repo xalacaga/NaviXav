@@ -240,3 +240,115 @@ def test_parked_aircraft_with_sparse_adsb_motion_remains_spawnable(tmp_path):
     assert aircraft.altitude_ft == 0.0
     assert aircraft.ground_speed_kt == 0.0
     assert aircraft.heading_deg == 0.0
+
+
+def test_remaining_credits_pace_the_refresh_over_a_flight(tmp_path, monkeypatch):
+    """Le quota journalier se dépense au rythme d'un vol, sans s'épuiser."""
+    clock = [1000.0]
+    monkeypatch.setattr("navixav.traffic.opensky.time.monotonic", lambda: clock[0])
+
+    class Session:
+        calls = 0
+        remaining = 400
+
+        def get(self, *_args, **_kwargs):
+            self.calls += 1
+            self.remaining -= 1
+            return _Response({"time": 1234, "states": []}, headers={
+                "X-Rate-Limit-Remaining": str(self.remaining),
+            })
+
+    session = Session()
+    client = OpenSkyClient(
+        lambda: (48.0, 2.0), session=session,
+        registry=_OfflineRegistry(tmp_path / "budget.sqlite"),
+    )
+    client.traffic()
+    # 399 crédits sur trois heures : un relevé toutes les 27 s environ.
+    clock[0] += 20
+    client.traffic()
+    assert session.calls == 1
+    clock[0] += 10
+    client.traffic()
+    assert session.calls == 2
+
+    # Presque épuisé, le quota ramène la cadence au plafond anonyme.
+    session.remaining = 5
+    clock[0] += 30
+    client.traffic()
+    assert session.calls == 3
+    clock[0] += CACHE_TTL_S - 1
+    client.traffic()
+    assert session.calls == 3
+    clock[0] += 1
+    client.traffic()
+    assert session.calls == 4
+
+
+def test_missing_credit_header_keeps_the_anonymous_interval(tmp_path, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("navixav.traffic.opensky.time.monotonic", lambda: clock[0])
+    session = _Session({"time": 1234, "states": []})
+    client = OpenSkyClient(
+        lambda: (48.0, 2.0), session=session,
+        registry=_OfflineRegistry(tmp_path / "no-header.sqlite"),
+    )
+    client.traffic()
+    clock[0] += CACHE_TTL_S - 1
+    client.traffic()
+    assert session.calls == 1
+
+
+def test_opensky_extends_the_injection_extrapolation_window(tmp_path):
+    client = OpenSkyClient(
+        lambda: (48.0, 2.0), session=_Session({"states": []}),
+        registry=_OfflineRegistry(tmp_path / "window.sqlite"),
+    )
+    assert client.max_extrapolation_s > CACHE_TTL_S
+
+
+def _state(track, time_position, on_ground=False):
+    return ["39abcd", "AFR123", "France", time_position, time_position, 2.2, 48.5,
+            3048.0, on_ground, 154.33, track, 0.0, None, None, None, False, 0]
+
+
+def _sequence_client(tmp_path, reports):
+    class Session:
+        calls = 0
+
+        def get(self, *_args, **_kwargs):
+            payload = {"time": 1, "states": reports[self.calls]}
+            self.calls += 1
+            return _Response(payload)
+
+    return OpenSkyClient(
+        lambda: (48.0, 2.0), session=Session(), ttl_s=0,
+        registry=_OfflineRegistry(tmp_path / "turn.sqlite"),
+    )
+
+
+def test_turn_rate_is_measured_between_two_reports(tmp_path):
+    client = _sequence_client(tmp_path, [
+        [_state(350.0, 1000)], [_state(20.0, 1030)], [_state(20.0, 1030)],
+    ])
+    assert client.traffic()[0].turn_rate_dps is None
+    # 350° → 020° en 30 s : 1 °/s à droite, à travers le nord.
+    assert client.traffic()[0].turn_rate_dps == pytest.approx(1.0)
+    # Sans nouvelle position, la mesure précédente reste valable.
+    assert client.traffic()[0].turn_rate_dps == pytest.approx(1.0)
+
+
+def test_straight_ground_and_implausible_turns_are_not_anticipated(tmp_path):
+    straight = _sequence_client(tmp_path, [[_state(90.0, 1000)], [_state(91.0, 1030)]])
+    straight.traffic()
+    assert straight.traffic()[0].turn_rate_dps is None
+
+    ground = _sequence_client(tmp_path, [
+        [_state(90.0, 1000, True)], [_state(180.0, 1030, True)],
+    ])
+    ground.traffic()
+    assert ground.traffic()[0].turn_rate_dps is None
+
+    noisy = _sequence_client(tmp_path, [[_state(90.0, 1000)], [_state(180.0, 1010)]])
+    noisy.traffic()
+    assert noisy.traffic()[0].turn_rate_dps == 3.0

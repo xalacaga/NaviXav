@@ -10,7 +10,7 @@ from typing import Any
 
 import requests
 
-from navixav.traffic.base import TrafficAircraft
+from navixav.traffic.base import TrafficAircraft, TurnRateTracker
 
 LOGGER = logging.getLogger(__name__)
 DATA_URL = "https://api.ivao.aero/v2/tracker/whazzup"
@@ -97,6 +97,7 @@ class IvaoClient:
         self._lock = threading.Lock()
         self._feed: dict[str, Any] | None = None
         self._fetched_at = 0.0
+        self._turns = TurnRateTracker()
 
     @property
     def name(self) -> str:
@@ -126,6 +127,8 @@ class IvaoClient:
 
     def traffic(self, limit: int | None = MAX_TRAFFIC) -> list[TrafficAircraft]:
         pilots = self._read()["clients"]["pilots"]
+        # Le flux ne date pas chaque position : son téléchargement la date.
+        fetched_at = self._fetched_at
         found: list[TrafficAircraft] = []
         for raw in pilots:
             entry = _aircraft(raw)
@@ -133,7 +136,7 @@ class IvaoClient:
                 found.append(entry)
                 if limit is not None and len(found) >= limit:
                     break
-        return found
+        return self._turns.apply(found, fetched_at)
 
     def detail(self, callsign: str) -> IvaoAircraftDetail | None:
         wanted = callsign.strip().upper()

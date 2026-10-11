@@ -10,7 +10,7 @@ from typing import Callable
 
 import requests
 
-from navixav.traffic.base import TrafficAircraft, generic_callsign
+from navixav.traffic.base import TrafficAircraft, TurnRateTracker, generic_callsign
 from navixav.traffic.registry import AircraftRegistry
 
 DATA_URL = "https://opensky-network.org/api/states/all"
@@ -21,6 +21,15 @@ DEFAULT_TIMEOUT = 10
 # allowance. Four minutes leaves a small margin while the local animation keeps
 # moving the last observations between two snapshots.
 CACHE_TTL_S = 240.0
+# The allowance is daily, but a flight lasts a few hours. When OpenSky reports
+# the credits left, the refresh spends them over this horizon instead: each
+# request lengthens the next interval, so the pace slows down by itself and the
+# allowance is never exhausted. 400 credits give a report every 27 s at first.
+BUDGET_HORIZON_S = 3 * 3600.0
+MIN_REFRESH_S = 20.0
+# Between two reports the injected aircraft keep flying on their last vector;
+# the window covers the slowest refresh with a margin, never a frozen object.
+MAX_EXTRAPOLATION_S = CACHE_TTL_S + 60.0
 ERROR_RETRY_S = 30.0
 RATE_LIMIT_RETRY_S = 300.0
 RADIUS_NM = 100.0
@@ -62,8 +71,10 @@ class OpenSkyClient:
         self._session = session or requests.Session()
         self._timeout = timeout
         self._ttl_s = ttl_s
+        self._refresh_s = ttl_s
         self._lock = threading.Lock()
         self._aircraft: list[TrafficAircraft] | None = None
+        self._turns = TurnRateTracker()
         self._updated_at = ""
         self._fetched_at = 0.0
         self._retry_at = 0.0
@@ -74,10 +85,26 @@ class OpenSkyClient:
     def name(self) -> str:
         return "OpenSky"
 
+    @property
+    def max_extrapolation_s(self) -> float:
+        """Durée pendant laquelle l'injection prolonge un relevé."""
+        return MAX_EXTRAPOLATION_S
+
+    def _budget_interval(self, headers: object) -> float:
+        """Intervalle suivant, d'après les crédits que le service annonce."""
+        try:
+            remaining = float(headers.get("X-Rate-Limit-Remaining"))  # type: ignore[attr-defined]
+        except (AttributeError, TypeError, ValueError):
+            return self._ttl_s
+        if not math.isfinite(remaining) or remaining < 0:
+            return self._ttl_s
+        interval = BUDGET_HORIZON_S / max(1.0, remaining)
+        return min(max(MIN_REFRESH_S, interval), self._ttl_s)
+
     def _refresh(self) -> None:
         with self._lock:
             now = time.monotonic()
-            if self._aircraft is not None and now - self._fetched_at < self._ttl_s:
+            if self._aircraft is not None and now - self._fetched_at < self._refresh_s:
                 return
             if now < self._retry_at:
                 raise OpenSkyError(
@@ -143,10 +170,12 @@ class OpenSkyClient:
                 entry = self._parse(state)
                 if entry is not None:
                     found.append(entry)
+            found = self._turns.apply(found)
             timestamp = payload.get("time") if isinstance(payload, dict) else None
             self._aircraft = found
             self._updated_at = str(timestamp or "")
             self._fetched_at = now
+            self._refresh_s = self._budget_interval(getattr(response, "headers", None))
             self._retry_at = 0.0
             self._last_error = ""
             self._last_error_code = ""
@@ -218,7 +247,7 @@ class OpenSkyClient:
         self._refresh()
         aircraft = []
         for entry in self._aircraft or ():
-            # Le relevé OpenSky reste en cache une minute, mais le registre se
+            # Le relevé OpenSky reste en cache entre deux appels, mais le registre se
             # remplit en arrière-plan entre-temps. Réappliquer son résultat à
             # chaque lecture rend l'appareil injectable dès qu'il est connu,
             # sans attendre le prochain appel à l'API d'états.

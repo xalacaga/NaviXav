@@ -585,3 +585,47 @@ def test_taxi_acceleration_and_heading_are_smoothed_but_stop_is_immediate():
     clock.advance(1 / 30)
     stopped = manager._tracked(replace(first, ground_speed_kt=0), clock())
     assert stopped.ground_speed_kt == 0
+
+
+def test_slow_source_keeps_aircraft_flying_until_its_next_report():
+    """Un relevé OpenSky de quatre minutes ne fige pas l'appareil en l'air."""
+
+    class SlowProvider(_Provider):
+        max_extrapolation_s = 300.0
+
+    def longitude_after(provider, seconds):
+        clock = _Clock()
+        injector = _Injector()
+        manager = TrafficManager(provider, _Models(), injector, lambda: (48, 2),
+                                 clock=clock, radius_nm=100)
+        manager.sync_once()
+        manager.render_once()
+        injector.updated.clear()
+        clock.advance(seconds)
+        manager.render_once()
+        manager.close()
+        return injector.updated[-1][0].longitude if injector.updated else None
+
+    # Au-delà de la fenêtre par défaut, l'appareil n'est plus animé.
+    assert longitude_after(_Provider([_aircraft("SLOW", 48.01)]), 200) is None
+    # La source lente l'annonce : 200 s à 180 kt vers l'est, soit 10 NM.
+    moved = longitude_after(SlowProvider([_aircraft("SLOW", 48.01)]), 200)
+    assert moved is not None
+    assert distance_nm((48.01, 2.0), (48.01, moved)) == pytest.approx(10.0, rel=0.05)
+
+
+def test_measured_turn_is_continued_then_damped():
+    """Un virage en cours se prolonge, mais l'appareil ne tourne pas en rond."""
+    from navixav.traffic.manager import _extrapolate
+
+    turning = replace(_aircraft("TURN", 48.0, speed=240), turn_rate_dps=3.0)
+    early = _extrapolate(turning, 5.0, 300.0)
+    late = _extrapolate(turning, 300.0, 300.0)
+    straight = _extrapolate(replace(turning, turn_rate_dps=None), 300.0, 300.0)
+
+    assert 90 < early.heading_deg < 105
+    assert late.heading_deg == pytest.approx(135.0, abs=0.5)
+    # 300 s à 240 kt : 20 NM parcourus, d'abord en virage puis cap 135.
+    assert late.latitude < straight.latitude
+    assert distance_nm((48.0, 2.0), (late.latitude, late.longitude)) < 20.0
+    assert distance_nm((48.0, 2.0), (late.latitude, late.longitude)) > 17.0

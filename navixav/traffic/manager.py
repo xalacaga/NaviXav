@@ -34,6 +34,11 @@ GROUND_SMOOTHING_S = 2.5
 GROUND_PREDICTION_FULL_S = 2.0
 GROUND_PREDICTION_STOP_S = 5.0
 AIRBORNE_SMOOTHING_S = 4.0
+# Un virage mesuré entre deux relevés espacés ne dit pas s'il dure encore : il
+# est prolongé en s'amortissant, jamais en boucle. À 3 °/s, 45° de plus au plus.
+TURN_DECAY_S = 15.0
+TURN_PHASE_S = 5 * TURN_DECAY_S
+TURN_STEP_S = 2.5
 
 
 @dataclass
@@ -62,11 +67,12 @@ def _same_motion(a: TrafficAircraft, b: TrafficAircraft) -> bool:
     )
 
 
-def _extrapolate(aircraft: TrafficAircraft, elapsed_s: float) -> TrafficAircraft:
+def _extrapolate(aircraft: TrafficAircraft, elapsed_s: float,
+                 limit_s: float = MAX_EXTRAPOLATION_S) -> TrafficAircraft:
     """Prolonge un relevé figé sans dépasser sa fenêtre de confiance."""
     speed = aircraft.ground_speed_kt
     heading = aircraft.heading_deg
-    elapsed = min(max(0.0, elapsed_s), MAX_EXTRAPOLATION_S)
+    elapsed = min(max(0.0, elapsed_s), limit_s)
     if aircraft.on_ground is True:
         if _stationary(aircraft):
             return replace(aircraft, ground_speed_kt=0.0, vertical_speed_fpm=0.0)
@@ -80,17 +86,26 @@ def _extrapolate(aircraft: TrafficAircraft, elapsed_s: float) -> TrafficAircraft
     if elapsed == 0.0 or speed is None or heading is None or speed <= 0.0:
         return aircraft
 
-    angular = (speed * elapsed / 3600.0) / 3440.065
-    bearing = math.radians(heading)
-    latitude = math.radians(aircraft.latitude)
-    longitude = math.radians(aircraft.longitude)
-    next_latitude = math.asin(
-        math.sin(latitude) * math.cos(angular)
-        + math.cos(latitude) * math.sin(angular) * math.cos(bearing)
-    )
-    next_longitude = longitude + math.atan2(
-        math.sin(bearing) * math.sin(angular) * math.cos(latitude),
-        math.cos(angular) - math.sin(latitude) * math.sin(next_latitude),
+    latitude, longitude = aircraft.latitude, aircraft.longitude
+    course = heading
+    straight = elapsed
+    rate = aircraft.turn_rate_dps
+    if aircraft.on_ground is not True and rate:
+        # Le virage mesuré se poursuit en s'amortissant : au plus
+        # rate × TURN_DECAY_S degrés de plus, puis la ligne droite reprend.
+        turning = min(elapsed, TURN_PHASE_S)
+        done = 0.0
+        while done < turning:
+            step = min(TURN_STEP_S, turning - done)
+            latitude, longitude = _destination(
+                latitude, longitude, _turn_heading(heading, rate, done + step / 2),
+                speed * step / 3600.0,
+            )
+            done += step
+        course = _turn_heading(heading, rate, turning)
+        straight = elapsed - turning
+    latitude, longitude = _destination(
+        latitude, longitude, course, speed * straight / 3600.0
     )
     altitude = aircraft.altitude_ft
     if (
@@ -101,10 +116,39 @@ def _extrapolate(aircraft: TrafficAircraft, elapsed_s: float) -> TrafficAircraft
         altitude += aircraft.vertical_speed_fpm * elapsed / 60.0
     return replace(
         aircraft,
-        latitude=math.degrees(next_latitude),
-        longitude=(math.degrees(next_longitude) + 540.0) % 360.0 - 180.0,
+        latitude=latitude,
+        longitude=longitude,
         altitude_ft=altitude,
+        heading_deg=course,
     )
+
+
+def _turn_heading(heading: float, rate: float, elapsed_s: float) -> float:
+    """Cap après un virage au taux `rate` amorti en TURN_DECAY_S."""
+    turned = rate * TURN_DECAY_S * (1.0 - math.exp(-elapsed_s / TURN_DECAY_S))
+    return (heading + turned) % 360.0
+
+
+def _destination(
+    latitude_deg: float, longitude_deg: float, bearing_deg: float, distance_nm: float
+) -> tuple[float, float]:
+    """Point atteint sur un grand cercle, en degrés."""
+    if distance_nm <= 0.0:
+        return latitude_deg, longitude_deg
+    angular = distance_nm / 3440.065
+    bearing = math.radians(bearing_deg)
+    latitude = math.radians(latitude_deg)
+    longitude = math.radians(longitude_deg)
+    next_latitude = math.asin(
+        math.sin(latitude) * math.cos(angular)
+        + math.cos(latitude) * math.sin(angular) * math.cos(bearing)
+    )
+    next_longitude = longitude + math.atan2(
+        math.sin(bearing) * math.sin(angular) * math.cos(latitude),
+        math.cos(angular) - math.sin(latitude) * math.sin(next_latitude),
+    )
+    return (math.degrees(next_latitude),
+            (math.degrees(next_longitude) + 540.0) % 360.0 - 180.0)
 
 
 def _blend_value(
@@ -175,6 +219,14 @@ class TrafficManager:
         self.state = state
         self.radius_nm = radius_nm
         self.max_aircraft = max_aircraft
+        # Une source lente (OpenSky anonyme : quatre minutes au pire entre
+        # deux relevés) annonce sa propre fenêtre ; sans elle, l'appareil
+        # s'arrêterait en l'air bien avant le relevé suivant.
+        limit = getattr(provider, "max_extrapolation_s", MAX_EXTRAPOLATION_S)
+        self.max_extrapolation_s = (
+            float(limit) if isinstance(limit, (int, float)) and limit > 0
+            else MAX_EXTRAPOLATION_S
+        )
         self._clock = clock
         self._wall_clock = wall_clock
         self._tracks: dict[str, _Track] = {}
@@ -202,7 +254,7 @@ class TrafficManager:
             for uid in set(self._render_tracks) - retained:
                 self._render_tracks.pop(uid, None)
             for track in targets:
-                if now - track.observed_at > MAX_EXTRAPOLATION_S:
+                if now - track.observed_at > self.max_extrapolation_s:
                     continue
                 uid = track.aircraft.uid
                 previous = self._render_tracks.get(uid)
@@ -261,17 +313,21 @@ class TrafficManager:
                        now - max(0.0, self._wall_clock() - timestamp)
                        if timestamp is not None else now)
         if track is None:
-            rendered = _extrapolate(aircraft, now - source_time)
+            rendered = _extrapolate(aircraft, now - source_time, self.max_extrapolation_s)
             track = _Track(aircraft, source_time, now, rendered, now,
                            rendered if _stationary(aircraft) else None)
             tracks[aircraft.uid] = track
             return rendered
 
         elapsed = max(0.0, now - track.rendered_at)
-        prediction_step = max(0.0, min(now - track.observed_at, MAX_EXTRAPOLATION_S)
-                              - min(track.rendered_at - track.observed_at, MAX_EXTRAPOLATION_S))
+        limit = self.max_extrapolation_s
+        prediction_step = max(0.0, min(now - track.observed_at, limit)
+                              - min(track.rendered_at - track.observed_at, limit))
         current = (track.rendered if aircraft.on_ground is True
-                   else _extrapolate(track.rendered, prediction_step))
+                   # Le virage appartient à la cible : le reprendre ici à
+                   # chaque image le ferait durer sans jamais s'amortir.
+                   else _extrapolate(replace(track.rendered, turn_rate_dps=None),
+                                     prediction_step, limit))
         fresh_timestamp = timestamp is not None and timestamp != track.aircraft.position_timestamp
         if not _same_motion(track.aircraft, aircraft) or fresh_timestamp:
             # Un transpondeur immobile bouge souvent de quelques mètres autour
@@ -294,7 +350,7 @@ class TrafficManager:
 
         if seen:
             track.last_seen_at = now
-        target = track.parked or _extrapolate(track.aircraft, now - track.observed_at)
+        target = track.parked or _extrapolate(track.aircraft, now - track.observed_at, limit)
         smoothing = (
             GROUND_SMOOTHING_S
             if target.on_ground is True

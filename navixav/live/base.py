@@ -120,6 +120,25 @@ class AircraftConfiguration:
 
 
 @dataclass(frozen=True)
+class TouchdownSample:
+    """Le dernier contact avec le sol, tel que MSFS l'a figé.
+
+    Le simulateur conserve ces valeurs jusqu'au toucher suivant : seule la
+    position permet de vérifier qu'elles décrivent bien l'atterrissage en cours.
+    """
+
+    normal_velocity_fpm: float | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    heading_true_deg: float | None = None
+    pitch_deg: float | None = None
+    bank_deg: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class AircraftState:
     latitude: float
     longitude: float
@@ -135,6 +154,8 @@ class AircraftState:
     title: str = ""
     source: str = ""
     configuration: AircraftConfiguration | None = None
+    # Lu seulement dans les secondes qui suivent un passage de l'air au sol.
+    touchdown: TouchdownSample | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -381,6 +381,32 @@ def _run_desktop_window(url: str, server: object) -> None:
                 return None
             return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
 
+        def select_landing_card_path(suggested_name: str) -> str | None:
+            """Demande où enregistrer l'image d'atterrissage."""
+            pictures = Path.home() / "Pictures"
+            selected = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory=str(pictures if pictures.is_dir() else Path.home()),
+                save_filename=suggested_name,
+                file_types=("Image PNG (*.png)",),
+            )
+            if not selected:
+                return None
+            return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
+
+        def select_logbook_export_path(suggested_name: str) -> str | None:
+            """Demande où enregistrer l'export du carnet de vol."""
+            documents = Path.home() / "Documents"
+            selected = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory=str(documents if documents.is_dir() else Path.home()),
+                save_filename=suggested_name,
+                file_types=("Tableur CSV (*.csv)",),
+            )
+            if not selected:
+                return None
+            return str(selected[0] if isinstance(selected, (list, tuple)) else selected)
+
         def close_window_when_server_stops() -> None:
             server_thread.join()
             try:
@@ -399,6 +425,8 @@ def _run_desktop_window(url: str, server: object) -> None:
         server.config.app.state.request_open_chartfox_auth = open_chartfox_auth
         server.config.app.state.request_aircraft_folder = select_aircraft_folder
         server.config.app.state.request_plan_file = select_plan_file
+        server.config.app.state.request_landing_card_path = select_landing_card_path
+        server.config.app.state.request_logbook_export_path = select_logbook_export_path
         watcher = threading.Thread(
             target=close_window_when_server_stops,
             name="NaviXav-window-watcher",

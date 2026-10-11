@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass
+import threading
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from typing import Any, Iterable, Protocol, runtime_checkable
 
@@ -19,6 +20,18 @@ OWN_AIRCRAFT_ALTITUDE_FT = 300.0
 # toujours quelques-uns. Une chaîne stable vaut mieux qu'un champ vide, que le
 # simulateur afficherait comme une immatriculation manquante.
 GENERIC_CALLSIGN_PREFIX = "TFC"
+
+# Aucun flux ne publie le taux de virage : il se déduit de deux relevés
+# successifs. Trop rapprochés, ils ne mesurent que le bruit de la route
+# publiée ; trop espacés, ils ne disent plus si le virage dure encore. En deçà
+# du dixième de degré par seconde, l'appareil est en ligne droite ; au-delà du
+# taux standard, la mesure est fausse plutôt que l'avion acrobate.
+TURN_MIN_INTERVAL_S = 5.0
+TURN_MAX_INTERVAL_S = 300.0
+TURN_MIN_RATE_DPS = 0.1
+TURN_MAX_RATE_DPS = 3.0
+# Sans indicateur sol (VATSIM), la vitesse tranche comme pour l'injection.
+TURN_GROUND_SPEED_MAX_KT = 50.0
 
 
 def distance_nm(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -61,6 +74,9 @@ class TrafficAircraft:
     arrival: str = ""
     # Unix seconds. Position age must not be inferred from the feed publication time.
     position_timestamp: float | None = None
+    # Degrés par seconde, positif à droite. Mesuré entre deux relevés : seule
+    # une source lente en a besoin pour anticiper un virage en cours.
+    turn_rate_dps: float | None = None
 
     @property
     def aircraft(self) -> str:
@@ -72,6 +88,77 @@ class TrafficAircraft:
         payload = asdict(self)
         payload["aircraft"] = self.aircraft_type or ""
         return payload
+
+
+def turn_rate(
+    previous: tuple[float, float] | None, current: tuple[float, float]
+) -> float | None:
+    """Taux de virage moyen entre deux relevés (horodatage, route)."""
+    if previous is None:
+        return None
+    elapsed = current[0] - previous[0]
+    if not TURN_MIN_INTERVAL_S <= elapsed <= TURN_MAX_INTERVAL_S:
+        return None
+    delta = (current[1] - previous[1] + 180.0) % 360.0 - 180.0
+    rate = delta / elapsed
+    if abs(rate) < TURN_MIN_RATE_DPS:
+        return None
+    return max(-TURN_MAX_RATE_DPS, min(TURN_MAX_RATE_DPS, rate))
+
+
+class TurnRateTracker:
+    """Mémoire des routes publiées, pour mesurer le virage de chaque appareil.
+
+    Une source relit souvent le même relevé en cache, et parfois une partie
+    seulement : la mémoire n'est donc purgée que par l'âge, jamais parce
+    qu'un appareil manque à une lecture.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # uid -> (horodatage, route, taux mesuré)
+        self._tracks: dict[str, tuple[float, float, float | None]] = {}
+        self._latest = 0.0
+
+    def apply(
+        self, found: list[TrafficAircraft], stamp: float | None = None
+    ) -> list[TrafficAircraft]:
+        """Ajoute le virage mesuré depuis le relevé distinct précédent.
+
+        `stamp` date tout le relevé quand la source ne date pas chaque
+        position ; sinon `position_timestamp` fait foi.
+        """
+        result = []
+        with self._lock:
+            for entry in found:
+                when = entry.position_timestamp if entry.position_timestamp else stamp
+                heading = entry.heading_deg
+                if when is None or heading is None or _grounded(entry):
+                    result.append(entry)
+                    continue
+                self._latest = max(self._latest, when)
+                known = self._tracks.get(entry.uid)
+                if known is not None and when - known[0] < TURN_MIN_INTERVAL_S:
+                    # Même relevé, ou relu trop tôt pour mesurer quoi que ce
+                    # soit : la référence et la mesure précédentes valent encore.
+                    rate = known[2]
+                else:
+                    rate = turn_rate(known[:2] if known else None, (when, heading))
+                    self._tracks[entry.uid] = (when, heading, rate)
+                result.append(
+                    replace(entry, turn_rate_dps=rate) if rate is not None else entry
+                )
+            horizon = self._latest - TURN_MAX_INTERVAL_S
+            for uid in [uid for uid, track in self._tracks.items() if track[0] < horizon]:
+                del self._tracks[uid]
+        return result
+
+
+def _grounded(aircraft: TrafficAircraft) -> bool:
+    if aircraft.on_ground is not None:
+        return aircraft.on_ground
+    speed = aircraft.ground_speed_kt
+    return speed is None or speed <= TURN_GROUND_SPEED_MAX_KT
 
 
 def is_own_position(

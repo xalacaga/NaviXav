@@ -677,6 +677,24 @@
   <div id="changelog-body" class="changelog-body"></div>
 </dialog>
 
+<!-- Analyse d'atterrissage : ouverte d'elle-même au toucher, rouverte depuis le
+     carnet de vol. L'image de partage est dessinée à la demande. -->
+<dialog id="landing-dialog" class="settings-dialog landing-dialog" aria-labelledby="landing-title">
+  <div class="settings-head">
+    <div>
+      <h2 id="landing-title">Analyse de l’atterrissage</h2>
+      <p id="landing-subtitle"></p>
+    </div>
+    <button type="button" id="landing-close" class="icon-btn" aria-label="Fermer">×</button>
+  </div>
+  <div id="landing-body" class="landing-body"></div>
+  <p id="landing-message" class="settings-message" role="status" aria-live="polite"></p>
+  <div class="settings-actions landing-actions">
+    <button type="button" id="landing-copy" class="icon-btn">Copier l’image</button>
+    <button type="button" id="landing-save" class="btn-primary">Enregistrer l’image</button>
+  </div>
+</dialog>
+
 <dialog id="welcome-dialog" class="settings-dialog welcome-dialog">
   <form id="welcome-form">
     <div class="settings-head">

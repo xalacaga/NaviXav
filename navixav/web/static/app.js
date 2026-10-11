@@ -336,7 +336,7 @@ const FLIGHT_LOG_INDEX_KEY = "navixav-flight-log-index";
 const FLIGHT_REPLAY_BASE_MS = 300;
 const FLIGHT_SUMMARY_KEY = "navixav-flight-summaries";
 const FLIGHT_SUMMARY_INTERVAL_MS = 5000;
-const FLIGHT_SUMMARY_MAX_ENTRIES = 100;
+const FLIGHT_SUMMARY_MAX_ENTRIES = 2000;
 const PROCEDURE_PROGRESS_PREFIX = "navixav-procedure-progress";
 // Rangée avec la progression : la phase la plus avancée que le vol ait vue.
 const PROCEDURE_REACHED_KEY = "__reached";
@@ -4482,7 +4482,70 @@ function flightSummaryPlanKey(plan) {
   ].join(":");
 }
 
+/*
+ * Le carnet est tenu par le service, dans logbook.json : il survit à une
+ * réinstallation et la tablette lit le même. Seule la fenêtre du PC l'écrit ;
+ * l'interface en garde une copie en mémoire pour l'afficher sans attendre.
+ */
+let flightSummaries = [];
+let flightSummariesLoaded = false;
+let logbookStats = null;
+let logbookWrite = Promise.resolve();
+let logbookRefreshTimer = null;
+
 function loadFlightSummaries() {
+  return flightSummaries.slice();
+}
+
+function adoptLogbook(payload) {
+  if (!Array.isArray(payload?.entries)) return;
+  flightSummaries = payload.entries;
+  logbookStats = payload.stats || null;
+  flightSummariesLoaded = true;
+  renderFlightSummaries();
+}
+
+function saveFlightSummaries(entries) {
+  if (latestStatus?.remote_client) {
+    // La tablette ne fait que lire : le PC aura écrit le même vol, relu ici.
+    scheduleLogbookRefresh();
+    return;
+  }
+  flightSummaries = entries.slice(0, FLIGHT_SUMMARY_MAX_ENTRIES);
+  // Avant la première lecture, le service ne connaît pas encore ce carnet :
+  // le remplacer effacerait les vols déjà enregistrés. initLogbook les fusionne.
+  if (!flightSummariesLoaded) return;
+  const snapshot = flightSummaries.slice();
+  logbookWrite = logbookWrite
+    .then(() => fetch("/api/logbook", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries: snapshot }),
+    }))
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      if (payload?.stats) logbookStats = payload.stats;
+      renderLogbookStats();
+    })
+    .catch(() => {
+      // Le vol reste affiché ; la prochaine écriture enverra le carnet entier.
+    });
+}
+
+function scheduleLogbookRefresh(delayMs = 5000) {
+  if (logbookRefreshTimer) return;
+  logbookRefreshTimer = setTimeout(async () => {
+    logbookRefreshTimer = null;
+    try {
+      adoptLogbook(await fetch("/api/logbook", { cache: "no-store" }).then((r) => r.json()));
+    } catch (_error) {
+      // La tablette garde le carnet qu'elle a déjà.
+    }
+  }, delayMs);
+}
+
+/** Vols que l'ancien stockage du WebView conservait, à reprendre une fois. */
+function legacyFlightSummaries() {
   try {
     const parsed = JSON.parse(localStorage.getItem(FLIGHT_SUMMARY_KEY) || "[]");
     return Array.isArray(parsed) ? parsed : [];
@@ -4491,14 +4554,28 @@ function loadFlightSummaries() {
   }
 }
 
-function saveFlightSummaries(entries) {
+async function initLogbook() {
   try {
-    localStorage.setItem(
-      FLIGHT_SUMMARY_KEY,
-      JSON.stringify(entries.slice(0, FLIGHT_SUMMARY_MAX_ENTRIES))
-    );
+    let payload = await fetch("/api/logbook", { cache: "no-store" }).then((r) => r.json());
+    const pending = [...legacyFlightSummaries(), ...flightSummaries];
+    if (pending.length && !latestStatus?.remote_client) {
+      const response = await fetch("/api/logbook/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: pending }),
+      });
+      if (response.ok) {
+        payload = await response.json();
+        try {
+          localStorage.removeItem(FLIGHT_SUMMARY_KEY);
+        } catch (_error) {
+          // La reprise est idempotente : un vol déjà connu n'est pas dupliqué.
+        }
+      }
+    }
+    adoptLogbook(payload);
   } catch (_error) {
-    // Le suivi du vol courant reste disponible même si le stockage est plein.
+    // Sans service, le carnet affiché reste vide plutôt que faux.
   }
 }
 
@@ -4514,8 +4591,9 @@ function summaryDistance(points) {
   return distanceNm;
 }
 
+/** Très anciens journaux détaillés : ramenés à un résumé, puis repris par initLogbook. */
 function migrateDetailedFlightLogs() {
-  const summaries = loadFlightSummaries();
+  const summaries = legacyFlightSummaries();
   const existing = new Set(summaries.map((entry) => entry.id));
   let archive = [];
   try {
@@ -4530,6 +4608,7 @@ function migrateDetailedFlightLogs() {
     const key = localStorage.key(index) || "";
     if (key.startsWith("navixav-flight-log:")) legacyKeys.push(key);
   }
+  if (!legacyKeys.length) return;
 
   for (const key of legacyKeys) {
     const points = loadStoredFlightLog(key);
@@ -4559,13 +4638,14 @@ function migrateDetailedFlightLogs() {
     localStorage.removeItem(key);
   }
   localStorage.removeItem(FLIGHT_LOG_INDEX_KEY);
-  summaries.sort(
-    (first, second) => String(second.ended_at).localeCompare(String(first.ended_at))
-  );
-  saveFlightSummaries(summaries);
+  try {
+    localStorage.setItem(FLIGHT_SUMMARY_KEY, JSON.stringify(summaries));
+  } catch (_error) {
+    // Les journaux détaillés sont déjà résumés : rien d'autre à préserver.
+  }
 }
 
-function purgeFlightHistory() {
+async function purgeFlightHistory() {
   const legacyKeys = [];
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index) || "";
@@ -4574,7 +4654,37 @@ function purgeFlightHistory() {
   for (const key of legacyKeys) localStorage.removeItem(key);
   localStorage.removeItem(FLIGHT_LOG_INDEX_KEY);
   localStorage.removeItem(FLIGHT_SUMMARY_KEY);
+  try {
+    const response = await fetch("/api/logbook", { method: "DELETE" });
+    if (response.ok) {
+      adoptLogbook(await response.json());
+      return;
+    }
+  } catch (_error) {
+    // L'affichage suit ce que le service a réellement effacé.
+  }
   renderFlightSummaries();
+}
+
+async function exportLogbook() {
+  if (latestStatus?.remote_client) {
+    const link = document.createElement("a");
+    link.href = "/api/logbook.csv";
+    link.download = "NaviXav-logbook.csv";
+    link.click();
+    return;
+  }
+  try {
+    const response = await fetch("/api/logbook/export", {
+      method: "POST",
+      headers: { "X-NaviXav-Logbook": "export" },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText);
+    if (!payload.cancelled) showBanner("info", t("logbook_exported"), [payload.file || ""]);
+  } catch (error) {
+    showBanner("error", t("logbook_export_failed"), [String(error.message || error)]);
+  }
 }
 
 function storeCompletedFlightSummary(summary) {
@@ -4599,6 +4709,9 @@ function updateFlightSummary(aircraft) {
       departure: currentPlan.departure?.icao || "----",
       arrival: currentPlan.arrival?.icao || "----",
       callsign: currentPlan.callsign || "",
+      // L'appareil réellement chargé, à défaut celui du plan : c'est lui que
+      // comptent les statistiques par avion.
+      aircraft: aircraft.title || currentPlan.aircraft_name || currentPlan.aircraft || "",
       flight_number: latestFms?.available ? latestFms.flight_number || "" : "",
       started_at: startedAt,
       ended_at: startedAt,
@@ -4653,7 +4766,75 @@ function formatFlightSummaryDuration(seconds) {
   return hours ? `${hours} h ${String(minutes).padStart(2, "0")}` : `${minutes} min`;
 }
 
+function formatLogbookHours(seconds) {
+  const minutes = Math.max(0, Math.round(finiteOr(seconds, 0) / 60));
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/** Totaux, atterrissages et habitudes, calculés par le service sur tout le carnet. */
+function renderLogbookStats() {
+  const container = $("logbook-stats");
+  if (!container) return;
+  container.innerHTML = "";
+  const stats = logbookStats;
+  show(container, Boolean(stats?.flights));
+  const exportButton = $("flight-summary-export");
+  if (exportButton) exportButton.disabled = !stats?.flights;
+  if (!stats?.flights) return;
+
+  const tiles = el("div", "flight-summary-metrics logbook-totals");
+  const landings = stats.landings || {};
+  const best = landings.best;
+  for (const [label, value] of [
+    [t("logbook_flights"), String(stats.flights)],
+    [t("logbook_hours"), formatLogbookHours(stats.total_duration_seconds)],
+    [t("distance"), `${Math.round(finiteOr(stats.total_distance_nm, 0)).toLocaleString(displayLocale())} NM`],
+    ...(landings.count ? [
+      [t("logbook_average_touchdown"), `${landings.average_rate_fpm} ft/min`],
+      [t("logbook_average_score"), `${landings.average_score ?? "—"}/100`],
+    ] : []),
+    ...(best ? [[
+      t("logbook_best_landing"),
+      [`${best.rate_fpm} ft/min`, `${best.score}/100`, [best.airport, best.runway].filter(Boolean).join(" ")]
+        .filter(Boolean).join(" · "),
+    ]] : []),
+  ]) {
+    const tile = el("span");
+    tile.append(el("small", null, label), el("b", null, value));
+    tiles.append(tile);
+  }
+  container.append(tiles);
+
+  const lists = el("div", "logbook-lists");
+  if (stats.aircraft?.length) {
+    const block = el("div");
+    block.append(el("h3", null, t("logbook_top_aircraft")));
+    const list = el("ol");
+    for (const row of stats.aircraft) {
+      list.append(el(
+        "li",
+        null,
+        `${row.name} — ${tf("logbook_flight_count", { count: row.flights })} · ${formatLogbookHours(row.duration_seconds)}`
+      ));
+    }
+    block.append(list);
+    lists.append(block);
+  }
+  if (stats.airports?.length) {
+    const block = el("div");
+    block.append(el("h3", null, t("logbook_top_airports")));
+    const list = el("ol");
+    for (const row of stats.airports) {
+      list.append(el("li", null, `${row.icao} — ${tf("logbook_visit_count", { count: row.visits })}`));
+    }
+    block.append(list);
+    lists.append(block);
+  }
+  if (lists.childElementCount) container.append(lists);
+}
+
 function renderFlightSummaries() {
+  renderLogbookStats();
   const container = $("flight-summary-list");
   if (!container) return;
   container.innerHTML = "";
@@ -4689,12 +4870,28 @@ function renderFlightSummaries() {
       [t("distance"), `${finiteOr(entry.distance_nm, 0).toFixed(1)} NM`],
       [t("max_altitude"), `${Math.round(finiteOr(entry.max_altitude_ft, 0))} ft`],
       ...(entry.fmgc_eta ? [[t("eta_fmgc"), entry.fmgc_eta]] : []),
+      ...(entry.landing ? [[
+        t("landing_touchdown"),
+        `${entry.landing.rate_fpm} ft/min · ${entry.landing.score}/100`,
+      ]] : []),
     ]) {
       const metric = el("span");
       metric.append(el("small", null, label), el("b", null, value));
       metrics.append(metric);
     }
     row.append(heading, metrics);
+
+    if (entry.landing) {
+      const analyse = el("button", "icon-btn", t("landing_open"));
+      analyse.type = "button";
+      analyse.addEventListener("click", () => openLandingDialog(entry.landing, {
+        departure: entry.departure,
+        arrival: entry.arrival,
+        callsign: entry.callsign,
+        aircraft: "",
+      }));
+      heading.append(analyse);
+    }
 
     // Les vols enregistrés avant cette version n'ont pas de chronologie : le
     // bouton n'apparaît que lorsqu'il y a quelque chose à rejouer.
@@ -4717,6 +4914,387 @@ function renderFlightSummaries() {
       row.append(timeline);
     }
     container.append(row);
+  }
+}
+
+/* ---------------------------------------------------- analyse d'atterrissage */
+
+/*
+ * Le service calcule l'analyse au toucher, à partir des valeurs que MSFS fige
+ * au contact du sol. L'interface l'affiche une fois, la rattache au vol que le
+ * carnet vient de clore et dessine à la demande l'image à partager. Rien ne
+ * quitte la machine sans un geste du pilote.
+ */
+const LANDING_SEEN_KEY = "navixav-landing-seen";
+const LANDING_SUMMARY_MATCH_MS = 3 * 60 * 1000;
+const LANDING_CARD_SIZE = { width: 1200, height: 630 };
+const LANDING_TDZ_M = [150, 600, 900];
+let lastLandingSignature = "";
+let displayedLanding = null;
+
+function landingContext(plan) {
+  return {
+    departure: plan?.departure?.icao || "----",
+    arrival: plan?.arrival?.icao || "----",
+    callsign: plan?.callsign || "",
+    aircraft: plan?.aircraft_name || plan?.aircraft || "",
+  };
+}
+
+function handleLandingReport(report) {
+  if (!report?.touched_down_at) return;
+  const signature = `${report.touched_down_at}:${report.bounces}:${report.final}`;
+  if (signature === lastLandingSignature) return;
+  lastLandingSignature = signature;
+  const context = landingContext(currentPlan);
+  attachLandingToSummary(report);
+
+  let seen = "";
+  try {
+    seen = localStorage.getItem(LANDING_SEEN_KEY) || "";
+  } catch (_error) {
+    seen = "";
+  }
+  if (seen !== report.touched_down_at) {
+    try {
+      localStorage.setItem(LANDING_SEEN_KEY, report.touched_down_at);
+    } catch (_error) {
+      // L'analyse s'affiche quand même ; elle pourrait seulement réapparaître.
+    }
+    openLandingDialog(report, context);
+  } else if (
+    $("landing-dialog").open
+    && displayedLanding?.report.touched_down_at === report.touched_down_at
+  ) {
+    // Un rebond ou la fin de la fenêtre de rebond complète l'analyse ouverte.
+    openLandingDialog(report, displayedLanding.context);
+  }
+}
+
+/** Rattache l'analyse au vol que le carnet a clos au même moment. */
+function attachLandingToSummary(report) {
+  const touchedAt = Date.parse(report.touched_down_at);
+  if (!Number.isFinite(touchedAt)) return;
+  const entries = loadFlightSummaries();
+  const entry = entries.find((candidate) => (
+    Math.abs(Date.parse(candidate.ended_at) - touchedAt) <= LANDING_SUMMARY_MATCH_MS
+  ));
+  if (!entry) return;
+  entry.landing = report;
+  saveFlightSummaries(entries);
+  renderFlightSummaries();
+}
+
+function landingGradeTone(grade) {
+  if (grade === "soft" || grade === "smooth") return "good";
+  if (grade === "firm") return "warning";
+  return "danger";
+}
+
+function formatLandingNumber(value, digits = 0) {
+  return Number(value).toLocaleString(displayLocale(), {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/** Lignes de mesure, dans l'ordre où un instructeur les lirait. */
+function landingMetrics(report) {
+  const rows = [];
+  if (report.runway) {
+    rows.push([t("landing_runway"), `${report.airport} ${report.runway}`]);
+  }
+  if (Number.isFinite(report.distance_from_threshold_m)) {
+    const zone = report.in_touchdown_zone ? t("landing_in_tdz") : t("landing_outside_tdz");
+    rows.push([
+      t("landing_threshold_distance"),
+      `${formatLandingNumber(report.distance_from_threshold_m)} m · ${zone}`,
+    ]);
+  }
+  if (Number.isFinite(report.centerline_offset_m)) {
+    const offset = Math.abs(report.centerline_offset_m);
+    const side = offset < 0.5
+      ? ""
+      : ` ${report.centerline_offset_m > 0 ? t("landing_right") : t("landing_left")}`;
+    rows.push([t("landing_centerline"), `${formatLandingNumber(offset, 1)} m${side}`]);
+  }
+  if (Number.isFinite(report.pitch_deg)) {
+    rows.push([t("landing_pitch"), `${formatLandingNumber(report.pitch_deg, 1)}°`]);
+  }
+  if (Number.isFinite(report.bank_deg)) {
+    rows.push([t("landing_bank"), `${formatLandingNumber(Math.abs(report.bank_deg), 1)}°`]);
+  }
+  const speeds = [
+    Number.isFinite(report.indicated_airspeed_kt) ? `IAS ${report.indicated_airspeed_kt} kt` : "",
+    Number.isFinite(report.ground_speed_kt) ? `GS ${report.ground_speed_kt} kt` : "",
+  ].filter(Boolean);
+  if (speeds.length) rows.push([t("landing_speeds"), speeds.join(" · ")]);
+  if (Number.isFinite(report.headwind_kt) && Number.isFinite(report.crosswind_kt)) {
+    const along = report.headwind_kt >= 0 ? t("landing_headwind") : t("landing_tailwind");
+    rows.push([
+      t("landing_wind"),
+      `${along} ${Math.abs(report.headwind_kt)} kt · ${t("landing_crosswind")} ${Math.abs(report.crosswind_kt)} kt`,
+    ]);
+  }
+  rows.push([t("landing_bounces"), String(report.bounces || 0)]);
+  return rows;
+}
+
+/** Piste vue de dessus : zone de toucher et point de contact, à l'échelle. */
+function landingRunwayStrip(report) {
+  const svgNs = "http://www.w3.org/2000/svg";
+  const length = finiteOr(report.runway_length_m);
+  const distance = finiteOr(report.distance_from_threshold_m);
+  if (!length || distance === null) return null;
+  const width = 600, height = 70, margin = 10;
+  const scale = (width - margin * 2) / length;
+  const svg = document.createElementNS(svgNs, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("class", "landing-strip");
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    `${t("landing_threshold_distance")} ${formatLandingNumber(distance)} m`
+  );
+  const add = (tag, attributes) => {
+    const node = document.createElementNS(svgNs, tag);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+    svg.append(node);
+    return node;
+  };
+  add("rect", { x: margin, y: 20, width: width - margin * 2, height: 30, rx: 3, class: "landing-strip-runway" });
+  add("rect", {
+    x: margin + LANDING_TDZ_M[0] * scale, y: 20,
+    width: (LANDING_TDZ_M[1] - LANDING_TDZ_M[0]) * scale, height: 30,
+    class: "landing-strip-tdz",
+  });
+  add("line", { x1: margin, y1: 35, x2: width - margin, y2: 35, class: "landing-strip-axis" });
+  const halfWidth = 22.5;
+  const offset = Math.max(-1, Math.min(1, finiteOr(report.centerline_offset_m, 0) / halfWidth));
+  add("circle", {
+    cx: margin + Math.max(0, Math.min(length, distance)) * scale,
+    cy: 35 + offset * 15,
+    r: 6,
+    class: `landing-strip-point is-${landingGradeTone(report.grade)}`,
+  });
+  return svg;
+}
+
+function openLandingDialog(report, context) {
+  displayedLanding = { report, context };
+  const dialog = $("landing-dialog");
+  $("landing-subtitle").textContent = [
+    `${context.departure} → ${context.arrival}`,
+    context.callsign,
+    report.aircraft || context.aircraft,
+  ].filter(Boolean).join(" · ");
+  $("landing-message").textContent = "";
+
+  const body = $("landing-body");
+  body.innerHTML = "";
+  const tone = landingGradeTone(report.grade);
+  const hero = el("div", "landing-hero");
+  const rate = el("div", "landing-rate");
+  rate.append(
+    el("small", null, t("landing_rate")),
+    el("strong", null, `${formatLandingNumber(report.rate_fpm)} ft/min`)
+  );
+  const grade = el("span", `landing-grade is-${tone}`, t(`landing_grade_${report.grade}`));
+  const score = el("div", "landing-score");
+  score.append(el("small", null, t("landing_score")), el("strong", null, `${report.score}/100`));
+  hero.append(rate, grade, score);
+  body.append(hero);
+  if (report.rate_source === "sampled") {
+    body.append(el("p", "landing-note", t("landing_rate_sampled")));
+  }
+
+  const strip = landingRunwayStrip(report);
+  if (strip) body.append(strip);
+
+  const metrics = el("div", "flight-summary-metrics landing-metrics");
+  for (const [label, value] of landingMetrics(report)) {
+    const metric = el("span");
+    metric.append(el("small", null, label), el("b", null, value));
+    metrics.append(metric);
+  }
+  body.append(metrics);
+
+  const stability = el("ul", "landing-stability");
+  for (const [key, value] of Object.entries(report.stability || {})) {
+    const state = value === true ? "good" : value === false ? "danger" : "unknown";
+    const item = el("li", `is-${state}`);
+    item.append(
+      el("span", "landing-stability-mark", value === true ? "✓" : value === false ? "✗" : "—"),
+      el("span", null, t(`landing_stab_${key}`))
+    );
+    stability.append(item);
+  }
+  body.append(el("h3", "landing-section", t("landing_stability")), stability);
+
+  if (!dialog.open) dialog.showModal();
+}
+
+/* Image de partage : 1200 × 630, le format que Discord, Reddit et les réseaux
+   affichent sans recadrer. */
+function landingCardColors(tone) {
+  return { good: "#34d399", warning: "#fbbf24", danger: "#fb7185" }[tone];
+}
+
+function drawLandingCard(report, context) {
+  const { width, height } = LANDING_CARD_SIZE;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const font = getComputedStyle(document.body).fontFamily || "sans-serif";
+  const tone = landingCardColors(landingGradeTone(report.grade));
+
+  const background = ctx.createLinearGradient(0, 0, width, height);
+  background.addColorStop(0, "#070b14");
+  background.addColorStop(1, "#12306b");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+
+  const text = (value, x, y, size, color, weight = 400, align = "left") => {
+    ctx.font = `${weight} ${size}px ${font}`;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.fillText(value, x, y);
+  };
+
+  text("NaviXav", 60, 78, 30, "#38bdf8", 700);
+  text(t("landing_title"), 60, 112, 22, "#92a2c4");
+  text(`${context.departure} → ${context.arrival}`, width - 60, 78, 34, "#e8eefc", 700, "right");
+  text(
+    [context.callsign, report.aircraft || context.aircraft].filter(Boolean).join(" · ").slice(0, 60),
+    width - 60, 112, 20, "#92a2c4", 400, "right"
+  );
+
+  text(t("landing_rate"), 60, 190, 22, "#92a2c4");
+  text(formatLandingNumber(report.rate_fpm), 60, 290, 110, "#e8eefc", 700);
+  ctx.font = `700 110px ${font}`;
+  const rateWidth = ctx.measureText(formatLandingNumber(report.rate_fpm)).width;
+  text("ft/min", 60 + rateWidth + 16, 290, 32, "#92a2c4");
+  text(t(`landing_grade_${report.grade}`), 60, 340, 34, tone, 700);
+
+  // Note sur 100, dans un anneau proportionnel.
+  const cx = width - 170, cy = 255, radius = 90;
+  ctx.lineWidth = 16;
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.2)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = tone;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * report.score / 100);
+  ctx.stroke();
+  text(String(report.score), cx, cy + 18, 56, "#e8eefc", 700, "center");
+  text(t("landing_score"), cx, cy + radius + 46, 20, "#92a2c4", 400, "center");
+
+  const metrics = landingMetrics(report).slice(0, 6);
+  const columnWidth = (width - 120) / 3;
+  metrics.forEach(([label, value], index) => {
+    const x = 60 + (index % 3) * columnWidth;
+    const y = 400 + Math.floor(index / 3) * 64;
+    text(label, x, y, 18, "#92a2c4");
+    text(String(value).slice(0, 34), x, y + 28, 23, "#e8eefc", 600);
+  });
+
+  const length = finiteOr(report.runway_length_m);
+  const distance = finiteOr(report.distance_from_threshold_m);
+  if (length && distance !== null) {
+    const left = 60, right = width - 60, top = 545, stripHeight = 34;
+    const scale = (right - left) / length;
+    ctx.fillStyle = "#5d6b85";
+    ctx.fillRect(left, top, right - left, stripHeight);
+    ctx.fillStyle = "rgba(52, 211, 153, 0.28)";
+    ctx.fillRect(left + LANDING_TDZ_M[0] * scale, top, (LANDING_TDZ_M[1] - LANDING_TDZ_M[0]) * scale, stripHeight);
+    ctx.setLineDash([14, 10]);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(left, top + stripHeight / 2);
+    ctx.lineTo(right, top + stripHeight / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const offset = Math.max(-1, Math.min(1, finiteOr(report.centerline_offset_m, 0) / 22.5));
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.arc(
+      left + Math.max(0, Math.min(length, distance)) * scale,
+      top + stripHeight / 2 + offset * (stripHeight / 2 - 4),
+      9, 0, Math.PI * 2
+    );
+    ctx.fill();
+  }
+
+  const date = new Date(report.touched_down_at);
+  text(
+    Number.isNaN(date.getTime()) ? "" : date.toLocaleString(displayLocale()),
+    60, height - 18, 16, "#64748b"
+  );
+  text(t("landing_card_footer"), width - 60, height - 18, 16, "#64748b", 400, "right");
+  return canvas;
+}
+
+function landingCardBlob() {
+  if (!displayedLanding) return Promise.resolve(null);
+  const canvas = drawLandingCard(displayedLanding.report, displayedLanding.context);
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function landingCardName() {
+  const { report, context } = displayedLanding;
+  const stamp = String(report.touched_down_at || "").replace(/[^0-9]/g, "").slice(0, 12);
+  return `NaviXav-${context.departure}-${context.arrival}-${stamp}.png`;
+}
+
+async function copyLandingCard() {
+  const message = $("landing-message");
+  try {
+    const blob = await landingCardBlob();
+    if (!blob || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      throw new Error("clipboard");
+    }
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    message.textContent = t("landing_copied");
+  } catch (_error) {
+    message.textContent = t("landing_copy_failed");
+  }
+}
+
+async function saveLandingCard() {
+  const message = $("landing-message");
+  const button = $("landing-save");
+  button.disabled = true;
+  try {
+    const blob = await landingCardBlob();
+    if (!blob) throw new Error("canvas");
+    if (latestStatus?.remote_client) {
+      // Sur tablette, le navigateur enregistre lui-même le fichier.
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = landingCardName();
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+      message.textContent = t("landing_saved");
+      return;
+    }
+    const response = await fetch(
+      `/api/landing/card?${new URLSearchParams({ name: landingCardName() })}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "image/png", "X-NaviXav-Landing": "save" },
+        body: blob,
+      }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || response.statusText);
+    if (!payload.cancelled) message.textContent = t("landing_saved");
+  } catch (_error) {
+    message.textContent = t("landing_save_failed");
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -6049,7 +6627,6 @@ function buildConfigurationSection() {
 }
 
 function renderFlightPanel(plan) {
-  migrateDetailedFlightLogs();
   if (activeFlightSummary?.plan_key !== flightSummaryPlanKey(plan)) {
     activeFlightSummary = null;
     previousFlightSummarySample = null;
@@ -6141,13 +6718,24 @@ function renderFlightPanel(plan) {
     if (!window.confirm(t("purge_history_confirm"))) return;
     purgeFlightHistory();
   });
-  journalHead.append(journalTitle, purge);
+  const exportButton = el("button", "icon-btn", t("logbook_export"));
+  exportButton.id = "flight-summary-export";
+  exportButton.type = "button";
+  exportButton.addEventListener("click", exportLogbook);
+  const journalActions = el("div", "flight-summary-actions");
+  journalActions.append(exportButton);
+  // Effacer le carnet reste un geste du PC : la tablette ne fait que le lire.
+  if (!latestStatus?.remote_client) journalActions.append(purge);
+  journalHead.append(journalTitle, journalActions);
   journal.append(journalHead);
   journal.append(el(
     "p",
     "flight-summary-note",
     t("flight_summary_note")
   ));
+  const stats = el("div", "logbook-stats");
+  stats.id = "logbook-stats";
+  journal.append(stats);
   const summaryList = el("div", "flight-summary-list");
   summaryList.id = "flight-summary-list";
   journal.append(summaryList);
@@ -9630,6 +10218,7 @@ async function pollLive() {
         Boolean(aircraft.paused),
       );
       applyAircraftState(aircraft);
+      handleLandingReport(data.landing);
       updateProcedures(data.procedures, aircraft);
       pollTaxiGuidance(aircraft);
     } catch (error) {
@@ -10215,6 +10804,9 @@ $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);
 $("changelog-open").addEventListener("click", openChangelog);
 $("changelog-close").addEventListener("click", () => $("changelog-dialog").close());
+$("landing-close").addEventListener("click", () => $("landing-dialog").close());
+$("landing-copy").addEventListener("click", copyLandingCard);
+$("landing-save").addEventListener("click", saveLandingCard);
 $("aircraft-photo-close").addEventListener("click", () => $("aircraft-photo-dialog").close());
 $("aircraft-photo-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
@@ -10333,6 +10925,10 @@ trafficSettingsTimer = setInterval(adoptTrafficSettings, TRAFFIC_SETTINGS_INTERV
 async function initialiseApplication() {
   try {
     const status = await loadStatus();
+    // Le carnet ne dépend ni du plan ni de l'accueil : il est lu dès que l'on
+    // sait si cette fenêtre est celle du PC, seule autorisée à l'écrire.
+    migrateDetailedFlightLogs();
+    void initLogbook();
     await loadMapPreferences(status);
     if (needsOnboarding(status)) {
       openWelcome(status);

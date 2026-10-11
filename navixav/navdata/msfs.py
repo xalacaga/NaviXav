@@ -431,7 +431,7 @@ class MsfsProvider:
         ).fetchone()
         if row is None or not row["ils_ident"]:
             return None
-        navaid = self._navaid(row["ils_ident"])
+        navaid = self._navaid(row["ils_ident"], icao)
         return navaid["frequency_mhz"] if navaid else None
 
     def ils_details(self, icao: str, runway_name: str) -> dict[str, float | str | None]:
@@ -442,7 +442,7 @@ class MsfsProvider:
         ).fetchone()
         if row is None or not row["ils_ident"]:
             return {}
-        navaid = self._navaid(row["ils_ident"])
+        navaid = self._navaid(row["ils_ident"], icao)
         if not navaid:
             return {"ident": row["ils_ident"]}
         return {
@@ -454,7 +454,7 @@ class MsfsProvider:
             ),
         }
 
-    def _navaid(self, ident: str) -> dict | None:
+    def _navaid(self, ident: str, icao: str | None = None) -> dict | None:
         key = ident.strip().upper()
         row = self._conn.execute(
             "SELECT * FROM navaid WHERE ident = ? LIMIT 1", (key,)
@@ -464,7 +464,7 @@ class MsfsProvider:
         if not self._allow_fetch or self._missed(key, "navaid"):
             return None
 
-        for region in self._candidate_regions(key):
+        for region in self._candidate_regions(key, icao):
             try:
                 found = extract_navaid(self._client_or_open(), key, region)
             except (NavdataError, SimConnectError):
@@ -475,13 +475,20 @@ class MsfsProvider:
         msfs_store.store_miss(self._conn, key, "navaid")
         return None
 
-    def _candidate_regions(self, ident: str) -> list[str]:
+    def _candidate_regions(self, ident: str, icao: str | None = None) -> list[str]:
         """Régions à essayer pour un identifiant.
 
         Le simulateur exige la région pour lever l'ambiguïté : un même
         identifiant peut désigner plusieurs installations dans le monde. Les
         segments de procédure déjà en base la portent ; à défaut, on tente les
-        régions des terrains chargés, puis une recherche sans région.
+        régions du terrain concerné, puis une recherche sans région.
+
+        Une région erronée ne reçoit aucune réponse : chaque essai manqué coûte
+        le délai d'attente entier. Parcourir toutes les régions de la base
+        avant celle du terrain figeait le calcul du plan près d'une minute pour
+        un ILS — et le déclarait ensuite introuvable. Le terrain connu, on s'en
+        tient donc à ses régions ; sans lui seulement, on tente celles des
+        autres terrains, les plus représentées d'abord.
         """
         regions: list[str] = []
         row = self._conn.execute(
@@ -492,15 +499,37 @@ class MsfsProvider:
         if row and row["fix_region"]:
             regions.append(row["fix_region"])
 
-        for candidate in self._conn.execute(
-            "SELECT DISTINCT fix_region FROM leg WHERE fix_region IS NOT NULL "
-            "AND fix_region <> '' LIMIT 8"
-        ).fetchall():
-            if candidate["fix_region"] not in regions:
-                regions.append(candidate["fix_region"])
+        local = self._airport_regions(icao) if icao else []
+        for region in local or [
+            row["fix_region"]
+            for row in self._conn.execute(
+                "SELECT fix_region FROM leg WHERE fix_region IS NOT NULL "
+                "AND fix_region <> '' GROUP BY fix_region "
+                "ORDER BY COUNT(*) DESC LIMIT 8"
+            ).fetchall()
+        ]:
+            if region not in regions:
+                regions.append(region)
 
         regions.append("")
         return regions
+
+    def _airport_regions(self, icao: str) -> list[str]:
+        """Régions citées par les procédures du terrain, la plus fréquente d'abord.
+
+        Un terrain frontalier en cite plusieurs ; un aérodrome sans procédure
+        n'en cite aucune, et la recherche retombe alors sur toute la base.
+        """
+        return [
+            row["fix_region"]
+            for row in self._conn.execute(
+                "SELECT l.fix_region FROM leg l "
+                "JOIN procedure p ON p.id = l.procedure_id "
+                "WHERE p.icao = ? AND l.fix_region IS NOT NULL AND l.fix_region <> '' "
+                "GROUP BY l.fix_region ORDER BY COUNT(*) DESC",
+                (icao.strip().upper(),),
+            ).fetchall()
+        ]
 
     def is_airway(self, name: str) -> bool:
         row = self._conn.execute(
@@ -552,7 +581,7 @@ class MsfsProvider:
 
         if self._allow_fetch and not self._missed(key, "waypoint"):
             seen = False
-            for region in self._candidate_regions(key):
+            for region in self._candidate_regions(key, icao):
                 try:
                     found = extract_waypoint(self._client_or_open(), key, region)
                 except (NavdataError, SimConnectError):

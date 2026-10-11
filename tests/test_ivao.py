@@ -171,3 +171,18 @@ def test_generic_traffic_endpoint_keeps_nearest_aircraft_inside_radius():
         assert [item["callsign"] for item in endpoint()["traffic"]] == ["NEAR"]
     finally:
         app.state.close_resources()
+
+
+def test_a_turn_is_measured_between_two_feeds(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("navixav.traffic.ivao.time.monotonic", lambda: clock[0])
+    session = _Session(_feed())
+    client = IvaoClient(session=session)
+    assert client.traffic()[0].turn_rate_dps is None
+
+    clock[0] += 15
+    turned = _feed()
+    turned["clients"]["pilots"][0]["lastTrack"]["heading"] = 240
+    session.payload = turned
+    # 270° → 240° en 15 s : 2 °/s à gauche.
+    assert client.traffic()[0].turn_rate_dps == pytest.approx(-2.0)
