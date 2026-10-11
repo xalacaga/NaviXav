@@ -1,21 +1,22 @@
-# NaviXav 1.7.3
+# NaviXav 1.7.4
 
-Publié le 2026-09-16.
+Publié le 2026-10-11.
 
 ## Nouveautés
 
-- Plans de vol MSFS : NaviXav lit désormais le plan préparé dans le planificateur de MSFS, pour ceux qui n'utilisent pas SimBrief. Un réglage « Source du plan de vol » choisit entre SimBrief et un plan MSFS (.PLN) ; le vol chargé dans MSFS est lu automatiquement et un bouton « Ouvrir un fichier .PLN » permet d'en choisir un autre. Terrains, route, voies aériennes, SID, STAR et pistes prévues sont exploités comme un OFP SimBrief ; la météo est prise en direct. Le premier lancement propose ce choix et n'exige plus de compte SimBrief.
-- Diagnostic : la commande « navixav probe-fms » relève ce que l'avion chargé expose de son FMS — le plan de vol du simulateur par SimConnect et, sur le Fenix A320, le plan du FMGC publié par la passerelle locale de l'EFB — et l'écrit dans un rapport à part, en lecture seule.
-- Fenix A320 : NaviXav lit le plan de vol actif du FMGC par la passerelle locale de l'EFB Fenix, en lecture seule. Sur la carte, la route du FMS n'est tracée en jaune que là où elle s'écarte de la route NaviXav (DIRECT TO, nouvelle STAR), avec sa légende, et le plan de dégagement s'affiche à la demande ; le T/C et le T/D du FMGC remplacent les estimations (source « FMGC de l'avion ») ; en vol la phase du FMGC remplace celle déduite de la télémétrie. Le suivi du vol gagne le point actif FMGC, l'ETA et les masses FMS, et deux alertes : limite de vitesse 250 kt et point de décélération. La fiche MCDU s'ouvre sur une vérification ligne à ligne de ce que le FMGC contient (FROM/TO, dégagement, numéro de vol, niveau, pistes, SID, route, STAR, approche, ZFW, vitesses de décollage) et se termine par un miroir des MCDU 1 et 2. Le journal de bord retient le numéro de vol et l'ETA du FMGC.
-- FlyByWire et PMDG : le miroir MCDU fonctionne aussi sur l'A32NX/A380X (écrans lus par SimBridge, phase FMGC par la variable de l'avion) et sur les 737/777 PMDG (écrans CDU diffusés par le SDK, une fois EnableCDUBroadcast activé). En lecture seule, source affichée dans le miroir ; la commande « navixav probe-fms » indique quel canal répond.
+- Le trafic VATSIM, IVAO et OpenSky anticipe les virages : un appareil en virage au dernier relevé continue de tourner en s’amortissant, sur la carte comme dans le simulateur, au lieu de filer tout droit jusqu’au relevé suivant.
+- Analyse de l’atterrissage : au toucher, NaviXav affiche la vitesse verticale figée par MSFS, l’assiette et l’inclinaison, la distance après le seuil et l’écart à l’axe de la piste réellement utilisée, le vent de face et de travers, les rebonds et la stabilisation de la finale, avec une note sur 100. L’analyse est rattachée au vol dans le carnet de bord et une image prête à partager peut être copiée ou enregistrée.
+- Le carnet de vol est désormais conservé dans le dossier de données de NaviXav plutôt que dans la fenêtre : il survit à une réinstallation ou à une réinitialisation de WebView2, et la tablette connectée en réseau local affiche le même carnet, en lecture seule. Les vols déjà enregistrés sont repris automatiquement au premier lancement.
+- Statistiques du carnet de vol : nombre de vols, heures de vol et distance totales, toucher et note moyens, meilleur atterrissage, avions les plus pilotés et terrains les plus fréquentés. Le carnet complet s’exporte en CSV pour un tableur.
 
 ## Corrections
 
-- Carte : le repère TOC ne suit plus l'avion. Il se fige là où la montée s'arrête réellement, même si le contrôle a donné un niveau différent de celui du plan, et n'est recalculé qu'en cas de montée reprise (step climb). Relancé en cours de vol, NaviXav ne place plus le TOC sous l'avion : il reprend celui du profil SimBrief, ou ne l'affiche pas. Avec un plan MSFS, le vol est reconnu à son contenu et non à la date du fichier, que MSFS réécrit à chaque chargement : le journal de vol et le TOC retrouvé survivent à un redémarrage.
-- Alertes : l'alerte « Ouverture dangereuse détectée », reprise du signal de sécurité de MSFS, est retirée. Elle se déclenchait sur des portes ou trappes que le pilote ouvre volontairement au sol.
+- Le trafic OpenSky avance désormais en continu sur la carte et dans le simulateur entre deux relevés, au lieu de rester figé puis de sauter de plusieurs nautiques.
+- OpenSky est relevé bien plus souvent en début de vol, environ toutes les 30 secondes : le quota public est réparti sur la durée d’un vol plutôt que sur une journée entière.
+- Le premier chargement d’un terrain n’attend plus près d’une minute : NaviXav cherche désormais l’ILS et les repères dans la région du terrain au lieu de parcourir celles de tous les terrains déjà connus, et retrouve les fréquences ILS qu’il déclarait à tort introuvables, comme celle de la 23R d’EGCC.
 
 ## Modifications
 
-- News.
+- Correction bug et ajout logbook.
 
 L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique.

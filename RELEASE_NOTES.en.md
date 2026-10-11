@@ -1,21 +1,22 @@
-# NaviXav 1.7.3
+# NaviXav 1.7.4
 
-Released on 2026-09-16.
+Released on 2026-10-11.
 
 ## Added
 
-- MSFS flight plans: NaviXav now reads the plan prepared in the MSFS planner, for pilots who do not use SimBrief. A “Flight plan source” setting chooses between SimBrief and an MSFS plan (.PLN); the flight loaded in MSFS is read automatically and an “Open a .PLN file” button lets you pick another one. Airports, route, airways, SID, STAR and planned runways are used like a SimBrief OFP; weather is taken live. The first launch offers this choice and no longer requires a SimBrief account.
-- Diagnostics: the “navixav probe-fms” command records what the loaded aircraft exposes of its FMS — the simulator flight plan through SimConnect and, on the Fenix A320, the FMGC plan published by the EFB's local gateway — into a separate read-only report.
-- Fenix A320: NaviXav reads the FMGC's active flight plan through the local gateway of the Fenix EFB, read-only. On the map, the FMS route is drawn in yellow only where it departs from the NaviXav route (DIRECT TO, new STAR), with its legend entry, and the alternate plan can be shown on demand; the FMGC's T/C and T/D replace the estimates (source “Aircraft FMGC”); in flight the FMGC phase replaces the one deduced from telemetry. Flight tracking gains the FMGC active waypoint, ETA and FMS weights, plus two alerts: the 250 kt speed limit and the deceleration point. The MCDU card opens with a line-by-line check of what the FMGC contains (FROM/TO, alternate, flight number, level, runways, SID, route, STAR, approach, ZFW, take-off speeds) and closes with a mirror of MCDU 1 and 2. The logbook keeps the FMGC flight number and ETA.
-- FlyByWire and PMDG: the MCDU mirror also works on the A32NX/A380X (screens read through SimBridge, FMGC phase through the aircraft variable) and on the PMDG 737/777 (CDU screens broadcast by the SDK once EnableCDUBroadcast is set). Read-only, the source is shown in the mirror; the “navixav probe-fms” command reports which channel answers.
+- VATSIM, IVAO and OpenSky traffic anticipates turns: an aircraft turning at the last report keeps turning, gradually easing off, on the map and in the simulator, instead of flying straight until the next report.
+- Landing analysis: at touchdown, NaviXav shows the vertical speed recorded by MSFS, pitch and bank, distance past the threshold and centreline deviation on the runway actually used, headwind and crosswind, bounces and approach stability, with a score out of 100. The analysis is attached to the flight in the logbook, and a ready-to-share image can be copied or saved.
+- The logbook is now kept in the NaviXav data folder rather than in the window: it survives a reinstall or a WebView2 reset, and a tablet connected over the local network shows the same logbook, read-only. Flights already recorded are carried over automatically at first launch.
+- Logbook statistics: number of flights, total flight hours and distance, average touchdown and score, best landing, most flown aircraft and most visited airports. The complete logbook can be exported to CSV for a spreadsheet.
 
 ## Fixed
 
-- Map: the TOC marker no longer follows the aircraft. It is fixed where the climb actually ends, even when ATC has assigned a level other than the planned one, and is only recomputed if the climb resumes (step climb). Restarted in flight, NaviXav no longer places the TOC under the aircraft: it uses the SimBrief profile's TOC, or does not show one. With an MSFS plan, the flight is recognised by its content rather than by the file date, which MSFS rewrites at every load: the flight log and the recovered TOC survive a restart.
-- Alerts: the “Unsafe opening detected” alert, taken from the MSFS safety signal, is removed. It fired on doors or hatches the pilot opens on purpose on the ground.
+- OpenSky traffic now keeps moving smoothly on the map and in the simulator between two reports, instead of freezing and then jumping several nautical miles.
+- OpenSky is polled much more often at the start of a flight, about every 30 seconds: the public allowance is spread over a flight rather than a whole day.
+- The first load of an airport no longer waits nearly a minute: NaviXav now looks up the ILS and fixes in the airport’s own region instead of going through those of every airport already known, and recovers ILS frequencies it wrongly reported as missing, such as EGCC runway 23R.
 
 ## Changed
 
-- News.
+- Correction bug et ajout logbook.
 
 The installer is verified against its SHA-256 checksum before any automatic update.
