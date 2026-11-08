@@ -17,6 +17,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -240,8 +242,39 @@ def _checklist_beside(directory: Path) -> Path | None:
     return files[0] if files else None
 
 
+# Lectures déjà faites, par dossier d'appareil. Les paquets de trafic (FSLTL,
+# AIG) comptent des milliers de livrées, chacune avec son aircraft.cfg : les
+# relire à chaque vignette demandée prenait plus de quinze secondes et
+# retenait le reste de l'API derrière. La clé porte la date et la taille du
+# fichier ainsi que la date du dossier, qui change quand un cockpit.cfg ou un
+# dossier Checklist apparaît : une modification est toujours relue.
+_READ_CACHE: dict[tuple[str, str], tuple[tuple[int, int, int], InstalledAircraft | None]] = {}
+
+
+def _read_signature(directory: Path) -> tuple[int, int, int] | None:
+    try:
+        config = (directory / "aircraft.cfg").stat()
+        folder = directory.stat()
+    except OSError:
+        return None
+    return (config.st_mtime_ns, config.st_size, folder.st_mtime_ns)
+
+
 def read_aircraft(directory: Path, package: str) -> InstalledAircraft | None:
     """Lit un dossier `SimObjects/Airplanes/<x>`, ou None s'il n'apprend rien."""
+    signature = _read_signature(directory)
+    if signature is None:
+        return _read_aircraft_uncached(directory, package)
+    key = (str(directory), package)
+    cached = _READ_CACHE.get(key)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    aircraft = _read_aircraft_uncached(directory, package)
+    _READ_CACHE[key] = (signature, aircraft)
+    return aircraft
+
+
+def _read_aircraft_uncached(directory: Path, package: str) -> InstalledAircraft | None:
     values = _read_config(directory / "aircraft.cfg")
     variations: list[dict[str, str]] = values.pop("__variations__", [])  # type: ignore[assignment]
 
@@ -297,13 +330,57 @@ def read_aircraft(directory: Path, package: str) -> InstalledAircraft | None:
     )
 
 
+# Un parcours de Community reste valable quelques secondes : l'interface
+# demande plusieurs vignettes à la fois, et elles doivent partager un seul
+# parcours au lieu d'en lancer autant en parallèle sur le même disque.
+SCAN_REUSE_S = 10.0
+_SCAN_LOCK = threading.Lock()
+_SCAN_RESULTS: dict[tuple[str, ...], tuple[float, list[InstalledAircraft]]] = {}
+
+
 def scan(folders: Iterable[Path]) -> list[InstalledAircraft]:
     """Appareils installés dans les dossiers donnés, un par modèle.
 
     Les décorations sont fusionnées : le premier dossier rencontré fournit les
     métadonnées, et les titres de tous les autres viennent s'y ajouter, parce
     que ce sont eux que le simulateur publiera.
+
+    Les appels simultanés attendent le parcours en cours plutôt que d'en lancer
+    un autre ; la liste rendue est une copie que l'appelant peut modifier.
     """
+    folders = list(folders)
+    # La date d'un dossier Community change dès qu'un paquet y entre ou en
+    # sort : un ajout est vu tout de suite, sans attendre l'expiration.
+    key = tuple(f"{folder}|{_folder_mtime(folder)}" for folder in folders)
+    with _SCAN_LOCK:
+        cached = _SCAN_RESULTS.get(key)
+        if cached is not None and time.monotonic() - cached[0] < SCAN_REUSE_S:
+            return list(cached[1])
+        started = time.monotonic()
+        result = _scan_uncached(folders)
+        _SCAN_RESULTS[key] = (time.monotonic(), result)
+        logger.info(
+            "Parcours Community : %d appareil(s) en %.2f s",
+            len(result),
+            time.monotonic() - started,
+        )
+        return list(result)
+
+
+def _folder_mtime(folder: Path) -> int:
+    try:
+        return folder.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
+def forget_scan() -> None:
+    """Oublie le dernier parcours : le suivant relira l'arborescence."""
+    with _SCAN_LOCK:
+        _SCAN_RESULTS.clear()
+
+
+def _scan_uncached(folders: list[Path]) -> list[InstalledAircraft]:
     merged: dict[tuple[str, str, str], InstalledAircraft] = {}
     for folder in folders:
         for config in sorted(folder.glob("*/SimObjects/Airplanes/*/aircraft.cfg")):

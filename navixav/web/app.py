@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from navixav import __version__
 from navixav.aircraft import AircraftMatcher
-from navixav.aircraft.community import community_folders, scan, survey
+from navixav.aircraft.community import community_folders, forget_scan, scan, survey
 from navixav.aircraft.documents import checked_document, document_inventory, search_document
 from navixav.aircraft.scaffold import write_entry
 from navixav.aircraft.procedures import procedure_payload
@@ -627,6 +627,9 @@ def create_app(
 
     @app.get("/api/aircraft/survey")
     def get_aircraft_survey(community: str = "") -> dict[str, object]:
+        # L'inventaire est demandé exprès : il repart d'un parcours neuf, les
+        # fichiers inchangés restant servis par le cache de lecture.
+        forget_scan()
         return aircraft_inventory(community)
 
     @app.post("/api/aircraft/select-folder")

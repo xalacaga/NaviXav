@@ -379,3 +379,78 @@ def test_refuse_d_ecraser_un_avion_deja_amorce(community: Path, tmp_path: Path):
     write_entry(widget, user)
     with pytest.raises(FileExistsError):
         write_entry(widget, user)
+
+
+# --------------------------------------------------------------------- #
+# Cache de lecture : les paquets de trafic comptent des milliers de livrées.
+
+
+def test_un_aircraft_cfg_inchange_n_est_pas_relu(community: Path, monkeypatch):
+    from navixav.aircraft import community as module
+
+    module.forget_scan()
+    first = scan([community])
+    reads: list[Path] = []
+    original = module._read_config
+    monkeypatch.setattr(
+        module, "_read_config", lambda path: reads.append(path) or original(path)
+    )
+    module.forget_scan()
+
+    assert scan([community]) == first
+    assert reads == []
+
+
+def test_un_aircraft_cfg_modifie_est_relu(community: Path):
+    from navixav.aircraft import community as module
+
+    module.forget_scan()
+    scan([community])
+    config = community / "vendor-aircraft-sprocket" / "SimObjects" / "Airplanes"
+    config = config / "vendor-sprocket" / "aircraft.cfg"
+    config.write_text(
+        config.read_text(encoding="cp1252").replace("SP10", "SP20"), encoding="cp1252"
+    )
+    module.forget_scan()
+
+    assert "SP20" in {aircraft.icao for aircraft in scan([community])}
+
+
+def test_un_paquet_ajoute_est_vu_sans_attendre_l_expiration(community: Path):
+    from navixav.aircraft import community as module
+
+    module.forget_scan()
+    before = {aircraft.icao for aircraft in scan([community])}
+    make_package(
+        community, "vendor-aircraft-gizmo", "vendor-gizmo",
+        titles=["Gizmo G1"], manufacturer="Gizmo", ui_type="G1", icao="GZ01",
+    )
+
+    after = {aircraft.icao for aircraft in scan([community])}
+    assert "GZ01" not in before
+    assert "GZ01" in after
+
+
+def test_les_demandes_simultanees_partagent_un_seul_parcours(community: Path, monkeypatch):
+    import threading
+
+    from navixav.aircraft import community as module
+
+    module.forget_scan()
+    walks: list[int] = []
+    original = module._scan_uncached
+    monkeypatch.setattr(
+        module, "_scan_uncached", lambda folders: walks.append(1) or original(folders)
+    )
+    results: list[list[InstalledAircraft]] = []
+    threads = [
+        threading.Thread(target=lambda: results.append(scan([community])))
+        for _ in range(6)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(walks) == 1
+    assert all(result == results[0] for result in results)
