@@ -32,6 +32,9 @@ const MAP = (() => {
   // de la route NaviXav, pour voir d'un coup d'œil où les deux divergent.
   let fmsRoute = [];
   let fmsAlternate = [];
+  // SIGMET en vigueur près de la route : polygones déjà projetés.
+  let sigmets = [];
+  let sigmetsVisible = true;
   let dragging = null;
   let basemapVisible = true;
   let constraintsVisible = true;
@@ -397,6 +400,7 @@ const MAP = (() => {
     if (!chart) return;
 
     if (basemapVisible) drawBasemap();
+    if (sigmetsVisible) drawSigmets();
     drawRunways();
     drawFmsAlternate();
     drawRoute();
@@ -580,8 +584,91 @@ const MAP = (() => {
     context.restore();
   }
 
-  function drawTrail() {
-    if (trail.filter(Boolean).length < 2) return;
+  /*
+   * SIGMET : une zone teintée par phénomène, son contour et ses niveaux. Ceux
+   * que la route traverse sont appuyés ; les autres restent en retrait, pour
+   * situer la menace sans masquer la route.
+   */
+  const SIGMET_COLOURS = {
+    TS: "#ef4444",
+    TC: "#dc2626",
+    TURB: "#f59e0b",
+    MTW: "#f59e0b",
+    ICE: "#38bdf8",
+    VA: "#a855f7",
+    DS: "#d97706",
+    RDOACT: "#22c55e",
+  };
+  const SIGMET_LABEL_MIN_PX = 48;
+
+  function sigmetLevel(feet, fallback) {
+    if (!Number.isFinite(feet)) return fallback;
+    return `FL${String(Math.round(feet / 100)).padStart(3, "0")}`;
+  }
+
+  function sigmetLabel(sigmet) {
+    const hazard = [sigmet.qualifier, sigmet.hazard].filter(Boolean).join(" ");
+    return `${hazard} · ${sigmetLevel(sigmet.base_ft, "SFC")}–${sigmetLevel(sigmet.top_ft, "?")}`;
+  }
+
+  function drawSigmets() {
+    if (!sigmets.length) return;
+    const boxes = [];
+    context.save();
+    // Les zones traversées en dernier : elles restent lisibles par-dessus.
+    const ordered = [...sigmets].sort((a, b) => Number(a.on_route) - Number(b.on_route));
+    for (const sigmet of ordered) {
+      const colour = SIGMET_COLOURS[sigmet.hazard] || "#94a3b8";
+      for (const ring of sigmet.rings) {
+        const screen = continuous(ring, view.centerX).map((point) => toScreen(point.x, point.y));
+        context.beginPath();
+        screen.forEach(([x, y], index) => (index ? context.lineTo(x, y) : context.moveTo(x, y)));
+        context.closePath();
+        context.fillStyle = colour;
+        context.globalAlpha = sigmet.on_route ? 0.2 : 0.09;
+        context.fill();
+        context.globalAlpha = sigmet.on_route ? 0.95 : 0.55;
+        context.strokeStyle = colour;
+        context.lineWidth = sigmet.on_route ? 2 : 1.2;
+        context.setLineDash(sigmet.on_route ? [] : [6, 4]);
+        context.stroke();
+        context.setLineDash([]);
+
+        const xs = screen.map(([x]) => x);
+        const ys = screen.map(([, y]) => y);
+        const width = Math.max(...xs) - Math.min(...xs);
+        const height = Math.max(...ys) - Math.min(...ys);
+        if (Math.max(width, height) < SIGMET_LABEL_MIN_PX) continue;
+        const cx = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+        const cy = ys.reduce((sum, y) => sum + y, 0) / ys.length;
+        drawSigmetLabel(sigmetLabel(sigmet), cx, cy, colour, boxes);
+      }
+    }
+    context.restore();
+  }
+
+  function drawSigmetLabel(text, x, y, colour, boxes) {
+    context.font = "700 10.5px 'Inter', system-ui, sans-serif";
+    const width = context.measureText(text).width + 10;
+    const box = { x: x - width / 2, y: y - 9, width, height: 18 };
+    if (overlaps(box, boxes)) return;
+    boxes.push(box);
+    context.globalAlpha = 0.9;
+    context.fillStyle = css("--label-bg") || "#1e293b";
+    roundRect(box.x, box.y, box.width, box.height, 4);
+    context.fill();
+    context.globalAlpha = 1;
+    context.strokeStyle = colour;
+    context.lineWidth = 1;
+    context.stroke();
+    context.fillStyle = colour;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(text, x, y + 0.5);
+    context.textBaseline = "alphabetic";
+  }
+
+  function drawTrail() {    if (trail.filter(Boolean).length < 2) return;
     context.save();
     context.strokeStyle = trailColor;
     context.globalAlpha = 0.9;
@@ -1351,7 +1438,28 @@ const MAP = (() => {
       draw();
     },
     get constraintsShown() { return constraintsVisible; },
-    /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
+    /** SIGMET reçus du service, en latitude/longitude. */
+    setSigmets(list) {
+      sigmets = (Array.isArray(list) ? list : []).map((sigmet) => ({
+        ...sigmet,
+        rings: (sigmet.polygons || [])
+          .map((ring) => ring
+            .filter((point) => Number.isFinite(point?.[0]) && Number.isFinite(point?.[1]))
+            .map(([latitude, longitude]) => project(latitude, longitude)))
+          .filter((ring) => ring.length >= 3),
+      })).filter((sigmet) => sigmet.rings.length);
+      draw();
+    },
+    toggleSigmets() {
+      sigmetsVisible = !sigmetsVisible;
+      const button = document.getElementById("map-sigmet");
+      if (button) {
+        button.classList.toggle("active", sigmetsVisible);
+        button.setAttribute("aria-pressed", String(sigmetsVisible));
+      }
+      draw();
+    },
+    get sigmetsShown() { return sigmetsVisible; },    /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
     setBasemap(key) {
       const applied = applyBasemap(key);
       draw();

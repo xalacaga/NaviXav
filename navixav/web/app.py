@@ -18,7 +18,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Any, AsyncIterator
+from typing import Annotated, Any, AsyncIterator, Literal
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
@@ -84,6 +84,7 @@ from navixav.traffic.service import TrafficService
 from navixav.vatsim import VatsimClient, VatsimError
 from navixav.updater import GitHubUpdater, UpdateError
 from navixav.weather.briefing import build_briefing
+from navixav.weather.sigmet import SigmetFeed, relate_to_route
 
 STATIC_DIR = resource_path("navixav", "web", "static")
 FAA_ICAO_PREFIXES = {
@@ -96,12 +97,21 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 WEATHER_REFRESH_SECONDS = 300
 
 
+class PanelAlert(BaseModel):
+    """Une alarme active, déjà traduite : le panneau ne fait que l'afficher."""
+
+    severity: Literal["info", "warning", "danger"] = "warning"
+    text: str = Field(default="", max_length=240)
+
+
 class PanelFlightSummary(BaseModel):
     revision: int = 0
     connected: bool = False
     route: str = Field(default="", max_length=40)
     values: dict[str, Annotated[str, Field(max_length=240)]] = Field(default_factory=dict, max_length=8)
     labels: dict[str, Annotated[str, Field(max_length=400)]] = Field(default_factory=dict, max_length=32)
+    # Les plus graves d'abord, comme dans le bandeau de l'application.
+    alerts: list[PanelAlert] = Field(default_factory=list, max_length=6)
 
 
 class PlanRequest(BaseModel):
@@ -231,6 +241,7 @@ def create_app(
     opensky = opensky_client or OpenSkyClient(
         lambda: (lambda state: (state.latitude, state.longitude))(tracker.read())
     )
+    sigmet_feed = SigmetFeed()
     current_plan_state: dict[str, Any] = {}
     panel_summary: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
@@ -331,6 +342,7 @@ def create_app(
         vatsim.close()
         ivao.close()
         opensky.close()
+        sigmet_feed.close()
         sia.session.close()
         faa.session.close()
         chartfox.close()
@@ -966,6 +978,36 @@ def create_app(
             "partial": live_reports < len(reports),
             "refreshed_at": refreshed_at,
             "refresh_interval_seconds": WEATHER_REFRESH_SECONDS,
+        }
+
+    @app.get("/api/weather/sigmets")
+    def current_sigmets() -> dict[str, Any]:
+        """SIGMET en vigueur, limités au couloir de la route quand un vol est chargé."""
+        try:
+            sigmets, fetched_at = sigmet_feed.current()
+        except Exception as exc:  # noqa: BLE001 - la couche reste simplement vide
+            LOGGER.warning("SIGMET indisponibles : %s", type(exc).__name__)
+            raise HTTPException(503, "Les SIGMET sont momentanément indisponibles.") from exc
+        payload = current_plan_state.get("payload") or {}
+        enroute = payload.get("enroute") or {}
+        route = [
+            (float(point["lat"]), float(point["lon"]))
+            for point in enroute.get("route_path") or []
+            if isinstance(point, dict)
+            and isinstance(point.get("lat"), (int, float))
+            and isinstance(point.get("lon"), (int, float))
+        ]
+        if route:
+            cruise = enroute.get("cruise_altitude_ft")
+            sigmets = relate_to_route(
+                sigmets, route, int(cruise) if isinstance(cruise, (int, float)) else None
+            )
+        return {
+            "sigmets": [sigmet.to_dict() for sigmet in sigmets],
+            "route_filtered": bool(route),
+            "fetched_at": datetime.fromtimestamp(fetched_at, timezone.utc).isoformat()
+            if fetched_at else None,
+            "source": "aviationweather.gov",
         }
 
     @app.get("/api/airport/{icao}")

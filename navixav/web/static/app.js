@@ -246,6 +246,10 @@ let fmsTimer = null;
 let latestFms = null;
 let simulatorTimer = null;
 let weatherTimer = null;
+// SIGMET en vigueur près de la route, rafraîchis indépendamment des METAR.
+let currentSigmets = [];
+let sigmetTimer = null;
+let sigmetRequest = 0;
 let vatsimTimer = null;
 /* Postes en ligne par aérodrome, tels que le serveur les a rapportés. */
 let vatsimPositions = {};
@@ -311,6 +315,12 @@ const EARTH_RADIUS_M = 6378137;
 const LIVE_INTERVAL_MS = 1000;
 const FMS_INTERVAL_MS = 4000;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const SIGMET_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+// Distance devant l'avion où un SIGMET traversé à son niveau est annoncé.
+const SIGMET_LOOKAHEAD_NM = 60;
+const SIGMET_LOOKAHEAD_STEP_NM = 5;
+// Marge verticale : un SIGMET publié jusqu'au FL340 concerne encore le FL350.
+const SIGMET_VERTICAL_MARGIN_FT = 1000;
 
 /* Le réseau demande de ne pas interroger son flux plus d'une fois par quart de
    minute, et le serveur garde déjà sa réponse une minute. Deux minutes ici :
@@ -1826,6 +1836,7 @@ function renderPlan(plan) {
   renderMapBar(plan);
   startLiveLoop();
   startWeatherLoop();
+  startSigmetLoop();
   startVatsimLoop();
   startTrafficLoop();
 
@@ -3553,9 +3564,135 @@ function fuelMonitor(plan, aircraft, projection) {
   return { planned, deviation, destination, minimum, status, deviationStatus };
 }
 
+/*
+ * Approche stabilisée : sous le portail — 1 000 ft en IMC, 500 ft en VMC —
+ * l'avion doit être configuré pour l'atterrissage, à vitesse tenue, sans
+ * descendre à plus de 1 000 ft/min et, sur ILS, à moins d'un point du
+ * localizer et du glide. Les mêmes critères que l'analyse après atterrissage,
+ * jugés cette fois pendant l'approche, quand il est encore temps de remettre
+ * les gaz. Une donnée absente n'est pas une faute : le critère est ignoré.
+ */
+const STABLE_GATE_IMC_FT = 1000;
+const STABLE_GATE_VMC_FT = 500;
+const STABLE_FLOOR_FT = 50;
+const STABLE_WATCH_FT = 2500;
+const STABLE_MAX_SINK_FPM = 1000;
+const STABLE_SPEED_WINDOW_MS = 10000;
+const STABLE_SPEED_MIN_SPAN_MS = 5000;
+const STABLE_SPEED_BAND_KT = 10;
+// Échelle des écrans de pilotage : deux points de part et d'autre, l'aiguille
+// SimConnect en butée (127 pour le localizer, 119 pour le glide) valant deux.
+const STABLE_MAX_DOTS = 1;
+const ILS_FULL_SCALE_DOTS = 2;
+const CDI_FULL_SCALE = 127;
+const GSI_FULL_SCALE = 119;
+
+const stabilityMemory = { imc: false, speeds: [], gateCalled: false };
+
+function resetStabilityMemory() {
+  stabilityMemory.imc = false;
+  stabilityMemory.speeds = [];
+  stabilityMemory.gateCalled = false;
+}
+
+/** Hauteur du portail : 1 000 ft si l'arrivée est IFR ou si l'avion a traversé des nuages. */
+function stabilityGateFt(plan, imcSeen) {
+  const category = String(plan?.weather?.arrival?.flight_category || "").toUpperCase();
+  return imcSeen || category === "IFR" || category === "LIFR"
+    ? STABLE_GATE_IMC_FT : STABLE_GATE_VMC_FT;
+}
+
+/** Écart d'une aiguille ILS en points, ou null quand elle ne dit rien. */
+function ilsDots(value, fullScale) {
+  const raw = finiteOr(value);
+  return raw === null ? null : (Math.abs(raw) / fullScale) * ILS_FULL_SCALE_DOTS;
+}
+
+/**
+ * Critères en défaut à cet instant, en notation de poste de pilotage.
+ * `speeds` : relevés [instant ms, vitesse indiquée kt] des dernières secondes.
+ */
+function stabilityFaults({ configuration, capabilities, verticalSpeed, speeds }) {
+  const faults = [];
+  const config = configuration || {};
+  const gear = finiteOr(config.gear_extended_pct);
+  if (capabilities?.retractable_gear && gear !== null && gear < 95) faults.push("GEAR");
+  if (capabilities?.flaps && config.flaps_handle_index === 0) faults.push("FLAPS");
+  if (Number.isFinite(verticalSpeed) && verticalSpeed < -STABLE_MAX_SINK_FPM) {
+    faults.push(`V/S ${Math.round(verticalSpeed)}`);
+  }
+  const samples = (speeds || []).filter(([, speed]) => Number.isFinite(speed) && speed > 0);
+  if (samples.length >= 2 && samples.at(-1)[0] - samples[0][0] >= STABLE_SPEED_MIN_SPAN_MS) {
+    const values = samples.map(([, speed]) => speed);
+    const spread = Math.max(...values) - Math.min(...values);
+    if (spread > STABLE_SPEED_BAND_KT) faults.push(`IAS Δ${Math.round(spread)} kt`);
+  }
+  // Les aiguilles génériques ne décrivent que le récepteur NAV1 : un avion qui
+  // guide l'ILS sur un autre récepteur ne peut pas être jugé sur elles.
+  const nav1 = [null, undefined, 1].includes(config.ils_receiver_index);
+  if (nav1 && config.nav1_has_localizer) {
+    const dots = ilsDots(config.nav1_cdi, CDI_FULL_SCALE);
+    if (dots !== null && dots > STABLE_MAX_DOTS) faults.push(`LOC ${dots.toFixed(1)} DOT`);
+  }
+  if (nav1 && config.nav1_has_glide_slope) {
+    const dots = ilsDots(config.nav1_gsi, GSI_FULL_SCALE);
+    if (dots !== null && dots > STABLE_MAX_DOTS) faults.push(`G/S ${dots.toFixed(1)} DOT`);
+  }
+  return faults;
+}
+
+/**
+ * État de stabilisation de l'approche en cours, ou null hors finale.
+ * `below` : l'avion est entre le portail et 50 ft, là où les critères comptent.
+ */
+function stabilityState(context, now = Date.now()) {
+  const inFinal = !context.onGround
+    && (context.phase === t("phase_approach") || context.phase === t("phase_landing"))
+    && context.aglFt !== null && context.aglFt < STABLE_WATCH_FT;
+  if (!inFinal) {
+    resetStabilityMemory();
+    return null;
+  }
+  if (context.configuration?.in_cloud === true) stabilityMemory.imc = true;
+  stabilityMemory.speeds.push([now, context.airspeed]);
+  stabilityMemory.speeds = stabilityMemory.speeds.filter(
+    ([stamp]) => now - stamp <= STABLE_SPEED_WINDOW_MS
+  );
+  const gate = stabilityGateFt(context.plan, stabilityMemory.imc);
+  const below = context.aglFt <= gate && context.aglFt >= STABLE_FLOOR_FT;
+  return {
+    gate,
+    below,
+    faults: below ? stabilityFaults({ ...context, speeds: stabilityMemory.speeds }) : [],
+  };
+}
+
+/** « Stabilized » au passage du portail ; une approche instable a son alarme. */
+function announceStabilized(stability) {
+  if (!stability?.below || stabilityMemory.gateCalled) return;
+  stabilityMemory.gateCalled = true;
+  if (!stability.faults.length) VOICE.announce([{ key: "voice_stabilized" }]);
+}
+
+function updateStabilityDisplay(stability) {
+  if (!stability) {
+    liveValue("flight-stability", "—");
+    return;
+  }
+  if (!stability.below) {
+    liveValue("flight-stability", tf("flight_stability_gate", { height: stability.gate }));
+    return;
+  }
+  liveValue(
+    "flight-stability",
+    stability.faults.length ? stability.faults.join(" · ") : t("flight_stability_stable"),
+    stability.faults.length ? "danger" : "good"
+  );
+}
+
 function flightContext(aircraft, projection, phase, constraint, descent = null) {
   const configuration = aircraft?.configuration || null;
-  return {
+  const context = {
     aircraft,
     configuration,
     capabilities: configuration?.capabilities || null,
@@ -3579,6 +3716,9 @@ function flightContext(aircraft, projection, phase, constraint, descent = null) 
       finiteOr(aircraft?.altitude_ft)
     ),
   };
+  context.stability = stabilityState(context);
+  context.sigmet = sigmetAhead(aircraft);
+  return context;
 }
 
 const ALERT_RULES = [
@@ -3846,6 +3986,24 @@ const ALERT_RULES = [
     armed: (c) => !c.onGround && c.fuel?.minimum !== null && c.fuel?.minimum !== undefined,
     when: (c) => c.fuel.destination < c.fuel.minimum,
     detail: (c) => `EFOB ${Math.round(c.fuel.destination)} kg · MIN ${Math.round(c.fuel.minimum)} kg`,
+  },
+  {
+    id: "unstable_approach",
+    severity: "danger",
+    armed: (c) => Boolean(c.stability?.below),
+    when: (c) => c.stability.faults.length > 0,
+    detail: (c) => c.stability.faults.join(" · "),
+  },
+  {
+    id: "sigmet_ahead",
+    severity: "warning",
+    armed: (c) => !c.onGround && Boolean(c.sigmet),
+    when: () => true,
+    detail: (c) => [
+      sigmetSummary(c.sigmet.sigmet),
+      c.sigmet.sigmet.fir,
+      c.sigmet.distanceNm ? `${c.sigmet.distanceNm} NM` : t("sigmet_inside"),
+    ].filter(Boolean).join(" · "),
   },
 ];
 
@@ -6564,6 +6722,8 @@ function updateFlightPanel(aircraft) {
   const context = flightContext(aircraft, projection, phase, constraint, descent);
   updateAlertsDisplay(context);
   updateFuelMonitorDisplay(context.fuel);
+  updateStabilityDisplay(context.stability);
+  announceStabilized(context.stability);
   updateGuidedContext(aircraft, phaseKey, projection, constraint);
 
   liveValue("flight-phase", phase);
@@ -6689,23 +6849,31 @@ function updateFlightPanel(aircraft) {
   publishPanelFlight(aircraft);
 }
 
+/** Alarmes actives pour le panneau MSFS : gravité et texte déjà traduit. */
+function panelAlerts(active) {
+  return (active || []).slice(0, 6).map((alert) => ({
+    severity: alert.severity,
+    text: [alert.label, alert.detail].filter(Boolean).join(" · ").slice(0, 240),
+  }));
+}
+
 function publishPanelFlight(aircraft) {
   if (latestStatus?.remote_client || performance.now() - panelFlightPublishedAt < 2000) return;
   const poll = beginPoll("panelFlight");
   if (!poll) return;
   panelFlightPublishedAt = performance.now();
   const values = {};
-  for (const id of ["flight-next-fix", "flight-next-distance", "flight-progress-remaining", "flight-next-constraint", "flight-constraint-distance", "flight-tod"]) {
+  for (const id of ["flight-next-fix", "flight-next-distance", "flight-progress-remaining", "flight-next-constraint", "flight-constraint-distance", "flight-tod", "flight-stability"]) {
     values[id] = $(id)?.textContent || "—";
   }
   const labels = {};
-  for (const key of ["panel_my_flight", "panel_flight_unavailable", "panel_confirmed", "panel_remaining", "flight_next_fix", "flight_next_constraint", "traffic_state_loading", "traffic_state_active", "traffic_state_empty", "traffic_state_error", "traffic_state_opensky_quota", "traffic_state_opensky_quota_detail", "traffic_state_stale", "traffic_state_detail"]) labels[key] = t(key);
+  for (const key of ["panel_my_flight", "panel_flight_unavailable", "panel_confirmed", "panel_remaining", "flight_next_fix", "flight_next_constraint", "traffic_state_loading", "traffic_state_active", "traffic_state_empty", "traffic_state_error", "traffic_state_opensky_quota", "traffic_state_opensky_quota_detail", "traffic_state_stale", "traffic_state_detail", "flight_stability", "master_warning", "master_caution"]) labels[key] = t(key);
   void poll.json("/api/panel/flight", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ revision: currentPlan?.panel_revision || 0,
       connected: Boolean(aircraft && currentPlan),
       route: currentPlan ? `${currentPlan.departure?.icao || "----"} → ${currentPlan.arrival?.icao || "----"}` : "",
-      values, labels }),
+      values, labels, alerts: panelAlerts(currentActiveAlerts) }),
   }).catch(() => {}).finally(() => poll.finish());
 }
 
@@ -6898,6 +7066,7 @@ function renderFlightPanel(plan) {
   // déjà faites ; seul un nouveau plan les réarme.
   if (voicePlanKey !== flightSummaryPlanKey(plan)) {
     resetVoiceMemory();
+    resetStabilityMemory();
     voicePlanKey = flightSummaryPlanKey(plan);
   }
   const panel = $("panel-flight");
@@ -6964,6 +7133,7 @@ function renderFlightPanel(plan) {
   item(t("flight_top_of_descent"), "flight-tod", t("flight_tod_source_note"));
   item(t("flight_vertical_profile"), "flight-vertical-profile", t("flight_vertical_profile_note"));
   item(t("flight_descent_rate"), "flight-descent-vs", t("flight_descent_rate_note"));
+  item(t("flight_stability"), "flight-stability", t("flight_stability_note"));
   panel.append(grid);
 
   panel.append(buildConfigurationSection());
@@ -10913,9 +11083,154 @@ function renderWeather(plan) {
     return;
   }
   panel.append(grid);
+  const sigmetCard = weatherSigmets(currentSigmets);
+  if (sigmetCard) panel.append(sigmetCard);
   panel.append(
     el("p", "wx-disclaimer", t("wx_disclaimer"))
   );
+}
+
+function sigmetLevel(feet, fallback) {
+  return Number.isFinite(feet) ? `FL${String(Math.round(feet / 100)).padStart(3, "0")}` : fallback;
+}
+
+function sigmetSummary(sigmet) {
+  const hazard = [sigmet.qualifier, sigmet.hazard].filter(Boolean).join(" ");
+  return `${hazard} · ${sigmetLevel(sigmet.base_ft, "SFC")}–${sigmetLevel(sigmet.top_ft, "?")}`;
+}
+
+function sigmetValidUntil(sigmet) {
+  const end = new Date(Number(sigmet.valid_to) * 1000);
+  if (Number.isNaN(end.getTime())) return "";
+  const hours = String(end.getUTCHours()).padStart(2, "0");
+  const minutes = String(end.getUTCMinutes()).padStart(2, "0");
+  return tf("wx_sigmet_until", { time: `${hours}${minutes}Z` });
+}
+
+/** SIGMET proches de la route : ceux qu'elle traverse en tête, texte brut à la demande. */
+function weatherSigmets(sigmets) {
+  if (!sigmets?.length) return null;
+  const card = el("article", "wx-card wx-sigmets");
+  const head = el("div", "wx-head");
+  const identity = el("div");
+  identity.append(el("div", "card-kicker", t("wx_sigmet_kicker")));
+  identity.append(el("div", "card-icao", "SIGMET"));
+  head.append(identity);
+  const crossed = sigmets.filter((sigmet) => sigmet.on_route).length;
+  const status = el("div", "wx-status");
+  status.append(el(
+    "span",
+    `wx-sigmet-count ${crossed ? "warning" : ""}`,
+    crossed ? tf("wx_sigmet_on_route", { count: crossed }) : t("wx_sigmet_near_only")
+  ));
+  head.append(status);
+  card.append(head);
+  const list = el("ul", "wx-sigmet-list");
+  for (const sigmet of sigmets) {
+    const item = el("li", sigmet.on_route ? "on-route" : "");
+    item.dataset.hazard = sigmet.hazard;
+    const details = el("details");
+    const summary = el("summary");
+    summary.append(el("strong", null, sigmetSummary(sigmet)));
+    summary.append(el("span", null, [sigmet.fir, sigmetValidUntil(sigmet)].filter(Boolean).join(" · ")));
+    details.append(summary);
+    if (sigmet.raw) details.append(el("pre", "wx-sigmet-raw", sigmet.raw));
+    item.append(details);
+    list.append(item);
+  }
+  card.append(list);
+  card.append(el("p", "stat-note", t("wx_sigmet_source")));
+  return card;
+}
+
+async function refreshSigmets() {
+  if (!currentPlan) return;
+  const request = ++sigmetRequest;
+  try {
+    const response = await fetch("/api/weather/sigmets", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (request !== sigmetRequest) return;
+    currentSigmets = Array.isArray(payload.sigmets) ? payload.sigmets : [];
+  } catch (error) {
+    // Les SIGMET du relevé précédent restent affichés : ils valent des heures.
+    console.warn("SIGMET refresh failed", error);
+    return;
+  }
+  MAP.setSigmets(currentSigmets);
+  show($("legend-sigmet"), currentSigmets.length > 0);
+  if (currentPlan) renderWeather(currentPlan);
+}
+
+function startSigmetLoop() {
+  if (sigmetTimer) clearInterval(sigmetTimer);
+  currentSigmets = [];
+  MAP.setSigmets([]);
+  show($("legend-sigmet"), false);
+  void refreshSigmets();
+  sigmetTimer = setInterval(() => refreshSigmets(), SIGMET_REFRESH_INTERVAL_MS);
+}
+
+/** Point à `distanceNm` sur la route vraie `bearingDeg` (sphère). */
+function pointAlong(latitude, longitude, bearingDeg, distanceNm) {
+  const radians = Math.PI / 180;
+  const angular = distanceNm / 3440.065;
+  const bearing = bearingDeg * radians;
+  const phi = latitude * radians;
+  const lambda = longitude * radians;
+  const phi2 = Math.asin(
+    Math.sin(phi) * Math.cos(angular) + Math.cos(phi) * Math.sin(angular) * Math.cos(bearing)
+  );
+  const lambda2 = lambda + Math.atan2(
+    Math.sin(bearing) * Math.sin(angular) * Math.cos(phi),
+    Math.cos(angular) - Math.sin(phi) * Math.sin(phi2)
+  );
+  return [phi2 / radians, ((lambda2 / radians + 540) % 360) - 180];
+}
+
+/** Point dans un anneau [lat, lon], longitudes recollées autour du point. */
+function insideRing(ring, latitude, longitude) {
+  const wrap = (value) => ((value - longitude + 540) % 360) - 180 + longitude;
+  let inside = false;
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const [latA, lonRawA] = ring[index];
+    const [latB, lonRawB] = ring[previous];
+    const lonA = wrap(lonRawA);
+    const lonB = wrap(lonRawB);
+    if ((latA > latitude) !== (latB > latitude)
+        && longitude < lonA + ((latitude - latA) * (lonB - lonA)) / (latB - latA)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Premier SIGMET que l'avion traversera à son niveau en gardant son cap, dans
+ * les `SIGMET_LOOKAHEAD_NM` prochains nautiques ; null s'il n'y en a pas.
+ */
+function sigmetAhead(aircraft, sigmets = currentSigmets) {
+  if (!sigmets?.length || !aircraft || aircraft.on_ground) return null;
+  const latitude = finiteOr(aircraft.latitude);
+  const longitude = finiteOr(aircraft.longitude);
+  const heading = finiteOr(aircraft.heading_true_deg);
+  // Les niveaux d'un SIGMET sont des niveaux de vol : l'altitude pression.
+  const level = finiteOr(aircraft.configuration?.pressure_altitude_ft, finiteOr(aircraft.altitude_ft));
+  if (latitude === null || longitude === null || heading === null || level === null) return null;
+  const atLevel = sigmets.filter((sigmet) => (
+    (!Number.isFinite(sigmet.base_ft) || level >= sigmet.base_ft - SIGMET_VERTICAL_MARGIN_FT)
+    && (!Number.isFinite(sigmet.top_ft) || level <= sigmet.top_ft + SIGMET_VERTICAL_MARGIN_FT)
+  ));
+  if (!atLevel.length) return null;
+  for (let distance = 0; distance <= SIGMET_LOOKAHEAD_NM; distance += SIGMET_LOOKAHEAD_STEP_NM) {
+    const [lat, lon] = distance
+      ? pointAlong(latitude, longitude, heading, distance) : [latitude, longitude];
+    const hit = atLevel.find((sigmet) => (
+      (sigmet.polygons || []).some((ring) => ring.length >= 3 && insideRing(ring, lat, lon))
+    ));
+    if (hit) return { sigmet: hit, distanceNm: distance };
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ tabs */
@@ -11035,6 +11350,7 @@ $("map-zoom-out").addEventListener("click", () => MAP.zoomOut());
 $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
+$("map-sigmet").addEventListener("click", () => MAP.toggleSigmets());
 $("map-fms-alternate").addEventListener("click", toggleFmsAlternate);
 MAP.onTrafficSelect((entry, x, y) => { void showTrafficCard(entry, x, y); });
 $("map-traffic").addEventListener("click", () => toggleTraffic());

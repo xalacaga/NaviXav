@@ -61,3 +61,43 @@ test('flight values and translated labels come from the desktop snapshot', () =>
   assert.equal(h.get('navixavFlightValues').children[0].children[1].textContent, 'LGL · 12.3 NM');
   assert.equal(h.get('navixavFlightNotice').textContent, '');
 });
+test('active alerts are shown most severe first, three at most', () => {
+  const h = setup();
+  const alerts = [
+    { severity: 'danger', text: 'Unstable approach · GEAR' },
+    { severity: 'warning', text: 'SIGMET ahead · SEV TURB · FL250–FL390' },
+    { severity: 'info', text: 'Taxi light off' },
+    { severity: 'warning', text: 'QNH not set' },
+  ];
+  h.panel.showFlight({ flight: { fresh: true, connected: true, alerts,
+    labels: { master_warning: 'MASTER WARNING', master_caution: 'MASTER CAUTION' } } });
+  const box = h.get('navixavAlerts');
+  assert.equal(box.class, 'navixavAlerts');
+  assert.equal(box.children.length, 4);
+  assert.equal(box.children[0].className, 'navixavAlert navixavAlert-danger');
+  assert.equal(box.children[0].children[0].textContent, 'MASTER WARNING');
+  assert.equal(box.children[1].children[1].textContent, 'SIGMET ahead · SEV TURB · FL250–FL390');
+  assert.equal(box.children[3].textContent, '+1');
+});
+test('alerts disappear when the flight data is stale or absent', () => {
+  const h = setup();
+  h.panel.showFlight({ flight: { fresh: false, connected: true,
+    alerts: [{ severity: 'danger', text: 'Gear not down' }] } });
+  assert.equal(h.get('navixavAlerts').class, 'panelHidden');
+  h.panel.showFlight({ flight: { fresh: true, connected: true } });
+  assert.equal(h.get('navixavAlerts').class, 'panelHidden');
+});
+test('the stabilisation status replaces the TOD row on final only', () => {
+  const h = setup();
+  const rows = () => h.get('navixavFlightValues').children;
+  h.panel.showFlight({ flight: { fresh: true, connected: true,
+    labels: { flight_stability: 'Stabilized approach' },
+    values: { 'flight-tod': 'TOD in 80 NM', 'flight-stability': '—' } } });
+  assert.equal(rows().at(-1).children[0].textContent, 'TOD');
+  h.get('navixavFlightValues').children = [];
+  h.panel.showFlight({ flight: { fresh: true, connected: true,
+    labels: { flight_stability: 'Stabilized approach' },
+    values: { 'flight-tod': 'Approach', 'flight-stability': 'GEAR · V/S -1400' } } });
+  assert.equal(rows().at(-1).children[0].textContent, 'Stabilized approach');
+  assert.equal(rows().at(-1).children[1].textContent, 'GEAR · V/S -1400');
+});

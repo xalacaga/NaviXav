@@ -286,14 +286,21 @@ class IngamePanelNaviXav extends UIElement {
     document.getElementById("navixavFlightRoute").textContent = flight.route || "—";
     document.getElementById("navixavFlightNotice").textContent = flight.fresh && flight.connected
       ? "" : (labels.panel_flight_unavailable || "Données de vol indisponibles ou anciennes.");
+    const live = Boolean(flight.fresh && flight.connected);
+    this.showAlerts(live ? flight.alerts : [], labels);
     const container = document.getElementById("navixavFlightValues");
     container.textContent = "";
-    const values = flight.fresh && flight.connected ? (flight.values || {}) : {};
+    const values = live ? (flight.values || {}) : {};
+    // En finale, la stabilisation remplace le TOD : il n'a plus rien à dire.
+    const stability = values["flight-stability"];
+    const final = Boolean(stability && stability !== "—");
     const rows = [
       [labels.flight_next_fix || "Prochain point", "flight-next-fix", "flight-next-distance"],
       [labels.panel_remaining || "Temps restant", "flight-progress-remaining"],
       [labels.flight_next_constraint || "Prochaine contrainte", "flight-next-constraint", "flight-constraint-distance"],
-      ["TOD", "flight-tod"],
+      final
+        ? [labels.flight_stability || "Approche stabilisée", "flight-stability"]
+        : ["TOD", "flight-tod"],
     ];
     rows.forEach((entry) => {
       const row = document.createElement("div");
@@ -305,6 +312,38 @@ class IngamePanelNaviXav extends UIElement {
       value.textContent = entry.slice(1).map((key) => values[key] || "—").join(" · ");
       row.appendChild(label); row.appendChild(value); container.appendChild(row);
     });
+  }
+
+  /**
+   * Alarmes de l'application, les plus graves d'abord. Trois lignes au plus :
+   * en plein écran ou en VR, c'est ici que le pilote les voit.
+   */
+  showAlerts(alerts, labels) {
+    const box = document.getElementById("navixavAlerts");
+    if (!box) return;
+    box.textContent = "";
+    const list = Array.isArray(alerts) ? alerts.filter((alert) => alert && alert.text) : [];
+    box.setAttribute("class", list.length ? "navixavAlerts" : "panelHidden");
+    list.slice(0, 3).forEach((alert) => {
+      const severity = ["info", "warning", "danger"].includes(alert.severity) ? alert.severity : "warning";
+      const row = document.createElement("div");
+      row.className = "navixavAlert navixavAlert-" + severity;
+      const mark = document.createElement("span");
+      mark.className = "navixavAlertMark";
+      mark.textContent = severity === "danger"
+        ? (labels.master_warning || "MASTER WARNING")
+        : severity === "warning" ? (labels.master_caution || "MASTER CAUTION") : "INFO";
+      const text = document.createElement("span");
+      text.className = "navixavAlertText";
+      text.textContent = String(alert.text);
+      row.appendChild(mark); row.appendChild(text); box.appendChild(row);
+    });
+    if (list.length > 3) {
+      const more = document.createElement("div");
+      more.className = "navixavAlertMore";
+      more.textContent = "+" + (list.length - 3);
+      box.appendChild(more);
+    }
   }
 
   /**

@@ -2490,7 +2490,51 @@ body.remote-client .mobile-theme {
 .key.route-fms-alternate {
   background: repeating-linear-gradient(90deg, var(--route-fms-alternate) 0 3px, transparent 3px 6px);
 }
+.key.sigmet {
+  background: rgba(239, 68, 68, 0.22);
+  border: 1.5px solid #ef4444;
+  height: 9px;
+}
 
+/* SIGMET près de la route, dans la météo. */
+.wx-sigmet-count {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--text-dim);
+}
+.wx-sigmet-count.warning { color: var(--medium); }
+.wx-sigmet-list {
+  list-style: none;
+  margin: 10px 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.wx-sigmet-list li {
+  border-left: 3px solid #94a3b8;
+  padding: 4px 0 4px 10px;
+  opacity: 0.78;
+}
+.wx-sigmet-list li.on-route { opacity: 1; }
+.wx-sigmet-list li[data-hazard="TS"], .wx-sigmet-list li[data-hazard="TC"] { border-color: #ef4444; }
+.wx-sigmet-list li[data-hazard="TURB"], .wx-sigmet-list li[data-hazard="MTW"] { border-color: #f59e0b; }
+.wx-sigmet-list li[data-hazard="ICE"] { border-color: #38bdf8; }
+.wx-sigmet-list li[data-hazard="VA"] { border-color: #a855f7; }
+.wx-sigmet-list summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.wx-sigmet-list summary span { color: var(--text-dim); font-size: 0.78rem; }
+.wx-sigmet-raw {
+  margin: 6px 0 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 0.74rem/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--text-dim);
+}
 /* Vérification FMGC et miroir MCDU, dans la fiche MCDU. */
 .fms-check, .fms-mirror { padding: 14px 16px; margin-bottom: 12px; }
 .fms-check-note { color: var(--text-muted); font-size: 0.76rem; margin: 4px 0 10px; }

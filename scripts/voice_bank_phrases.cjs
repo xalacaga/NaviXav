@@ -26,6 +26,7 @@ const LANGUAGES = ["fr", "en", "de", "es", "it", "pt", "nl", "pl"];
 const ANNOUNCED_KEYS = [
   "master_caution", "master_warning",
   "voice_tod_prepare", "voice_tod_imminent", "voice_tod_now", "voice_test_phrase",
+  "voice_stabilized",
   "taxi_arrived", "taxi_off_route", "taxi_hold_short",
   "taxi_turn_left", "taxi_turn_right", "taxi_continue",
 ];

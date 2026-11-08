@@ -90,6 +90,10 @@ class AircraftConfiguration:
     nav1_course_deg: float | None = None
     nav1_has_localizer: bool | None = None
     nav1_has_glide_slope: bool | None = None
+    # Aiguilles du récepteur NAV1 : -127 à +127 pour le localizer, -119 à +119
+    # pour le glide, déviation pleine échelle aux extrêmes.
+    nav1_cdi: float | None = None
+    nav1_gsi: float | None = None
 
     # Masses et carburant, en kilogrammes
     fuel_total_kg: float | None = None

@@ -80,6 +80,7 @@ ENGLISH_TERMS: tuple[tuple[str, str], ...] = (
     (r"\bQNH\b", "Q N H"),
     (r"\bILS\b", "I L S"),
     (r"\bSTD\b", "standard"),
+    (r"\bSIGMET\b", "sig met"),
 )
 _ENGLISH_PATTERN = re.compile("|".join(f"({pattern})" for pattern, _spoken in ENGLISH_TERMS))
 ENGLISH_ESPEAK = "en-us"
