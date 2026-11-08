@@ -1024,3 +1024,75 @@ def test_fenix_captain_std_overrides_generic_mode_and_missing_data_stays_unknown
     else:
         assert configuration.altimeter_std is None
         assert configuration.altimeter_hpa is None
+
+
+# --------------------------------------------------------------------------- #
+# Journal des coupures
+# --------------------------------------------------------------------------- #
+
+
+def _link_messages(caplog) -> list[tuple[str, str]]:
+    return [
+        (record.levelname, record.getMessage())
+        for record in caplog.records
+        if record.name == "navixav.live.simconnect"
+        and ("SimConnect" in record.getMessage() or "injoignable" in record.getMessage())
+    ]
+
+
+def test_each_link_change_is_logged_once_with_its_reason_and_duration(monkeypatch, caplog):
+    import logging
+
+    from navixav.live import simconnect as module
+
+    fake = FakeClient()
+    monkeypatch.setattr(module, "SimConnectClient", lambda: fake)
+    source = SimConnectSource()
+    caplog.set_level(logging.INFO, logger="navixav.live.simconnect")
+
+    source.read()
+    source.read()
+    fake.failing = ("position",)
+    with pytest.raises(PositionUnavailable):
+        source.read()
+    # Pendant le délai de nouvelle tentative, aucune ligne de plus.
+    for _ in range(3):
+        with pytest.raises(PositionUnavailable):
+            source.read()
+    # Une reconnexion qui échoue encore est comptée, sans nouvelle ligne.
+    source._last_failure -= 10
+    with pytest.raises(PositionUnavailable):
+        source.read()
+    source._last_failure -= 10
+    fake.failing = ()
+    source.read()
+
+    messages = _link_messages(caplog)
+    assert [level for level, _ in messages] == ["INFO", "WARNING", "INFO"]
+    assert messages[0][1] == "Connexion SimConnect établie"
+    assert "Connexion SimConnect perdue après" in messages[1][1]
+    assert "lecture abandonnée après" in messages[1][1]
+    assert "bloc position refusé" in messages[1][1]
+    assert "Connexion SimConnect rétablie après" in messages[2][1]
+    assert "(1 reconnexion(s) échouée(s) entre-temps)" in messages[2][1]
+
+
+def test_a_simulator_never_started_is_logged_once(monkeypatch, caplog):
+    import logging
+
+    from navixav.live import simconnect as module
+
+    def refuse():
+        raise SimConnectError("Microsoft Flight Simulator ne répond pas.")
+
+    monkeypatch.setattr(module, "SimConnectClient", refuse)
+    source = SimConnectSource()
+    caplog.set_level(logging.INFO, logger="navixav.live.simconnect")
+
+    for _ in range(4):
+        with pytest.raises(PositionUnavailable):
+            source.read()
+        source._last_failure -= 10
+
+    messages = _link_messages(caplog)
+    assert messages == [("INFO", "Simulateur injoignable : Microsoft Flight Simulator ne répond pas.")]

@@ -240,10 +240,57 @@ class SimConnectSource:
         self._traffic_disabled_until = 0.0
         self._touchdown_window_until = 0.0
         self._touchdown_disabled_until = 0.0
+        # État du lien, pour ne journaliser que ses changements : chaque
+        # coupure laisse une trace datée avec sa raison et sa durée.
+        self._link_up_since: float | None = None
+        self._link_down_since: float | None = None
+        self._link_down_attempts = 0
+        self._link_unreachable_logged = False
 
     @property
     def name(self) -> str:
         return "SimConnect"
+
+    def _note_link_up(self) -> None:
+        now = time.monotonic()
+        if self._link_up_since is not None:
+            return
+        if self._link_down_since is not None:
+            logger.info(
+                "Connexion SimConnect rétablie après %.1f s de coupure "
+                "(%d reconnexion(s) échouée(s) entre-temps)",
+                now - self._link_down_since,
+                self._link_down_attempts,
+            )
+        else:
+            logger.info("Connexion SimConnect établie")
+        self._link_up_since = now
+        self._link_down_since = None
+        self._link_down_attempts = 0
+        self._link_unreachable_logged = False
+
+    def _note_link_down(self, reason: str, read_s: float | None = None, *, attempt: bool) -> None:
+        now = time.monotonic()
+        if self._link_up_since is not None:
+            # La durée de la lecture distingue un simulateur qui ne répond plus
+            # dans le délai d'un refus immédiat : ce ne sont pas les mêmes causes.
+            logger.warning(
+                "Connexion SimConnect perdue après %.0f s de liaison%s : %s",
+                now - self._link_up_since,
+                f" (lecture abandonnée après {read_s:.2f} s)" if read_s is not None else "",
+                reason,
+            )
+            self._link_up_since = None
+            self._link_down_since = now
+            self._link_down_attempts = 0
+            return
+        if attempt and self._link_down_since is not None:
+            self._link_down_attempts += 1
+        if self._link_down_since is None and not self._link_unreachable_logged:
+            # Jamais connecté depuis le démarrage : une seule ligne, pas une
+            # par sondage, tant que le simulateur n'est pas lancé.
+            logger.info("Simulateur injoignable : %s", reason)
+            self._link_unreachable_logged = True
 
     def is_available(self) -> bool:
         """Vrai si une DLL SimConnect est présente sur la machine."""
@@ -314,16 +361,31 @@ class SimConnectSource:
 
     def read(self) -> AircraftState:
         with self._lock:
-            client = self._connect()
+            # Pendant le délai de nouvelle tentative, `_connect` refuse sans
+            # rien essayer : ce n'est pas une tentative de reconnexion.
+            attempting = (
+                self._client is not None
+                or time.monotonic() - self._last_failure >= _RETRY_DELAY_S
+            )
+            try:
+                client = self._connect()
+            except PositionUnavailable as exc:
+                self._note_link_down(str(exc), attempt=attempting)
+                raise
+            started = time.monotonic()
             try:
                 values = client.read_simvars(_VARIABLES)
             except SimConnectError as exc:
+                read_s = time.monotonic() - started
                 self._reset()
-                self._fail(
+                reason = (
                     "Aucun vol chargé dans le simulateur, ou connexion perdue. "
                     f"({exc})"
                 )
+                self._note_link_down(reason, read_s, attempt=True)
+                self._fail(reason)
 
+            self._note_link_up()
             self._failure_reason = ""
             title = self._read_aircraft_title(client)
             on_ground = bool(values["SIM ON GROUND"])
