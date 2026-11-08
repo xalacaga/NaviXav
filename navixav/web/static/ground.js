@@ -668,19 +668,12 @@ const GROUND = (() => {
     const position = toLocal(aircraft.latitude, aircraft.longitude);
     if (!position) return;
     const [x, y] = toScreen(position.x, position.y);
-    const heading = ((aircraft.heading_true_deg ?? 0) * Math.PI) / 180;
-
-    context.save();
-    context.translate(x, y);
-    context.rotate(heading);
-    context.fillStyle = css("--ground-aircraft");
-    context.strokeStyle = css("--ground-bg");
-    context.lineWidth = 1.5;
-
-    aircraftPath();
-    context.fill();
-    context.stroke();
-    context.restore();
+    // Même silhouette que sur la carte : le pilote reconnaît son appareil
+    // d'une vue à l'autre.
+    AIRCRAFT_ICON.draw(context, x, y, aircraft.heading_true_deg, {
+      fill: css("--ground-aircraft"),
+      outline: css("--ground-bg"),
+    });
   }
 
   /** Silhouette simple : fuselage, ailes et empennage. */

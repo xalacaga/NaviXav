@@ -461,6 +461,19 @@
         <span class="switch-track"><span class="switch-thumb"></span></span>
         <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
       </label>
+      <div class="settings-voice settings-wide">
+        <label class="switch settings-switch">
+          <input type="checkbox" id="settings-voice" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="switch-label" id="settings-voice-label">Annonces vocales</span>
+        </label>
+        <label class="field" for="settings-voice-name">
+          <span id="settings-voice-name-label">Voix</span>
+          <select id="settings-voice-name"></select>
+        </label>
+        <button type="button" class="icon-btn" id="settings-voice-test">Écouter</button>
+        <p class="settings-note" id="settings-voice-help">Voix de Windows, réglées sur cet appareil.</p>
+      </div>
       </div>
     </details>
     <details class="settings-section" name="settings-group">
@@ -752,6 +765,8 @@
 </footer>
 
 <script src="/static/i18n.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/voice.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/aircraft-icon.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/map.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/ground.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/aircraft-documents.js?v=__NAVIXAV_VERSION__"></script>

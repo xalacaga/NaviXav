@@ -893,7 +893,7 @@ function renderAircraftSurvey(report) {
       const visual = aircraftVisual({
         aircraft: aircraft.icao || "",
         aircraft_name: aircraft.label || "",
-      }, null, community, photoRevision);
+      }, null, community, photoRevision, { lazy: true });
       visual.classList.add("aircraft-survey-photo");
       const copy = el("span");
       copy.append(el("strong", "", aircraft.label));
@@ -3449,6 +3449,107 @@ function reserveFuelKg(plan) {
     : reserve;
 }
 
+/**
+ * Carburant à bord mesuré, ou null s'il est inconnu. `finiteOr` lit null comme
+ * 0 : un avion qui ne publie pas sa quantité passerait pour un réservoir vide.
+ */
+function measuredFuelKg(configuration) {
+  const value = configuration?.fuel_total_kg;
+  return value === null || value === undefined || value === "" ? null : finiteOr(value);
+}
+
+/** Quantité de carburant de l'OFP ramenée en kilogrammes, ou null. */
+function ofpFuelKg(plan, value) {
+  const amount = finiteOr(value);
+  if (amount === null) return null;
+  return String(plan?.dispatch?.units || "").toLowerCase().startsWith("lb")
+    ? amount * LBS_TO_KG
+    : amount;
+}
+
+// Au-delà de cet écart latéral, l'avion n'est plus sur la route de l'OFP
+// (déroutement, guidage radar prolongé) et la comparaison ne vaut plus rien.
+const FUEL_MONITOR_MAX_OFF_ROUTE_NM = 30;
+
+/**
+ * Carburant que l'OFP prévoyait à bord à `remainingNm` de la destination.
+ *
+ * Le profil du navlog SimBrief est indexé sur la longueur de sa propre route ;
+ * celle que suit NaviXav peut différer quand la SID ou la STAR ont été
+ * remplacées, d'où la mise à l'échelle sur la distance totale. Sans profil, la
+ * consommation d'étape est répartie uniformément : moins juste en montée, mais
+ * toujours mieux qu'aucune estimation.
+ */
+function plannedFuelOnboardKg(plan, remainingNm, routeTotalNm) {
+  const dispatch = plan?.dispatch || {};
+  const remaining = finiteOr(remainingNm);
+  const total = finiteOr(routeTotalNm);
+  if (remaining === null || !total || total <= 0) return null;
+
+  const profile = (Array.isArray(dispatch.fuel_profile) ? dispatch.fuel_profile : [])
+    .map(([distance, fuel]) => [finiteOr(distance), ofpFuelKg(plan, fuel)])
+    .filter(([distance, fuel]) => distance !== null && fuel !== null)
+    .sort((first, second) => second[0] - first[0]);
+  if (profile.length >= 2) {
+    const profileTotal = finiteOr(dispatch.route_distance_nm, profile[0][0]);
+    const scaled = Math.max(0, remaining * (profileTotal / total));
+    const [firstDistance, firstFuel] = profile[0];
+    if (scaled >= firstDistance) {
+      // Avant le premier point du navlog : la pente de la première branche.
+      const [nextDistance, nextFuel] = profile[1];
+      const slope = firstDistance > nextDistance
+        ? (firstFuel - nextFuel) / (firstDistance - nextDistance)
+        : 0;
+      return firstFuel + (Math.min(scaled, profileTotal) - firstDistance) * slope;
+    }
+    for (let index = 1; index < profile.length; index += 1) {
+      const [distance, fuel] = profile[index];
+      if (scaled < distance) continue;
+      const [previousDistance, previousFuel] = profile[index - 1];
+      const span = previousDistance - distance;
+      const ratio = span > 0 ? (scaled - distance) / span : 0;
+      return fuel + (previousFuel - fuel) * ratio;
+    }
+    return profile[profile.length - 1][1];
+  }
+
+  const landing = ofpFuelKg(plan, dispatch.landing_fuel);
+  const trip = ofpFuelKg(plan, dispatch.trip_fuel);
+  if (landing === null || trip === null || trip <= 0) return null;
+  return landing + Math.min(remaining, total) * (trip / total);
+}
+
+/**
+ * Suivi du carburant en vol : écart au plan et carburant estimé à destination.
+ *
+ * L'estimation suppose que la suite du vol consommera ce que l'OFP prévoyait :
+ * l'écart constaté ici se retrouve donc tel quel à l'arrivée. Le minimum de
+ * déroutement est la réserve finale augmentée du carburant de dégagement.
+ */
+function fuelMonitor(plan, aircraft, projection) {
+  if (!plan || !aircraft || !projection || aircraft.on_ground) return null;
+  if (finiteOr(projection.crossTrackNm, 0) > FUEL_MONITOR_MAX_OFF_ROUTE_NM) return null;
+  const onboard = measuredFuelKg(aircraft.configuration);
+  const landing = ofpFuelKg(plan, plan.dispatch?.landing_fuel);
+  if (onboard === null || landing === null) return null;
+  const planned = plannedFuelOnboardKg(plan, projection.remainingNm, flightRouteTotalNm);
+  if (planned === null) return null;
+
+  const deviation = onboard - planned;
+  const destination = landing + deviation;
+  const reserve = reserveFuelKg(plan);
+  const alternate = ofpFuelKg(plan, plan.dispatch?.alternate_fuel) || 0;
+  const minimum = reserve === null ? null : reserve + alternate;
+  const contingency = ofpFuelKg(plan, plan.dispatch?.contingency_fuel);
+  let status = "good";
+  if (reserve !== null && destination < reserve) status = "danger";
+  else if (minimum !== null && destination < minimum) status = "warning";
+  // Le carburant de route est fait pour absorber les écarts : on ne s'en
+  // inquiète qu'une fois cette marge consommée.
+  const deviationStatus = contingency && deviation < -contingency ? "warning" : "good";
+  return { planned, deviation, destination, minimum, status, deviationStatus };
+}
+
 function flightContext(aircraft, projection, phase, constraint, descent = null) {
   const configuration = aircraft?.configuration || null;
   return {
@@ -3460,6 +3561,7 @@ function flightContext(aircraft, projection, phase, constraint, descent = null) 
     phase,
     constraint,
     descent,
+    fuel: fuelMonitor(currentPlan, aircraft, projection),
     // Pseudo-points du FMGC, en NM devant l'avion ; null sans plan lisible.
     fmsSpeedLimitNm: fmsPointDistanceNm(aircraft, latestFms?.speed_limit),
     fmsDecelNm: fmsPointDistanceNm(aircraft, latestFms?.decel),
@@ -3730,10 +3832,17 @@ const ALERT_RULES = [
     severity: "danger",
     armed: (c) => !c.onGround && reserveFuelKg(c.plan) !== null,
     when: (c) => {
-      const onboard = finiteOr(c.configuration.fuel_total_kg);
+      const onboard = measuredFuelKg(c.configuration);
       return onboard !== null && onboard < reserveFuelKg(c.plan);
     },
     detail: (c) => `${Math.round(c.configuration.fuel_total_kg)} kg`,
+  },
+  {
+    id: "fuel_destination_low",
+    severity: "warning",
+    armed: (c) => !c.onGround && c.fuel?.minimum !== null && c.fuel?.minimum !== undefined,
+    when: (c) => c.fuel.destination < c.fuel.minimum,
+    detail: (c) => `EFOB ${Math.round(c.fuel.destination)} kg · MIN ${Math.round(c.fuel.minimum)} kg`,
   },
 ];
 
@@ -3833,6 +3942,56 @@ function acknowledgeAlert(id) {
 function resetAlertStates() {
   alertStates.clear();
   alertPhaseMemory = null;
+}
+
+/*
+ * Annonces vocales. Chaque annonce n'est dite qu'au moment où sa condition
+ * apparaît : une alarme qui reste levée, un TOD qui se rapproche ou une
+ * consigne de roulage inchangée ne se répètent pas.
+ */
+const voiceMemory = { alerts: new Set(), todRank: 0, taxi: "" };
+let voicePlanKey = null;
+const TOD_VOICE_RANK = { prepare: 1, imminent: 2, now: 3 };
+
+function resetVoiceMemory() {
+  voiceMemory.alerts = new Set();
+  voiceMemory.todRank = 0;
+  voiceMemory.taxi = "";
+}
+
+function announceAlerts(active) {
+  const current = new Set(active.map((alert) => alert.id));
+  for (const alert of active) {
+    if (voiceMemory.alerts.has(alert.id)) continue;
+    const master = t(alert.severity === "danger" ? "master_warning" : "master_caution");
+    VOICE.speak(`${master}. ${alert.label}.`, { priority: alert.severity === "danger" });
+  }
+  voiceMemory.alerts = current;
+}
+
+/** Étape vocale du TOD, ou null quand il n'y a rien à annoncer. */
+function todVoiceStage(descent, phaseKey) {
+  if (!descent || descent.leftCruise) return null;
+  if (!["phase_climb", "phase_cruise", "phase_enroute"].includes(phaseKey)) return null;
+  const distance = descent.todInNm;
+  if (distance > 50) return null;
+  if (distance > 10) return "prepare";
+  if (distance > 2) return "imminent";
+  return distance >= -2 ? "now" : null;
+}
+
+function announceTod(descent, phaseKey) {
+  const stage = todVoiceStage(descent, phaseKey);
+  if (!stage || TOD_VOICE_RANK[stage] <= voiceMemory.todRank) return;
+  voiceMemory.todRank = TOD_VOICE_RANK[stage];
+  const distance = Math.round(descent.todInNm);
+  VOICE.speak(stage === "now" ? t("voice_tod_now") : tf(`voice_tod_${stage}`, { distance }));
+}
+
+function announceTaxi(text) {
+  if (text === voiceMemory.taxi) return;
+  voiceMemory.taxi = text || "";
+  if (text) VOICE.speak(text);
 }
 
 /*
@@ -5498,7 +5657,7 @@ function describeSelectedAltitude(configuration) {
 }
 
 function describeFuel(configuration, plan) {
-  const onboard = finiteOr(configuration.fuel_total_kg);
+  const onboard = measuredFuelKg(configuration);
   if (onboard === null) return { text: "—", status: "" };
   const reserve = reserveFuelKg(plan);
   if (reserve === null) return { text: `${Math.round(onboard)} kg`, status: "" };
@@ -6084,6 +6243,7 @@ function updateAlertsDisplay(context) {
   if (inhibition) {
     resetAlertStates();
     currentActiveAlerts = [];
+    announceAlerts([]);
     updateGlobalFlightAlert([]);
     master.dataset.severity = "none";
     master.textContent = inhibition.detail
@@ -6098,6 +6258,7 @@ function updateAlertsDisplay(context) {
     performance.now()
   );
   currentActiveAlerts = active;
+  announceAlerts(active);
 
   if (!active.length) {
     updateGlobalFlightAlert([]);
@@ -6306,6 +6467,27 @@ function updateFlightProgress(aircraft, projection, remainingSeconds, plannedEte
   liveValue("flight-progress-remaining", hhmm(remainingSeconds) || "—");
 }
 
+function signedKg(value) {
+  const rounded = Math.round(value);
+  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded)} kg`;
+}
+
+function updateFuelMonitorDisplay(fuel) {
+  if (!fuel) {
+    liveValue("flight-fuel-deviation", "—");
+    liveValue("flight-fuel-destination", "—");
+    return;
+  }
+  liveValue("flight-fuel-deviation", signedKg(fuel.deviation), fuel.deviationStatus);
+  liveValue(
+    "flight-fuel-destination",
+    fuel.minimum !== null
+      ? `${Math.round(fuel.destination)} kg · MIN ${Math.round(fuel.minimum)} kg`
+      : `${Math.round(fuel.destination)} kg`,
+    fuel.status
+  );
+}
+
 function updateTodDisplay(descent, phaseKey) {
   // Phase comes from telemetry, not a reading of the FMS mode.
   // Keep descent active through intermediate level segments.
@@ -6367,7 +6549,9 @@ function updateFlightPanel(aircraft) {
   updateConfigurationBlock(aircraft);
   updateFlightEvents(aircraft, phaseKey);
   renderFlightEvents();
-  updateAlertsDisplay(flightContext(aircraft, projection, phase, constraint, descent));
+  const context = flightContext(aircraft, projection, phase, constraint, descent);
+  updateAlertsDisplay(context);
+  updateFuelMonitorDisplay(context.fuel);
   updateGuidedContext(aircraft, phaseKey, projection, constraint);
 
   liveValue("flight-phase", phase);
@@ -6451,6 +6635,7 @@ function updateFlightPanel(aircraft) {
   }
 
   updateTodDisplay(descent, phaseKey);
+  announceTod(descent, phaseKey);
   if (descent) {
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
@@ -6532,6 +6717,74 @@ function buildFlightAlertsToggle() {
   switchLabel.append(el("span", "switch-label", t("alerts_toggle")));
   switchLabel.title = t("alerts_toggle_title");
   return switchLabel;
+}
+
+/** Interrupteur des annonces vocales, à côté de celui des alarmes. */
+function buildFlightVoiceToggle() {
+  const switchLabel = el("label", "switch");
+  const input = el("input");
+  input.type = "checkbox";
+  input.id = "flight-voice-toggle";
+  input.checked = VOICE.enabled();
+  input.disabled = !VOICE.available();
+  input.addEventListener("change", () => VOICE.setEnabled(input.checked));
+  switchLabel.append(input);
+  const track = el("span", "switch-track");
+  track.append(el("span", "switch-thumb"));
+  switchLabel.append(track);
+  switchLabel.append(el("span", "switch-label", t("voice_toggle")));
+  switchLabel.title = t(VOICE.available() ? "voice_toggle_title" : "voice_unavailable");
+  return switchLabel;
+}
+
+/** Remplit le choix de voix et aligne les interrupteurs sur la préférence. */
+function syncVoiceSettings() {
+  const toggle = $("settings-voice");
+  const select = $("settings-voice-name");
+  const test = $("settings-voice-test");
+  const flightToggle = $("flight-voice-toggle");
+  if (flightToggle) flightToggle.checked = VOICE.enabled();
+  if (!toggle || !select || !test) return;
+  const available = VOICE.available();
+  toggle.checked = VOICE.enabled();
+  toggle.disabled = !available;
+  test.disabled = !available;
+  select.disabled = !available;
+  select.innerHTML = "";
+  const automatic = el("option", null, t("voice_automatic"));
+  automatic.value = "";
+  select.append(automatic);
+  const voices = VOICE.voices();
+  for (const voice of voices) {
+    const option = el(
+      "option",
+      null,
+      voice.natural ? `${voice.name} · ${t("voice_natural")}` : voice.name
+    );
+    option.value = voice.name;
+    select.append(option);
+  }
+  const preferred = VOICE.preferredName();
+  select.value = voices.some((voice) => voice.name === preferred) ? preferred : "";
+  const active = VOICE.activeName();
+  $("settings-voice-help").textContent = !available
+    ? t("voice_unavailable")
+    : !voices.length
+      ? t("voice_none_for_language")
+      : `${t("voice_help")} ${tf("voice_active", { name: active })}`;
+}
+
+function initVoiceSettings() {
+  $("settings-voice").addEventListener("change", (event) => {
+    VOICE.setEnabled(event.target.checked);
+  });
+  $("settings-voice-name").addEventListener("change", (event) => {
+    VOICE.setPreferredName(event.target.value);
+  });
+  $("settings-voice-test").addEventListener("click", () => VOICE.test(t("voice_test_phrase")));
+  VOICE.onChange(syncVoiceSettings);
+  window.addEventListener("navixav:languagechange", syncVoiceSettings);
+  syncVoiceSettings();
 }
 
 /** Ouvre une seule fois l'historique après le premier démarrage d'une version.
@@ -6640,6 +6893,12 @@ function renderFlightPanel(plan) {
   }
   flightEventsRenderKey = "";
   resetAlertStates();
+  // Un changement de langue reconstruit le panneau sans rouvrir les annonces
+  // déjà faites ; seul un nouveau plan les réarme.
+  if (voicePlanKey !== flightSummaryPlanKey(plan)) {
+    resetVoiceMemory();
+    voicePlanKey = flightSummaryPlanKey(plan);
+  }
   const panel = $("panel-flight");
   panel.innerHTML = "";
   const header = el("div", "flight-panel-head");
@@ -6649,6 +6908,7 @@ function renderFlightPanel(plan) {
   header.append(title);
   const pills = el("div", "flight-panel-pills");
   pills.append(buildFlightAlertsToggle());
+  pills.append(buildFlightVoiceToggle());
   const master = el("span", "flight-alert-pill", t("alerts_none"));
   master.id = "flight-alert-master";
   master.dataset.severity = "none";
@@ -6692,6 +6952,8 @@ function renderFlightPanel(plan) {
   item(t("flight_fms_weights"), "flight-fms-weights", t("flight_fms_weights_note"));
   item(t("flight_lateral_deviation"), "flight-deviation", t("flight_lateral_deviation_note"));
   item(t("flight_remaining_distance"), "flight-remaining");
+  item(t("flight_fuel_deviation"), "flight-fuel-deviation", t("flight_fuel_deviation_note"));
+  item(t("flight_fuel_destination"), "flight-fuel-destination", t("flight_fuel_destination_note"));
   item(t("ground_speed"), "flight-ground-speed", t("ground_speed_note"));
   item(t("air_speed"), "flight-air-speed", t("air_speed_note"));
   item(t("flight_next_constraint"), "flight-next-constraint");
@@ -8425,6 +8687,7 @@ function aircraftVisual(
   aircraft = latestAircraft,
   communityPath = "",
   photoRevision = "",
+  { lazy = false } = {},
 ) {
   const loadedTitle = String(aircraft?.title || "").trim();
   const loadedCode = loadedTitle.toUpperCase().split(/\s+/).find(token => (
@@ -8434,7 +8697,11 @@ function aircraftVisual(
   const mark = el("div", "aircraft-mark", loadedCode || plan.aircraft || "—");
   const photo = document.createElement("img");
   photo.alt = "";
-  photo.loading = "eager";
+  // Une liste d'inventaire peut compter une centaine d'appareils : chargées
+  // d'un coup, leurs vignettes occupaient les six connexions que le
+  // navigateur ouvre vers NaviXav et retenaient tout le reste, jusqu'à
+  // l'enregistrement des paramètres. Elles ne sont demandées qu'à l'écran.
+  photo.loading = lazy ? "lazy" : "eager";
   photo.decoding = "async";
   photo.classList.add("hidden");
   visual.append(mark, photo);
@@ -9794,6 +10061,7 @@ function updateGroundHud() {
       announcement = tf(key, { taxiway: guidance.next_name });
     }
     if (announcement) hud.append(el("div", `ground-call is-${kind}`, announcement));
+    announceTaxi(announcement);
   }
 
   // Le repoussage est la première consigne du départ, et la seule que le
@@ -10799,6 +11067,7 @@ $("ground-alarm").addEventListener("click", () => toggleTaxiAlarmSound());
 $("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
 $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
+initVoiceSettings();
 $("chartfox-connect").addEventListener("click", connectChartFox);
 $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);

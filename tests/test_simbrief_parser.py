@@ -168,3 +168,53 @@ def test_missing_sections_do_not_raise():
     assert summary.origin_icao == ""
     assert summary.enroute_fixes == []
     assert summary.sid_exit_hint is None
+
+
+def _navlog_fix(ident: str, distance: str, onboard: str | None) -> dict[str, str]:
+    fix = {"ident": ident, "distance": distance}
+    if onboard is not None:
+        fix["fuel_plan_onboard"] = onboard
+    return fix
+
+
+def test_planned_fuel_is_indexed_by_the_distance_left_to_destination():
+    summary = parse_ofp(
+        {
+            "navlog": {
+                "fix": [
+                    _navlog_fix("TOC", "100", "5000"),
+                    _navlog_fix("MID", "200", "3800"),
+                    _navlog_fix("TOD", "150", "2700"),
+                    _navlog_fix("LFBO", "50", "2400"),
+                ]
+            }
+        }
+    )
+
+    assert summary.dispatch.fuel_profile == [
+        [400.0, 5000], [200.0, 3800], [50.0, 2700], [0.0, 2400],
+    ]
+
+
+def test_a_fix_without_planned_fuel_still_counts_its_distance():
+    summary = parse_ofp(
+        {
+            "navlog": [
+                _navlog_fix("A", "100", "5000"),
+                _navlog_fix("B", "100", None),
+                _navlog_fix("C", "100", "3000"),
+            ]
+        }
+    )
+
+    assert summary.dispatch.fuel_profile == [[200.0, 5000], [0.0, 3000]]
+
+
+def test_an_incomplete_navlog_gives_no_fuel_profile_rather_than_a_wrong_one():
+    missing_distance = parse_ofp(
+        {"navlog": [{"ident": "A", "fuel_plan_onboard": "5000"}, _navlog_fix("B", "100", "3000")]}
+    )
+    single_point = parse_ofp({"navlog": [_navlog_fix("A", "100", "5000")]})
+
+    assert missing_distance.dispatch.fuel_profile == []
+    assert single_point.dispatch.fuel_profile == []

@@ -38,6 +38,10 @@ class NavlogFix:
     stage: str = ""
     lat: float | None = None
     lon: float | None = None
+    # Longueur de la branche qui mène à ce point, et carburant prévu à bord en
+    # l'atteignant, dans l'unité de l'OFP.
+    leg_distance_nm: float | None = None
+    fuel_plan_onboard: int | None = None
 
     @property
     def is_real_fix(self) -> bool:
@@ -86,6 +90,10 @@ class DispatchSummary:
     landing_fuel: int | None = None
     average_fuel_flow: int | None = None
     max_tanks: int | None = None
+    # Carburant prévu à bord le long de la route : couples
+    # [distance restante jusqu'à destination en NM, carburant prévu], du départ
+    # vers l'arrivée. Vide quand le navlog ne porte pas ces valeurs.
+    fuel_profile: list[list[float]] = field(default_factory=list)
 
     # Profil et performances
     cost_index: str = ""
@@ -312,6 +320,7 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         star_entry_hint=star_block[0].ident if star_block else None,
         dispatch=_parse_dispatch(data),
     )
+    summary.dispatch.fuel_profile = _fuel_profile(navlog)
     return summary
 
 
@@ -418,9 +427,38 @@ def _parse_navlog(raw: Any) -> list[NavlogFix]:
                     item, "pos_long", "pos_lon", "lon", "longitude",
                     minimum=-180, maximum=180,
                 ),
+                leg_distance_nm=_float(item, "distance"),
+                fuel_plan_onboard=_int(item, "fuel_plan_onboard"),
             )
         )
     return fixes
+
+
+def _fuel_profile(navlog: list[NavlogFix]) -> list[list[float]]:
+    """Carburant prévu à bord en fonction de la distance restante.
+
+    SimBrief donne, pour chaque point, la longueur de la branche qui y mène et
+    le carburant prévu en l'atteignant. On en tire une courbe indexée par la
+    distance jusqu'à destination : c'est la seule grandeur que l'interface
+    connaît en vol, et elle reste valable quand NaviXav remplace la SID ou la
+    STAR, au prix d'une mise à l'échelle sur la longueur réelle de la route.
+    Un navlog incomplet ne donne aucune courbe plutôt qu'une courbe fausse.
+    """
+    if len(navlog) < 2:
+        return []
+    if any(fix.leg_distance_nm is None or fix.leg_distance_nm < 0 for fix in navlog):
+        return []
+    total = sum(fix.leg_distance_nm or 0.0 for fix in navlog)
+    if total <= 0:
+        return []
+    profile: list[list[float]] = []
+    travelled = 0.0
+    for fix in navlog:
+        travelled += fix.leg_distance_nm or 0.0
+        if fix.fuel_plan_onboard is None or fix.fuel_plan_onboard < 0:
+            continue
+        profile.append([round(max(0.0, total - travelled), 1), fix.fuel_plan_onboard])
+    return profile if len(profile) >= 2 else []
 
 
 def _block_procedure_name(block: list[NavlogFix]) -> str | None:

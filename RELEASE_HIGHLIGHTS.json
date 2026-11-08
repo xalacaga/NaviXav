@@ -15,6 +15,68 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [],
-  "fixed": []
+  "added": [
+    {
+      "en": "Voice callouts: NaviXav speaks MASTER CAUTION and MASTER WARNING alerts, the top of descent at 50, 10 and 0 NM, and taxi instructions such as hold-short points, with the Windows voice of your choice and the best natural voice picked automatically; switch them on in Settings or from Flight tracking",
+      "fr": "Annonces vocales : NaviXav annonce les alarmes MASTER CAUTION et MASTER WARNING, le top de descente à 50, 10 et 0 NM et les consignes de roulage comme les points d’arrêt avant piste, avec la voix Windows de votre choix et la meilleure voix naturelle choisie d’office ; à activer dans les Paramètres ou depuis Suivi du vol",
+      "de": "Sprachansagen: NaviXav sagt MASTER-CAUTION- und MASTER-WARNING-Alarme, den Top of Descent bei 50, 10 und 0 NM sowie Rollanweisungen wie Haltepunkte vor der Piste an, mit der Windows-Stimme Ihrer Wahl und automatisch der besten natürlichen Stimme; einschaltbar in den Einstellungen oder in der Flugverfolgung",
+      "es": "Avisos de voz: NaviXav anuncia las alarmas MASTER CAUTION y MASTER WARNING, el inicio de descenso a 50, 10 y 0 NM y las instrucciones de rodaje como los puntos de espera antes de pista, con la voz de Windows que elija y la mejor voz natural seleccionada automáticamente; se activan en Ajustes o desde Seguimiento del vuelo",
+      "it": "Annunci vocali: NaviXav annuncia gli allarmi MASTER CAUTION e MASTER WARNING, l’inizio discesa a 50, 10 e 0 NM e le istruzioni di rullaggio come i punti di attesa prima della pista, con la voce di Windows che preferisci e la migliore voce naturale scelta automaticamente; si attivano nelle Impostazioni o da Monitoraggio del volo",
+      "pt": "Anúncios de voz: o NaviXav anuncia os alarmes MASTER CAUTION e MASTER WARNING, o início da descida a 50, 10 e 0 NM e as instruções de rolagem como os pontos de espera antes da pista, com a voz do Windows à sua escolha e a melhor voz natural escolhida automaticamente; ative-os nas Definições ou no Acompanhamento do voo",
+      "nl": "Gesproken meldingen: NaviXav meldt MASTER CAUTION- en MASTER WARNING-alarmen, de top of descent op 50, 10 en 0 NM en taxi-instructies zoals wachtpunten voor de baan, met de Windows-stem van uw keuze en automatisch de beste natuurlijke stem; in te schakelen in Instellingen of vanuit Vluchtvolging",
+      "pl": "Komunikaty głosowe: NaviXav ogłasza alarmy MASTER CAUTION i MASTER WARNING, początek zniżania na 50, 10 i 0 NM oraz instrukcje kołowania, takie jak punkty oczekiwania przed drogą startową, wybranym głosem Windows, a najlepszy naturalny głos wybiera automatycznie; włącz je w Ustawieniach lub w Śledzeniu lotu"
+    },
+    {
+      "en": "Fuel monitoring: Flight tracking compares the fuel on board with the SimBrief OFP at your position along the route, estimates the fuel at destination (EFOB) and raises a caution when it falls below the final reserve plus alternate fuel",
+      "fr": "Suivi du carburant : Suivi du vol compare le carburant à bord à l’OFP SimBrief à votre position sur la route, estime le carburant à l’arrivée (EFOB) et lève une alarme lorsqu’il passe sous la réserve finale augmentée du carburant de dégagement",
+      "de": "Kraftstoffüberwachung: Die Flugverfolgung vergleicht den Kraftstoff an Bord mit dem SimBrief-OFP an Ihrer Position auf der Route, schätzt den Kraftstoff am Ziel (EFOB) und warnt, sobald er unter Endreserve plus Ausweichkraftstoff fällt",
+      "es": "Seguimiento del combustible: Seguimiento del vuelo compara el combustible a bordo con el OFP de SimBrief en su posición sobre la ruta, estima el combustible en destino (EFOB) y avisa cuando baja de la reserva final más el combustible al alternativo",
+      "it": "Monitoraggio del carburante: Monitoraggio del volo confronta il carburante a bordo con l’OFP SimBrief nella tua posizione lungo la rotta, stima il carburante a destinazione (EFOB) e avvisa quando scende sotto la riserva finale più il carburante per l’alternato",
+      "pt": "Acompanhamento do combustível: o Acompanhamento do voo compara o combustível a bordo com o OFP SimBrief na sua posição na rota, estima o combustível no destino (EFOB) e alerta quando desce abaixo da reserva final mais o combustível para o alternante",
+      "nl": "Brandstofbewaking: Vluchtvolging vergelijkt de brandstof aan boord met het SimBrief-OFP op uw positie langs de route, schat de brandstof op de bestemming (EFOB) en waarschuwt zodra die onder de eindreserve plus uitwijkbrandstof zakt",
+      "pl": "Monitorowanie paliwa: Śledzenie lotu porównuje paliwo na pokładzie z OFP SimBrief w Twojej pozycji na trasie, szacuje paliwo w miejscu docelowym (EFOB) i ostrzega, gdy spadnie ono poniżej rezerwy końcowej powiększonej o paliwo na lotnisko zapasowe"
+    },
+    {
+      "en": "Diagnostic log: every loss and recovery of the connection to MSFS is now recorded with its reason, the duration of the read that failed and the length of the outage, to make connection reports easier to investigate",
+      "fr": "Journal de diagnostic : chaque perte et chaque rétablissement de la connexion à MSFS sont désormais consignés avec leur raison, la durée de la lecture en échec et celle de la coupure, pour faciliter l’analyse des problèmes de connexion",
+      "de": "Diagnoseprotokoll: Jeder Verlust und jede Wiederherstellung der Verbindung zu MSFS wird jetzt mit Ursache, Dauer des fehlgeschlagenen Lesevorgangs und Länge der Unterbrechung festgehalten, um Verbindungsprobleme leichter zu untersuchen",
+      "es": "Registro de diagnóstico: cada pérdida y cada recuperación de la conexión con MSFS se registran ahora con su motivo, la duración de la lectura fallida y la de la interrupción, para facilitar el análisis de los problemas de conexión",
+      "it": "Registro diagnostico: ogni perdita e ogni ripristino della connessione con MSFS vengono ora annotati con la causa, la durata della lettura non riuscita e quella dell’interruzione, per analizzare più facilmente i problemi di connessione",
+      "pt": "Registo de diagnóstico: cada perda e cada restabelecimento da ligação ao MSFS passam a ser registados com o motivo, a duração da leitura falhada e a da interrupção, para facilitar a análise dos problemas de ligação",
+      "nl": "Diagnoselogboek: elk verlies en elk herstel van de verbinding met MSFS wordt nu vastgelegd met de oorzaak, de duur van de mislukte uitlezing en de lengte van de onderbreking, zodat verbindingsproblemen makkelijker te onderzoeken zijn",
+      "pl": "Dziennik diagnostyczny: każda utrata i każde przywrócenie połączenia z MSFS są teraz zapisywane wraz z przyczyną, czasem nieudanego odczytu i długością przerwy, aby łatwiej analizować problemy z połączeniem"
+    },
+    {
+      "en": "Map and taxi diagram: your aircraft is now drawn as the same airliner silhouette in both views, turned to its heading, with engines, windscreen and a soft shadow, instead of an arrow",
+      "fr": "Carte et plan de roulage : votre avion est désormais représenté par la même silhouette d’avion de ligne dans les deux vues, orientée au cap, avec réacteurs, pare-brise et une ombre légère, à la place de la flèche",
+      "de": "Karte und Rollplan: Ihr Flugzeug wird jetzt in beiden Ansichten als dieselbe Verkehrsflugzeug-Silhouette in Kursrichtung dargestellt, mit Triebwerken, Cockpitscheibe und leichtem Schatten, statt als Pfeil",
+      "es": "Mapa y plano de rodaje: su avión se muestra ahora con la misma silueta de avión de línea en ambas vistas, orientada al rumbo, con motores, parabrisas y una sombra suave, en lugar de la flecha",
+      "it": "Mappa e piano di rullaggio: il tuo aereo è ora rappresentato dalla stessa sagoma di aereo di linea in entrambe le viste, orientata secondo la prua, con motori, parabrezza e un’ombra leggera, al posto della freccia",
+      "pt": "Mapa e plano de rolagem: o seu avião passa a ser representado pela mesma silhueta de avião de linha nas duas vistas, orientada à proa, com motores, para-brisas e uma sombra suave, em vez da seta",
+      "nl": "Kaart en taxiplan: uw vliegtuig wordt nu in beide weergaven als hetzelfde silhouet van een verkeersvliegtuig getoond, in de koersrichting, met motoren, cockpitruit en een zachte schaduw, in plaats van een pijl",
+      "pl": "Mapa i plan kołowania: Twój samolot jest teraz przedstawiany w obu widokach tą samą sylwetką samolotu pasażerskiego zwróconą zgodnie z kursem, z silnikami, szybą kokpitu i delikatnym cieniem, zamiast strzałki"
+    }
+  ],
+  "fixed": [
+    {
+      "en": "An aircraft that does not publish its fuel quantity no longer shows 0 kg or raises a false fuel-below-reserve MASTER WARNING",
+      "fr": "Un avion qui ne publie pas sa quantité de carburant n’affiche plus 0 kg et ne déclenche plus de faux MASTER WARNING de carburant sous la réserve",
+      "de": "Ein Flugzeug, das seine Kraftstoffmenge nicht übermittelt, zeigt nicht mehr 0 kg an und löst keine falsche MASTER WARNING wegen Kraftstoff unter der Reserve mehr aus",
+      "es": "Un avión que no publica su cantidad de combustible ya no muestra 0 kg ni dispara un falso MASTER WARNING de combustible por debajo de la reserva",
+      "it": "Un aereo che non pubblica la quantità di carburante non mostra più 0 kg e non fa più scattare un falso MASTER WARNING di carburante sotto la riserva",
+      "pt": "Um avião que não publica a quantidade de combustível já não mostra 0 kg nem dispara um falso MASTER WARNING de combustível abaixo da reserva",
+      "nl": "Een vliegtuig dat zijn brandstofhoeveelheid niet doorgeeft, toont niet langer 0 kg en geeft geen valse MASTER WARNING voor brandstof onder de reserve meer",
+      "pl": "Samolot, który nie publikuje ilości paliwa, nie pokazuje już 0 kg i nie wywołuje fałszywego MASTER WARNING o paliwie poniżej rezerwy"
+    },
+    {
+      "en": "Saving the settings is immediate again: the aircraft thumbnails of the installed-aircraft list no longer reread thousands of Community files each and no longer hold up the rest of the application",
+      "fr": "L’enregistrement des paramètres est de nouveau immédiat : les vignettes de la liste des avions installés ne relisent plus chacune des milliers de fichiers de Community et ne retiennent plus le reste de l’application",
+      "de": "Das Speichern der Einstellungen erfolgt wieder sofort: Die Vorschaubilder der Liste installierter Flugzeuge lesen nicht mehr jeweils Tausende Community-Dateien neu ein und blockieren den Rest der Anwendung nicht mehr",
+      "es": "Guardar los ajustes vuelve a ser inmediato: las miniaturas de la lista de aviones instalados ya no releen cada una miles de archivos de Community ni retienen el resto de la aplicación",
+      "it": "Il salvataggio delle impostazioni è di nuovo immediato: le miniature dell’elenco degli aerei installati non rileggono più ciascuna migliaia di file di Community e non bloccano più il resto dell’applicazione",
+      "pt": "Guardar as definições volta a ser imediato: as miniaturas da lista de aviões instalados já não releem cada uma milhares de ficheiros do Community nem retêm o resto da aplicação",
+      "nl": "Instellingen opslaan gaat weer direct: de miniaturen in de lijst met geïnstalleerde vliegtuigen lezen niet langer elk duizenden Community-bestanden opnieuw in en houden de rest van de applicatie niet meer op",
+      "pl": "Zapisywanie ustawień znów jest natychmiastowe: miniatury na liście zainstalowanych samolotów nie wczytują już każda z osobna tysięcy plików z Community i nie blokują reszty aplikacji"
+    }
+  ]
 }

@@ -1824,6 +1824,16 @@ body.remote-client .mobile-theme {
 }
 .settings-note a { color: var(--accent); }
 .settings-switch { align-self: end; min-height: 38px; }
+/* Interrupteur, voix et essai sur une ligne : le choix s'entend aussitôt. */
+.settings-voice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: end;
+}
+.settings-voice .field { min-width: 0; }
+.settings-voice > button { min-height: 38px; }
+.settings-voice .settings-note { margin: 0; }
 /* Une mise en garde tient sous son réglage, sur toute la largeur : la couper
    en colonne la rendrait illisible juste là où elle compte. */
 .settings-note {
@@ -2082,6 +2092,7 @@ body.remote-client .mobile-theme {
 }
 @media (max-width: 620px) {
   .settings-grid { grid-template-columns: 1fr; }
+  .settings-voice { grid-template-columns: 1fr; }
   .aircraft-survey-columns { grid-template-columns: 1fr; }
   .aircraft-folder-row { align-items: stretch; flex-direction: column; }
   .support-card { align-items: stretch; flex-direction: column; }

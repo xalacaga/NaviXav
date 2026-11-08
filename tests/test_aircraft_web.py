@@ -144,7 +144,10 @@ def test_aircraft_panel_uses_bundled_photos_then_community_thumbnails():
     assert javascript.index('asset: "airbus-a321"') < javascript.index('asset: "airbus-a320"')
     assert 'encodeURIComponent(loadedTitle ? "" : plan.aircraft || "")' in javascript
     assert 'encodeURIComponent(loadedTitle || plan.aircraft_name || "")' in javascript
-    assert '}, null, community, photoRevision)' in javascript
+    # Les vignettes d'inventaire ne sont demandées qu'une fois à l'écran : une
+    # centaine chargée d'un coup occupait toutes les connexions du navigateur.
+    assert '}, null, community, photoRevision, { lazy: true })' in javascript
+    assert 'photo.loading = lazy ? "lazy" : "eager"' in javascript
     assert '`&community=${encodeURIComponent(communityPath)}`' in javascript
     assert '`&v=${encodeURIComponent(photoRevision)}`' in javascript
     assert 'photo.classList.remove("hidden")' in javascript

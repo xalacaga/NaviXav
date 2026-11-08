@@ -986,32 +986,12 @@ const MAP = (() => {
   function drawAircraft() {
     if (!aircraft) return;
     const [x, y] = toScreen(nearestX(aircraft.x, view.centerX), aircraft.y);
-    const heading = ((aircraft.heading ?? 0) * Math.PI) / 180;
-
-    context.save();
-    context.translate(x, y);
-
-    // Halo, pour rester repérable même dézoomé.
-    context.fillStyle = css("--accent");
-    context.globalAlpha = 0.18;
-    context.beginPath();
-    context.arc(0, 0, 22, 0, Math.PI * 2);
-    context.fill();
-    context.globalAlpha = 1;
-
-    context.rotate(heading);
-    context.fillStyle = css("--accent");
-    context.strokeStyle = css("--aircraft-outline");
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.moveTo(0, -13);
-    context.lineTo(11, 9);
-    context.lineTo(0, 4);
-    context.lineTo(-11, 9);
-    context.closePath();
-    context.fill();
-    context.stroke();
-    context.restore();
+    AIRCRAFT_ICON.draw(context, x, y, aircraft.heading, {
+      fill: css("--accent"),
+      outline: css("--aircraft-outline"),
+      // Halo, pour rester repérable même dézoomé.
+      halo: true,
+    });
   }
 
   function drawScaleBar() {
