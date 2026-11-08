@@ -1,22 +1,26 @@
-# NaviXav 1.7.4
+# NaviXav 1.8.0
 
-Publié le 2026-10-11.
+Publié le 2026-11-08.
 
 ## Nouveautés
 
-- Le trafic VATSIM, IVAO et OpenSky anticipe les virages : un appareil en virage au dernier relevé continue de tourner en s’amortissant, sur la carte comme dans le simulateur, au lieu de filer tout droit jusqu’au relevé suivant.
-- Analyse de l’atterrissage : au toucher, NaviXav affiche la vitesse verticale figée par MSFS, l’assiette et l’inclinaison, la distance après le seuil et l’écart à l’axe de la piste réellement utilisée, le vent de face et de travers, les rebonds et la stabilisation de la finale, avec une note sur 100. L’analyse est rattachée au vol dans le carnet de bord et une image prête à partager peut être copiée ou enregistrée.
-- Le carnet de vol est désormais conservé dans le dossier de données de NaviXav plutôt que dans la fenêtre : il survit à une réinstallation ou à une réinitialisation de WebView2, et la tablette connectée en réseau local affiche le même carnet, en lecture seule. Les vols déjà enregistrés sont repris automatiquement au premier lancement.
-- Statistiques du carnet de vol : nombre de vols, heures de vol et distance totales, toucher et note moyens, meilleur atterrissage, avions les plus pilotés et terrains les plus fréquentés. Le carnet complet s’exporte en CSV pour un tableur.
+- Annonces vocales : NaviXav annonce les alarmes MASTER CAUTION et MASTER WARNING, le top de descente à 50, 10 et 0 NM et les consignes de roulage comme les points d’arrêt avant piste ; à activer dans les Paramètres ou depuis Suivi du vol.
+- Suivi du carburant : Suivi du vol compare le carburant à bord à l’OFP SimBrief à votre position sur la route, estime le carburant à l’arrivée (EFOB) et lève une alarme lorsqu’il passe sous la réserve finale augmentée du carburant de dégagement.
+- Journal de diagnostic : chaque perte et chaque rétablissement de la connexion à MSFS sont désormais consignés avec leur raison, la durée de la lecture en échec et celle de la coupure, pour faciliter l’analyse des problèmes de connexion.
+- Carte et plan de roulage : votre avion est désormais représenté par la même silhouette d’avion de ligne dans les deux vues, orientée au cap, avec réacteurs, pare-brise et une ombre légère, à la place de la flèche.
+- Voix NaviXav : les annonces sont dites par des voix neuronales de haute qualité livrées avec l’application, dans les huit langues, entièrement hors ligne et sans rien à installer ; les termes aéronautiques restent en anglais et trois voix sont proposées en anglais.
+- SIGMET sur la carte : les SIGMET en vigueur près de la route sont dessinés en zones colorées avec leurs niveaux, ceux que la route traverse sont mis en évidence, l’onglet météo les liste avec leur texte complet et une alarme prévient quand l’avion va en traverser un à son niveau.
+- Approche stabilisée : sous le portail (1000 ft IMC, 500 ft VMC), NaviXav contrôle le train, les volets, la vitesse, le taux de descente et les aiguilles ILS, annonce « Stabilisé » quand tout est en ordre et déclenche sinon une alarme d’approche non stabilisée ; une tuile du suivi de vol affiche les critères en défaut.
+- Panneau MSFS 1.2.3 : le panneau du simulateur affiche les alarmes en cours, colorées selon leur gravité, et l’état de stabilisation en finale ; mettez-le à jour depuis les réglages de NaviXav.
 
 ## Corrections
 
-- Le trafic OpenSky avance désormais en continu sur la carte et dans le simulateur entre deux relevés, au lieu de rester figé puis de sauter de plusieurs nautiques.
-- OpenSky est relevé bien plus souvent en début de vol, environ toutes les 30 secondes : le quota public est réparti sur la durée d’un vol plutôt que sur une journée entière.
-- Le premier chargement d’un terrain n’attend plus près d’une minute : NaviXav cherche désormais l’ILS et les repères dans la région du terrain au lieu de parcourir celles de tous les terrains déjà connus, et retrouve les fréquences ILS qu’il déclarait à tort introuvables, comme celle de la 23R d’EGCC.
+- Un avion qui ne publie pas sa quantité de carburant n’affiche plus 0 kg et ne déclenche plus de faux MASTER WARNING de carburant sous la réserve.
+- L’enregistrement des paramètres est de nouveau immédiat : les vignettes de la liste des avions installés ne relisent plus chacune des milliers de fichiers de Community et ne retiennent plus le reste de l’application.
+- Les avertissements météo « en conditions LIFR » et « météo indisponible » ne restent plus en français lorsqu’une autre langue d’interface est choisie.
 
 ## Modifications
 
-- Correction bug et ajout logbook.
+- Mettre en cache la lecture des aircraft.cfg de Community.
 
 L'installateur est vérifié par sa somme de contrôle SHA-256 avant toute mise à jour automatique.

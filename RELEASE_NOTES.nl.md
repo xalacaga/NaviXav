@@ -1,22 +1,26 @@
-# NaviXav 1.7.4
+# NaviXav 1.8.0
 
-Uitgebracht op 2026-10-11.
+Uitgebracht op 2026-11-08.
 
 ## Nieuw
 
-- VATSIM-, IVAO- en OpenSky-verkeer anticipeert op bochten: een toestel dat bij de laatste meting in een bocht zat, blijft op de kaart en in de simulator geleidelijk uitlopend draaien, in plaats van rechtdoor te vliegen tot de volgende meting.
-- Landingsanalyse: bij de touchdown toont NaviXav de door MSFS vastgelegde verticale snelheid, neusstand en helling, de afstand voorbij de drempel en de afwijking van de middellijn van de werkelijk gebruikte baan, tegen- en zijwind, stuiters en de stabiliteit van de eindnadering, met een score op 100. De analyse wordt aan de vlucht in het logboek gekoppeld en een afbeelding om te delen kan worden gekopieerd of opgeslagen.
-- Het logboek wordt nu in de gegevensmap van NaviXav bewaard in plaats van in het venster: het overleeft een herinstallatie of een reset van WebView2, en een via het lokale netwerk verbonden tablet toont hetzelfde logboek, alleen-lezen. Al vastgelegde vluchten worden bij de eerste start automatisch overgenomen.
-- Logboekstatistieken: aantal vluchten, totale vlieguren en afstand, gemiddelde touchdown en score, beste landing, meest gevlogen toestellen en meest bezochte vliegvelden. Het volledige logboek kan naar CSV worden geëxporteerd voor een spreadsheet.
+- Gesproken meldingen: NaviXav meldt MASTER CAUTION- en MASTER WARNING-alarmen, de top of descent op 50, 10 en 0 NM en taxi-instructies zoals wachtpunten voor de baan; in te schakelen in Instellingen of vanuit Vluchtvolging.
+- Brandstofbewaking: Vluchtvolging vergelijkt de brandstof aan boord met het SimBrief-OFP op uw positie langs de route, schat de brandstof op de bestemming (EFOB) en waarschuwt zodra die onder de eindreserve plus uitwijkbrandstof zakt.
+- Diagnoselogboek: elk verlies en elk herstel van de verbinding met MSFS wordt nu vastgelegd met de oorzaak, de duur van de mislukte uitlezing en de lengte van de onderbreking, zodat verbindingsproblemen makkelijker te onderzoeken zijn.
+- Kaart en taxiplan: uw vliegtuig wordt nu in beide weergaven als hetzelfde silhouet van een verkeersvliegtuig getoond, in de koersrichting, met motoren, cockpitruit en een zachte schaduw, in plaats van een pijl.
+- NaviXav-stem: meldingen worden uitgesproken door neurale stemmen van hoge kwaliteit die met de applicatie worden meegeleverd, in alle acht talen, volledig offline en zonder installatie; luchtvaarttermen blijven Engels en in het Engels zijn drie stemmen beschikbaar.
+- SIGMET op de kaart: geldende SIGMET's bij de route worden als gekleurde gebieden met hun niveaus getekend, de gebieden die de route doorkruist worden gemarkeerd, het weertabblad toont ze met hun volledige tekst en een alarm waarschuwt wanneer het vliegtuig er op zijn hoogte in dreigt te vliegen.
+- Gestabiliseerde nadering: onder de gate (1000 ft IMC, 500 ft VMC) controleert NaviXav landingsgestel, flaps, snelheid, daalsnelheid en de ILS-naalden, roept „Gestabiliseerd” om als alles in orde is en geeft anders een alarm voor een niet-gestabiliseerde nadering; een tegel in het vluchtvolgen toont de criteria die niet kloppen.
+- MSFS-paneel 1.2.3: het paneel in de simulator toont de actieve alarmen, gekleurd naar ernst, en in de eindnadering de stabilisatiestatus; werk het bij via de NaviXav-instellingen.
 
 ## Opgelost
 
-- OpenSky-verkeer beweegt nu vloeiend door op de kaart en in de simulator tussen twee metingen, in plaats van stil te staan en dan enkele zeemijlen te verspringen.
-- OpenSky wordt aan het begin van een vlucht veel vaker opgevraagd, ongeveer elke 30 seconden: het openbare tegoed wordt over een vlucht verdeeld in plaats van over een hele dag.
-- Het eerste laden van een vliegveld duurt niet langer bijna een minuut: NaviXav zoekt het ILS en de bakens nu in de regio van het vliegveld in plaats van die van alle al bekende vliegvelden af te lopen, en vindt ILS-frequenties terug die ten onrechte als onvindbaar werden gemeld, zoals die van baan 23R van EGCC.
+- Een vliegtuig dat zijn brandstofhoeveelheid niet doorgeeft, toont niet langer 0 kg en geeft geen valse MASTER WARNING voor brandstof onder de reserve meer.
+- Instellingen opslaan gaat weer direct: de miniaturen in de lijst met geïnstalleerde vliegtuigen lezen niet langer elk duizenden Community-bestanden opnieuw in en houden de rest van de applicatie niet meer op.
+- De weerwaarschuwingen ‘in LIFR-omstandigheden’ en ‘weer niet beschikbaar’ verschijnen niet langer in het Frans wanneer een andere interfacetaal is gekozen.
 
 ## Gewijzigd
 
-- Correction bug et ajout logbook.
+- Mettre en cache la lecture des aircraft.cfg de Community.
 
 Het installatieprogramma wordt vóór elke automatische update geverifieerd aan de hand van zijn SHA-256-controlesom.

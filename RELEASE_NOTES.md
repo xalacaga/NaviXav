@@ -1,22 +1,26 @@
-# NaviXav 1.7.4
+# NaviXav 1.8.0
 
-Released on 2026-10-11.
+Released on 2026-11-08.
 
 ## Added
 
-- VATSIM, IVAO and OpenSky traffic anticipates turns: an aircraft turning at the last report keeps turning, gradually easing off, on the map and in the simulator, instead of flying straight until the next report.
-- Landing analysis: at touchdown, NaviXav shows the vertical speed recorded by MSFS, pitch and bank, distance past the threshold and centreline deviation on the runway actually used, headwind and crosswind, bounces and approach stability, with a score out of 100. The analysis is attached to the flight in the logbook, and a ready-to-share image can be copied or saved.
-- The logbook is now kept in the NaviXav data folder rather than in the window: it survives a reinstall or a WebView2 reset, and a tablet connected over the local network shows the same logbook, read-only. Flights already recorded are carried over automatically at first launch.
-- Logbook statistics: number of flights, total flight hours and distance, average touchdown and score, best landing, most flown aircraft and most visited airports. The complete logbook can be exported to CSV for a spreadsheet.
+- Voice callouts: NaviXav speaks MASTER CAUTION and MASTER WARNING alerts, the top of descent at 50, 10 and 0 NM, and taxi instructions such as hold-short points; switch them on in Settings or from Flight tracking.
+- Fuel monitoring: Flight tracking compares the fuel on board with the SimBrief OFP at your position along the route, estimates the fuel at destination (EFOB) and raises a caution when it falls below the final reserve plus alternate fuel.
+- Diagnostic log: every loss and recovery of the connection to MSFS is now recorded with its reason, the duration of the read that failed and the length of the outage, to make connection reports easier to investigate.
+- Map and taxi diagram: your aircraft is now drawn as the same airliner silhouette in both views, turned to its heading, with engines, windscreen and a soft shadow, instead of an arrow.
+- NaviXav voice: callouts are spoken by high-quality neural voices shipped with the application, in all eight languages, fully offline and with nothing to install; aviation terms stay in English and three voices are available in English.
+- SIGMET on the map: the SIGMETs in force near the route are drawn as coloured areas with their levels, those the route crosses are highlighted, the weather tab lists them with their full text, and an alert warns when the aircraft is about to enter one at its level.
+- Stabilized approach: below the gate (1000 ft IMC, 500 ft VMC) NaviXav checks gear, flaps, speed, sink rate and the ILS needles, calls out "Stabilized" when all is in order and raises an unstable approach alarm otherwise; a flight tracking tile shows the faulty criteria.
+- MSFS panel 1.2.3: the in-sim panel shows the active alarms, colour-coded by severity, and the stabilized approach status on final; update it from the NaviXav settings.
 
 ## Fixed
 
-- OpenSky traffic now keeps moving smoothly on the map and in the simulator between two reports, instead of freezing and then jumping several nautical miles.
-- OpenSky is polled much more often at the start of a flight, about every 30 seconds: the public allowance is spread over a flight rather than a whole day.
-- The first load of an airport no longer waits nearly a minute: NaviXav now looks up the ILS and fixes in the airport’s own region instead of going through those of every airport already known, and recovers ILS frequencies it wrongly reported as missing, such as EGCC runway 23R.
+- An aircraft that does not publish its fuel quantity no longer shows 0 kg or raises a false fuel-below-reserve MASTER WARNING.
+- Saving the settings is immediate again: the aircraft thumbnails of the installed-aircraft list no longer reread thousands of Community files each and no longer hold up the rest of the application.
+- The weather warnings “in LIFR conditions” and “weather unavailable” are no longer shown in French when another interface language is selected.
 
 ## Changed
 
-- Correction bug et ajout logbook.
+- Mettre en cache la lecture des aircraft.cfg de Community.
 
 The installer is verified against its SHA-256 checksum before any automatic update.
