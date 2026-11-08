@@ -4776,6 +4776,16 @@
   Object.assign(TRANSLATIONS.nl, { guide_open_title: "Gebruikershandleiding" });
   Object.assign(TRANSLATIONS.pl, { guide_open_title: "Przewodnik użytkownika" });
 
+  // Ambiance radio ATC.
+  Object.assign(TRANSLATIONS.fr, { chatter_toggle: "Ambiance radio ATC", chatter_volume: "Volume de l’ambiance", chatter_help: "Échanges radio en anglais joués en fond selon la phase du vol : sol, tour, approche ou centre. Ils ne concernent pas votre avion et se taisent pendant les annonces NaviXav." });
+  Object.assign(TRANSLATIONS.en, { chatter_toggle: "ATC radio ambience", chatter_volume: "Ambience volume", chatter_help: "English radio exchanges played in the background according to the flight phase: ground, tower, approach or centre. They do not concern your aircraft and pause during NaviXav callouts." });
+  Object.assign(TRANSLATIONS.de, { chatter_toggle: "ATC-Funkatmosphäre", chatter_volume: "Lautstärke der Atmosphäre", chatter_help: "Englischer Funkverkehr, der je nach Flugphase im Hintergrund läuft: Boden, Turm, Anflug oder Kontrolle. Er betrifft nicht Ihr Flugzeug und verstummt während der NaviXav-Ansagen." });
+  Object.assign(TRANSLATIONS.es, { chatter_toggle: "Ambiente de radio ATC", chatter_volume: "Volumen del ambiente", chatter_help: "Comunicaciones de radio en inglés reproducidas de fondo según la fase del vuelo: rodadura, torre, aproximación o control. No conciernen a tu avión y se callan durante los avisos de NaviXav." });
+  Object.assign(TRANSLATIONS.it, { chatter_toggle: "Atmosfera radio ATC", chatter_volume: "Volume dell’atmosfera", chatter_help: "Comunicazioni radio in inglese riprodotte in sottofondo secondo la fase del volo: ground, torre, avvicinamento o controllo. Non riguardano il tuo aereo e tacciono durante gli annunci di NaviXav." });
+  Object.assign(TRANSLATIONS.pt, { chatter_toggle: "Ambiente de rádio ATC", chatter_volume: "Volume do ambiente", chatter_help: "Comunicações de rádio em inglês reproduzidas em fundo conforme a fase do voo: placa, torre, aproximação ou controlo. Não dizem respeito ao seu avião e calam-se durante os avisos do NaviXav." });
+  Object.assign(TRANSLATIONS.nl, { chatter_toggle: "ATC-radiosfeer", chatter_volume: "Volume van de sfeer", chatter_help: "Engelstalig radioverkeer dat op de achtergrond speelt volgens de vluchtfase: grond, toren, nadering of luchtverkeersleiding. Het gaat niet over uw vliegtuig en zwijgt tijdens de meldingen van NaviXav." });
+  Object.assign(TRANSLATIONS.pl, { chatter_toggle: "Atmosfera radiowa ATC", chatter_volume: "Głośność atmosfery", chatter_help: "Angielska korespondencja radiowa odtwarzana w tle zależnie od fazy lotu: ziemia, wieża, zbliżanie lub kontrola obszaru. Nie dotyczy Twojego samolotu i milknie podczas komunikatów NaviXav." });
+
   const ELEMENTS = {
     "#map-view-label": "map_group_view",
     "#map-layers-label": "map_group_layers",
@@ -4915,6 +4925,9 @@
     "#settings-voice-label": "voice_settings_toggle",
     "#settings-voice-name-label": "voice_name",
     "#settings-voice-test": "voice_test",
+    "#settings-chatter-label": "chatter_toggle",
+    "#settings-chatter-volume-label": "chatter_volume",
+    "#settings-chatter-help": "chatter_help",
     "#settings-lan-label": "lan_access",
     "#settings-lan-title": "lan_address",
     "#settings-lan-help": "lan_help",

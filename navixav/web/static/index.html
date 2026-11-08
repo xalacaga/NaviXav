@@ -483,6 +483,18 @@
         <button type="button" class="icon-btn" id="settings-voice-test">Écouter</button>
         <p class="settings-note" id="settings-voice-help">Voix neuronale livrée avec NaviXav : elle fonctionne hors ligne, sans rien installer, et se règle sur cet appareil.</p>
       </div>
+      <div class="settings-chatter settings-wide">
+        <label class="switch settings-switch">
+          <input type="checkbox" id="settings-chatter" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="switch-label" id="settings-chatter-label">Ambiance radio ATC</span>
+        </label>
+        <label class="field" for="settings-chatter-volume">
+          <span id="settings-chatter-volume-label">Volume de l’ambiance</span>
+          <input id="settings-chatter-volume" type="range" min="0" max="100" step="5" value="35" />
+        </label>
+        <p class="settings-note" id="settings-chatter-help">Échanges radio en anglais joués en fond selon la phase du vol : sol, tour, approche ou centre. Ils ne concernent pas votre avion et se taisent pendant les annonces NaviXav.</p>
+      </div>
       </div>
     </details>
     <details class="settings-section" name="settings-group">
@@ -787,6 +799,7 @@
 
 <script src="/static/i18n.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/voice.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/chatter.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/aircraft-icon.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/map.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/ground.js?v=__NAVIXAV_VERSION__"></script>

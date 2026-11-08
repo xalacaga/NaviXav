@@ -83,6 +83,7 @@ const GUIDE = (() => {
           panel: ["Panneau MSFS", "{settings} > {settings_section_msfs_panel} > « {settings_msfs_panel_install} ». Une icône NaviXav apparaît dans la barre d’outils du simulateur au prochain chargement. Quand une nouvelle version est disponible, le même bouton la met à jour."],
           tablet: ["Téléphone ou tablette", "{settings} > {settings_section_connections} : activez l’accès, redémarrez NaviXav, autorisez le réseau privé si Windows le demande, puis ouvrez l’adresse affichée depuis un appareil du même Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > « {chartfox_connect} ». La connexion passe par votre navigateur ; NaviXav ne voit jamais votre mot de passe."],
+          chatter: ["Ambiance radio ATC", "{settings} > {settings_section_flight} : activez « {chatter_toggle} » et réglez son volume. Des échanges radio en anglais, enregistrés hors ligne, se jouent en fond selon la phase du vol ; ils ne concernent pas votre avion et se taisent pendant les annonces NaviXav."],
         },
       },
       alerts: {
@@ -177,6 +178,7 @@ const GUIDE = (() => {
           panel: ["MSFS panel", "{settings} > {settings_section_msfs_panel} > “{settings_msfs_panel_install}”. A NaviXav icon appears in the simulator toolbar at the next load. When a new version is available, the same button updates it."],
           tablet: ["Phone or tablet", "{settings} > {settings_section_connections}: turn access on, restart NaviXav, allow private networks if Windows asks, then open the address shown from a device on the same Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > “{chartfox_connect}”. Sign-in goes through your browser; NaviXav never sees your password."],
+          chatter: ["ATC radio ambience", "{settings} > {settings_section_flight}: turn on “{chatter_toggle}” and set its volume. Pre-recorded English radio exchanges play in the background according to the flight phase; they do not concern your aircraft and pause during NaviXav callouts."],
         },
       },
       alerts: {
@@ -271,6 +273,7 @@ const GUIDE = (() => {
           panel: ["MSFS-Panel", "{settings} > {settings_section_msfs_panel} > „{settings_msfs_panel_install}“. Beim nächsten Laden erscheint ein NaviXav-Symbol in der Symbolleiste des Simulators. Gibt es eine neue Version, aktualisiert sie dieselbe Schaltfläche."],
           tablet: ["Telefon oder Tablet", "{settings} > {settings_section_connections}: Zugriff einschalten, NaviXav neu starten, private Netzwerke zulassen, wenn Windows fragt, und die angezeigte Adresse auf einem Gerät im selben WLAN öffnen."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > „{chartfox_connect}“. Die Anmeldung läuft über Ihren Browser; NaviXav sieht Ihr Passwort nie."],
+          chatter: ["ATC-Funkatmosphäre", "{settings} > {settings_section_flight}: „{chatter_toggle}“ einschalten und die Lautstärke einstellen. Vorab aufgenommener englischer Funkverkehr läuft je nach Flugphase im Hintergrund; er betrifft nicht Ihr Flugzeug und verstummt während der NaviXav-Ansagen."],
         },
       },
       alerts: {
@@ -365,6 +368,7 @@ const GUIDE = (() => {
           panel: ["Panel de MSFS", "{settings} > {settings_section_msfs_panel} > «{settings_msfs_panel_install}». Un icono de NaviXav aparece en la barra del simulador en la siguiente carga. Cuando hay una versión nueva, el mismo botón la actualiza."],
           tablet: ["Teléfono o tableta", "{settings} > {settings_section_connections}: activa el acceso, reinicia NaviXav, permite las redes privadas si Windows lo pide y abre la dirección mostrada desde un dispositivo de la misma Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > «{chartfox_connect}». El inicio de sesión pasa por tu navegador; NaviXav nunca ve tu contraseña."],
+          chatter: ["Ambiente de radio ATC", "{settings} > {settings_section_flight}: activa «{chatter_toggle}» y ajusta su volumen. Comunicaciones de radio en inglés grabadas de antemano suenan de fondo según la fase del vuelo; no conciernen a tu avión y se callan durante los avisos de NaviXav."],
         },
       },
       alerts: {
@@ -459,6 +463,7 @@ const GUIDE = (() => {
           panel: ["Pannello MSFS", "{settings} > {settings_section_msfs_panel} > «{settings_msfs_panel_install}». Al caricamento successivo compare un’icona NaviXav nella barra del simulatore. Quando esce una nuova versione, lo stesso pulsante la aggiorna."],
           tablet: ["Telefono o tablet", "{settings} > {settings_section_connections}: attiva l’accesso, riavvia NaviXav, consenti le reti private se Windows lo chiede, poi apri l’indirizzo mostrato da un dispositivo sulla stessa Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > «{chartfox_connect}». L’accesso passa dal browser; NaviXav non vede mai la tua password."],
+          chatter: ["Atmosfera radio ATC", "{settings} > {settings_section_flight}: attiva «{chatter_toggle}» e regola il volume. Comunicazioni radio in inglese preregistrate suonano in sottofondo secondo la fase del volo; non riguardano il tuo aereo e tacciono durante gli annunci di NaviXav."],
         },
       },
       alerts: {
@@ -553,6 +558,7 @@ const GUIDE = (() => {
           panel: ["Painel do MSFS", "{settings} > {settings_section_msfs_panel} > «{settings_msfs_panel_install}». Um ícone do NaviXav aparece na barra do simulador no carregamento seguinte. Quando há uma versão nova, o mesmo botão atualiza-a."],
           tablet: ["Telemóvel ou tablet", "{settings} > {settings_section_connections}: ative o acesso, reinicie o NaviXav, autorize as redes privadas se o Windows pedir e abra o endereço indicado num dispositivo da mesma rede Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > «{chartfox_connect}». O início de sessão passa pelo navegador; o NaviXav nunca vê a sua palavra-passe."],
+          chatter: ["Ambiente de rádio ATC", "{settings} > {settings_section_flight}: ative «{chatter_toggle}» e ajuste o volume. Comunicações de rádio em inglês pré-gravadas tocam em fundo conforme a fase do voo; não dizem respeito ao seu avião e calam-se durante os avisos do NaviXav."],
         },
       },
       alerts: {
@@ -647,6 +653,7 @@ const GUIDE = (() => {
           panel: ["MSFS-paneel", "{settings} > {settings_section_msfs_panel} > „{settings_msfs_panel_install}”. Bij de volgende keer laden verschijnt een NaviXav-pictogram in de werkbalk van de simulator. Is er een nieuwe versie, dan werkt dezelfde knop die bij."],
           tablet: ["Telefoon of tablet", "{settings} > {settings_section_connections}: zet de toegang aan, start NaviXav opnieuw, sta privénetwerken toe als Windows erom vraagt en open het getoonde adres op een apparaat in hetzelfde wifi-netwerk."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > „{chartfox_connect}”. Het aanmelden loopt via uw browser; NaviXav ziet uw wachtwoord nooit."],
+          chatter: ["ATC-radiosfeer", "{settings} > {settings_section_flight}: zet „{chatter_toggle}” aan en stel het volume in. Vooraf opgenomen Engelstalig radioverkeer speelt op de achtergrond volgens de vluchtfase; het gaat niet over uw vliegtuig en zwijgt tijdens de meldingen van NaviXav."],
         },
       },
       alerts: {
@@ -741,6 +748,7 @@ const GUIDE = (() => {
           panel: ["Panel MSFS", "{settings} > {settings_section_msfs_panel} > „{settings_msfs_panel_install}”. Przy następnym wczytaniu w pasku symulatora pojawi się ikona NaviXav. Gdy pojawi się nowa wersja, ten sam przycisk ją zaktualizuje."],
           tablet: ["Telefon lub tablet", "{settings} > {settings_section_connections}: włącz dostęp, uruchom ponownie NaviXav, zezwól na sieci prywatne, jeśli Windows o to poprosi, i otwórz wyświetlony adres na urządzeniu w tej samej sieci Wi-Fi."],
           chartfox: ["ChartFox", "{settings} > {settings_section_connections} > „{chartfox_connect}”. Logowanie odbywa się w przeglądarce; NaviXav nigdy nie widzi Twojego hasła."],
+          chatter: ["Atmosfera radiowa ATC", "{settings} > {settings_section_flight}: włącz „{chatter_toggle}” i ustaw głośność. Nagrana wcześniej angielska korespondencja radiowa gra w tle zależnie od fazy lotu; nie dotyczy Twojego samolotu i milknie podczas komunikatów NaviXav."],
         },
       },
       alerts: {

@@ -213,6 +213,12 @@ const VOICE = (() => {
     if (priority) stop();
     let start = Math.max(audio.currentTime + 0.05, queueEnd);
     if (!priority && start - audio.currentTime > MAX_BACKLOG_S) return false;
+    // L'ambiance radio se tait pendant l'annonce.
+    try {
+      window.dispatchEvent(new CustomEvent("navixav:voice-start"));
+    } catch (_error) {
+      // Navigateur sans CustomEvent : l'annonce passe quand même.
+    }
     for (const clip of decoded) {
       const source = audio.createBufferSource();
       source.buffer = clip;
@@ -289,6 +295,8 @@ const VOICE = (() => {
       label: entry.label,
     })),
     announce,
+    /** Une annonce est-elle en cours ou en attente ? */
+    speaking: () => Boolean(audioContext && queueEnd > audioContext.currentTime),
     /** Fait entendre la voix retenue, même annonces coupées. */
     test() {
       return say([{ key: "voice_test_phrase" }], true);

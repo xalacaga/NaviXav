@@ -55,10 +55,12 @@ Microsoft components
 The Python package named "SimConnect" is not included. NaviXav uses its own
 ctypes client with the official Microsoft SDK DLL.
 
-Voice announcements (navixav/web/static/voice)
+Voice announcements and ATC radio ambience
+(navixav/web/static/voice, navixav/web/static/chatter)
   The distribution contains pre-recorded audio files only. No speech
   synthesis engine or voice model is included; the files were produced once
-  with scripts/generate_voice_bank.py.
+  with scripts/generate_voice_bank.py and scripts/generate_chatter_bank.py.
+  The ATC radio ambience uses Kokoro-82M English voices only.
   English, French, Spanish, Italian
     Kokoro-82M                  Apache License 2.0
     https://huggingface.co/hexgrad/Kokoro-82M

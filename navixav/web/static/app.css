@@ -4332,3 +4332,17 @@ body.remote-client .toolbar {
   .guide-items { grid-template-columns: 1fr; gap: 2px; }
   .guide-items dd { margin-bottom: 8px; }
 }
+
+/* Ambiance radio ATC, sous les annonces vocales. */
+.settings-chatter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: end;
+}
+.settings-chatter .field { min-width: 0; }
+.settings-chatter input[type="range"] { width: 100%; accent-color: var(--accent); }
+.settings-chatter .settings-note { margin: 0; }
+@media (max-width: 640px) {
+  .settings-chatter { grid-template-columns: 1fr; }
+}

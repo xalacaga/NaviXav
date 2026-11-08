@@ -6883,6 +6883,7 @@ function updateFlightPanel(aircraft) {
 
   updateTodDisplay(descent, phaseKey);
   announceTod(descent, phaseKey);
+  CHATTER.update(phaseKey, aircraft, { replay: replayActive });
   if (descent) {
     liveValue("flight-descent-vs", `${descent.requiredVsFpm} ft/min`);
     const verticalSpeed = Number(aircraft?.vertical_speed_fpm || 0);
@@ -7016,6 +7017,20 @@ function syncVoiceSettings() {
   const preferred = VOICE.preferredName();
   select.value = voices.some((voice) => voice.value === preferred) ? preferred : "";
   $("settings-voice-help").textContent = t(available ? "voice_navixav_help" : "voice_unavailable");
+}
+
+/** Ambiance radio ATC : préférence de l'appareil, appliquée sans attendre l'enregistrement. */
+function initChatterSettings() {
+  const toggle = $("settings-chatter");
+  const slider = $("settings-chatter-volume");
+  toggle.checked = CHATTER.enabled();
+  slider.value = String(Math.round(CHATTER.volume() * 100));
+  slider.disabled = !toggle.checked;
+  toggle.addEventListener("change", () => {
+    CHATTER.setEnabled(toggle.checked);
+    slider.disabled = !toggle.checked;
+  });
+  slider.addEventListener("input", () => CHATTER.setVolume(Number(slider.value) / 100));
 }
 
 function initVoiceSettings() {
@@ -11462,6 +11477,7 @@ $("ground-zoom-in").addEventListener("click", () => GROUND.zoomIn());
 $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
 initVoiceSettings();
+initChatterSettings();
 $("chartfox-connect").addEventListener("click", connectChartFox);
 $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);

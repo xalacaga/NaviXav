@@ -1,0 +1,1334 @@
+{
+ "version": 1,
+ "positions": {
+  "ground": [
+   {
+    "file": "ground_000.ogg",
+    "duration": 20.58,
+    "lines": [
+     "Ground, KLM six, stand Romeo five one, request taxi.",
+     "KLM six, taxi to holding point runway one eight via Papa and Kilo, QNH one zero two six.",
+     "Taxi holding point runway one eight via Papa and Kilo, QNH one zero two six, KLM six."
+    ]
+   },
+   {
+    "file": "ground_001.ogg",
+    "duration": 11.44,
+    "lines": [
+     "Condor eight three six november, hold short of taxiway Echo, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Condor eight three six november."
+    ]
+   },
+   {
+    "file": "ground_002.ogg",
+    "duration": 9.75,
+    "lines": [
+     "Lufthansa seven one six eight, contact Tower one two two decimal one, good day.",
+     "Tower, Lufthansa seven one six eight, good day."
+    ]
+   },
+   {
+    "file": "ground_003.ogg",
+    "duration": 10.33,
+    "lines": [
+     "Scandinavian three three one seven, contact Tower one one niner decimal two five, good day.",
+     "Tower, Scandinavian three three one seven, good day."
+    ]
+   },
+   {
+    "file": "ground_004.ogg",
+    "duration": 10.2,
+    "lines": [
+     "Vueling four seven seven, vacate right via Kilo five, taxi to stand Kilo four three.",
+     "Taxi to stand Kilo four three, Vueling four seven seven."
+    ]
+   },
+   {
+    "file": "ground_005.ogg",
+    "duration": 11.61,
+    "lines": [
+     "Aer Lingus five five one three, hold short of taxiway Delta, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Aer Lingus five five one three."
+    ]
+   },
+   {
+    "file": "ground_006.ogg",
+    "duration": 8.84,
+    "lines": [
+     "Swiss eight eight whiskey, contact Tower one three zero decimal two five, good day.",
+     "Tower, Swiss eight eight whiskey, good day."
+    ]
+   },
+   {
+    "file": "ground_007.ogg",
+    "duration": 9.17,
+    "lines": [
+     "Air France two one zero five, pushback and start up approved, facing north.",
+     "Pushback and start up approved, Air France two one zero five."
+    ]
+   },
+   {
+    "file": "ground_008.ogg",
+    "duration": 6.89,
+    "lines": [
+     "Austrian four, pushback and start up approved, facing south.",
+     "Pushback and start up approved, Austrian four."
+    ]
+   },
+   {
+    "file": "ground_009.ogg",
+    "duration": 11.06,
+    "lines": [
+     "Transavia five eight six one, hold short of taxiway November, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Transavia five eight six one."
+    ]
+   },
+   {
+    "file": "ground_010.ogg",
+    "duration": 7.52,
+    "lines": [
+     "United one, contact Tower one two seven decimal four five, good day.",
+     "Tower, United one, good day."
+    ]
+   },
+   {
+    "file": "ground_011.ogg",
+    "duration": 9.65,
+    "lines": [
+     "Air Europa five, hold short of taxiway Echo, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Air Europa five."
+    ]
+   },
+   {
+    "file": "ground_012.ogg",
+    "duration": 23.04,
+    "lines": [
+     "Ground, Brussels five zero zero one lima, stand Papa six zero, request taxi.",
+     "Brussels five zero zero one lima, taxi to holding point runway two four right via November and Papa, QNH one zero two four.",
+     "Taxi holding point runway two four right via November and Papa, QNH one zero two four, Brussels five zero zero one lima."
+    ]
+   },
+   {
+    "file": "ground_013.ogg",
+    "duration": 20.65,
+    "lines": [
+     "Ground, Transavia five zero six, stand Echo four seven, request taxi.",
+     "Transavia five zero six, taxi to holding point runway two seven via Bravo and Echo, QNH one zero two one.",
+     "Taxi holding point runway two seven via Bravo and Echo, QNH one zero two one, Transavia five zero six."
+    ]
+   },
+   {
+    "file": "ground_014.ogg",
+    "duration": 8.77,
+    "lines": [
+     "Air Canada two tango, pushback and start up approved, facing west.",
+     "Pushback and start up approved, Air Canada two tango."
+    ]
+   },
+   {
+    "file": "ground_015.ogg",
+    "duration": 22.44,
+    "lines": [
+     "Ground, American three zero victor, stand Charlie four one, request taxi.",
+     "American three zero victor, taxi to holding point runway three two left via Papa and Bravo, QNH one zero zero six.",
+     "Taxi holding point runway three two left via Papa and Bravo, QNH one zero zero six, American three zero victor."
+    ]
+   },
+   {
+    "file": "ground_016.ogg",
+    "duration": 8.34,
+    "lines": [
+     "Speedbird four six, pushback and start up approved, facing east.",
+     "Pushback and start up approved, Speedbird four six."
+    ]
+   },
+   {
+    "file": "ground_017.ogg",
+    "duration": 6.56,
+    "lines": [
+     "Easy eight, pushback and start up approved, facing east.",
+     "Pushback and start up approved, Easy eight."
+    ]
+   },
+   {
+    "file": "ground_018.ogg",
+    "duration": 23.2,
+    "lines": [
+     "Ground, Transavia seven eight echo, stand Echo three, request taxi.",
+     "Transavia seven eight echo, taxi to holding point runway one four left via Papa and Delta, QNH one zero zero five.",
+     "Taxi holding point runway one four left via Papa and Delta, QNH one zero zero five, Transavia seven eight echo."
+    ]
+   },
+   {
+    "file": "ground_019.ogg",
+    "duration": 20.81,
+    "lines": [
+     "Ground, Vueling niner eight mike, stand Bravo three three, request taxi.",
+     "Vueling niner eight mike, taxi to holding point runway zero six via Alpha and November, QNH niner niner niner.",
+     "Taxi holding point runway zero six via Alpha and November, QNH niner niner niner, Vueling niner eight mike."
+    ]
+   },
+   {
+    "file": "ground_020.ogg",
+    "duration": 10.81,
+    "lines": [
+     "KLM two four niner four, hold short of taxiway Papa, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, KLM two four niner four."
+    ]
+   },
+   {
+    "file": "ground_021.ogg",
+    "duration": 10.62,
+    "lines": [
+     "Ryanair six eight eight five, vacate right via Delta three, taxi to stand Delta five two.",
+     "Taxi to stand Delta five two, Ryanair six eight eight five."
+    ]
+   },
+   {
+    "file": "ground_022.ogg",
+    "duration": 10.84,
+    "lines": [
+     "Condor two four seven victor, hold short of taxiway Romeo, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Condor two four seven victor."
+    ]
+   },
+   {
+    "file": "ground_023.ogg",
+    "duration": 19.43,
+    "lines": [
+     "Ground, Tap niner six, stand Charlie one, request taxi.",
+     "Tap niner six, taxi to holding point runway zero niner left via Echo and Kilo, QNH one zero one one.",
+     "Taxi holding point runway zero niner left via Echo and Kilo, QNH one zero one one, Tap niner six."
+    ]
+   },
+   {
+    "file": "ground_024.ogg",
+    "duration": 8.28,
+    "lines": [
+     "Tap five zero three, contact Tower one three two decimal three five, good day.",
+     "Tower, Tap five zero three, good day."
+    ]
+   },
+   {
+    "file": "ground_025.ogg",
+    "duration": 21.36,
+    "lines": [
+     "Ground, Lufthansa seven one quebec, stand Kilo one five, request taxi.",
+     "Lufthansa seven one quebec, taxi to holding point runway two one right via Whiskey and November, QNH one zero one six.",
+     "Taxi holding point runway two one right via Whiskey and November, QNH one zero one six, Lufthansa seven one quebec."
+    ]
+   },
+   {
+    "file": "ground_026.ogg",
+    "duration": 9.56,
+    "lines": [
+     "Air France eight four seven kilo, contact Tower one three four decimal niner, good day.",
+     "Tower, Air France eight four seven kilo, good day."
+    ]
+   },
+   {
+    "file": "ground_027.ogg",
+    "duration": 7.38,
+    "lines": [
+     "Swiss six two one, pushback and start up approved, facing north.",
+     "Pushback and start up approved, Swiss six two one."
+    ]
+   },
+   {
+    "file": "ground_028.ogg",
+    "duration": 8.28,
+    "lines": [
+     "Hop eight eight, hold short of taxiway Papa, give way to the Airbus from your left.",
+     "Holding short, giving way to the Airbus, Hop eight eight."
+    ]
+   },
+   {
+    "file": "ground_029.ogg",
+    "duration": 10.44,
+    "lines": [
+     "Easy five two seven bravo, vacate left via Kilo six, taxi to stand Romeo four two.",
+     "Taxi to stand Romeo four two, Easy five two seven bravo."
+    ]
+   },
+   {
+    "file": "ground_030.ogg",
+    "duration": 6.28,
+    "lines": [
+     "Swiss three, pushback and start up approved, facing south.",
+     "Pushback and start up approved, Swiss three."
+    ]
+   },
+   {
+    "file": "ground_031.ogg",
+    "duration": 9.71,
+    "lines": [
+     "Vueling three six seven five, pushback and start up approved, facing south.",
+     "Pushback and start up approved, Vueling three six seven five."
+    ]
+   },
+   {
+    "file": "ground_032.ogg",
+    "duration": 18.35,
+    "lines": [
+     "Ground, Delta seven, stand Echo one niner, request taxi.",
+     "Delta seven, taxi to holding point runway two five via November and Romeo, QNH niner niner five.",
+     "Taxi holding point runway two five via November and Romeo, QNH niner niner five, Delta seven."
+    ]
+   },
+   {
+    "file": "ground_033.ogg",
+    "duration": 9.28,
+    "lines": [
+     "Vueling eight niner niner zero, contact Tower one one niner decimal one five, good day.",
+     "Tower, Vueling eight niner niner zero, good day."
+    ]
+   },
+   {
+    "file": "ground_034.ogg",
+    "duration": 9.32,
+    "lines": [
+     "Transavia eight eight zero two, pushback and start up approved, facing north.",
+     "Pushback and start up approved, Transavia eight eight zero two."
+    ]
+   },
+   {
+    "file": "ground_035.ogg",
+    "duration": 8.06,
+    "lines": [
+     "Lot four three eight five, contact Tower one three zero decimal one, good day.",
+     "Tower, Lot four three eight five, good day."
+    ]
+   },
+   {
+    "file": "ground_036.ogg",
+    "duration": 21.87,
+    "lines": [
+     "Ground, Iberia four four six, stand Kilo one one, request taxi.",
+     "Iberia four four six, taxi to holding point runway one eight right via Kilo and Bravo, QNH one zero three one.",
+     "Taxi holding point runway one eight right via Kilo and Bravo, QNH one zero three one, Iberia four four six."
+    ]
+   },
+   {
+    "file": "ground_037.ogg",
+    "duration": 9.68,
+    "lines": [
+     "Transavia one three foxtrot, pushback and start up approved, facing north.",
+     "Pushback and start up approved, Transavia one three foxtrot."
+    ]
+   },
+   {
+    "file": "ground_038.ogg",
+    "duration": 8.38,
+    "lines": [
+     "Iberia two one alpha, pushback and start up approved, facing south.",
+     "Pushback and start up approved, Iberia two one alpha."
+    ]
+   },
+   {
+    "file": "ground_039.ogg",
+    "duration": 21.3,
+    "lines": [
+     "Ground, Lufthansa four papa, stand Papa one two, request taxi.",
+     "Lufthansa four papa, taxi to holding point runway zero six right via Charlie and Delta, QNH one zero zero five.",
+     "Taxi holding point runway zero six right via Charlie and Delta, QNH one zero zero five, Lufthansa four papa."
+    ]
+   }
+  ],
+  "tower": [
+   {
+    "file": "tower_000.ogg",
+    "duration": 8.14,
+    "lines": [
+     "Lufthansa three seven, runway two five, line up and wait.",
+     "Line up and wait runway two five, Lufthansa three seven."
+    ]
+   },
+   {
+    "file": "tower_001.ogg",
+    "duration": 8.14,
+    "lines": [
+     "Lufthansa eight niner five eight, runway two four, line up and wait.",
+     "Line up and wait runway two four, Lufthansa eight niner five eight."
+    ]
+   },
+   {
+    "file": "tower_002.ogg",
+    "duration": 8.09,
+    "lines": [
+     "Tap three eight zero, runway zero niner, line up and wait.",
+     "Line up and wait runway zero niner, Tap three eight zero."
+    ]
+   },
+   {
+    "file": "tower_003.ogg",
+    "duration": 9.86,
+    "lines": [
+     "Lufthansa three, wind zero two zero degrees, one seven knots, runway two seven left, cleared to land.",
+     "Cleared to land runway two seven left, Lufthansa three."
+    ]
+   },
+   {
+    "file": "tower_004.ogg",
+    "duration": 10.21,
+    "lines": [
+     "Tower, KLM two five, established ILS runway two four.",
+     "KLM two five, continue approach, number three.",
+     "Continue approach, KLM two five."
+    ]
+   },
+   {
+    "file": "tower_005.ogg",
+    "duration": 10.58,
+    "lines": [
+     "Iberia six one, wind one niner zero degrees, one five knots, runway two one right, cleared to land.",
+     "Cleared to land runway two one right, Iberia six one."
+    ]
+   },
+   {
+    "file": "tower_006.ogg",
+    "duration": 10.85,
+    "lines": [
+     "Easy six three niner eight, contact Departure one two five decimal three, good bye.",
+     "Departure one two five decimal three, Easy six three niner eight, bye bye."
+    ]
+   },
+   {
+    "file": "tower_007.ogg",
+    "duration": 10.56,
+    "lines": [
+     "Shamrock four two six, wind three two zero degrees, four knots, runway two five left, cleared for take off.",
+     "Cleared for take off runway two five left, Shamrock four two six."
+    ]
+   },
+   {
+    "file": "tower_008.ogg",
+    "duration": 11.02,
+    "lines": [
+     "Tower, Brussels four niner eight, established ILS runway zero niner.",
+     "Brussels four niner eight, continue approach, number two.",
+     "Continue approach, Brussels four niner eight."
+    ]
+   },
+   {
+    "file": "tower_009.ogg",
+    "duration": 12.21,
+    "lines": [
+     "Vueling four five zero one foxtrot, wind three one zero degrees, eight knots, runway three two, cleared for take off.",
+     "Cleared for take off runway three two, Vueling four five zero one foxtrot."
+    ]
+   },
+   {
+    "file": "tower_010.ogg",
+    "duration": 11.24,
+    "lines": [
+     "KLM two six x-ray, wind zero seven zero degrees, one six knots, runway zero niner, cleared to land.",
+     "Cleared to land runway zero niner, KLM two six x-ray."
+    ]
+   },
+   {
+    "file": "tower_011.ogg",
+    "duration": 8.89,
+    "lines": [
+     "Hop six seven, wind one three zero degrees, one eight knots, runway two four, cleared to land.",
+     "Cleared to land runway two four, Hop six seven."
+    ]
+   },
+   {
+    "file": "tower_012.ogg",
+    "duration": 10.13,
+    "lines": [
+     "Easy eight one eight six, wind three zero zero degrees, one six knots, runway two five right, cleared to land.",
+     "Cleared to land runway two five right, Easy eight one eight six."
+    ]
+   },
+   {
+    "file": "tower_013.ogg",
+    "duration": 5.73,
+    "lines": [
+     "Vueling two, runway one four, line up and wait.",
+     "Line up and wait runway one four, Vueling two."
+    ]
+   },
+   {
+    "file": "tower_014.ogg",
+    "duration": 12.0,
+    "lines": [
+     "Tower, Air Canada five six one, established ILS runway zero niner.",
+     "Air Canada five six one, continue approach, number two.",
+     "Continue approach, Air Canada five six one."
+    ]
+   },
+   {
+    "file": "tower_015.ogg",
+    "duration": 7.46,
+    "lines": [
+     "Shamrock niner eight, runway two one left, line up and wait.",
+     "Line up and wait runway two one left, Shamrock niner eight."
+    ]
+   },
+   {
+    "file": "tower_016.ogg",
+    "duration": 11.91,
+    "lines": [
+     "Tower, Vueling niner four four x-ray, established ILS runway two six.",
+     "Vueling niner four four x-ray, continue approach, number two.",
+     "Continue approach, Vueling niner four four x-ray."
+    ]
+   },
+   {
+    "file": "tower_017.ogg",
+    "duration": 10.26,
+    "lines": [
+     "Transavia two six seven, wind two three zero degrees, one five knots, runway one eight, cleared to land.",
+     "Cleared to land runway one eight, Transavia two six seven."
+    ]
+   },
+   {
+    "file": "tower_018.ogg",
+    "duration": 10.08,
+    "lines": [
+     "Tower, Austrian one, established ILS runway two seven right.",
+     "Austrian one, continue approach, number three.",
+     "Continue approach, Austrian one."
+    ]
+   },
+   {
+    "file": "tower_019.ogg",
+    "duration": 9.21,
+    "lines": [
+     "Lot five bravo, contact Departure one three five decimal niner, good bye.",
+     "Departure one three five decimal niner, Lot five bravo, bye bye."
+    ]
+   },
+   {
+    "file": "tower_020.ogg",
+    "duration": 9.43,
+    "lines": [
+     "Easy two three one one, wind two five zero degrees, four knots, runway two four, cleared to land.",
+     "Cleared to land runway two four, Easy two three one one."
+    ]
+   },
+   {
+    "file": "tower_021.ogg",
+    "duration": 12.74,
+    "lines": [
+     "Tower, Vueling niner three zero six, established ILS runway two seven.",
+     "Vueling niner three zero six, continue approach, number three.",
+     "Continue approach, Vueling niner three zero six."
+    ]
+   },
+   {
+    "file": "tower_022.ogg",
+    "duration": 12.49,
+    "lines": [
+     "Scandinavian eight zero delta, wind three zero zero degrees, seven knots, runway two five left, cleared for take off.",
+     "Cleared for take off runway two five left, Scandinavian eight zero delta."
+    ]
+   },
+   {
+    "file": "tower_023.ogg",
+    "duration": 11.01,
+    "lines": [
+     "Delta eight one five six, wind zero six zero degrees, one one knots, runway two one right, cleared for take off.",
+     "Cleared for take off runway two one right, Delta eight one five six."
+    ]
+   },
+   {
+    "file": "tower_024.ogg",
+    "duration": 7.47,
+    "lines": [
+     "Emirates niner, runway two four, line up and wait.",
+     "Line up and wait runway two four, Emirates niner."
+    ]
+   },
+   {
+    "file": "tower_025.ogg",
+    "duration": 10.61,
+    "lines": [
+     "KLM seven niner seven, contact Departure one two two decimal five, good bye.",
+     "Departure one two two decimal five, KLM seven niner seven, bye bye."
+    ]
+   },
+   {
+    "file": "tower_026.ogg",
+    "duration": 11.97,
+    "lines": [
+     "Tower, Eurowings four seven zero, established ILS runway two five left.",
+     "Eurowings four seven zero, continue approach, number three.",
+     "Continue approach, Eurowings four seven zero."
+    ]
+   },
+   {
+    "file": "tower_027.ogg",
+    "duration": 9.74,
+    "lines": [
+     "Swiss five two zero, wind zero six zero degrees, niner knots, runway two seven, cleared to land.",
+     "Cleared to land runway two seven, Swiss five two zero."
+    ]
+   },
+   {
+    "file": "tower_028.ogg",
+    "duration": 11.61,
+    "lines": [
+     "Tower, Air France six tango, established ILS runway one four.",
+     "Air France six tango, continue approach, number two.",
+     "Continue approach, Air France six tango."
+    ]
+   },
+   {
+    "file": "tower_029.ogg",
+    "duration": 12.16,
+    "lines": [
+     "Tower, Aer Lingus six three eight, established ILS runway zero six.",
+     "Aer Lingus six three eight, continue approach, number two.",
+     "Continue approach, Aer Lingus six three eight."
+    ]
+   },
+   {
+    "file": "tower_030.ogg",
+    "duration": 12.92,
+    "lines": [
+     "Scandinavian three six one five, wind one five zero degrees, niner knots, runway two seven left, cleared to land.",
+     "Cleared to land runway two seven left, Scandinavian three six one five."
+    ]
+   },
+   {
+    "file": "tower_031.ogg",
+    "duration": 11.97,
+    "lines": [
+     "Tower, Shamrock niner five two six, established ILS runway two five.",
+     "Shamrock niner five two six, continue approach, number three.",
+     "Continue approach, Shamrock niner five two six."
+    ]
+   },
+   {
+    "file": "tower_032.ogg",
+    "duration": 9.68,
+    "lines": [
+     "Brussels four, wind three five zero degrees, one eight knots, runway zero niner, cleared for take off.",
+     "Cleared for take off runway zero niner, Brussels four."
+    ]
+   },
+   {
+    "file": "tower_033.ogg",
+    "duration": 9.29,
+    "lines": [
+     "Shamrock five one, wind one five zero degrees, one two knots, runway two six, cleared to land.",
+     "Cleared to land runway two six, Shamrock five one."
+    ]
+   },
+   {
+    "file": "tower_034.ogg",
+    "duration": 9.89,
+    "lines": [
+     "Shamrock five, contact Departure one three zero decimal niner, good bye.",
+     "Departure one three zero decimal niner, Shamrock five, bye bye."
+    ]
+   },
+   {
+    "file": "tower_035.ogg",
+    "duration": 6.84,
+    "lines": [
+     "Swiss seven zulu, runway two seven, line up and wait.",
+     "Line up and wait runway two seven, Swiss seven zulu."
+    ]
+   },
+   {
+    "file": "tower_036.ogg",
+    "duration": 8.8,
+    "lines": [
+     "Tap five, contact Departure one three four decimal one five, good bye.",
+     "Departure one three four decimal one five, Tap five, bye bye."
+    ]
+   },
+   {
+    "file": "tower_037.ogg",
+    "duration": 12.03,
+    "lines": [
+     "Air Europa five zero two six, wind zero one zero degrees, three knots, runway one eight right, cleared to land.",
+     "Cleared to land runway one eight right, Air Europa five zero two six."
+    ]
+   },
+   {
+    "file": "tower_038.ogg",
+    "duration": 5.98,
+    "lines": [
+     "Easy one, runway two one, line up and wait.",
+     "Line up and wait runway two one, Easy one."
+    ]
+   },
+   {
+    "file": "tower_039.ogg",
+    "duration": 9.61,
+    "lines": [
+     "Vueling eight lima, wind three one zero degrees, one seven knots, runway zero six, cleared to land.",
+     "Cleared to land runway zero six, Vueling eight lima."
+    ]
+   }
+  ],
+  "approach": [
+   {
+    "file": "approach_000.ogg",
+    "duration": 8.2,
+    "lines": [
+     "Transavia four one one alpha, turn right heading two zero zero.",
+     "Heading two zero zero, Transavia four one one alpha."
+    ]
+   },
+   {
+    "file": "approach_001.ogg",
+    "duration": 5.79,
+    "lines": [
+     "Brussels eight, turn left heading zero three zero.",
+     "Heading zero three zero, Brussels eight."
+    ]
+   },
+   {
+    "file": "approach_002.ogg",
+    "duration": 12.71,
+    "lines": [
+     "Air France six niner two niner, heading one three zero, cleared ILS approach runway two five right.",
+     "Heading one three zero, cleared ILS runway two five right, Air France six niner two niner."
+    ]
+   },
+   {
+    "file": "approach_003.ogg",
+    "duration": 18.54,
+    "lines": [
+     "Approach, Emirates two niner, descending flight level one five zero, information mike.",
+     "Emirates two niner, radar contact, descend three thousand five hundred feet, QNH one zero one five.",
+     "Descend three thousand five hundred feet, QNH one zero one five, Emirates two niner."
+    ]
+   },
+   {
+    "file": "approach_004.ogg",
+    "duration": 14.39,
+    "lines": [
+     "Approach, United six, descending flight level one five zero, information golf.",
+     "United six, radar contact, descend four thousand feet, QNH one zero one one.",
+     "Descend four thousand feet, QNH one zero one one, United six."
+    ]
+   },
+   {
+    "file": "approach_005.ogg",
+    "duration": 16.08,
+    "lines": [
+     "Approach, Transavia five six, descending flight level eight zero, information tango.",
+     "Transavia five six, radar contact, descend four thousand feet, QNH one zero zero three.",
+     "Descend four thousand feet, QNH one zero zero three, Transavia five six."
+    ]
+   },
+   {
+    "file": "approach_006.ogg",
+    "duration": 17.56,
+    "lines": [
+     "Approach, Transavia three seven, descending flight level one four zero, information bravo.",
+     "Transavia three seven, radar contact, descend five thousand feet, QNH one zero zero two.",
+     "Descend five thousand feet, QNH one zero zero two, Transavia three seven."
+    ]
+   },
+   {
+    "file": "approach_007.ogg",
+    "duration": 7.95,
+    "lines": [
+     "Austrian niner, contact Tower one two four decimal eight five.",
+     "Tower one two four decimal eight five, Austrian niner."
+    ]
+   },
+   {
+    "file": "approach_008.ogg",
+    "duration": 7.63,
+    "lines": [
+     "Transavia one one, turn right heading zero seven zero.",
+     "Heading zero seven zero, Transavia one one."
+    ]
+   },
+   {
+    "file": "approach_009.ogg",
+    "duration": 19.25,
+    "lines": [
+     "Approach, Emirates seven niner five three echo, descending flight level eight zero, information charlie.",
+     "Emirates seven niner five three echo, radar contact, descend six thousand feet, QNH one zero zero seven.",
+     "Descend six thousand feet, QNH one zero zero seven, Emirates seven niner five three echo."
+    ]
+   },
+   {
+    "file": "approach_010.ogg",
+    "duration": 7.23,
+    "lines": [
+     "Shamrock eight, contact Tower one three one decimal six.",
+     "Tower one three one decimal six, Shamrock eight."
+    ]
+   },
+   {
+    "file": "approach_011.ogg",
+    "duration": 9.92,
+    "lines": [
+     "Air Canada niner eight zero one, reduce speed one six zero knots.",
+     "Speed one six zero knots, Air Canada niner eight zero one."
+    ]
+   },
+   {
+    "file": "approach_012.ogg",
+    "duration": 5.98,
+    "lines": [
+     "Vueling two echo, turn left heading zero eight zero.",
+     "Heading zero eight zero, Vueling two echo."
+    ]
+   },
+   {
+    "file": "approach_013.ogg",
+    "duration": 18.76,
+    "lines": [
+     "Approach, Condor four two one, descending flight level one one zero, information sierra.",
+     "Condor four two one, radar contact, descend five thousand feet, QNH one zero two niner.",
+     "Descend five thousand feet, QNH one zero two niner, Condor four two one."
+    ]
+   },
+   {
+    "file": "approach_014.ogg",
+    "duration": 7.38,
+    "lines": [
+     "Vueling five four, contact Tower one two zero decimal three.",
+     "Tower one two zero decimal three, Vueling five four."
+    ]
+   },
+   {
+    "file": "approach_015.ogg",
+    "duration": 13.06,
+    "lines": [
+     "American eight six zero four, heading two six zero, cleared ILS approach runway three two right.",
+     "Heading two six zero, cleared ILS runway three two right, American eight six zero four."
+    ]
+   },
+   {
+    "file": "approach_016.ogg",
+    "duration": 13.63,
+    "lines": [
+     "Speedbird six four three three romeo, heading three one zero, cleared ILS approach runway one eight right.",
+     "Heading three one zero, cleared ILS runway one eight right, Speedbird six four three three romeo."
+    ]
+   },
+   {
+    "file": "approach_017.ogg",
+    "duration": 8.06,
+    "lines": [
+     "United eight zero, reduce speed two two zero knots.",
+     "Speed two two zero knots, United eight zero."
+    ]
+   },
+   {
+    "file": "approach_018.ogg",
+    "duration": 5.6,
+    "lines": [
+     "Shamrock five, turn right heading two eight zero.",
+     "Heading two eight zero, Shamrock five."
+    ]
+   },
+   {
+    "file": "approach_019.ogg",
+    "duration": 19.24,
+    "lines": [
+     "Approach, KLM one, descending flight level one zero zero, information tango.",
+     "KLM one, radar contact, descend three thousand five hundred feet, QNH one zero zero three.",
+     "Descend three thousand five hundred feet, QNH one zero zero three, KLM one."
+    ]
+   },
+   {
+    "file": "approach_020.ogg",
+    "duration": 11.52,
+    "lines": [
+     "Air Canada three four two, heading one zero zero, cleared ILS approach runway zero six right.",
+     "Heading one zero zero, cleared ILS runway zero six right, Air Canada three four two."
+    ]
+   },
+   {
+    "file": "approach_021.ogg",
+    "duration": 9.44,
+    "lines": [
+     "Delta three one, heading one one zero, cleared ILS approach runway three two.",
+     "Heading one one zero, cleared ILS runway three two, Delta three one."
+    ]
+   },
+   {
+    "file": "approach_022.ogg",
+    "duration": 10.01,
+    "lines": [
+     "Easy six one, heading one one zero, cleared ILS approach runway one eight.",
+     "Heading one one zero, cleared ILS runway one eight, Easy six one."
+    ]
+   },
+   {
+    "file": "approach_023.ogg",
+    "duration": 16.54,
+    "lines": [
+     "Approach, Finnair four whiskey, descending flight level eight zero, information zulu.",
+     "Finnair four whiskey, radar contact, descend three thousand five hundred feet, QNH one zero zero three.",
+     "Descend three thousand five hundred feet, QNH one zero zero three, Finnair four whiskey."
+    ]
+   },
+   {
+    "file": "approach_024.ogg",
+    "duration": 9.03,
+    "lines": [
+     "Ryanair six five seven niner, reduce speed two zero zero knots.",
+     "Speed two zero zero knots, Ryanair six five seven niner."
+    ]
+   },
+   {
+    "file": "approach_025.ogg",
+    "duration": 8.52,
+    "lines": [
+     "Lufthansa five niner four, reduce speed two zero zero knots.",
+     "Speed two zero zero knots, Lufthansa five niner four."
+    ]
+   },
+   {
+    "file": "approach_026.ogg",
+    "duration": 17.46,
+    "lines": [
+     "Approach, Emirates two hotel, descending flight level one two zero, information zulu.",
+     "Emirates two hotel, radar contact, descend three thousand feet, QNH niner niner six.",
+     "Descend three thousand feet, QNH niner niner six, Emirates two hotel."
+    ]
+   },
+   {
+    "file": "approach_027.ogg",
+    "duration": 7.56,
+    "lines": [
+     "Lufthansa one whiskey, reduce speed two zero zero knots.",
+     "Speed two zero zero knots, Lufthansa one whiskey."
+    ]
+   },
+   {
+    "file": "approach_028.ogg",
+    "duration": 6.08,
+    "lines": [
+     "Hop two, reduce speed one seven zero knots.",
+     "Speed one seven zero knots, Hop two."
+    ]
+   },
+   {
+    "file": "approach_029.ogg",
+    "duration": 9.77,
+    "lines": [
+     "Scandinavian four six, contact Tower one two seven decimal four five.",
+     "Tower one two seven decimal four five, Scandinavian four six."
+    ]
+   },
+   {
+    "file": "approach_030.ogg",
+    "duration": 7.35,
+    "lines": [
+     "Qatari five, contact Tower one three one decimal one five.",
+     "Tower one three one decimal one five, Qatari five."
+    ]
+   },
+   {
+    "file": "approach_031.ogg",
+    "duration": 8.24,
+    "lines": [
+     "American one six one sierra, turn left heading one niner zero.",
+     "Heading one niner zero, American one six one sierra."
+    ]
+   },
+   {
+    "file": "approach_032.ogg",
+    "duration": 7.75,
+    "lines": [
+     "Air Canada two three zero, reduce speed two five zero knots.",
+     "Speed two five zero knots, Air Canada two three zero."
+    ]
+   },
+   {
+    "file": "approach_033.ogg",
+    "duration": 6.85,
+    "lines": [
+     "Finnair seven, reduce speed one six zero knots.",
+     "Speed one six zero knots, Finnair seven."
+    ]
+   },
+   {
+    "file": "approach_034.ogg",
+    "duration": 7.03,
+    "lines": [
+     "American seven, reduce speed two three zero knots.",
+     "Speed two three zero knots, American seven."
+    ]
+   },
+   {
+    "file": "approach_035.ogg",
+    "duration": 17.74,
+    "lines": [
+     "Approach, Eurowings three kilo, descending flight level one zero zero, information zulu.",
+     "Eurowings three kilo, radar contact, descend three thousand feet, QNH one zero one eight.",
+     "Descend three thousand feet, QNH one zero one eight, Eurowings three kilo."
+    ]
+   },
+   {
+    "file": "approach_036.ogg",
+    "duration": 17.69,
+    "lines": [
+     "Approach, Finnair niner eight four niner, descending flight level one three zero, information mike.",
+     "Finnair niner eight four niner, radar contact, descend two thousand feet, QNH one zero two six.",
+     "Descend two thousand feet, QNH one zero two six, Finnair niner eight four niner."
+    ]
+   },
+   {
+    "file": "approach_037.ogg",
+    "duration": 11.42,
+    "lines": [
+     "Hop five six, heading two two zero, cleared ILS approach runway zero six left.",
+     "Heading two two zero, cleared ILS runway zero six left, Hop five six."
+    ]
+   },
+   {
+    "file": "approach_038.ogg",
+    "duration": 7.4,
+    "lines": [
+     "Austrian five six, reduce speed one seven zero knots.",
+     "Speed one seven zero knots, Austrian five six."
+    ]
+   },
+   {
+    "file": "approach_039.ogg",
+    "duration": 7.53,
+    "lines": [
+     "Speedbird six, contact Tower one two one decimal seven.",
+     "Tower one two one decimal seven, Speedbird six."
+    ]
+   }
+  ],
+  "center": [
+   {
+    "file": "center_000.ogg",
+    "duration": 11.12,
+    "lines": [
+     "Shamrock niner two, descend flight level two two zero, rate one thousand or greater.",
+     "Descend flight level two two zero, rate one thousand or greater, Shamrock niner two."
+    ]
+   },
+   {
+    "file": "center_001.ogg",
+    "duration": 10.26,
+    "lines": [
+     "Aer Lingus niner three six six, contact Control one two niner decimal two five, good day.",
+     "One two niner decimal two five, Aer Lingus niner three six six, good day."
+    ]
+   },
+   {
+    "file": "center_002.ogg",
+    "duration": 8.38,
+    "lines": [
+     "KLM four seven alpha, climb flight level three seven zero.",
+     "Climb flight level three seven zero, KLM four seven alpha."
+    ]
+   },
+   {
+    "file": "center_003.ogg",
+    "duration": 10.74,
+    "lines": [
+     "Lufthansa niner eight lima, contact Control one three zero decimal three, good day.",
+     "One three zero decimal three, Lufthansa niner eight lima, good day."
+    ]
+   },
+   {
+    "file": "center_004.ogg",
+    "duration": 6.44,
+    "lines": [
+     "Easy six zero, squawk one one six two.",
+     "Squawk one one six two, Easy six zero."
+    ]
+   },
+   {
+    "file": "center_005.ogg",
+    "duration": 11.45,
+    "lines": [
+     "Shamrock one seven, descend flight level one eight zero, rate one thousand or greater.",
+     "Descend flight level one eight zero, rate one thousand or greater, Shamrock one seven."
+    ]
+   },
+   {
+    "file": "center_006.ogg",
+    "duration": 10.11,
+    "lines": [
+     "Aer Lingus niner zero yankee, contact Control one two three decimal three five, good day.",
+     "One two three decimal three five, Aer Lingus niner zero yankee, good day."
+    ]
+   },
+   {
+    "file": "center_007.ogg",
+    "duration": 8.27,
+    "lines": [
+     "Emirates niner zero, climb flight level three four zero.",
+     "Climb flight level three four zero, Emirates niner zero."
+    ]
+   },
+   {
+    "file": "center_008.ogg",
+    "duration": 18.03,
+    "lines": [
+     "Swiss one one niner two romeo, request flight level three three zero due to turbulence.",
+     "Swiss one one niner two romeo, climb flight level three three zero, report reaching.",
+     "Climb flight level three three zero, wilco, Swiss one one niner two romeo."
+    ]
+   },
+   {
+    "file": "center_009.ogg",
+    "duration": 8.93,
+    "lines": [
+     "Air Canada six niner three, climb flight level two six zero.",
+     "Climb flight level two six zero, Air Canada six niner three."
+    ]
+   },
+   {
+    "file": "center_010.ogg",
+    "duration": 11.13,
+    "lines": [
+     "United eight two six, descend flight level two one zero, rate one thousand or greater.",
+     "Descend flight level two one zero, rate one thousand or greater, United eight two six."
+    ]
+   },
+   {
+    "file": "center_011.ogg",
+    "duration": 8.4,
+    "lines": [
+     "Air Europa niner five, climb flight level three niner zero.",
+     "Climb flight level three niner zero, Air Europa niner five."
+    ]
+   },
+   {
+    "file": "center_012.ogg",
+    "duration": 7.66,
+    "lines": [
+     "American five two seven hotel, proceed direct Banko.",
+     "Direct Banko, American five two seven hotel."
+    ]
+   },
+   {
+    "file": "center_013.ogg",
+    "duration": 5.75,
+    "lines": [
+     "Tap three five, proceed direct Rotno.",
+     "Direct Rotno, Tap three five."
+    ]
+   },
+   {
+    "file": "center_014.ogg",
+    "duration": 6.36,
+    "lines": [
+     "Emirates two eight niner, proceed direct Velin.",
+     "Direct Velin, Emirates two eight niner."
+    ]
+   },
+   {
+    "file": "center_015.ogg",
+    "duration": 15.5,
+    "lines": [
+     "Speedbird two niner six seven, request flight level three eight zero due to turbulence.",
+     "Speedbird two niner six seven, climb flight level three eight zero, report reaching.",
+     "Climb flight level three eight zero, wilco, Speedbird two niner six seven."
+    ]
+   },
+   {
+    "file": "center_016.ogg",
+    "duration": 10.82,
+    "lines": [
+     "Speedbird four two three, descend flight level one two zero, rate one thousand or greater.",
+     "Descend flight level one two zero, rate one thousand or greater, Speedbird four two three."
+    ]
+   },
+   {
+    "file": "center_017.ogg",
+    "duration": 14.69,
+    "lines": [
+     "Good day, Iberia eight three three three, flight level three six zero.",
+     "Iberia eight three three three, identified, maintain level, expect direct Kelux shortly.",
+     "Maintain, expect direct Kelux, Iberia eight three three three."
+    ]
+   },
+   {
+    "file": "center_018.ogg",
+    "duration": 5.83,
+    "lines": [
+     "KLM eight zero, proceed direct Dikon.",
+     "Direct Dikon, KLM eight zero."
+    ]
+   },
+   {
+    "file": "center_019.ogg",
+    "duration": 13.02,
+    "lines": [
+     "Finnair five three one, request flight level three five zero due to turbulence.",
+     "Finnair five three one, climb flight level three five zero, report reaching.",
+     "Climb flight level three five zero, wilco, Finnair five three one."
+    ]
+   },
+   {
+    "file": "center_020.ogg",
+    "duration": 7.37,
+    "lines": [
+     "KLM eight seven two, climb flight level two eight zero.",
+     "Climb flight level two eight zero, KLM eight seven two."
+    ]
+   },
+   {
+    "file": "center_021.ogg",
+    "duration": 8.1,
+    "lines": [
+     "Tap seven six niner seven papa, squawk four one four zero.",
+     "Squawk four one four zero, Tap seven six niner seven papa."
+    ]
+   },
+   {
+    "file": "center_022.ogg",
+    "duration": 10.92,
+    "lines": [
+     "Air Canada seven two, descend flight level two two zero, rate one thousand or greater.",
+     "Descend flight level two two zero, rate one thousand or greater, Air Canada seven two."
+    ]
+   },
+   {
+    "file": "center_023.ogg",
+    "duration": 13.09,
+    "lines": [
+     "Good day, Delta eight four zero, flight level three seven zero.",
+     "Delta eight four zero, identified, maintain level, expect direct Lumas shortly.",
+     "Maintain, expect direct Lumas, Delta eight four zero."
+    ]
+   },
+   {
+    "file": "center_024.ogg",
+    "duration": 8.97,
+    "lines": [
+     "Scandinavian one six one three, squawk six two two six.",
+     "Squawk six two two six, Scandinavian one six one three."
+    ]
+   },
+   {
+    "file": "center_025.ogg",
+    "duration": 6.54,
+    "lines": [
+     "Tap eight, climb flight level three three zero.",
+     "Climb flight level three three zero, Tap eight."
+    ]
+   },
+   {
+    "file": "center_026.ogg",
+    "duration": 7.88,
+    "lines": [
+     "Aer Lingus five five whiskey, squawk three one seven two.",
+     "Squawk three one seven two, Aer Lingus five five whiskey."
+    ]
+   },
+   {
+    "file": "center_027.ogg",
+    "duration": 7.68,
+    "lines": [
+     "Air Canada six eight one six, squawk zero three five two.",
+     "Squawk zero three five two, Air Canada six eight one six."
+    ]
+   },
+   {
+    "file": "center_028.ogg",
+    "duration": 12.74,
+    "lines": [
+     "Good day, Delta one, flight level three niner zero.",
+     "Delta one, identified, maintain level, expect direct Velin shortly.",
+     "Maintain, expect direct Velin, Delta one."
+    ]
+   },
+   {
+    "file": "center_029.ogg",
+    "duration": 7.92,
+    "lines": [
+     "Finnair two golf, climb flight level three zero zero.",
+     "Climb flight level three zero zero, Finnair two golf."
+    ]
+   },
+   {
+    "file": "center_030.ogg",
+    "duration": 7.61,
+    "lines": [
+     "Brussels three two zero four, proceed direct Rotno.",
+     "Direct Rotno, Brussels three two zero four."
+    ]
+   },
+   {
+    "file": "center_031.ogg",
+    "duration": 7.38,
+    "lines": [
+     "Lufthansa three yankee, squawk two zero five five.",
+     "Squawk two zero five five, Lufthansa three yankee."
+    ]
+   },
+   {
+    "file": "center_032.ogg",
+    "duration": 14.71,
+    "lines": [
+     "Good day, Condor one zero one four, flight level three seven zero.",
+     "Condor one zero one four, identified, maintain level, expect direct Merek shortly.",
+     "Maintain, expect direct Merek, Condor one zero one four."
+    ]
+   },
+   {
+    "file": "center_033.ogg",
+    "duration": 12.73,
+    "lines": [
+     "Lot seven zero mike, descend flight level one seven zero, rate one thousand or greater.",
+     "Descend flight level one seven zero, rate one thousand or greater, Lot seven zero mike."
+    ]
+   },
+   {
+    "file": "center_034.ogg",
+    "duration": 14.4,
+    "lines": [
+     "Good day, Speedbird three niner two, flight level three two zero.",
+     "Speedbird three niner two, identified, maintain level, expect direct Kelux shortly.",
+     "Maintain, expect direct Kelux, Speedbird three niner two."
+    ]
+   },
+   {
+    "file": "center_035.ogg",
+    "duration": 11.32,
+    "lines": [
+     "Air Europa six niner niner niner, contact Control one two one decimal one five, good day.",
+     "One two one decimal one five, Air Europa six niner niner niner, good day."
+    ]
+   },
+   {
+    "file": "center_036.ogg",
+    "duration": 13.66,
+    "lines": [
+     "Finnair eight eight, request flight level three four zero due to turbulence.",
+     "Finnair eight eight, climb flight level three four zero, report reaching.",
+     "Climb flight level three four zero, wilco, Finnair eight eight."
+    ]
+   },
+   {
+    "file": "center_037.ogg",
+    "duration": 8.27,
+    "lines": [
+     "Shamrock two eight four four, squawk five seven zero three.",
+     "Squawk five seven zero three, Shamrock two eight four four."
+    ]
+   },
+   {
+    "file": "center_038.ogg",
+    "duration": 12.96,
+    "lines": [
+     "Qatari five niner, descend flight level one zero zero, rate one thousand or greater.",
+     "Descend flight level one zero zero, rate one thousand or greater, Qatari five niner."
+    ]
+   },
+   {
+    "file": "center_039.ogg",
+    "duration": 8.08,
+    "lines": [
+     "Eurowings five, contact Control one two zero decimal two, good day.",
+     "One two zero decimal two, Eurowings five, good day."
+    ]
+   }
+  ]
+ }
+}
