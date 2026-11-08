@@ -54,3 +54,18 @@ Microsoft components
 
 The Python package named "SimConnect" is not included. NaviXav uses its own
 ctypes client with the official Microsoft SDK DLL.
+
+Voice announcements (navixav/web/static/voice)
+  The distribution contains pre-recorded audio files only. No speech
+  synthesis engine or voice model is included; the files were produced once
+  with scripts/generate_voice_bank.py.
+  English, French, Spanish, Italian
+    Kokoro-82M                  Apache License 2.0
+    https://huggingface.co/hexgrad/Kokoro-82M
+    The French voice (ff_siwis) is derived from the SIWIS French speech
+    synthesis database, CC BY 4.0.
+  German, Dutch, Portuguese, Polish
+    Piper voices                de_DE-thorsten-high, nl_NL-pim-medium and
+                                pt_PT-tugão-medium: CC0 1.0;
+                                pl_PL-bass-high: Apache License 2.0
+    https://huggingface.co/rhasspy/piper-voices

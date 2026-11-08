@@ -433,6 +433,7 @@ def _run_desktop_window(url: str, server: object) -> None:
             daemon=True,
         )
         watcher.start()
+        allow_audio_without_gesture()
         webview.start(
             gui="edgechromium",
             debug=False,
@@ -455,6 +456,29 @@ def _run_desktop_window(url: str, server: object) -> None:
                 for thread in threading.enumerate()
             ),
         )
+
+
+WEBVIEW2_ARGUMENTS_VARIABLE = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+# pywebview passe déjà le premier ; la variable d'environnement remplace ses
+# arguments, il faut donc le reprendre pour ne pas le perdre.
+WEBVIEW2_ARGUMENTS = (
+    "--disable-features=ElasticOverscroll",
+    "--autoplay-policy=no-user-gesture-required",
+)
+
+
+def allow_audio_without_gesture() -> None:
+    """Laisse les annonces vocales jouer avant tout clic dans la fenêtre.
+
+    Chromium suspend le son d'une page tant que l'utilisateur n'y a pas
+    interagi ; une alarme levée en vol, fenêtre au second plan, resterait
+    muette. Les arguments déjà présents dans la variable sont conservés.
+    """
+    current = os.environ.get(WEBVIEW2_ARGUMENTS_VARIABLE, "").split()
+    for argument in WEBVIEW2_ARGUMENTS:
+        if argument not in current:
+            current.append(argument)
+    os.environ[WEBVIEW2_ARGUMENTS_VARIABLE] = " ".join(current)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -194,6 +194,9 @@ function warningText(value) {
     [/^Piste SimBrief « (.+) » inconnue à (.+)\.$/, "SimBrief runway “$1” is unknown at $2."],
     [/^(.+) : la piste (.+) prévue par SimBrief est hors limites \((.+)\)\.$/, "$1: runway $2 planned by SimBrief is outside the configured limits ($3)."],
     [/^METAR indisponible pour (.+) ; repli sur l'OFP SimBrief\.$/, "METAR unavailable for $1; using the SimBrief OFP instead."],
+    // Avertissements du briefing météo (weather/briefing.py).
+    [/^(.+) en conditions LIFR\.$/, "$1 in LIFR conditions."],
+    [/^Météo indisponible pour (.+)\.$/, "Weather unavailable for $1."],
     [/^Aucun METAR pour (.+) : sélection de piste dégradée\.$/, "No METAR for $1: runway selection has reduced confidence."],
     [/^Cycles AIRAC différents : SimBrief (.+) contre navdata locale (.+)\. Une procédure peut avoir changé de nom ou disparu\.$/, "AIRAC cycle mismatch: SimBrief $1 versus local navdata $2. A procedure may have been renamed or removed."],
   ];
@@ -3963,8 +3966,13 @@ function announceAlerts(active) {
   const current = new Set(active.map((alert) => alert.id));
   for (const alert of active) {
     if (voiceMemory.alerts.has(alert.id)) continue;
-    const master = t(alert.severity === "danger" ? "master_warning" : "master_caution");
-    VOICE.speak(`${master}. ${alert.label}.`, { priority: alert.severity === "danger" });
+    VOICE.announce(
+      [
+        { key: alert.severity === "danger" ? "master_warning" : "master_caution" },
+        { key: `alert_${alert.id}` },
+      ],
+      { priority: alert.severity === "danger" }
+    );
   }
   voiceMemory.alerts = current;
 }
@@ -3985,13 +3993,17 @@ function announceTod(descent, phaseKey) {
   if (!stage || TOD_VOICE_RANK[stage] <= voiceMemory.todRank) return;
   voiceMemory.todRank = TOD_VOICE_RANK[stage];
   const distance = Math.round(descent.todInNm);
-  VOICE.speak(stage === "now" ? t("voice_tod_now") : tf(`voice_tod_${stage}`, { distance }));
+  VOICE.announce([
+    stage === "now" ? { key: "voice_tod_now" } : { key: `voice_tod_${stage}`, values: { distance } },
+  ]);
 }
 
-function announceTaxi(text) {
-  if (text === voiceMemory.taxi) return;
-  voiceMemory.taxi = text || "";
-  if (text) VOICE.speak(text);
+/** Consigne de roulage, {key, values} ou null, dite quand elle change. */
+function announceTaxi(call) {
+  const fingerprint = call ? JSON.stringify(call) : "";
+  if (fingerprint === voiceMemory.taxi) return;
+  voiceMemory.taxi = fingerprint;
+  if (call) VOICE.announce([call]);
 }
 
 /*
@@ -6746,32 +6758,21 @@ function syncVoiceSettings() {
   if (flightToggle) flightToggle.checked = VOICE.enabled();
   if (!toggle || !select || !test) return;
   const available = VOICE.available();
+  // Seules les voix NaviXav livrées pour la langue affichée sont proposées.
+  const voices = VOICE.banks();
   toggle.checked = VOICE.enabled();
   toggle.disabled = !available;
-  test.disabled = !available;
-  select.disabled = !available;
+  test.disabled = !available || !VOICE.bank();
+  select.disabled = !available || voices.length < 2;
   select.innerHTML = "";
-  const automatic = el("option", null, t("voice_automatic"));
-  automatic.value = "";
-  select.append(automatic);
-  const voices = VOICE.voices();
-  for (const voice of voices) {
-    const option = el(
-      "option",
-      null,
-      voice.natural ? `${voice.name} · ${t("voice_natural")}` : voice.name
-    );
-    option.value = voice.name;
+  for (const voice of voices.length ? voices : [{ value: "", label: "NaviXav" }]) {
+    const option = el("option", null, voice.label);
+    option.value = voice.value;
     select.append(option);
   }
   const preferred = VOICE.preferredName();
-  select.value = voices.some((voice) => voice.name === preferred) ? preferred : "";
-  const active = VOICE.activeName();
-  $("settings-voice-help").textContent = !available
-    ? t("voice_unavailable")
-    : !voices.length
-      ? t("voice_none_for_language")
-      : `${t("voice_help")} ${tf("voice_active", { name: active })}`;
+  select.value = voices.some((voice) => voice.value === preferred) ? preferred : "";
+  $("settings-voice-help").textContent = t(available ? "voice_navixav_help" : "voice_unavailable");
 }
 
 function initVoiceSettings() {
@@ -6781,7 +6782,7 @@ function initVoiceSettings() {
   $("settings-voice-name").addEventListener("change", (event) => {
     VOICE.setPreferredName(event.target.value);
   });
-  $("settings-voice-test").addEventListener("click", () => VOICE.test(t("voice_test_phrase")));
+  $("settings-voice-test").addEventListener("click", () => VOICE.test());
   VOICE.onChange(syncVoiceSettings);
   window.addEventListener("navixav:languagechange", syncVoiceSettings);
   syncVoiceSettings();
@@ -10049,19 +10050,21 @@ function updateGroundHud() {
     const kind = guidance.arrived
       ? "done"
       : (!guidance.on_route && "lost") || (guidance.hold_short && "hold") || "go";
-    let announcement = null;
-    if (guidance.arrived) announcement = t("taxi_arrived");
-    else if (!guidance.on_route) announcement = t("taxi_off_route");
+    // La consigne est une clé et ses valeurs : l'écran l'affiche, la voix la
+    // compose à partir de sa banque de phrases.
+    let call = null;
+    if (guidance.arrived) call = { key: "taxi_arrived" };
+    else if (!guidance.on_route) call = { key: "taxi_off_route" };
     else if (guidance.hold_short && guidance.distance_to_hold_m <= 250) {
-      announcement = tf("taxi_hold_short", { runway: guidance.hold_short });
+      call = { key: "taxi_hold_short", values: { runway: guidance.hold_short } };
     } else if (guidance.next_name && guidance.distance_to_next_m <= 250) {
       const key = guidance.next_turn === "left"
         ? "taxi_turn_left"
         : guidance.next_turn === "right" ? "taxi_turn_right" : "taxi_continue";
-      announcement = tf(key, { taxiway: guidance.next_name });
+      call = { key, values: { taxiway: guidance.next_name } };
     }
-    if (announcement) hud.append(el("div", `ground-call is-${kind}`, announcement));
-    announceTaxi(announcement);
+    if (call) hud.append(el("div", `ground-call is-${kind}`, tf(call.key, call.values)));
+    announceTaxi(call);
   }
 
   // Le repoussage est la première consigne du départ, et la seule que le

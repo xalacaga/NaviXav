@@ -1,0 +1,68 @@
+{
+ "fr": [
+  {
+   "bank": "fr",
+   "voice": "ff_siwis",
+   "label": "Siwis"
+  }
+ ],
+ "en": [
+  {
+   "bank": "en",
+   "voice": "af_heart",
+   "label": "Heart (US)"
+  },
+  {
+   "bank": "en-af_bella",
+   "voice": "af_bella",
+   "label": "Bella (US)"
+  },
+  {
+   "bank": "en-bf_emma",
+   "voice": "bf_emma",
+   "label": "Emma (UK)"
+  }
+ ],
+ "es": [
+  {
+   "bank": "es",
+   "voice": "ef_dora",
+   "label": "Dora"
+  }
+ ],
+ "it": [
+  {
+   "bank": "it",
+   "voice": "if_sara",
+   "label": "Sara"
+  }
+ ],
+ "pt": [
+  {
+   "bank": "pt",
+   "voice": "pt_PT-tugao-medium",
+   "label": "Tugão"
+  }
+ ],
+ "de": [
+  {
+   "bank": "de",
+   "voice": "de_DE-thorsten-high",
+   "label": "Thorsten"
+  }
+ ],
+ "nl": [
+  {
+   "bank": "nl",
+   "voice": "nl_NL-pim-medium",
+   "label": "Pim"
+  }
+ ],
+ "pl": [
+  {
+   "bank": "pl",
+   "voice": "pl_PL-bass-high",
+   "label": "Bass"
+  }
+ ]
+}

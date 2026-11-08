@@ -2622,3 +2622,18 @@ def test_the_cache_notice_shows_that_something_is_happening():
     # Une animation en boucle n'est pas une information.
     reduced = css[css.index("@media (prefers-reduced-motion: reduce)"):]
     assert ".banner-plane { animation: none;" in reduced
+
+
+def test_voice_announcements_may_play_before_any_click(monkeypatch):
+    """Une alarme levée fenêtre au second plan ne doit pas rester muette."""
+    monkeypatch.setenv(desktop.WEBVIEW2_ARGUMENTS_VARIABLE, "--lang=fr")
+
+    desktop.allow_audio_without_gesture()
+    desktop.allow_audio_without_gesture()
+
+    arguments = desktop.os.environ[desktop.WEBVIEW2_ARGUMENTS_VARIABLE].split()
+    assert arguments[0] == "--lang=fr"
+    assert "--autoplay-policy=no-user-gesture-required" in arguments
+    # pywebview passe celui-ci : la variable remplace ses arguments.
+    assert "--disable-features=ElasticOverscroll" in arguments
+    assert len(arguments) == len(set(arguments))

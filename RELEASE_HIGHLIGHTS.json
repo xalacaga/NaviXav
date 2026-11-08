@@ -17,14 +17,14 @@
   ],
   "added": [
     {
-      "en": "Voice callouts: NaviXav speaks MASTER CAUTION and MASTER WARNING alerts, the top of descent at 50, 10 and 0 NM, and taxi instructions such as hold-short points, with the Windows voice of your choice and the best natural voice picked automatically; switch them on in Settings or from Flight tracking",
-      "fr": "Annonces vocales : NaviXav annonce les alarmes MASTER CAUTION et MASTER WARNING, le top de descente à 50, 10 et 0 NM et les consignes de roulage comme les points d’arrêt avant piste, avec la voix Windows de votre choix et la meilleure voix naturelle choisie d’office ; à activer dans les Paramètres ou depuis Suivi du vol",
-      "de": "Sprachansagen: NaviXav sagt MASTER-CAUTION- und MASTER-WARNING-Alarme, den Top of Descent bei 50, 10 und 0 NM sowie Rollanweisungen wie Haltepunkte vor der Piste an, mit der Windows-Stimme Ihrer Wahl und automatisch der besten natürlichen Stimme; einschaltbar in den Einstellungen oder in der Flugverfolgung",
-      "es": "Avisos de voz: NaviXav anuncia las alarmas MASTER CAUTION y MASTER WARNING, el inicio de descenso a 50, 10 y 0 NM y las instrucciones de rodaje como los puntos de espera antes de pista, con la voz de Windows que elija y la mejor voz natural seleccionada automáticamente; se activan en Ajustes o desde Seguimiento del vuelo",
-      "it": "Annunci vocali: NaviXav annuncia gli allarmi MASTER CAUTION e MASTER WARNING, l’inizio discesa a 50, 10 e 0 NM e le istruzioni di rullaggio come i punti di attesa prima della pista, con la voce di Windows che preferisci e la migliore voce naturale scelta automaticamente; si attivano nelle Impostazioni o da Monitoraggio del volo",
-      "pt": "Anúncios de voz: o NaviXav anuncia os alarmes MASTER CAUTION e MASTER WARNING, o início da descida a 50, 10 e 0 NM e as instruções de rolagem como os pontos de espera antes da pista, com a voz do Windows à sua escolha e a melhor voz natural escolhida automaticamente; ative-os nas Definições ou no Acompanhamento do voo",
-      "nl": "Gesproken meldingen: NaviXav meldt MASTER CAUTION- en MASTER WARNING-alarmen, de top of descent op 50, 10 en 0 NM en taxi-instructies zoals wachtpunten voor de baan, met de Windows-stem van uw keuze en automatisch de beste natuurlijke stem; in te schakelen in Instellingen of vanuit Vluchtvolging",
-      "pl": "Komunikaty głosowe: NaviXav ogłasza alarmy MASTER CAUTION i MASTER WARNING, początek zniżania na 50, 10 i 0 NM oraz instrukcje kołowania, takie jak punkty oczekiwania przed drogą startową, wybranym głosem Windows, a najlepszy naturalny głos wybiera automatycznie; włącz je w Ustawieniach lub w Śledzeniu lotu"
+      "en": "Voice callouts: NaviXav speaks MASTER CAUTION and MASTER WARNING alerts, the top of descent at 50, 10 and 0 NM, and taxi instructions such as hold-short points; switch them on in Settings or from Flight tracking",
+      "fr": "Annonces vocales : NaviXav annonce les alarmes MASTER CAUTION et MASTER WARNING, le top de descente à 50, 10 et 0 NM et les consignes de roulage comme les points d’arrêt avant piste ; à activer dans les Paramètres ou depuis Suivi du vol",
+      "de": "Sprachansagen: NaviXav sagt MASTER-CAUTION- und MASTER-WARNING-Alarme, den Top of Descent bei 50, 10 und 0 NM sowie Rollanweisungen wie Haltepunkte vor der Piste an; einschaltbar in den Einstellungen oder in der Flugverfolgung",
+      "es": "Avisos de voz: NaviXav anuncia las alarmas MASTER CAUTION y MASTER WARNING, el inicio de descenso a 50, 10 y 0 NM y las instrucciones de rodaje como los puntos de espera antes de pista; se activan en Ajustes o desde Seguimiento del vuelo",
+      "it": "Annunci vocali: NaviXav annuncia gli allarmi MASTER CAUTION e MASTER WARNING, l’inizio discesa a 50, 10 e 0 NM e le istruzioni di rullaggio come i punti di attesa prima della pista; si attivano nelle Impostazioni o da Monitoraggio del volo",
+      "pt": "Anúncios de voz: o NaviXav anuncia os alarmes MASTER CAUTION e MASTER WARNING, o início da descida a 50, 10 e 0 NM e as instruções de rolagem como os pontos de espera antes da pista; ative-os nas Definições ou no Acompanhamento do voo",
+      "nl": "Gesproken meldingen: NaviXav meldt MASTER CAUTION- en MASTER WARNING-alarmen, de top of descent op 50, 10 en 0 NM en taxi-instructies zoals wachtpunten voor de baan; in te schakelen in Instellingen of vanuit Vluchtvolging",
+      "pl": "Komunikaty głosowe: NaviXav ogłasza alarmy MASTER CAUTION i MASTER WARNING, początek zniżania na 50, 10 i 0 NM oraz instrukcje kołowania, takie jak punkty oczekiwania przed drogą startową; włącz je w Ustawieniach lub w Śledzeniu lotu"
     },
     {
       "en": "Fuel monitoring: Flight tracking compares the fuel on board with the SimBrief OFP at your position along the route, estimates the fuel at destination (EFOB) and raises a caution when it falls below the final reserve plus alternate fuel",
@@ -55,6 +55,16 @@
       "pt": "Mapa e plano de rolagem: o seu avião passa a ser representado pela mesma silhueta de avião de linha nas duas vistas, orientada à proa, com motores, para-brisas e uma sombra suave, em vez da seta",
       "nl": "Kaart en taxiplan: uw vliegtuig wordt nu in beide weergaven als hetzelfde silhouet van een verkeersvliegtuig getoond, in de koersrichting, met motoren, cockpitruit en een zachte schaduw, in plaats van een pijl",
       "pl": "Mapa i plan kołowania: Twój samolot jest teraz przedstawiany w obu widokach tą samą sylwetką samolotu pasażerskiego zwróconą zgodnie z kursem, z silnikami, szybą kokpitu i delikatnym cieniem, zamiast strzałki"
+    },
+    {
+      "en": "NaviXav voice: callouts are spoken by high-quality neural voices shipped with the application, in all eight languages, fully offline and with nothing to install; aviation terms stay in English and three voices are available in English",
+      "fr": "Voix NaviXav : les annonces sont dites par des voix neuronales de haute qualité livrées avec l’application, dans les huit langues, entièrement hors ligne et sans rien à installer ; les termes aéronautiques restent en anglais et trois voix sont proposées en anglais",
+      "de": "NaviXav-Stimme: Ansagen werden von hochwertigen neuronalen Stimmen gesprochen, die mit der Anwendung geliefert werden, in allen acht Sprachen, vollständig offline und ohne Installation; Luftfahrtbegriffe bleiben englisch, und auf Englisch stehen drei Stimmen zur Wahl",
+      "es": "Voz NaviXav: los avisos los dicen voces neuronales de alta calidad incluidas con la aplicación, en los ocho idiomas, totalmente sin conexión y sin nada que instalar; los términos aeronáuticos se mantienen en inglés y hay tres voces en inglés",
+      "it": "Voce NaviXav: gli annunci sono pronunciati da voci neurali di alta qualità fornite con l’applicazione, in tutte e otto le lingue, completamente offline e senza nulla da installare; i termini aeronautici restano in inglese e in inglese sono disponibili tre voci",
+      "pt": "Voz NaviXav: os anúncios são ditos por vozes neuronais de alta qualidade incluídas na aplicação, nas oito línguas, totalmente offline e sem nada para instalar; os termos aeronáuticos mantêm-se em inglês e há três vozes em inglês",
+      "nl": "NaviXav-stem: meldingen worden uitgesproken door neurale stemmen van hoge kwaliteit die met de applicatie worden meegeleverd, in alle acht talen, volledig offline en zonder installatie; luchtvaarttermen blijven Engels en in het Engels zijn drie stemmen beschikbaar",
+      "pl": "Głos NaviXav: komunikaty wypowiadają wysokiej jakości głosy neuronowe dostarczane z aplikacją, we wszystkich ośmiu językach, całkowicie offline i bez instalacji; terminy lotnicze pozostają po angielsku, a w języku angielskim dostępne są trzy głosy"
     }
   ],
   "fixed": [
@@ -77,6 +87,16 @@
       "pt": "Guardar as definições volta a ser imediato: as miniaturas da lista de aviões instalados já não releem cada uma milhares de ficheiros do Community nem retêm o resto da aplicação",
       "nl": "Instellingen opslaan gaat weer direct: de miniaturen in de lijst met geïnstalleerde vliegtuigen lezen niet langer elk duizenden Community-bestanden opnieuw in en houden de rest van de applicatie niet meer op",
       "pl": "Zapisywanie ustawień znów jest natychmiastowe: miniatury na liście zainstalowanych samolotów nie wczytują już każda z osobna tysięcy plików z Community i nie blokują reszty aplikacji"
+    },
+    {
+      "en": "The weather warnings “in LIFR conditions” and “weather unavailable” are no longer shown in French when another interface language is selected",
+      "fr": "Les avertissements météo « en conditions LIFR » et « météo indisponible » ne restent plus en français lorsqu’une autre langue d’interface est choisie",
+      "de": "Die Wetterwarnungen „LIFR-Bedingungen“ und „Wetter nicht verfügbar“ erscheinen bei einer anderen Oberflächensprache nicht mehr auf Französisch",
+      "es": "Los avisos meteorológicos «en condiciones LIFR» y «meteorología no disponible» ya no aparecen en francés cuando se elige otro idioma de interfaz",
+      "it": "Gli avvisi meteo «in condizioni LIFR» e «meteo non disponibile» non restano più in francese quando si sceglie un’altra lingua dell’interfaccia",
+      "pt": "Os avisos meteorológicos «em condições LIFR» e «meteorologia indisponível» já não aparecem em francês quando se escolhe outra língua de interface",
+      "nl": "De weerwaarschuwingen ‘in LIFR-omstandigheden’ en ‘weer niet beschikbaar’ verschijnen niet langer in het Frans wanneer een andere interfacetaal is gekozen",
+      "pl": "Ostrzeżenia pogodowe „w warunkach LIFR” i „pogoda niedostępna” nie są już wyświetlane po francusku po wybraniu innego języka interfejsu"
     }
   ]
 }
