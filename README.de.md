@@ -314,6 +314,10 @@ erhalten.
 Die Karte umfasst:
 
 - einen OpenStreetMap-Hintergrund;
+- optionales Niederschlagsradar nahezu in Echtzeit (RainViewer), aktive
+  SIGMETs und METAR-Windfahnen für Abflug und Ankunft (aviationweather.gov),
+  direkt auf der Karte mit lokal gespeicherten Ebenenschaltern; diese
+  Beobachtungen bilden nicht das in MSFS geladene Wetterfeld nach;
 - die SimBrief-Route mit ihren Punkten;
 - unterschiedliche Farben für SID, Streckenteil, STAR und Anflug;
 - die Bahnen und die ausgewählte Bahn;

@@ -84,6 +84,7 @@ from navixav.traffic.service import TrafficService
 from navixav.vatsim import VatsimClient, VatsimError
 from navixav.updater import GitHubUpdater, UpdateError
 from navixav.weather.briefing import build_briefing
+from navixav.weather.radar import RadarFeed
 from navixav.weather.sigmet import SigmetFeed, relate_to_route
 
 STATIC_DIR = resource_path("navixav", "web", "static")
@@ -160,6 +161,8 @@ class SettingsRequest(BaseModel):
     aircraft_rnp_capable: bool = True
     map_basemap: str = Field(default="osm", pattern="^(osm|opentopo)$")
     map_trail_color: str = Field(default="#22d3ee", pattern="^#[0-9A-Fa-f]{6}$")
+    map_weather_radar: bool = True
+    map_weather_stations: bool = True
     taxi_speed_limit_kt: int = Field(default=25, ge=1, le=60)
     taxi_turn_speed_limit_kt: int = Field(default=10, ge=1, le=60)
     taxi_speed_alarm_sound: bool = True
@@ -242,6 +245,7 @@ def create_app(
         lambda: (lambda state: (state.latitude, state.longitude))(tracker.read())
     )
     sigmet_feed = SigmetFeed()
+    radar_feed = RadarFeed()
     current_plan_state: dict[str, Any] = {}
     panel_summary: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
@@ -343,6 +347,7 @@ def create_app(
         ivao.close()
         opensky.close()
         sigmet_feed.close()
+        radar_feed.close()
         sia.session.close()
         faa.session.close()
         chartfox.close()
@@ -512,6 +517,8 @@ def create_app(
             "lan_url": f"http://{address}:{port}/" if address else "",
             "map_basemap": settings.map_basemap,
             "map_trail_color": settings.map_trail_color,
+            "map_weather_radar": settings.map_weather_radar,
+            "map_weather_stations": settings.map_weather_stations,
             # Un client distant ne lit pas /api/settings : sans ces valeurs son
             # plan de roulage alerterait sur des limites qui ne sont pas les
             # tiennes.
@@ -1009,6 +1016,18 @@ def create_app(
             if fetched_at else None,
             "source": "aviationweather.gov",
         }
+
+    @app.get("/api/weather/radar")
+    def current_radar() -> dict[str, object]:
+        """Dernière mosaïque de précipitations disponible pour le calque carte."""
+        try:
+            frame = radar_feed.current()
+        except Exception as exc:  # noqa: BLE001 - le calque reste simplement vide
+            LOGGER.warning("Radar météo indisponible : %s", type(exc).__name__)
+            raise HTTPException(
+                503, "Le radar météo est momentanément indisponible."
+            ) from exc
+        return {"frame": frame, "refresh_interval_seconds": 600}
 
     @app.get("/api/airport/{icao}")
     def airport(icao: str) -> dict[str, Any]:

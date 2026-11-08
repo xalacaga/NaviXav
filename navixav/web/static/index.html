@@ -212,6 +212,10 @@
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
         <button id="map-sigmet" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les SIGMET en vigueur près de la route">SIGMET</button>
+        <button id="map-radar" class="icon-btn active" aria-pressed="true"
+                title="Afficher ou masquer le radar de précipitations">Radar</button>
+        <button id="map-weather-stations" class="icon-btn active" aria-pressed="true"
+                title="Afficher ou masquer les METAR et barbules de vent">METAR / vent</button>
         <button id="map-fms-alternate" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher le plan de dégagement du FMGC">Dégagement FMGC</button>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
@@ -260,7 +264,12 @@
         <span id="legend-fms" class="hidden"><i class="key route-fms"></i>route FMGC</span>
         <span id="legend-fms-alternate" class="hidden"><i class="key route-fms-alternate"></i>dégagement FMGC</span>
         <span id="legend-sigmet" class="hidden"><i class="key sigmet"></i>SIGMET</span>
+        <span id="legend-radar" class="hidden"><i class="key radar"></i>précipitations</span>
+        <span id="legend-weather-stations" class="hidden"><i class="key weather-station"></i>METAR / vent</span>
       </div>
+      <div id="map-weather-status" class="map-weather-status hidden" role="status"></div>
+      <a id="map-weather-attribution" class="map-attribution map-weather-attribution hidden"
+         href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar © RainViewer · METAR aviationweather.gov</a>
       <a id="map-attribution" class="map-attribution"
          href="https://www.openstreetmap.org/copyright"
          target="_blank" rel="noopener">© OpenStreetMap contributors</a>

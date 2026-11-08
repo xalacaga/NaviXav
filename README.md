@@ -297,6 +297,10 @@ checks and the local MSFS cache as a fallback.
 The map includes:
 
 - an OpenStreetMap background;
+- optional near-real-time precipitation radar (RainViewer), active SIGMETs and
+  departure/arrival METAR wind barbs (aviationweather.gov), drawn directly on
+  the map with locally remembered layer switches; these observations are not a
+  copy of the weather field loaded in MSFS;
 - the SimBrief route drawn with its waypoints;
 - distinct colours for the SID, the enroute portion, the STAR and the approach;
 - the runways and the selected runway;

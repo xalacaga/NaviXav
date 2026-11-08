@@ -4766,6 +4766,56 @@
     flight_stability_stable: "Stabilne",
   });
 
+  // Calques météo directement superposés à la carte de vol.
+  Object.assign(TRANSLATIONS.fr, {
+    map_radar: "Radar", map_radar_title: "Afficher ou masquer le radar de précipitations",
+    map_weather_stations: "METAR / vent", map_weather_stations_title: "Afficher ou masquer les METAR et barbules de vent",
+    legend_radar: "précipitations", legend_weather_stations: "METAR / vent",
+    map_radar_time: "Radar {time}Z · quasi temps réel",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    map_radar: "Radar", map_radar_title: "Show or hide the precipitation radar",
+    map_weather_stations: "METAR / wind", map_weather_stations_title: "Show or hide METARs and wind barbs",
+    legend_radar: "precipitation", legend_weather_stations: "METAR / wind",
+    map_radar_time: "Radar {time}Z · near real time",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    map_radar: "Radar", map_radar_title: "Niederschlagsradar ein- oder ausblenden",
+    map_weather_stations: "METAR / Wind", map_weather_stations_title: "METARs und Windfahnen ein- oder ausblenden",
+    legend_radar: "Niederschlag", legend_weather_stations: "METAR / Wind",
+    map_radar_time: "Radar {time}Z · nahezu Echtzeit",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    map_radar: "Radar", map_radar_title: "Mostrar u ocultar el radar de precipitación",
+    map_weather_stations: "METAR / viento", map_weather_stations_title: "Mostrar u ocultar METAR y barbas de viento",
+    legend_radar: "precipitación", legend_weather_stations: "METAR / viento",
+    map_radar_time: "Radar {time}Z · casi en tiempo real",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    map_radar: "Radar", map_radar_title: "Mostrare o nascondere il radar delle precipitazioni",
+    map_weather_stations: "METAR / vento", map_weather_stations_title: "Mostrare o nascondere METAR e barbette del vento",
+    legend_radar: "precipitazioni", legend_weather_stations: "METAR / vento",
+    map_radar_time: "Radar {time}Z · quasi in tempo reale",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    map_radar: "Radar", map_radar_title: "Mostrar ou ocultar o radar de precipitação",
+    map_weather_stations: "METAR / vento", map_weather_stations_title: "Mostrar ou ocultar METAR e barbelas de vento",
+    legend_radar: "precipitação", legend_weather_stations: "METAR / vento",
+    map_radar_time: "Radar {time}Z · quase em tempo real",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    map_radar: "Radar", map_radar_title: "Neerslagradar tonen of verbergen",
+    map_weather_stations: "METAR / wind", map_weather_stations_title: "METARs en windveren tonen of verbergen",
+    legend_radar: "neerslag", legend_weather_stations: "METAR / wind",
+    map_radar_time: "Radar {time}Z · bijna realtime",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    map_radar: "Radar", map_radar_title: "Pokaż lub ukryj radar opadów",
+    map_weather_stations: "METAR / wiatr", map_weather_stations_title: "Pokaż lub ukryj METAR i chorągiewki wiatru",
+    legend_radar: "opady", legend_weather_stations: "METAR / wiatr",
+    map_radar_time: "Radar {time}Z · prawie na żywo",
+  });
+
   // Guide d'utilisation : seul le bouton qui l'ouvre vit ici, le texte est dans guide.js.
   Object.assign(TRANSLATIONS.fr, { guide_open_title: "Guide d’utilisation" });
   Object.assign(TRANSLATIONS.en, { guide_open_title: "User guide" });
@@ -4831,6 +4881,8 @@
     "#map-basemap": "basemap",
     "#map-constraints": "map_constraints",
     "#map-sigmet": "map_sigmet",
+    "#map-radar": "map_radar",
+    "#map-weather-stations": "map_weather_stations",
     "#map-traffic": "map_traffic",
     "#ground-traffic": "ground_traffic",
     "#map-sia": "overlay",
@@ -4848,6 +4900,8 @@
     "#legend-fms": "legend_fms",
     "#legend-fms-alternate": "legend_fms_alternate",
     "#legend-sigmet": "legend_sigmet",
+    "#legend-radar": "legend_radar",
+    "#legend-weather-stations": "legend_weather_stations",
     "#map-fms-alternate": "map_fms_alternate",
     "#empty h2": "no_plan",
     "#empty-hint": "loading_latest",
@@ -4982,6 +5036,8 @@
     "#map-basemap-style": "basemap_style_title",
     "#map-constraints": "map_constraints_title",
     "#map-sigmet": "map_sigmet_title",
+    "#map-radar": "map_radar_title",
+    "#map-weather-stations": "map_weather_stations_title",
     "#map-traffic": "map_traffic_title",
     "#ground-traffic": "ground_traffic_title",
     "#map-sia": "overlay_title",

@@ -275,6 +275,10 @@ local de MSFS como alternativa.
 El mapa incluye:
 
 - un fondo OpenStreetMap;
+- radar de precipitación casi en tiempo real (RainViewer), SIGMET activos y
+  barbas de viento METAR de salida y llegada (aviationweather.gov),
+  superpuestos directamente en el mapa con controles de capa guardados
+  localmente; estas observaciones no reproducen el campo meteorológico de MSFS;
 - la ruta SimBrief dibujada con sus puntos;
 - colores distintos para la SID, el tramo en ruta, la STAR y la aproximación;
 - las pistas y la pista seleccionada;

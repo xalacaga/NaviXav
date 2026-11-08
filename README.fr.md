@@ -312,6 +312,11 @@ le cache MSFS local comme solution de repli.
 La carte comprend :
 
 - un fond OpenStreetMap ;
+- un radar de précipitations quasi temps réel (RainViewer), les SIGMET actifs
+  et les barbules de vent METAR du départ et de l’arrivée
+  (aviationweather.gov), superposés directement à la carte avec des boutons de
+  calque mémorisés localement ; ces observations ne reproduisent pas le champ
+  météo chargé dans MSFS ;
 - la route SimBrief dessinée avec ses points ;
 - des couleurs distinctes pour la SID, la partie en route, la STAR et
   l’approche ;

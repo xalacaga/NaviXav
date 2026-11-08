@@ -71,3 +71,11 @@ Voice announcements and ATC radio ambience
                                 pt_PT-tugão-medium: CC0 1.0;
                                 pl_PL-bass-high: Apache License 2.0
     https://huggingface.co/rhasspy/piper-voices
+
+Online weather data services (data is fetched at runtime, not distributed)
+  AviationWeather.gov          U.S. National Weather Service aviation data
+  https://aviationweather.gov/data/api/
+  RainViewer Weather Maps API  Public radar tiles for personal and educational
+                                use, subject to RainViewer's current API terms
+  https://www.rainviewer.com/api/weather-maps-api.html
+  https://www.rainviewer.com/terms.html

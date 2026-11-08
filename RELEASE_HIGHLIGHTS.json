@@ -35,6 +35,16 @@
       "pt": "Ambiente de rádio ATC: comunicações de rádio em inglês opcionais tocam em fundo conforme a fase do voo — placa, torre, aproximação ou controlo — com efeito de rádio VHF e várias vozes de controladores e tripulações, totalmente offline; calam-se durante os avisos do NaviXav e o volume ajusta-se nas definições",
       "nl": "ATC-radiosfeer: optioneel Engelstalig radioverkeer speelt op de achtergrond volgens de vluchtfase — grond, toren, nadering of luchtverkeersleiding — met een VHF-radio-effect en meerdere stemmen van verkeersleiders en bemanningen, volledig offline; het zwijgt tijdens de meldingen van NaviXav en het volume is in te stellen in de instellingen",
       "pl": "Atmosfera radiowa ATC: opcjonalna angielska korespondencja radiowa gra w tle zależnie od fazy lotu — ziemia, wieża, zbliżanie lub kontrola obszaru — z efektem radia VHF i kilkoma głosami kontrolerów i załóg, całkowicie offline; milknie podczas komunikatów NaviXav, a głośność ustawia się w ustawieniach"
+    },
+    {
+      "en": "Live weather map: optional RainViewer precipitation radar, active SIGMETs and departure/arrival METAR wind barbs are drawn directly over the flight map, with locally remembered layer switches, visible timestamps and source attribution",
+      "fr": "Carte météo en direct : le radar de précipitations RainViewer, les SIGMET actifs et les barbules de vent METAR du départ et de l’arrivée se superposent directement à la carte de vol, avec des boutons de calque mémorisés localement, l’heure du relevé et l’attribution des sources",
+      "de": "Live-Wetterkarte: Optionales RainViewer-Niederschlagsradar, aktive SIGMETs und METAR-Windfahnen für Abflug und Ankunft werden direkt über der Flugkarte dargestellt, mit lokal gespeicherten Ebenenschaltern, sichtbaren Zeitstempeln und Quellenangabe",
+      "es": "Mapa meteorológico en directo: el radar de precipitación opcional de RainViewer, los SIGMET activos y las barbas de viento METAR de salida y llegada se superponen directamente al mapa de vuelo, con controles de capa guardados localmente, hora visible y atribución de fuentes",
+      "it": "Mappa meteo in tempo reale: radar delle precipitazioni RainViewer opzionale, SIGMET attivi e barbette del vento METAR di partenza e arrivo sono sovrapposti direttamente alla mappa di volo, con interruttori di livello memorizzati localmente, orario visibile e attribuzione delle fonti",
+      "pt": "Mapa meteorológico em direto: radar de precipitação RainViewer opcional, SIGMET ativos e barbelas de vento METAR da partida e chegada são sobrepostos diretamente no mapa de voo, com interruptores de camada guardados localmente, hora visível e atribuição das fontes",
+      "nl": "Liveweerkaart: optionele RainViewer-neerslagradar, actieve SIGMETs en METAR-windveren voor vertrek en aankomst worden rechtstreeks over de vluchtkaart getekend, met lokaal onthouden laagschakelaars, zichtbare tijdstempels en bronvermelding",
+      "pl": "Mapa pogody na żywo: opcjonalny radar opadów RainViewer, aktywne SIGMET oraz chorągiewki wiatru METAR dla odlotu i przylotu są nakładane bezpośrednio na mapę lotu, z lokalnie zapamiętywanymi przełącznikami warstw, widocznym czasem i oznaczeniem źródeł"
     }
   ],
   "fixed": []

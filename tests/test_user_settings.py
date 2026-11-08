@@ -29,6 +29,8 @@ def test_user_settings_round_trip(tmp_path):
             "aircraft_rnp_capable": False,
             "map_basemap": "opentopo",
             "map_trail_color": "#ff5500",
+            "map_weather_radar": False,
+            "map_weather_stations": False,
             "aircraft_community_path": str(tmp_path / "Community"),
             "fsltl_path": str(tmp_path / "Community" / "fsltl-traffic-base"),
             "traffic_source": "vatsim",
@@ -46,6 +48,8 @@ def test_user_settings_round_trip(tmp_path):
     assert restored.aircraft_rnp_capable is False
     assert restored.map_basemap == "opentopo"
     assert restored.map_trail_color == "#ff5500"
+    assert restored.map_weather_radar is False
+    assert restored.map_weather_stations is False
     assert restored.aircraft_community_path == tmp_path / "Community"
     assert restored.fsltl_path == tmp_path / "Community" / "fsltl-traffic-base"
     assert restored.traffic_source == "vatsim"
@@ -62,6 +66,8 @@ def test_settings_request_accepts_interface_values():
         min_runway_length_ft=4500,
         map_basemap="opentopo",
         map_trail_color="#AABBCC",
+        map_weather_radar=False,
+        map_weather_stations=False,
         aircraft_community_path=r"D:\MSFS\Community",
         fsltl_path=r"D:\MSFS\Community\fsltl-traffic-base",
         traffic_source="ivao",
@@ -73,6 +79,8 @@ def test_settings_request_accepts_interface_values():
     assert request.simbrief_pilot_id == "654321"
     assert request.min_runway_length_ft == 4500
     assert request.map_basemap == "opentopo"
+    assert request.map_weather_radar is False
+    assert request.map_weather_stations is False
     assert request.aircraft_community_path == r"D:\MSFS\Community"
     assert request.fsltl_path == r"D:\MSFS\Community\fsltl-traffic-base"
     assert request.traffic_source == "ivao"

@@ -275,6 +275,10 @@ ripiego.
 La mappa comprende:
 
 - uno sfondo OpenStreetMap;
+- radar delle precipitazioni quasi in tempo reale (RainViewer), SIGMET attivi
+  e barbette del vento METAR di partenza e arrivo (aviationweather.gov),
+  sovrapposti direttamente alla mappa con interruttori di livello memorizzati
+  localmente; queste osservazioni non riproducono il campo meteo caricato in MSFS;
 - la rotta SimBrief disegnata con i suoi punti;
 - colori distinti per la SID, la parte in rotta, la STAR e l'avvicinamento;
 - le piste e la pista selezionata;

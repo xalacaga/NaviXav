@@ -273,6 +273,10 @@ cache local do MSFS como alternativa.
 O mapa inclui:
 
 - um fundo OpenStreetMap;
+- radar de precipitação quase em tempo real (RainViewer), SIGMET ativos e
+  barbelas de vento METAR da partida e chegada (aviationweather.gov),
+  sobrepostos diretamente no mapa com interruptores de camada guardados
+  localmente; estas observações não reproduzem o campo meteorológico do MSFS;
 - a rota SimBrief desenhada com os seus pontos;
 - cores distintas para a SID, a parte em rota, a STAR e a aproximação;
 - as pistas e a pista selecionada;

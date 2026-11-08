@@ -271,6 +271,10 @@ podręcznej MSFS jako rozwiązania awaryjnego.
 Mapa obejmuje:
 
 - podkład OpenStreetMap;
+- opcjonalny radar opadów prawie na żywo (RainViewer), aktywne SIGMET oraz
+  chorągiewki wiatru METAR dla odlotu i przylotu (aviationweather.gov),
+  nałożone bezpośrednio na mapę z lokalnie zapamiętywanymi przełącznikami
+  warstw; obserwacje te nie odwzorowują pola pogody wczytanego w MSFS;
 - trasę SimBrief narysowaną wraz z jej punktami;
 - odrębne kolory dla SID, części trasowej, STAR i podejścia;
 - drogi startowe oraz wybraną drogę startową;

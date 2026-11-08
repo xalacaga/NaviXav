@@ -2476,7 +2476,15 @@ body.remote-client .mobile-theme {
   text-decoration: none;
 }
 .map-attribution:hover { color: var(--text); }
-.map-legend + .map-attribution { bottom: 52px; }
+.map-stage > #map-attribution { bottom: 52px; }
+.map-weather-attribution { left: 8px; right: auto; }
+.map-weather-status {
+  position: absolute; left: 8px; bottom: 28px;
+  padding: 3px 7px; border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+  color: var(--text-dim); font-size: 0.64rem; line-height: 1.2;
+  pointer-events: none;
+}
 .key { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
 .key.rwy { background: var(--rwy); }
 .key.rwy-active { background: var(--rwy-active); }
@@ -2494,6 +2502,14 @@ body.remote-client .mobile-theme {
   background: rgba(239, 68, 68, 0.22);
   border: 1.5px solid #ef4444;
   height: 9px;
+}
+.key.radar {
+  height: 8px;
+  background: linear-gradient(90deg, #38bdf8, #facc15, #ef4444);
+}
+.key.weather-station {
+  width: 9px; height: 9px;
+  border: 2px solid #22c55e; border-radius: 50%;
 }
 
 /* SIGMET près de la route, dans la météo. */
@@ -4176,7 +4192,8 @@ pre {
     gap: 7px 10px;
     padding: 6px 8px;
   }
-  .map-legend + .map-attribution { bottom: 45px; }
+  .map-stage > #map-attribution { bottom: 45px; }
+  .map-weather-status { bottom: 26px; }
   .ground-speed { right: 8px; bottom: 8px; padding: 6px 10px; }
   .ground-speed-value { font-size: 1.3rem; }
   .sia-library-grid { grid-template-columns: minmax(0, 1fr); }

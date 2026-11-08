@@ -128,6 +128,8 @@ class Settings:
     aircraft_rnp_capable: bool = True
     map_basemap: str = DEFAULT_MAP_BASEMAP
     map_trail_color: str = DEFAULT_MAP_TRAIL_COLOR
+    map_weather_radar: bool = True
+    map_weather_stations: bool = True
     # Vitesse au-delà de laquelle le plan de roulage alerte. La limite de
     # virage vaut aussi à l'approche d'une barre d'arrêt et du poste d'arrivée.
     taxi_speed_limit_kt: int = DEFAULT_TAXI_SPEED_LIMIT_KT
@@ -201,6 +203,8 @@ class Settings:
             aircraft_rnp_capable=_env_bool("AIRCRAFT_RNP_CAPABLE", True),
             map_basemap=DEFAULT_MAP_BASEMAP,
             map_trail_color=DEFAULT_MAP_TRAIL_COLOR,
+            map_weather_radar=True,
+            map_weather_stations=True,
             taxi_speed_limit_kt=_env_int(
                 "TAXI_SPEED_LIMIT_KT", DEFAULT_TAXI_SPEED_LIMIT_KT
             ),
@@ -323,6 +327,12 @@ class Settings:
             ),
             map_basemap=raw_basemap,
             map_trail_color=raw_trail_color,
+            map_weather_radar=bool(
+                values.get("map_weather_radar", self.map_weather_radar)
+            ),
+            map_weather_stations=bool(
+                values.get("map_weather_stations", self.map_weather_stations)
+            ),
             taxi_speed_limit_kt=taxi_speed_limit,
             taxi_turn_speed_limit_kt=taxi_turn_speed_limit,
             taxi_speed_alarm_sound=bool(
@@ -368,6 +378,8 @@ class Settings:
             "aircraft_rnp_capable": self.aircraft_rnp_capable,
             "map_basemap": self.map_basemap,
             "map_trail_color": self.map_trail_color,
+            "map_weather_radar": self.map_weather_radar,
+            "map_weather_stations": self.map_weather_stations,
             "taxi_speed_limit_kt": self.taxi_speed_limit_kt,
             "taxi_turn_speed_limit_kt": self.taxi_turn_speed_limit_kt,
             "taxi_speed_alarm_sound": self.taxi_speed_alarm_sound,

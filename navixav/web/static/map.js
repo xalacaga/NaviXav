@@ -35,12 +35,18 @@ const MAP = (() => {
   // SIGMET en vigueur près de la route : polygones déjà projetés.
   let sigmets = [];
   let sigmetsVisible = true;
+  // Précipitations quasi temps réel et observations METAR aux extrémités du vol.
+  let radarFrame = null;
+  let radarVisible = true;
+  let weatherStations = [];
+  let weatherStationsVisible = true;
   let dragging = null;
   let basemapVisible = true;
   let constraintsVisible = true;
   let basemapKey = "osm";
   let trailColor = "#22d3ee";
   const tileCache = new Map();
+  const radarTileCache = new Map();
   // Le fond est assemblé opaque à part, puis déposé en une seule fois. Appliquer
   // sa transparence tuile par tuile ferait ressortir chaque raccord.
   const basemapLayer = document.createElement("canvas");
@@ -53,6 +59,10 @@ const MAP = (() => {
   const MERCATOR_LIMIT_DEG = 85.051129;
   const MAX_TILE_CACHE = 320;
   const MAX_TILE_RADIUS = 8;
+  // Le service public limite les appels : 9 × 9 tuiles au plus par vue et un
+  // cache séparé par image radar suffisent jusqu'au zoom 7 qu'il publie.
+  const MAX_RADAR_TILE_RADIUS = 4;
+  const MAX_RADAR_TILE_CACHE = 120;
   // La silhouette du trafic est dessinée dans le repère du plan de roulage,
   // long de vingt-huit pixels. Réduite de moitié, elle reste reconnaissable
   // tout en laissant l'avion suivi dominer la carte.
@@ -400,7 +410,9 @@ const MAP = (() => {
     if (!chart) return;
 
     if (basemapVisible) drawBasemap();
+    if (radarVisible) drawRadar();
     if (sigmetsVisible) drawSigmets();
+    if (weatherStationsVisible) drawWeatherStations();
     drawRunways();
     drawFmsAlternate();
     drawRoute();
@@ -507,6 +519,85 @@ const MAP = (() => {
     context.save();
     context.globalAlpha = BASEMAPS[basemapKey].alpha ?? 0.78;
     context.drawImage(basemapLayer, 0, 0, canvas.clientWidth, canvas.clientHeight);
+    context.restore();
+  }
+
+  function getRadarTile(zoom, x, y) {
+    if (!radarFrame?.tile_url) return null;
+    const key = `${radarFrame.time}/${zoom}/${x}/${y}`;
+    let tile = radarTileCache.get(key);
+    if (tile) return tile;
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.referrerPolicy = "no-referrer";
+    tile = { image, loaded: false, failed: false };
+    radarTileCache.set(key, tile);
+    image.onload = () => {
+      tile.loaded = true;
+      draw();
+    };
+    image.onerror = () => {
+      tile.failed = true;
+    };
+    image.src = radarFrame.tile_url
+      .replace("{z}", String(zoom))
+      .replace("{x}", String(x))
+      .replace("{y}", String(y));
+
+    if (radarTileCache.size > MAX_RADAR_TILE_CACHE) {
+      radarTileCache.delete(radarTileCache.keys().next().value);
+    }
+    return tile;
+  }
+
+  /** Mosaïque radar transparente, dans le même repère Web Mercator que le fond. */
+  function drawRadar() {
+    if (!radarFrame?.tile_url || !Number.isFinite(view.scale) || view.scale <= 0) return;
+    if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
+    const zoom = Math.min(Number(radarFrame.max_zoom) || 7, basemapZoom());
+    const tileCount = 2 ** zoom;
+    const tileWorldM = MERCATOR_WORLD_M / tileCount;
+    const screenPixelsPerTile = tileWorldM * view.scale;
+    if (!Number.isFinite(screenPixelsPerTile) || screenPixelsPerTile <= 0) return;
+    const halfWorld = MERCATOR_WORLD_M / 2;
+    const centreTileX = (view.centerX + halfWorld) / tileWorldM;
+    const centreTileY = (halfWorld - view.centerY) / tileWorldM;
+    const radiusX = Math.min(
+      MAX_RADAR_TILE_RADIUS,
+      Math.ceil(canvas.clientWidth / screenPixelsPerTile / 2) + 1
+    );
+    const radiusY = Math.min(
+      MAX_RADAR_TILE_RADIUS,
+      Math.ceil(canvas.clientHeight / screenPixelsPerTile / 2) + 1
+    );
+    const firstX = Math.floor(centreTileX) - radiusX;
+    const lastX = Math.floor(centreTileX) + radiusX;
+    const firstY = Math.max(0, Math.floor(centreTileY) - radiusY);
+    const lastY = Math.min(tileCount - 1, Math.floor(centreTileY) + radiusY);
+
+    context.save();
+    context.globalAlpha = 0.58;
+    for (let tileY = firstY; tileY <= lastY; tileY += 1) {
+      for (let tileX = firstX; tileX <= lastX; tileX += 1) {
+        const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+        const tile = getRadarTile(zoom, wrappedX, tileY);
+        if (!tile?.loaded || tile.failed) continue;
+        const screenX = canvas.clientWidth / 2
+          + (tileX - centreTileX) * screenPixelsPerTile;
+        const screenY = canvas.clientHeight / 2
+          + (tileY - centreTileY) * screenPixelsPerTile;
+        const left = Math.floor(screenX);
+        const top = Math.floor(screenY);
+        context.drawImage(
+          tile.image,
+          left,
+          top,
+          Math.max(1, Math.floor(screenX + screenPixelsPerTile) - left),
+          Math.max(1, Math.floor(screenY + screenPixelsPerTile) - top)
+        );
+      }
+    }
     context.restore();
   }
 
@@ -666,6 +757,81 @@ const MAP = (() => {
     context.textBaseline = "middle";
     context.fillText(text, x, y + 0.5);
     context.textBaseline = "alphabetic";
+  }
+
+  const WEATHER_CATEGORY_COLOURS = {
+    VFR: "#22c55e",
+    MVFR: "#38bdf8",
+    IFR: "#ef4444",
+    LIFR: "#d946ef",
+  };
+
+  function drawWindBarb(station, x, y) {
+    const direction = Number(station.wind?.direction_deg);
+    const speed = Number(station.wind?.speed_kt);
+    if (!Number.isFinite(speed)) return;
+    context.save();
+    context.translate(x, y);
+    context.strokeStyle = "#f8fafc";
+    context.fillStyle = "#f8fafc";
+    context.lineWidth = 1.6;
+    if (speed < 3 || !Number.isFinite(direction)) {
+      context.beginPath();
+      context.arc(0, 0, 5, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+      return;
+    }
+    context.rotate((direction * Math.PI) / 180);
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(0, -27);
+    context.stroke();
+    let remaining = Math.round(speed / 5) * 5;
+    let offset = -26;
+    while (remaining >= 10 && offset < -8) {
+      context.beginPath();
+      context.moveTo(0, offset);
+      context.lineTo(8, offset + 5);
+      context.stroke();
+      remaining -= 10;
+      offset += 5;
+    }
+    if (remaining >= 5) {
+      context.beginPath();
+      context.moveTo(0, offset);
+      context.lineTo(5, offset + 3);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  /** Cercle de catégorie de vol, indicatif et barbule de vent du METAR. */
+  function drawWeatherStations() {
+    if (!weatherStations.length) return;
+    context.save();
+    for (const station of weatherStations) {
+      const [x, y] = toScreen(nearestX(station.x, view.centerX), station.y);
+      if (x < -60 || y < -60 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 60) {
+        continue;
+      }
+      const colour = WEATHER_CATEGORY_COLOURS[station.flight_category] || "#94a3b8";
+      context.globalAlpha = station.stale ? 0.58 : 1;
+      context.fillStyle = css("--label-bg") || "#0f172a";
+      context.strokeStyle = colour;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(x, y, 7, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      drawWindBarb(station, x, y);
+      context.font = "700 10px 'Inter', system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      context.fillStyle = colour;
+      context.fillText(station.icao, x, y + 10);
+    }
+    context.restore();
   }
 
   function drawTrail() {    if (trail.filter(Boolean).length < 2) return;
@@ -1352,6 +1518,16 @@ const MAP = (() => {
         : "#22d3ee";
       applyBasemap(options.basemap);
       trailColor = nextColor;
+      radarVisible = options.radarVisible !== false;
+      weatherStationsVisible = options.weatherStationsVisible !== false;
+      for (const [id, visible] of [
+        ["map-radar", radarVisible],
+        ["map-weather-stations", weatherStationsVisible],
+      ]) {
+        const button = document.getElementById(id);
+        button?.classList.toggle("active", visible);
+        button?.setAttribute("aria-pressed", String(visible));
+      }
       draw();
     },
     setRoute(points) {
@@ -1460,6 +1636,42 @@ const MAP = (() => {
       draw();
     },
     get sigmetsShown() { return sigmetsVisible; },    /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
+    setRadarFrame(frame) {
+      const next = frame?.tile_url ? frame : null;
+      if (next?.time !== radarFrame?.time) radarTileCache.clear();
+      radarFrame = next;
+      draw();
+    },
+    toggleRadar() {
+      radarVisible = !radarVisible;
+      const button = document.getElementById("map-radar");
+      button?.classList.toggle("active", radarVisible);
+      button?.setAttribute("aria-pressed", String(radarVisible));
+      draw();
+      return radarVisible;
+    },
+    get radarShown() { return radarVisible; },
+    setWeatherStations(list) {
+      weatherStations = (Array.isArray(list) ? list : [])
+        .filter((station) => (
+          Number.isFinite(station?.latitude) && Number.isFinite(station?.longitude)
+        ))
+        .map((station) => ({
+          ...station,
+          ...project(station.latitude, station.longitude),
+        }));
+      draw();
+    },
+    toggleWeatherStations() {
+      weatherStationsVisible = !weatherStationsVisible;
+      const button = document.getElementById("map-weather-stations");
+      button?.classList.toggle("active", weatherStationsVisible);
+      button?.setAttribute("aria-pressed", String(weatherStationsVisible));
+      draw();
+      return weatherStationsVisible;
+    },
+    get weatherStationsShown() { return weatherStationsVisible; },
+    /** Change le fond depuis la barre carte ; renvoie la clé appliquée. */
     setBasemap(key) {
       const applied = applyBasemap(key);
       draw();

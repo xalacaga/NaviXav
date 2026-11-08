@@ -274,6 +274,10 @@ terugvaloptie behouden blijven.
 De kaart omvat:
 
 - een OpenStreetMap-achtergrond;
+- optionele bijna-realtime neerslagradar (RainViewer), actieve SIGMETs en
+  METAR-windveren voor vertrek en aankomst (aviationweather.gov), rechtstreeks
+  op de kaart met lokaal onthouden laagschakelaars; deze waarnemingen zijn geen
+  kopie van het in MSFS geladen weerveld;
 - de SimBrief-route met haar punten;
 - afzonderlijke kleuren voor de SID, het en-routedeel, de STAR en de nadering;
 - de banen en de geselecteerde baan;

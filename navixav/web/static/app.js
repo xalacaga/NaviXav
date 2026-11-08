@@ -250,6 +250,9 @@ let weatherTimer = null;
 let currentSigmets = [];
 let sigmetTimer = null;
 let sigmetRequest = 0;
+let radarTimer = null;
+let radarRequest = 0;
+let currentRadarFrame = null;
 let vatsimTimer = null;
 /* Postes en ligne par aérodrome, tels que le serveur les a rapportés. */
 let vatsimPositions = {};
@@ -316,6 +319,7 @@ const LIVE_INTERVAL_MS = 1000;
 const FMS_INTERVAL_MS = 4000;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const SIGMET_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const RADAR_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 // Distance devant l'avion où un SIGMET traversé à son niveau est annoncé.
 const SIGMET_LOOKAHEAD_NM = 60;
 const SIGMET_LOOKAHEAD_STEP_NM = 5;
@@ -1908,10 +1912,12 @@ function renderPlan(plan) {
   renderOfficialCharts(plan);
   renderMcdu(plan);
   renderWeather(plan);
+  syncWeatherStations(plan);
   renderMapBar(plan);
   startLiveLoop();
   startWeatherLoop();
   startSigmetLoop();
+  startRadarLoop();
   startVatsimLoop();
   startTrafficLoop();
 
@@ -10567,7 +10573,10 @@ function applyMapPreferences(values) {
   MAP.configure({
     basemap: values?.map_basemap || "osm",
     trailColor: values?.map_trail_color || "#22d3ee",
+    radarVisible: values?.map_weather_radar !== false,
+    weatherStationsVisible: values?.map_weather_stations !== false,
   });
+  syncWeatherMapUi();
 }
 
 /**
@@ -11122,6 +11131,7 @@ async function refreshWeather({ silent = false } = {}) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || t("wx_refresh_failed"));
     currentPlan.weather = payload.weather || currentPlan.weather;
+    syncWeatherStations(currentPlan);
     weatherLastUpdatedAt = payload.refreshed_at;
     weatherRefreshState = !payload.enabled
       ? "off"
@@ -11259,6 +11269,85 @@ function startSigmetLoop() {
   show($("legend-sigmet"), false);
   void refreshSigmets();
   sigmetTimer = setInterval(() => refreshSigmets(), SIGMET_REFRESH_INTERVAL_MS);
+}
+
+function weatherStation(report, point) {
+  if (!report || !point) return null;
+  const latitude = Number(point.lat);
+  const longitude = Number(point.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    icao: report.icao,
+    latitude,
+    longitude,
+    wind: report.wind || {},
+    flight_category: report.flight_category,
+    stale: Boolean(report.stale),
+    observed_at: report.observed_at,
+  };
+}
+
+/** METAR de départ et d'arrivée, posés sur les extrémités de la route. */
+function syncWeatherStations(plan = currentPlan) {
+  const route = plan?.enroute?.route_path || [];
+  const stations = [
+    weatherStation(plan?.weather?.departure, route[0]),
+    weatherStation(plan?.weather?.arrival, route.at(-1)),
+  ].filter(Boolean).filter((station, index, items) => (
+    items.findIndex((candidate) => candidate.icao === station.icao) === index
+  ));
+  MAP.setWeatherStations(stations);
+  syncWeatherMapUi();
+}
+
+function radarTimeLabel(frame) {
+  const parsed = new Date(Number(frame?.time) * 1000);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return tf("map_radar_time", {
+    time: new Intl.DateTimeFormat(displayLocale(), {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(parsed),
+  });
+}
+
+function syncWeatherMapUi() {
+  const radarAvailable = Boolean(currentRadarFrame);
+  const radarShown = radarAvailable && MAP.radarShown;
+  show($("legend-radar"), radarShown);
+  show($("legend-weather-stations"), MAP.weatherStationsShown && Boolean(currentPlan));
+  const status = $("map-weather-status");
+  status.textContent = radarShown ? radarTimeLabel(currentRadarFrame) : "";
+  show(status, Boolean(status.textContent));
+  show(
+    $("map-weather-attribution"),
+    radarShown || (MAP.weatherStationsShown && Boolean(currentPlan))
+  );
+}
+
+async function refreshRadar() {
+  if (!currentPlan || !MAP.radarShown) return;
+  const request = ++radarRequest;
+  try {
+    const response = await fetch("/api/weather/radar", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (request !== radarRequest) return;
+    currentRadarFrame = payload.frame?.tile_url ? payload.frame : null;
+    MAP.setRadarFrame(currentRadarFrame);
+    syncWeatherMapUi();
+  } catch (error) {
+    // Le dernier relevé reste affiché ; une panne ne doit pas vider la carte.
+    console.warn("Radar refresh failed", error);
+  }
+}
+
+function startRadarLoop() {
+  if (radarTimer) clearInterval(radarTimer);
+  radarTimer = null;
+  if (MAP.radarShown) void refreshRadar();
+  radarTimer = setInterval(() => refreshRadar(), RADAR_REFRESH_INTERVAL_MS);
 }
 
 /** Point à `distanceNm` sur la route vraie `bearingDeg` (sphère). */
@@ -11441,6 +11530,17 @@ $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
 $("map-sigmet").addEventListener("click", () => MAP.toggleSigmets());
+$("map-radar").addEventListener("click", () => {
+  const visible = MAP.toggleRadar();
+  persistSetting({ map_weather_radar: visible });
+  if (visible) void refreshRadar();
+  syncWeatherMapUi();
+});
+$("map-weather-stations").addEventListener("click", () => {
+  const visible = MAP.toggleWeatherStations();
+  persistSetting({ map_weather_stations: visible });
+  syncWeatherMapUi();
+});
 $("map-fms-alternate").addEventListener("click", toggleFmsAlternate);
 MAP.onTrafficSelect((entry, x, y) => { void showTrafficCard(entry, x, y); });
 $("map-traffic").addEventListener("click", () => toggleTraffic());
