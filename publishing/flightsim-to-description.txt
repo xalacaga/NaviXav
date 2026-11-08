@@ -26,17 +26,25 @@ Every import checks that SID, route, STAR and approach actually connect on MSFS 
 
 Departure, arrival and alternate METAR and TAF with graphical flight conditions, wind, visibility and ceiling, plus en-route wind and temperature taken from the OFP. Live METAR refreshes every 5 minutes from aviationweather.gov — and never changes your runway or your procedures behind your back.
 
+SIGMETs in force within 150 NM of your route — thunderstorms, turbulence, icing, volcanic ash, tropical cyclones — are listed with their levels, validity and full text, and the ones your route actually crosses at or below your cruise level come first. International and US SIGMETs are both covered, and the latest report stays on screen if aviationweather.gov stops answering.
+
 📡 Flight tracking
 
 Flight phase, GS and IAS, next waypoint and distance, lateral deviation, distance to go, next constraint and the vertical rate required to meet it, Top of Descent and deviation from the planned vertical profile.
 
 The TOD comes from the SimBrief performance profile once validated against the active route, otherwise from a 3° estimate, always respecting published STAR and approach ceilings. It is an estimate and not a reading of your MCDU: the FMS may place it elsewhere. From 50 NM, NaviXav asks you to prepare the descent; at 10 NM a separate imminent-TOD caution stays up until the descent is engaged.
 
+Fuel is followed against the OFP all the way: NaviXav compares the fuel on board with what the SimBrief navlog planned at your position, and carries that difference to an estimated fuel at destination, checked against final reserve plus alternate fuel. Contingency fuel absorbs small deviations, so the caution only appears once that margin is gone.
+
+On final, a stabilized-approach gate at 1,000 ft in IMC or 500 ft in VMC checks gear, flaps, speed stability, sink rate and, on an ILS, localizer and glideslope deviation. A tile shows the gate and then either "Stable" or the criteria that are out.
+
 🎛️ Aircraft configuration and alerts
 
 Gear, flaps, speedbrakes, parking brake, altimeter setting, autopilot modes, selected altitude, fuel, wind and the seven exterior lights, read live from MSFS in a cockpit-style synoptic. The classic compact layout remains available.
 
-NaviXav raises MASTER CAUTION and MASTER WARNING for gear not down on approach, flaps or speedbrakes misconfigured, strobes or landing lights off, parking brake still set, wrong QNH or STD across the transition altitude, selected altitude above the next constraint, ILS frequency differing from the plan, anti-ice off in icing conditions and fuel below final reserve.
+NaviXav raises MASTER CAUTION and MASTER WARNING for gear not down on approach, flaps or speedbrakes misconfigured, strobes or landing lights off, parking brake still set, wrong QNH or STD across the transition altitude, selected altitude above the next constraint, ILS frequency differing from the plan, anti-ice off in icing conditions, fuel below final reserve, estimated destination fuel below the diversion minimum, an unstable approach below the gate, and a SIGMET ahead that the aircraft is about to enter at its current level.
+
+Voice callouts are optional and fully offline: alerts, Top of Descent and ground taxi instructions are spoken by high-quality neural voices shipped with NaviXav, in all eight interface languages, with nothing to install and nothing sent over the network. Aviation terms such as MASTER CAUTION stay in English, as they do in a real cockpit, and three voices are available in English. A "Stabilized" call is made at the approach gate when everything is in order.
 
 Three safeguards keep it quiet: a rule applies only to a system the aircraft actually has, a condition must persist several seconds before it raises anything, and alerts are suspended at accelerated simulation rate. Alerts clear and re-arm on their own, can be acknowledged, and the whole system can be switched off from Flight tracking. Blinking is reserved for critical alerts and is disabled when reduced motion is requested.
 
@@ -59,11 +67,11 @@ NaviXav is the injection engine and removes only the SimConnect objects it creat
 
 🧰 MSFS toolbar panel (optional)
 
-An optional panel can be added to the MSFS toolbar from Settings: traffic source and on/off switch, model set and service status, next waypoint, time remaining, next constraint and TOD, and a button that brings the NaviXav window back — without leaving the simulator. It is the only part of NaviXav that goes into Community, it is installed, updated and removed explicitly, and it follows the interface language.
+An optional panel can be added to the MSFS toolbar from Settings: traffic source and on/off switch, model set and service status, next waypoint, time remaining, next constraint and TOD, and a button that brings the NaviXav window back — without leaving the simulator. Active alerts appear at the top, colour-coded by severity, and on final the TOD line gives way to the stabilized-approach status, so nothing is missed in full screen or VR. It is the only part of NaviXav that goes into Community, it is installed, updated and removed explicitly, and it follows the interface language.
 
 🗺️ Map
 
-OpenStreetMap or OpenTopoMap background, complete SimBrief route with SID, en-route, STAR and approach in distinct colours, waypoints, runways, live aircraft position and heading, trail and the complete track actually flown, follow mode, fit-to-route and fit-to-airport. Surrounding traffic appears as silhouettes turned to their heading with their callsign, and a click opens type, pilot, departure and arrival airports, ground speed and altitude.
+OpenStreetMap or OpenTopoMap background, complete SimBrief route with SID, en-route, STAR and approach in distinct colours, waypoints, runways, live aircraft position and heading, trail and the complete track actually flown, follow mode, fit-to-route and fit-to-airport. SIGMET areas are drawn in their hazard colour with their levels, the ones crossed by the route outlined in full and the others dashed, and can be hidden from the toolbar. Surrounding traffic appears as silhouettes turned to their heading with their callsign, and a click opens type, pilot, departure and arrival airports, ground speed and altitude.
 
 🚕 Ground taxiing
 
@@ -90,7 +98,7 @@ The card adapts to the aircraft family: MCDU for Airbus, CDU for Boeing, generic
 
 🔌 Connection to MSFS 2024
 
-NaviXav talks to the simulator through SimConnect, using the native MSFS 2024 AI traffic API: connection state, live position, altitude and height above ground, heading, ground speed and vertical speed, STD versus QNH, open doors, and the airports, runways and their lighting, procedures, waypoints and navaids. Retrieved navigation data progressively builds a local database that remains available offline; the simulator must be running with a flight loaded to fetch anything new.
+NaviXav talks to the simulator through SimConnect, using the native MSFS 2024 AI traffic API: connection state, live position, altitude and height above ground, heading, ground speed and vertical speed, STD versus QNH, open doors, and the airports, runways and their lighting, procedures, waypoints and navaids. Retrieved navigation data progressively builds a local database that remains available offline; the simulator must be running with a flight loaded to fetch anything new. Every loss and recovery of the SimConnect link is logged with its cause and duration, so a disconnection can be diagnosed from evidence.
 
 When the detailed SimBrief navlog already carries validated coordinates, NaviXav plots the en-route section immediately and queries MSFS Facilities only for what is missing — a much shorter first load, with route-corridor validation and the local MSFS cache still in place as safeguards.
 
@@ -102,7 +110,7 @@ After landing, a concise summary is stored locally with a bounded event timeline
 
 🇬🇧 English · 🇫🇷 French · 🇩🇪 German · 🇪🇸 Spanish · 🇮🇹 Italian · 🇵🇹 Portuguese · 🇳🇱 Dutch · 🇵🇱 Polish
 
-Changing the language is immediate. Aeronautical abbreviations, procedure identifiers, METAR data and MCDU values deliberately stay in their standard international notation.
+Changing the language is immediate, and voice callouts follow it. Aeronautical abbreviations, procedure identifiers, METAR data and MCDU values deliberately stay in their standard international notation.
 
 🔐 Privacy
 
@@ -122,7 +130,7 @@ MSFS is not required to consult information already cached locally.
 
 📦 Installation
 
-The installer carries everything: the Python runtime and libraries, pywebview, NaviXav's own SimConnect connector and the signed Microsoft WebView2 bootstrapper. Nothing has to be installed by hand.
+The installer carries everything: the Python runtime and libraries, pywebview, NaviXav's own SimConnect connector, the pre-recorded voice callouts and the signed Microsoft WebView2 bootstrapper. Nothing has to be installed by hand.
 
 NaviXav never installs or replaces SimConnect system-wide. It ships a private copy of the modern DLL, which talks to the SimConnect service provided by MSFS. An existing SimConnect installation is left untouched.
 

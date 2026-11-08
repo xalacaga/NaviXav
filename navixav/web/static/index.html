@@ -369,6 +369,12 @@
         <p>Enregistrés localement sur cet ordinateur.</p>
       </div>
       <div class="settings-head-actions">
+        <button type="button" id="guide-open" class="icon-btn changelog-btn"
+                title="Guide d’utilisation" aria-label="Guide d’utilisation">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-1-5h2v2h-2v-2zm1-10a3.5 3.5 0 0 0-3.5 3.5h2a1.5 1.5 0 1 1 2.2 1.3c-.9.5-1.7 1.2-1.7 2.7v.5h2v-.4c0-.6.3-.9 1-1.3A3.5 3.5 0 0 0 12 5z"/>
+          </svg>
+        </button>
         <button type="button" id="changelog-open" class="icon-btn changelog-btn"
                 title="Journal des versions" aria-label="Journal des versions">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -475,7 +481,7 @@
           <select id="settings-voice-name"></select>
         </label>
         <button type="button" class="icon-btn" id="settings-voice-test">Écouter</button>
-        <p class="settings-note" id="settings-voice-help">Voix de Windows, réglées sur cet appareil.</p>
+        <p class="settings-note" id="settings-voice-help">Voix neuronale livrée avec NaviXav : elle fonctionne hors ligne, sans rien installer, et se règle sur cet appareil.</p>
       </div>
       </div>
     </details>
@@ -680,6 +686,18 @@
       <button type="submit" id="settings-submit" class="btn-primary" aria-busy="false">Enregistrer</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="guide-dialog" class="settings-dialog changelog-dialog guide-dialog" aria-labelledby="guide-title">
+  <div class="settings-head">
+    <div>
+      <h2 id="guide-title">Guide d’utilisation</h2>
+      <p id="guide-intro"></p>
+    </div>
+    <button type="button" id="guide-close" class="icon-btn" aria-label="Fermer">×</button>
+  </div>
+  <nav id="guide-contents" class="guide-contents"></nav>
+  <div id="guide-body" class="changelog-body guide-body"></div>
 </dialog>
 
 <dialog id="changelog-dialog" class="settings-dialog changelog-dialog">

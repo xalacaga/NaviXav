@@ -15,6 +15,17 @@
     "localised siblings, and prepends a version section to CHANGELOG.md, the",
     "history the application reads, then resets this file."
   ],
-  "added": [],
+  "added": [
+    {
+      "en": "User guide: a question-mark icon at the top of the settings opens a guide to every menu, module and setting, with step-by-step setup and troubleshooting, in all eight interface languages",
+      "fr": "Guide d’utilisation : une icône en forme de point d’interrogation, en haut des paramètres, ouvre un guide de chaque menu, module et réglage, avec une configuration pas à pas et l’aide en cas de problème, dans les huit langues de l’interface",
+      "de": "Benutzerhandbuch: Ein Fragezeichen-Symbol oben in den Einstellungen öffnet ein Handbuch zu jedem Menü, Modul und jeder Einstellung, mit Schritt-für-Schritt-Einrichtung und Fehlerbehebung, in allen acht Sprachen der Oberfläche",
+      "es": "Guía de uso: un icono de interrogación en la parte superior de los ajustes abre una guía de cada menú, módulo y ajuste, con configuración paso a paso y solución de problemas, en los ocho idiomas de la interfaz",
+      "it": "Guida all’uso: un’icona a forma di punto interrogativo in alto nelle impostazioni apre una guida a ogni menu, modulo e impostazione, con configurazione passo dopo passo e risoluzione dei problemi, nelle otto lingue dell’interfaccia",
+      "pt": "Guia de utilização: um ícone de ponto de interrogação no topo das definições abre um guia de cada menu, módulo e definição, com configuração passo a passo e resolução de problemas, nas oito línguas da interface",
+      "nl": "Gebruikershandleiding: een vraagteken-pictogram bovenaan de instellingen opent een handleiding bij elk menu, elke module en elke instelling, met stapsgewijze installatie en probleemoplossing, in alle acht talen van de interface",
+      "pl": "Przewodnik użytkownika: ikona znaku zapytania u góry ustawień otwiera przewodnik po każdym menu, module i ustawieniu, z konfiguracją krok po kroku i rozwiązywaniem problemów, we wszystkich ośmiu językach interfejsu"
+    }
+  ],
   "fixed": []
 }

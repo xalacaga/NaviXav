@@ -628,6 +628,81 @@ async function openChangelog() {
   }
 }
 
+/*
+ * Guide d'utilisation. Les noms de menus ne sont pas recopiés dans le guide :
+ * ils viennent des libellés de l'interface, si bien qu'un libellé renommé se
+ * retrouve aussitôt dans le texte qui y renvoie.
+ */
+const GUIDE_TERM_KEYS = {
+  toolbar: { import: "complete", settings: "settings", update: "check_update", quit: "quit" },
+  modules: {
+    terminal: "tab_terminal", map: "tab_map", ground: "tab_ground", procedures: "tab_procedures",
+    flight: "tab_flight", constraints: "tab_constraints", dispatch: "tab_dispatch",
+    aircraft: "tab_aircraft", sia: "tab_charts", mcdu: "tab_mcdu", weather: "tab_weather",
+  },
+  settings: {
+    general: "settings_section_general", flight: "settings_section_flight",
+    display: "settings_section_display", traffic: "settings_section_traffic",
+    msfs_panel: "settings_section_msfs_panel", connections: "settings_section_connections",
+    aircraft_procedures: "aircraft_settings_title", about: "settings_section_about",
+    changelog: "changelog_title",
+  },
+};
+
+/** Remplace chaque {clé} par le libellé de l'interface ; une clé inconnue reste visible. */
+function guideFill(text) {
+  return String(text).replace(/\{([a-z_]+)\}/g, (match, key) => {
+    const label = t(key);
+    return label === key ? match : label;
+  });
+}
+
+function guideTerm(sectionId, itemId, fallback) {
+  const key = GUIDE_TERM_KEYS[sectionId]?.[itemId];
+  const label = key ? t(key) : key;
+  return key && label !== key ? label : guideFill(fallback);
+}
+
+function renderGuide() {
+  if (typeof GUIDE === "undefined") return;
+  const guide = GUIDE.text(window.I18N.getLanguage());
+  $("guide-title").textContent = guide.title;
+  $("guide-intro").textContent = guide.intro;
+  const contents = $("guide-contents");
+  const body = $("guide-body");
+  contents.innerHTML = "";
+  body.innerHTML = "";
+  contents.setAttribute("aria-label", guide.contents);
+  for (const sectionId of GUIDE.sections) {
+    const section = guide.sections[sectionId];
+    if (!section) continue;
+    const anchor = el("button", "guide-contents-link", section.title);
+    anchor.type = "button";
+    anchor.addEventListener("click", () => {
+      $(`guide-section-${sectionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    contents.append(anchor);
+
+    const block = el("section", "guide-section");
+    block.id = `guide-section-${sectionId}`;
+    block.append(el("h3", "guide-section-title", section.title));
+    if (section.intro) block.append(el("p", "guide-section-intro", guideFill(section.intro)));
+    const list = el("dl", "guide-items");
+    for (const [itemId, [term, text]] of Object.entries(section.items)) {
+      list.append(el("dt", null, guideTerm(sectionId, itemId, term)));
+      list.append(el("dd", null, guideFill(text)));
+    }
+    block.append(list);
+    body.append(block);
+  }
+}
+
+function openGuide() {
+  renderGuide();
+  $("guide-body").scrollTop = 0;
+  $("guide-dialog").showModal();
+}
+
 async function pollSimulatorStatus() {
   const context = () => true;
   const poll = beginPoll("pollSimulatorStatus", context);
@@ -11391,6 +11466,11 @@ $("chartfox-connect").addEventListener("click", connectChartFox);
 $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);
 $("changelog-open").addEventListener("click", openChangelog);
+$("guide-open").addEventListener("click", openGuide);
+$("guide-close").addEventListener("click", () => $("guide-dialog").close());
+window.addEventListener("navixav:languagechange", () => {
+  if ($("guide-dialog").open) renderGuide();
+});
 $("changelog-close").addEventListener("click", () => $("changelog-dialog").close());
 $("landing-close").addEventListener("click", () => $("landing-dialog").close());
 $("landing-copy").addEventListener("click", copyLandingCard);

@@ -4301,3 +4301,34 @@ body.remote-client .toolbar {
      texte suffisent à les distinguer. */
   * { animation: none !important; }
 }
+
+/* Guide d'utilisation : un sommaire fixe, puis le texte qui défile. */
+.guide-dialog[open] { max-width: min(860px, calc(100vw - 32px)); }
+.guide-contents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.guide-contents-link {
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.guide-contents-link:hover { color: var(--text); border-color: var(--accent); }
+.guide-section { padding: 14px 0 6px; border-top: 1px solid var(--border); }
+.guide-section:first-child { border-top: 0; padding-top: 2px; }
+.guide-section-title { margin: 0 0 6px; font-size: 1rem; }
+.guide-section-intro { margin: 0 0 8px; color: var(--text-dim); font-size: 0.84rem; }
+.guide-items { margin: 0; display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 8px 16px; }
+.guide-items dt { font-weight: 650; font-size: 0.86rem; color: var(--text); }
+.guide-items dd { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--text-dim); }
+@media (max-width: 640px) {
+  .guide-items { grid-template-columns: 1fr; gap: 2px; }
+  .guide-items dd { margin-bottom: 8px; }
+}

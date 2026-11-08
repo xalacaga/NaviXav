@@ -4766,6 +4766,16 @@
     flight_stability_stable: "Stabilne",
   });
 
+  // Guide d'utilisation : seul le bouton qui l'ouvre vit ici, le texte est dans guide.js.
+  Object.assign(TRANSLATIONS.fr, { guide_open_title: "Guide d’utilisation" });
+  Object.assign(TRANSLATIONS.en, { guide_open_title: "User guide" });
+  Object.assign(TRANSLATIONS.de, { guide_open_title: "Benutzerhandbuch" });
+  Object.assign(TRANSLATIONS.es, { guide_open_title: "Guía de uso" });
+  Object.assign(TRANSLATIONS.it, { guide_open_title: "Guida all’uso" });
+  Object.assign(TRANSLATIONS.pt, { guide_open_title: "Guia de utilização" });
+  Object.assign(TRANSLATIONS.nl, { guide_open_title: "Gebruikershandleiding" });
+  Object.assign(TRANSLATIONS.pl, { guide_open_title: "Przewodnik użytkownika" });
+
   const ELEMENTS = {
     "#map-view-label": "map_group_view",
     "#map-layers-label": "map_group_layers",
@@ -4947,6 +4957,7 @@
     "#ground-traffic-source": "traffic_source_switch_title",
     "#settings-open": "settings_title",
     "#changelog-open": "changelog_title",
+    "#guide-open": "guide_open_title",
     "#simbrief-create": "simbrief_create_title",
     "#msfs-plan-open": "msfs_plan_open_title",
     "#module-menu-toggle": "module_menu",
@@ -5251,6 +5262,10 @@
     if (supportToolbar) supportToolbar.setAttribute("aria-label", t("support_title"));
     const changelog = document.querySelector("#changelog-open");
     if (changelog) changelog.setAttribute("aria-label", t("changelog_title"));
+    const guideButton = document.querySelector("#guide-open");
+    if (guideButton) guideButton.setAttribute("aria-label", t("guide_open_title"));
+    const guideClose = document.querySelector("#guide-close");
+    if (guideClose) guideClose.setAttribute("aria-label", t("close"));
     const moduleMenu = document.querySelector("#tabs");
     if (moduleMenu) moduleMenu.setAttribute("aria-label", t("module_menu"));
     const moduleBackdrop = document.querySelector("#module-menu-backdrop");
