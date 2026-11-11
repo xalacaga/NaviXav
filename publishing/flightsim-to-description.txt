@@ -1,6 +1,6 @@
 ✈️ NaviXav — IFR flight assistant for MSFS 2024
 
-NaviXav is a local Windows application that turns your latest SimBrief OFP into a complete IFR workflow: preparation, MCDU/FMS entry, weather, live flight monitoring, ground taxi guidance, official charts — and live traffic injected into the simulator.
+NaviXav is a local Windows application that turns your latest SimBrief OFP into a complete IFR workflow: preparation, a live GSX Pro turnaround, MCDU/FMS entry, weather and turbulence, live flight monitoring, offline radio and interphone, ground taxi guidance, official charts — and live traffic injected into the simulator.
 
 Everything runs on your own computer. No account, no cloud, no subscription.
 
@@ -13,6 +13,7 @@ Everything runs on your own computer. No account, no cloud, no subscription.
     Settings, navigation database, logbook and chart cache all stay local
     Resizable down to 720 x 560 px, panels and map rearrange themselves
     An external browser opens only when you ask for it (SimBrief editor, ChartFox sign-in)
+    A built-in user guide, in the settings, explains every menu, module and setting, with step-by-step setup and troubleshooting
 
 📋 Flight preparation
 
@@ -22,11 +23,17 @@ It then completes the departure and the arrival: runways, SID, STAR, transitions
 
 Every import checks that SID, route, STAR and approach actually connect on MSFS data. A missing connection asks for confirmation instead of silently inventing a transition.
 
+With GSX Pro installed, a Turnaround module follows the ground services live from a top view of your aircraft at the stand, drawn from real silhouettes: seats turn green as passengers board, holds and tanks fill, and the jetway, stairs, catering, fuel truck, belt loaders, GPU and pushback tug come and go. Each service has its progress bar, the estimated TOBT is compared with the OFP departure, and a final load and trim sheet flags any last-minute change. Real seat, hold and centre-of-gravity figures are read from the aircraft whenever it publishes them, as the Fenix does. On arrival, a docking guidance display brings you onto the stand line. The module only appears when GSX Pro is installed, and works with any aircraft.
+
 🌦️ Weather
 
 Departure, arrival and alternate METAR and TAF with graphical flight conditions, wind, visibility and ceiling, plus en-route wind and temperature taken from the OFP. Live METAR refreshes every 5 minutes from aviationweather.gov — and never changes your runway or your procedures behind your back.
 
 SIGMETs in force within 150 NM of your route — thunderstorms, turbulence, icing, volcanic ash, tropical cyclones — are listed with their levels, validity and full text, and the ones your route actually crosses at or below your cruise level come first. International and US SIGMETs are both covered, and the latest report stays on screen if aviationweather.gov stops answering.
+
+Turbulence gets its own layer: the clear-air turbulence risk forecast along your route from the OFP wind shear, and turbulence actually reported by pilots (PIREP and AIREP) near the route. When reported turbulence lies ahead at your level, an information alert tells you, without a master caution.
+
+On the map, an optional RainViewer precipitation radar, kept on the latest published frame, and METAR wind barbs with speed at the departure and arrival airports complete the picture, each with its own switch, a visible timestamp and its source attribution.
 
 📡 Flight tracking
 
@@ -45,6 +52,12 @@ Gear, flaps, speedbrakes, parking brake, altimeter setting, autopilot modes, sel
 NaviXav raises MASTER CAUTION and MASTER WARNING for gear not down on approach, flaps or speedbrakes misconfigured, strobes or landing lights off, parking brake still set, wrong QNH or STD across the transition altitude, selected altitude above the next constraint, ILS frequency differing from the plan, anti-ice off in icing conditions, fuel below final reserve, estimated destination fuel below the diversion minimum, an unstable approach below the gate, and a SIGMET ahead that the aircraft is about to enter at its current level.
 
 Voice callouts are optional and fully offline: alerts, Top of Descent and ground taxi instructions are spoken by high-quality neural voices shipped with NaviXav, in all eight interface languages, with nothing to install and nothing sent over the network. Aviation terms such as MASTER CAUTION stay in English, as they do in a real cockpit, and three voices are available in English. A "Stabilized" call is made at the approach gate when everything is in order.
+
+An optional ATC radio ambience brings the frequency to life: pre-recorded English exchanges between controllers and crews, with a VHF radio effect, follow your flight phase — ground while taxiing, tower for take-off and short final, approach below FL100, centre en route. It is background atmosphere, not an ATC service: nothing said concerns your aircraft, it falls silent during NaviXav callouts, and its volume is adjustable.
+
+Offline radio and interphone go one step further and speak to you, from the flight you loaded: clearance at the stand with your destination, SID and squawk, boarding completed from the cabin, loadsheet ready, pushback approved, taxi clearance along the computed route, line-up and take-off with the current wind, handoff to departure, and on arrival your stand and chocks in. French controllers speak French at French airports when the interface is in French, English everywhere else. Radio messages carry a VHF effect, cabin calls an interphone effect, and everything falls silent when you fly with VATSIM or IVAO. Taxi instructions stop once you are on the departure runway. Callouts and alarms have their own volume, set in the Cockpit audio settings.
+
+For the most natural voices, an optional speech engine (Kokoro, with eSpeak NG shipped as a separate GPL program) speaks every message as a whole sentence, still fully offline. Without it, recorded phrases are used.
 
 Three safeguards keep it quiet: a rule applies only to a system the aircraft actually has, a condition must persist several seconds before it raises anything, and alerts are suspended at accelerated simulation rate. Alerts clear and re-arm on their own, can be acknowledged, and the whole system can be switched off from Flight tracking. Blinking is reserved for critical alerts and is disabled when reduced motion is requested.
 
@@ -71,13 +84,13 @@ An optional panel can be added to the MSFS toolbar from Settings: traffic source
 
 🗺️ Map
 
-OpenStreetMap or OpenTopoMap background, complete SimBrief route with SID, en-route, STAR and approach in distinct colours, waypoints, runways, live aircraft position and heading, trail and the complete track actually flown, follow mode, fit-to-route and fit-to-airport. SIGMET areas are drawn in their hazard colour with their levels, the ones crossed by the route outlined in full and the others dashed, and can be hidden from the toolbar. Surrounding traffic appears as silhouettes turned to their heading with their callsign, and a click opens type, pilot, departure and arrival airports, ground speed and altitude.
+OpenStreetMap or OpenTopoMap background, complete SimBrief route with SID, en-route, STAR and approach in distinct colours, waypoints, runways, live aircraft position and heading, trail and the complete track actually flown, follow mode, fit-to-route and fit-to-airport. SIGMET areas are drawn in their hazard colour with their levels, the ones crossed by the route outlined in full and the others dashed; turbulence forecast segments and pilot reports are shown along the route. A compact toolbar groups the layers — SIGMET, turbulence, precipitation radar, METAR wind — in light menus, each layer with its own switch. Surrounding traffic appears as silhouettes turned to their heading with their callsign, and a click opens type, pilot, departure and arrival airports, ground speed and altitude.
 
 🚕 Ground taxiing
 
 A dedicated airport diagram built only from native MSFS facilities: dark aviation background, metric grid, north arrow, runways, taxiways and stands. Named taxiways stay visible even when MSFS files them as generic path segments; unnamed links and stand-access paths are hidden until you press Secondary.
 
-On the ground near a stand, NaviXav proposes a route to the selected runway, starting with a pushback when the stand requires one. On arrival, the destination stand remains your choice. The route separates what is behind from what is ahead, names the taxiways, announces the next manoeuvre and the remaining distance, and makes every runway crossing an explicit hold-short point. A crossing that cannot be represented safely means the route is rejected rather than guessed. Deviate, and it is recalculated from where you actually are.
+On the ground near a stand, NaviXav proposes a route to the selected runway, starting with a pushback when the stand requires one. On arrival, the destination stand remains your choice. The route separates what is behind from what is ahead, names the taxiways, announces the next manoeuvre and the remaining distance, and makes every runway crossing an explicit hold-short point. A crossing that cannot be represented safely means the route is rejected rather than guessed. Deviate, and it is recalculated from where you actually are. With GSX Pro, the pushback is drawn on the diagram as it happens.
 
 Ground speed is shown on the diagram, with a warning near the taxi limit and a flashing alarm beyond it, reduced automatically before turns, hold bars and the arrival stand, and never applied while you are on a runway.
 
@@ -114,7 +127,7 @@ Changing the language is immediate, and voice callouts follow it. Aeronautical a
 
 🔐 Privacy
 
-Settings, navigation database, caches, logbook and rotating diagnostic logs all stay on your computer. Logs never contain your SimBrief Pilot ID, your username or your complete route. The ChartFox token is protected by Windows DPAPI. Outbound requests are limited to what you asked for: SimBrief, map tiles, weather, traffic sources and aeronautical publications.
+Settings, navigation database, caches, logbook and rotating diagnostic logs all stay on your computer. Logs never contain your SimBrief Pilot ID, your username or your complete route. The ChartFox token is protected by Windows DPAPI. Outbound requests are limited to what you asked for: SimBrief, map tiles, weather, pilot reports and radar images, traffic sources and aeronautical publications. Voice callouts, the ATC radio ambience and the offline radio play without any network access, and the optional speech engine runs entirely on your computer.
 
 Please do not publish your SimBrief Pilot ID or username in public comments.
 
@@ -130,7 +143,9 @@ MSFS is not required to consult information already cached locally.
 
 📦 Installation
 
-The installer carries everything: the Python runtime and libraries, pywebview, NaviXav's own SimConnect connector, the pre-recorded voice callouts and the signed Microsoft WebView2 bootstrapper. Nothing has to be installed by hand.
+The installer carries everything: the Python runtime and libraries, pywebview, NaviXav's own SimConnect connector, the pre-recorded voice callouts and ATC radio ambience, and the signed Microsoft WebView2 bootstrapper. Nothing has to be installed by hand.
+
+The natural ATC voice is offered as an option during setup (about 170 MB). Already installed? Download it from Settings, Cockpit audio. The portable version takes the separate voice-engine archive, extracted next to NaviXav.exe.
 
 NaviXav never installs or replaces SimConnect system-wide. It ships a private copy of the modern DLL, which talks to the SimConnect service provided by MSFS. An existing SimConnect installation is left untouched.
 
@@ -158,4 +173,4 @@ PolyForm Noncommercial License 1.0.0. The complete source is public, noncommerci
 
 Copyright © 2026 Xavier BEGUE
 
-NaviXav is an independent project and is not affiliated with or endorsed by Microsoft, SimBrief, Navigraph, ChartFox, VATSIM, IVAO, OpenSky, national AIS authorities or the FAA.
+NaviXav is an independent project and is not affiliated with or endorsed by Microsoft, SimBrief, Navigraph, ChartFox, VATSIM, IVAO, OpenSky, RainViewer, FSDreamTeam (GSX), Fenix Simulations, national AIS authorities or the FAA.

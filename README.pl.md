@@ -165,6 +165,26 @@ Wyświetlany TOD jest szacunkiem SimBrief lub NaviXav, a nie odczytem MCDU. Prof
 
 Śledzenie lotu i panel w symulatorze pokazują „Zniżanie w toku” zamiast TOD podczas zniżania, a następnie „Podejście”. Odcinki poziome zachowują komunikat, jeśli utrata wysokości potwierdza zniżanie. Status pochodzi z telemetrii, nie z trybu DES FMS.
 
+### Obsługa postoju, radio i turbulencje
+
+- **Moduł Obsługa postoju z GSX Pro** (widoczny tylko, gdy zainstalowano GSX
+  Pro): widok z góry na żywo samolotu na stanowisku z sylwetkami plane-watch,
+  kabina zapełniająca się podczas wsiadania, ładowane luki i zbiorniki oraz
+  przyjeżdżające i odjeżdżające rękaw, schody, catering, cysterna, taśmy
+  bagażowe, GPU i ciągnik. Każda usługa ma pasek postępu, szacowany TOBT jest
+  porównywany z odlotem z OFP, a końcowy arkusz załadunku i wyważenia
+  sygnalizuje każdą LMC. Rzeczywiste miejsca, luki i środek ciężkości są
+  odczytywane z samolotu, gdy je publikuje (EFB Fenixa, stacje załadunku MSFS).
+- **Radio i interkom offline**: zgoda na stanowisku, koniec wsiadania zgłoszony
+  przez kabinę, gotowy arkusz załadunku, zgoda na wypychanie, kołowanie po
+  wyznaczonej trasie, zajęcie pasa i start z wiatrem, przekazanie do odlotów, a
+  po przylocie stanowisko i klocki. Wszystko pochodzi z wczytanego lotu; milknie
+  przy ruchu VATSIM lub IVAO. Nie jest to służba kontroli ruchu.
+- **Turbulencje**: ryzyko turbulencji w czystym powietrzu prognozowane wzdłuż
+  trasy na podstawie uskoku wiatru z OFP oraz turbulencje zgłoszone przez
+  pilotów (PIREP, AIREP) w pobliżu trasy, z komunikatem, gdy są przed Tobą na
+  Twoim poziomie.
+
 ### Karta MCDU
 
 Karta **Karta MCDU** dostosowuje strony do typu samolotu: MCDU Airbusa, CDU
@@ -420,6 +440,13 @@ Dostępne jest również archiwum przenośne: rozpakować
 `NaviXav-<wersja>-windows-x64-portable.zip`, a następnie uruchomić
 `NaviXav.exe`. Na komputerze bez WebView2 należy najpierw użyć pełnego
 instalatora.
+
+Instalator oferuje też opcjonalnie **naturalny głos ATC** (około 170 MB):
+syntezator mowy offline (Kokoro, z eSpeak NG dostarczanym jako osobny program
+na licencji GPL), który wypowiada komunikaty radia i interkomu całymi zdaniami.
+Istniejące instalacje mogą go pobrać w **Ustawienia > Dźwięk w kokpicie**; wersja
+przenośna korzysta z osobnego archiwum `NaviXav-<version>-voice-engine.zip`,
+rozpakowanego obok `NaviXav.exe`. Bez niego wieża używa nagranych zdań.
 
 ### Ze źródeł
 

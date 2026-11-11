@@ -31,6 +31,11 @@ this licensing change does not revoke them. Third-party components and
 runtime data remain governed by their own terms, as described in
 [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
+The aircraft silhouettes in `navixav/web/static/silhouettes.js` come from
+plane-watch/pw-silhouettes under CC BY-NC-SA 4.0. A NaviXav commercial licence
+cannot cover them: commercial use requires replacing them, or a separate
+licence from Plane Watch.
+
 ## Français
 
 Le code source actuel de NaviXav est utilisable gratuitement pour les usages
@@ -63,3 +68,8 @@ sous licence Apache 2.0. Les droits déjà accordés sur ces versions restent
 valables et ne sont pas révoqués par ce changement. Les composants tiers et
 les données chargées à l'exécution restent soumis à leurs propres conditions, décrites
 dans [NOTICE](NOTICE) et [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
+Les silhouettes d'avions de `navixav/web/static/silhouettes.js` proviennent
+de plane-watch/pw-silhouettes, sous licence CC BY-NC-SA 4.0. Une licence
+commerciale de NaviXav ne peut pas les couvrir : un usage commercial impose de
+les remplacer, ou d'obtenir une licence distincte auprès de Plane Watch.

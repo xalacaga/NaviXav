@@ -101,3 +101,21 @@ def test_radar_endpoint_exposes_only_the_validated_frame(monkeypatch, tmp_path):
     assert result["frame"]["source"] == "RainViewer"
     assert result["frame"]["max_zoom"] == 7
     assert result["refresh_interval_seconds"] == 600
+
+
+def test_the_manifest_is_read_again_as_soon_as_the_next_image_is_due():
+    """Relevé réel : relire à heure fixe laissait jusqu'à vingt minutes de retard."""
+    session = Session(PAYLOAD)
+    feed = RadarFeed(session=session)
+    newest = 1_700_000_600
+
+    feed.current(monotonic=1000, wall=newest + 60)
+    # L'image suivante n'existe pas encore : aucun appel.
+    feed.current(monotonic=1120, wall=newest + 180)
+    assert session.calls == 1
+    # Dix minutes et demie après la dernière image : elle doit être publiée.
+    feed.current(monotonic=1570, wall=newest + 600 + 90)
+    assert session.calls == 2
+    # En attendant qu'elle paraisse, au plus une relecture par minute.
+    feed.current(monotonic=1600, wall=newest + 600 + 120)
+    assert session.calls == 2

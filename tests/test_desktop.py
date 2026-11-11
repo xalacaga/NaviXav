@@ -126,6 +126,38 @@ def test_responsive_styles_cover_compact_windows():
     assert "100dvh" in css
 
 
+def test_map_turbulence_key_reserves_space_for_its_report_triangle():
+    css = (Path(desktop.__file__).parent / "web" / "static" / "app.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert ".map-legend > span { white-space: nowrap; }" in css
+    turbulence_key = css[css.index(".key.turbulence {") :]
+    turbulence_key = turbulence_key[: turbulence_key.index("}")]
+    assert "margin-right: 10px" in turbulence_key
+    assert "flex: 0 0 22px" in turbulence_key
+
+
+def test_every_primary_map_display_uses_a_distinct_colour_in_both_themes():
+    css = (Path(desktop.__file__).parent / "web" / "static" / "app.css").read_text(
+        encoding="utf-8"
+    )
+    variables = (
+        "rwy", "rwy-active", "route-sid", "route-enroute", "route-star",
+        "route-approach", "route-fms", "route-fms-alternate", "map-weather-station",
+    )
+
+    dark = css[: css.index(':root[data-theme="light"]')]
+    light = css[css.index(':root[data-theme="light"]') : css.index("\n* {")]
+    for theme in (dark, light):
+        colours = [re.search(rf"--{name}:\s*(#[0-9a-fA-F]{{6}})", theme).group(1).lower() for name in variables]
+        assert len(colours) == len(set(colours)), colours
+
+    assert "border: 2px solid var(--map-weather-station)" in css
+    assert "var(--map-turbulence-light)" in css
+    assert "var(--map-turbulence-severe)" in css
+
+
 def test_interface_offers_persistent_european_languages():
     static = Path(desktop.__file__).parent / "web" / "static"
     html = (static / "index.html").read_text(encoding="utf-8")
@@ -243,6 +275,42 @@ def test_settings_collapse_every_configuration_family():
     assert html.count('name="settings-group"') >= 7
     assert html.index('id="settings-section-general"') < html.index('class="aircraft-settings"')
     assert html.index('class="aircraft-settings"') < html.index('id="support-title"')
+
+
+def test_audio_settings_are_grouped_and_the_flight_panel_has_a_synced_atc_switch():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    tower = (static / "tower.js").read_text(encoding="utf-8")
+
+    # L'audio du cockpit est une section de paramètres à part, plus une carte
+    # rangée dans « Vol & météo ».
+    assert 'class="settings-section settings-section-audio"' in html
+    assert 'class="settings-audio"' in html
+    flight = html.index('id="settings-section-flight"')
+    audio = html.index('id="settings-audio-title"')
+    assert html.index("</details>", flight) < audio
+    assert html.count('class="settings-audio-card ') == 3
+    assert 'class="settings-audio-more"' in html
+    assert ".settings-audio-grid" in css
+    assert 'input.id = "flight-atc-toggle"' in javascript
+    assert "pills.append(buildFlightAtcToggle());" in javascript
+    assert 'TOWER.onChange(syncTowerSettings);' in javascript
+    assert "onChange(listener) { listeners.add(listener); }" in tower
+
+
+def test_turnaround_seats_follow_the_live_gsx_passenger_counter():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "turnaround.js").read_text(encoding="utf-8")
+    css = (static / "app.css").read_text(encoding="utf-8")
+
+    assert "const followingGsxProgress = running(derived.boarding) || running(derived.deboarding);" in javascript
+    assert 'cabin.source === "aircraft" && !followingGsxProgress' in javascript
+    progress = javascript[javascript.index("if (followingGsxProgress) {") :]
+    assert "order.slice(0, scaled)" in progress
+    assert '.ta-seat[data-state="reserved"] { fill: #94a3b8; }' in css
+    assert '.ta-seat[data-state="occupied"] {' in css
 
 
 def test_procedure_header_status_and_phase_flow_are_compact():
@@ -2637,3 +2705,24 @@ def test_voice_announcements_may_play_before_any_click(monkeypatch):
     # pywebview passe celui-ci : la variable remplace ses arguments.
     assert "--disable-features=ElasticOverscroll" in arguments
     assert len(arguments) == len(set(arguments))
+
+
+def test_the_offline_atc_listen_button_never_waits_for_live_synthesis():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    application = (static / "app.js").read_text(encoding="utf-8")
+    tower = (static / "tower.js").read_text(encoding="utf-8")
+
+    opening = application[application.index("async function openSettings()") :]
+    opening = opening[: opening.index("\n}")]
+    assert opening.index("prepareTowerTest();") < opening.index('fetch("/api/settings")')
+    assert "TOWER.prepareTest(towerTestContext());" in application
+    prepare_method = tower[tower.index("prepareTest(context)") :]
+    prepare_method = prepare_method[: prepare_method.index("\n    },")]
+    assert 'prepareRecorded("takeoff", context, lang)' in prepare_method
+
+    test_method = tower[tower.index("async test(context)") :]
+    test_method = test_method[: test_method.index("\n    },")]
+    assert 'prepare("takeoff", context, lang)' in test_method
+    assert 'entry.ready && transmitBuffer(entry.buffer, "takeoff")' in test_method
+    assert 'transmitRecorded("takeoff", context, lang)' in test_method
+    assert "await entry.promise" not in test_method

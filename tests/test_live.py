@@ -15,7 +15,9 @@ from navixav.live.simconnect import (
     _FENIX_CONTROL_VARIABLES,
     _FENIX_BARO_VARIABLES,
     _FENIX_ILS_VARIABLES,
+    _GSX_VARIABLES,
     _NAV_SELECTION_VARIABLES,
+    _RAMP_VARIABLES,
     _AIRCRAFT_TITLE_VARIABLES,
     _LIGHT_STATE_VARIABLES,
     _MODERN_CONFIGURATION_VARIABLES,
@@ -116,9 +118,11 @@ class FakeClient:
     bloc secondaire ne fait pas tomber la position.
     """
 
-    def __init__(self, failing: tuple[str, ...] = ()) -> None:
+    def __init__(self, failing: tuple[str, ...] = (), gsx: dict | None = None) -> None:
         self.failing = failing
         self.calls: list[int] = []
+        # LVars GSX : un simulateur sans GSX les lit toutes à zéro.
+        self.gsx = gsx or {}
 
     def read_simvars(self, variables, timeout_s: float = 3.0):
         self.calls.append(len(variables))
@@ -188,10 +192,161 @@ class FakeClient:
             return {"NAV ACTIVE FREQUENCY:3": 108.15}
         if variables == _NAV_SELECTION_VARIABLES:
             return {"AUTOPILOT NAV SELECTED": 1.0}
+        if variables == _GSX_VARIABLES:
+            if "gsx" in self.failing:
+                raise SimConnectError("LVars GSX refusées")
+            values = {name: 0.0 for name, _unit in _GSX_VARIABLES}
+            values.update(self.gsx)
+            return values
+        if variables == _RAMP_VARIABLES:
+            if "ramp" in self.failing:
+                raise SimConnectError("bloc rampe refusé")
+            return {
+                "CG PERCENT": 25.85,
+                "EXTERNAL POWER ON:1": 1.0,
+                "PUSHBACK STATE": 3.0,
+                "PUSHBACK ATTACHED": 0.0,
+            }
         raise AssertionError(f"bloc de variables inattendu : {variables}")
 
     def close(self):
         pass
+
+
+def _on_ground(fake: FakeClient) -> FakeClient:
+    original = fake.read_simvars
+
+    def read(variables, timeout_s: float = 3.0):
+        values = original(variables, timeout_s)
+        if variables == _VARIABLES:
+            values["SIM ON GROUND"] = 1.0
+        return values
+
+    fake.read_simvars = read
+    return fake
+
+
+def test_gsx_services_are_read_on_the_ground_for_any_aircraft(monkeypatch):
+    """GSX publie ses LVars lui-même : aucun avion particulier n'est requis."""
+    source = SimConnectSource()
+    source.set_aircraft_hint("C172")
+    fake = _on_ground(FakeClient(gsx={
+        "L:FSDT_GSX_COUATL_STARTED": 1.0,
+        "L:FSDT_GSX_BOARDING_STATE": 5.0,
+        "L:FSDT_GSX_CATERING_STATE": 6.0,
+        "L:FSDT_GSX_REFUELING_STATE": 1.0,
+        "L:FSDT_GSX_DEPARTURE_STATE": 9.0,
+        "L:FSDT_GSX_NUMPASSENGERS": 174.0,
+        "L:FSDT_GSX_NUMPASSENGERS_BOARDING_TOTAL": 112.0,
+        "L:FSDT_GSX_BOARDING_CARGO_PERCENT": 140.0,
+        "L:FSDT_GSX_FUELHOSE_CONNECTED": 1.0,
+    }))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    services = source.read().ground_services
+
+    assert services is not None
+    assert services.boarding == "active"
+    assert services.catering == "completed"
+    assert services.refueling == "available"
+    # Un code que GSX ne documente pas n'est pas interprété.
+    assert services.departure is None
+    assert services.passengers_planned == 174
+    assert services.passengers_boarded == 112
+    assert services.cargo_boarded_pct == 100.0
+    assert services.fuel_hose_connected is True
+
+
+def test_gsx_services_are_absent_when_gsx_is_not_running(monkeypatch):
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient(gsx={"L:FSDT_GSX_BOARDING_STATE": 5.0}))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    assert source.read().ground_services is None
+
+
+def test_gsx_services_are_not_read_in_flight(monkeypatch):
+    source = SimConnectSource()
+    fake = FakeClient(gsx={"L:FSDT_GSX_COUATL_STARTED": 1.0})
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    state = source.read()
+
+    assert state.ground_services is None
+    assert len(_GSX_VARIABLES) not in fake.calls
+
+
+def test_finished_boarding_is_inferred_from_the_counters(monkeypatch):
+    """Relevé réel : GSX repasse à « disponible » une fois l'embarquement fini."""
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient(gsx={
+        "L:FSDT_GSX_COUATL_STARTED": 1.0,
+        "L:FSDT_GSX_BOARDING_STATE": 1.0,
+        "L:FSDT_GSX_DEBOARDING_STATE": 1.0,
+        "L:FSDT_GSX_NUMPASSENGERS": 180.0,
+        "L:FSDT_GSX_NUMPASSENGERS_BOARDING_TOTAL": 180.0,
+        "L:FSDT_GSX_BOARDING_CARGO_PERCENT": 100.0,
+        "L:FSDT_GSX_STAIRS": 5.0,
+        "L:FSDT_GSX_JETWAY": 2.0,
+    }))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    services = source.read().ground_services
+
+    assert services.boarding == "completed"
+    # Personne n'a débarqué : le débarquement reste simplement disponible.
+    assert services.deboarding == "available"
+    assert services.stairs == "active"
+    assert services.jetway == "unavailable"
+
+
+def test_boarding_with_cargo_still_loading_is_not_completed(monkeypatch):
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient(gsx={
+        "L:FSDT_GSX_COUATL_STARTED": 1.0,
+        "L:FSDT_GSX_BOARDING_STATE": 1.0,
+        "L:FSDT_GSX_NUMPASSENGERS": 180.0,
+        "L:FSDT_GSX_NUMPASSENGERS_BOARDING_TOTAL": 180.0,
+        "L:FSDT_GSX_BOARDING_CARGO_PERCENT": 50.0,
+    }))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    assert source.read().ground_services.boarding == "available"
+
+
+def test_ramp_state_is_read_on_the_ground_without_gsx(monkeypatch):
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient())
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    ramp = source.read().ramp
+
+    assert ramp.cg_percent_mac == 25.85
+    assert ramp.external_power_on is True
+    assert ramp.pushback_state == 3
+    assert ramp.pushback_attached is False
+
+
+def test_refused_ramp_block_never_breaks_position(monkeypatch):
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient(failing=("ramp",)))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    state = source.read()
+
+    assert state.on_ground
+    assert state.ramp is None
+
+
+def test_refused_gsx_block_never_breaks_position(monkeypatch):
+    source = SimConnectSource()
+    fake = _on_ground(FakeClient(failing=("gsx",)))
+    monkeypatch.setattr(source, "_connect", lambda: fake)
+
+    state = source.read()
+
+    assert state.on_ground
+    assert state.ground_services is None
 
 
 def test_simconnect_source_maps_direct_values(monkeypatch):

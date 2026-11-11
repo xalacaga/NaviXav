@@ -192,6 +192,26 @@ The displayed TOD is a SimBrief or NaviXav estimate, not a reading from the MCDU
 
 Flight tracking and the in-game panel show “Descent in progress” instead of TOD during descent, then “Approach”. Level segments retain this indication when altitude loss confirms descent. This status comes from telemetry, not the FMS DES mode.
 
+### Turnaround, radio and turbulence
+
+- **Turnaround module with GSX Pro** (shown only when GSX Pro is installed):
+  a live top view of the aircraft at its stand with plane-watch silhouettes,
+  the cabin filling as passengers board, holds and tanks loading, and the
+  jetway, stairs, catering, fuel truck, belt loaders, GPU and pushback tug
+  coming and going. Each service has a progress bar, the estimated TOBT is
+  compared with the OFP departure, and a final load and trim sheet flags any
+  LMC. Real seat, hold and centre-of-gravity data are read from the aircraft
+  when it publishes them (Fenix EFB, MSFS payload stations).
+- **Offline radio and interphone**: clearance at the stand, boarding completed
+  from the cabin, loadsheet ready, pushback approved, taxi clearance along the
+  computed route, line-up and takeoff with the wind, handoff to departure, and
+  on arrival the stand assignment and chocks in. Everything comes from the
+  loaded flight; it falls silent with VATSIM or IVAO traffic. It is not an air
+  traffic control service.
+- **Turbulence**: clear-air turbulence risk forecast along the route from the
+  OFP wind shear, and turbulence reported by pilots (PIREP, AIREP) near the
+  route, with an information alert when it lies ahead at your level.
+
 ### MCDU card
 
 The **MCDU card** tab adapts its pages to the aircraft type: Airbus MCDU,
@@ -450,6 +470,14 @@ require administrator rights.
 A portable archive is also available: extract
 `NaviXav-<version>-windows-x64-portable.zip`, then run `NaviXav.exe`. On a
 machine without WebView2, use the full installer first.
+
+The installer also offers an optional **natural ATC voice** (about 170 MB):
+an offline speech engine (Kokoro, with eSpeak NG shipped as a separate program
+under its GPL licence) that speaks the radio and interphone messages as whole
+sentences. Existing installations can download it from **Settings > Cockpit
+audio**; the portable version takes the separate
+`NaviXav-<version>-voice-engine.zip` archive, extracted next to `NaviXav.exe`.
+Without it, the tower uses recorded phrases.
 
 ### From source
 

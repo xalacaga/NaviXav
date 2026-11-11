@@ -42,6 +42,12 @@ class NavlogFix:
     # l'atteignant, dans l'unité de l'OFP.
     leg_distance_nm: float | None = None
     fuel_plan_onboard: int | None = None
+    # Cisaillement vertical du vent prévu par SimBrief, en nœuds par 1 000 ft,
+    # avec le niveau et le vent du point : de quoi estimer la turbulence en
+    # air clair le long de la route.
+    shear_kt_per_kft: float | None = None
+    altitude_ft: int | None = None
+    wind_speed_kt: int | None = None
 
     @property
     def is_real_fix(self) -> bool:
@@ -94,6 +100,9 @@ class DispatchSummary:
     # [distance restante jusqu'à destination en NM, carburant prévu], du départ
     # vers l'arrivée. Vide quand le navlog ne porte pas ces valeurs.
     fuel_profile: list[list[float]] = field(default_factory=list)
+    # Cisaillement prévu le long de la route : risque de turbulence en air
+    # clair point par point, indexé par la distance jusqu'à destination.
+    turbulence_profile: list[dict[str, Any]] = field(default_factory=list)
 
     # Profil et performances
     cost_index: str = ""
@@ -321,6 +330,7 @@ def parse_ofp(data: dict[str, Any]) -> OfpSummary:
         dispatch=_parse_dispatch(data),
     )
     summary.dispatch.fuel_profile = _fuel_profile(navlog)
+    summary.dispatch.turbulence_profile = _turbulence_profile(navlog)
     return summary
 
 
@@ -429,6 +439,9 @@ def _parse_navlog(raw: Any) -> list[NavlogFix]:
                 ),
                 leg_distance_nm=_float(item, "distance"),
                 fuel_plan_onboard=_int(item, "fuel_plan_onboard"),
+                shear_kt_per_kft=_float(item, "shear"),
+                altitude_ft=_int(item, "altitude_feet"),
+                wind_speed_kt=_int(item, "wind_spd"),
             )
         )
     return fixes
@@ -458,6 +471,51 @@ def _fuel_profile(navlog: list[NavlogFix]) -> list[list[float]]:
         if fix.fuel_plan_onboard is None or fix.fuel_plan_onboard < 0:
             continue
         profile.append([round(max(0.0, total - travelled), 1), fix.fuel_plan_onboard])
+    return profile if len(profile) >= 2 else []
+
+
+# Seuils de cisaillement vertical (nœuds par 1 000 ft) retenus en météorologie
+# aéronautique pour la turbulence en air clair : léger dès 3, modéré dès 6,
+# fort dès 9. Ce sont des tendances de prévision, pas des observations.
+CAT_THRESHOLDS = ((9.0, "SEV"), (6.0, "MOD"), (3.0, "LGT"))
+
+
+def cat_risk(shear: float | None) -> str | None:
+    """Risque de turbulence en air clair déduit du cisaillement prévu."""
+    if shear is None:
+        return None
+    for threshold, level in CAT_THRESHOLDS:
+        if shear >= threshold:
+            return level
+    return None
+
+
+def _turbulence_profile(navlog: list[NavlogFix]) -> list[dict[str, Any]]:
+    """Cisaillement prévu par point, indexé par la distance jusqu'à destination.
+
+    Comme le profil carburant : c'est la grandeur que l'interface connaît en
+    vol. Seuls les points dont SimBrief donne le cisaillement et la position
+    sont gardés ; un navlog sans distances ne donne aucun profil.
+    """
+    if len(navlog) < 2 or any(fix.leg_distance_nm is None or fix.leg_distance_nm < 0 for fix in navlog):
+        return []
+    total = sum(fix.leg_distance_nm or 0.0 for fix in navlog)
+    profile: list[dict[str, Any]] = []
+    travelled = 0.0
+    for fix in navlog:
+        travelled += fix.leg_distance_nm or 0.0
+        if fix.shear_kt_per_kft is None or fix.lat is None or fix.lon is None:
+            continue
+        profile.append({
+            "ident": fix.ident,
+            "lat": fix.lat,
+            "lon": fix.lon,
+            "remaining_nm": round(max(0.0, total - travelled), 1),
+            "altitude_ft": fix.altitude_ft,
+            "wind_kt": fix.wind_speed_kt,
+            "shear": fix.shear_kt_per_kft,
+            "risk": cat_risk(fix.shear_kt_per_kft),
+        })
     return profile if len(profile) >= 2 else []
 
 

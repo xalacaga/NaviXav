@@ -26,24 +26,30 @@
 
   /* Carte */
   --map-bg: #0b1120;
-  --rwy: #5d6b85;
-  --rwy-active: #38bdf8;
+  --rwy: #64748b;
+  --rwy-active: #f8fafc;
   --rwy-centreline: #cbd5e1;
   --label-bg: #1e293b;
   --label-border: rgba(148, 163, 184, 0.5);
   --label-text: #e2e8f0;
   --label-on-active: #041020;
   --aircraft-outline: #041020;
-  --route-sid: #38bdf8;
+  /* Chaque information de la carte garde une teinte propre : la piste
+     retenue ne se confond plus avec la SID, ni la STAR avec le FMGC. */
+  --route-sid: #22d3ee;
   --route-enroute: #a78bfa;
-  --route-star: #f59e0b;
+  --route-star: #f472b6;
   --route-approach: #34d399;
   --route-toc: #ec4899;
   --route-tod: #ef4444;
   /* Route du FMS de l'avion : un jaune franc, seule teinte encore libre
      entre SID, route, STAR, approche, TOC, TOD, trace et trafic. */
   --route-fms: #fde047;
-  --route-fms-alternate: #94a3b8;
+  --route-fms-alternate: #60a5fa;
+  --map-weather-station: #a3e635;
+  --map-turbulence-light: #fb923c;
+  --map-turbulence-moderate: #f97316;
+  --map-turbulence-severe: #ef4444;
 
   /* Trafic environnant. Une teinte neutre, volontairement plus sourde que
      l'accent : le seul appareil qui doit sauter aux yeux est celui qu'on
@@ -108,21 +114,25 @@
 
     --map-bg: #e6ecf6;
     --rwy: #64748b;
-    --rwy-active: #0369a1;
+    --rwy-active: #0f172a;
     --rwy-centreline: #ffffff;
     --label-bg: #ffffff;
     --label-border: rgba(30, 58, 110, 0.3);
     --label-text: #0f1c33;
     --label-on-active: #ffffff;
     --aircraft-outline: #ffffff;
-    --route-sid: #0284c7;
+    --route-sid: #0891b2;
     --route-enroute: #7c3aed;
-    --route-star: #b45309;
+    --route-star: #be185d;
     --route-approach: #047857;
     --route-toc: #be185d;
     --route-tod: #b91c1c;
     --route-fms: #a16207;
-    --route-fms-alternate: #64748b;
+    --route-fms-alternate: #1d4ed8;
+    --map-weather-station: #4d7c0f;
+    --map-turbulence-light: #c2410c;
+    --map-turbulence-moderate: #ea580c;
+    --map-turbulence-severe: #b91c1c;
     --traffic: #5b6b86;
     --traffic-label: #334155;
 
@@ -1825,15 +1835,72 @@ body.remote-client .mobile-theme {
 .settings-note a { color: var(--accent); }
 .settings-switch { align-self: end; min-height: 38px; }
 /* Interrupteur, voix et essai sur une ligne : le choix s'entend aussitôt. */
-.settings-voice {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px 14px;
-  align-items: end;
+.settings-audio {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-solid) 42%, transparent);
 }
-.settings-voice .field { min-width: 0; }
-.settings-voice > button { min-height: 38px; }
-.settings-voice .settings-note { margin: 0; }
+.settings-audio-heading { margin-bottom: 11px; }
+.settings-audio-heading h3 { margin: 0; font-size: 0.9rem; }
+.settings-audio-heading p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+.settings-audio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.settings-audio-card {
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.settings-audio-card.settings-tower { grid-column: 1 / -1; }
+.settings-audio-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+.settings-audio-card .settings-switch { align-self: center; min-height: 0; }
+.settings-listen { flex: 0 0 auto; min-height: 34px; padding-block: 6px; }
+.settings-audio-controls {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.75fr) minmax(180px, 1.25fr);
+  gap: 10px;
+}
+.settings-audio-card .field { min-width: 0; }
+.settings-audio-card input[type="range"] { width: 100%; accent-color: var(--accent); }
+.settings-audio-card .settings-note { margin: 0; }
+.settings-engine-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-solid) 52%, transparent);
+}
+.settings-engine-status .settings-note { flex: 1 1 auto; }
+.settings-engine-status button { flex: 0 0 auto; }
+.settings-audio-more { border-top: 1px solid var(--border); padding-top: 9px; }
+.settings-audio-more summary {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.settings-audio-more[open] summary { margin-bottom: 8px; color: var(--text); }
 /* Une mise en garde tient sous son réglage, sur toute la largeur : la couper
    en colonne la rendrait illisible juste là où elle compte. */
 .settings-note {
@@ -2092,7 +2159,10 @@ body.remote-client .mobile-theme {
 }
 @media (max-width: 620px) {
   .settings-grid { grid-template-columns: 1fr; }
-  .settings-voice { grid-template-columns: 1fr; }
+  .settings-audio-grid, .settings-audio-controls { grid-template-columns: 1fr; }
+  .settings-audio-card.settings-tower { grid-column: auto; }
+  .settings-engine-status { align-items: stretch; flex-direction: column; }
+  .settings-engine-status button { width: 100%; }
   .aircraft-survey-columns { grid-template-columns: 1fr; }
   .aircraft-folder-row { align-items: stretch; flex-direction: column; }
   .support-card { align-items: stretch; flex-direction: column; }
@@ -2463,6 +2533,7 @@ body.remote-client .mobile-theme {
   pointer-events: none;
 }
 .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.map-legend > span { white-space: nowrap; }
 .map-attribution {
   position: absolute;
   right: 8px;
@@ -2509,7 +2580,7 @@ body.remote-client .mobile-theme {
 }
 .key.weather-station {
   width: 9px; height: 9px;
-  border: 2px solid #22c55e; border-radius: 50%;
+  border: 2px solid var(--map-weather-station); border-radius: 50%;
 }
 
 /* SIGMET près de la route, dans la météo. */
@@ -4351,15 +4422,320 @@ body.remote-client .toolbar {
 }
 
 /* Ambiance radio ATC, sous les annonces vocales. */
-.settings-chatter {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px 14px;
-  align-items: end;
+/* ------------------------------------------------------------- module Escale */
+
+.ta-panel { padding-bottom: 24px; }
+.ta-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ta-head h2 { margin: 4px 0 0; }
+.ta-status-pill {
+  padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  border: 1px solid var(--border-strong); color: var(--text-dim);
 }
-.settings-chatter .field { min-width: 0; }
-.settings-chatter input[type="range"] { width: 100%; accent-color: var(--accent); }
-.settings-chatter .settings-note { margin: 0; }
-@media (max-width: 640px) {
-  .settings-chatter { grid-template-columns: 1fr; }
+.ta-status-pill[data-state="on"] { color: var(--high); border-color: color-mix(in srgb, var(--high) 45%, transparent); }
+.ta-waiting { margin: 14px 0 0; color: var(--text-dim); }
+.ta-grid {
+  display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.1fr);
+  gap: 16px; margin-top: 16px;
 }
+.ta-grid[data-gsx="off"] { opacity: 0.55; }
+@media (max-width: 980px) { .ta-grid { grid-template-columns: 1fr; } }
+.ta-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ta-card {
+  padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 65%, transparent); min-width: 0;
+}
+.ta-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ta-card-head h3 { margin: 0; font-size: 0.98rem; }
+.ta-card-kicker { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+.ta-chip {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); white-space: nowrap;
+}
+.ta-note { margin: 10px 0 0; font-size: 0.76rem; color: var(--text-faint); line-height: 1.45; }
+
+/* Vue de rampe : asphalte, marquage au sol, avion vu de dessus. */
+.ta-ramp-svg {
+  display: block; width: 100%; max-height: 560px; border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--ground-bg) 80%, #ffffff 4%), var(--ground-bg));
+}
+.ta-lead-line { stroke: var(--ground-hold); stroke-width: 1.4; stroke-dasharray: 10 6; opacity: 0.55; }
+.ta-stop-bar { stroke: var(--ground-hold); stroke-width: 3; opacity: 0.8; }
+.ta-door { fill: var(--ground-hold); }
+.ta-door-cargo { fill: var(--route-enroute); }
+
+.ta-vehicle {
+  opacity: 0; transform: translate(var(--from-x, 0), var(--from-y, 0));
+  transition: transform 1.8s cubic-bezier(.2,.8,.2,1), opacity 0.7s ease;
+}
+.ta-vehicle[data-show="1"] { opacity: 1; transform: none; }
+.ta-vehicle-fuel .ta-vehicle-catering-front .ta-vehicle-body, .ta-vehicle-catering-rear .ta-vehicle-gpu .ta-vehicle-water .ta-vehicle-lavatory .ta-tug .ta-stairs .ta-belt .ta-jetway { opacity: 0; transform-origin: 0 0; transform: scaleX(0.05); transform-box: fill-box; transition: transform 2.2s ease, opacity 0.5s ease; }
+.ta-jetway[data-show="1"] { opacity: 1; transform: none; }
+.ta-terminal { fill: #475569; }
+
+.ta-hose, .ta-bag-flow, .ta-pax-flow { fill: none; opacity: 0; transition: opacity 0.6s ease; }
+.ta-hose[data-show="1"], .ta-bag-flow[data-show="1"], .ta-pax-flow[data-show="1"] { opacity: 1; }
+.ta-hose { stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 5 4; animation: ta-flow 0.8s linear infinite; }
+.ta-bag-flow { stroke: #fcd34d; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 3 6; animation: ta-flow 0.7s linear infinite; }
+.ta-bag-flow[data-direction="out"] { animation-direction: reverse; }
+.ta-pax-flow { stroke: var(--high); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0.1 9; animation: ta-flow-reverse 1.4s linear infinite; }
+.ta-pax-flow[data-direction="out"] { animation-name: ta-flow; }
+@keyframes ta-flow { to { stroke-dashoffset: -18; } }
+@keyframes ta-flow-reverse { to { stroke-dashoffset: 18; } }
+
+.ta-ramp-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin-top: 12px; }
+.ta-figure { display: grid; gap: 3px; }
+.ta-figure-label { font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.ta-figure-value { font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+.ta-bar { height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--text-faint) 25%, transparent); overflow: hidden; }
+.ta-bar-fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.8s ease; }
+/* Vert pour les passagers, bleu pour le carburant : une couleur par grandeur. */
+.ta-bar-fill.ta-bar-pax { background: var(--high); }
+
+/* Prochaine étape. */
+.ta-next-text { margin: 6px 0 0; font-size: 1.02rem; font-weight: 600; }
+.ta-next-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ta-next-actions:empty { display: none; }
+
+/* Chronologie A-CDM. */
+.ta-tobt { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
+.ta-tobt > div { display: grid; gap: 2px; }
+.ta-tobt-value { font-size: 1.7rem; font-variant-numeric: tabular-nums; color: var(--accent); }
+.ta-std-value { font-size: 1.1rem; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.ta-delay { font-weight: 700; font-size: 0.9rem; padding: 3px 9px; border-radius: 999px; }
+.ta-delay:empty { display: none; }
+.ta-delay[data-state="good"] { color: var(--high); background: color-mix(in srgb, var(--high) 14%, transparent); }
+.ta-delay[data-state="warning"] { color: var(--medium); background: color-mix(in srgb, var(--medium) 14%, transparent); }
+.ta-delay[data-state="danger"] { color: var(--low); background: color-mix(in srgb, var(--low) 14%, transparent); }
+.ta-critical { margin: 8px 0 0; font-size: 0.84rem; color: var(--medium); }
+.ta-critical:empty { display: none; }
+.ta-critical[data-state="ready"] { color: var(--high); font-weight: 700; }
+.ta-gantt { display: grid; gap: 7px; margin-top: 12px; }
+.ta-gantt-row { display: grid; grid-template-columns: 112px 1fr 56px; align-items: center; gap: 8px; font-size: 0.8rem; }
+.ta-gantt-row[data-critical="1"] .ta-gantt-label { color: var(--medium); font-weight: 700; }
+.ta-gantt-label { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-gantt-track { position: relative; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--text-faint) 16%, transparent); }
+.ta-gantt-done, .ta-gantt-forecast { position: absolute; top: 0; bottom: 0; border-radius: 6px; }
+.ta-gantt-done { background: var(--accent); }
+.ta-gantt-forecast {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 55%, transparent) 0 4px, transparent 4px 8px);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.ta-gantt-forecast.standard { filter: grayscale(0.7); }
+.ta-gantt-eta { font-variant-numeric: tabular-nums; color: var(--text-dim); text-align: right; }
+.ta-gantt-axis { position: relative; height: 18px; margin-left: 120px; margin-right: 64px; }
+.ta-gantt-axis span {
+  position: absolute; top: 0; transform: translateX(-50%); font-size: 0.68rem; font-weight: 700;
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+}
+.ta-gantt-now { color: var(--text); background: color-mix(in srgb, var(--text) 12%, transparent); }
+.ta-gantt-tobt { color: var(--accent); background: var(--accent-soft); }
+.ta-gantt-std { color: var(--text-dim); border: 1px solid var(--border-strong); }
+
+/* Devis de masse et centrage, imprimé comme un ACARS. */
+.ta-loadsheet-text {
+  margin: 0; padding: 12px; border-radius: 8px; overflow-x: auto;
+  font: 600 0.78rem/1.5 "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  background: color-mix(in srgb, var(--ground-bg) 85%, transparent); color: var(--text);
+  white-space: pre;
+}
+.ta-loadsheet-text[data-state="pending"] { font-family: inherit; font-weight: 400; white-space: normal; color: var(--text-dim); }
+.ta-lmc { margin: 10px 0 0; font-weight: 700; font-size: 0.86rem; }
+.ta-lmc:empty { display: none; }
+.ta-lmc[data-state="good"] { color: var(--high); }
+.ta-lmc[data-state="warning"] { color: var(--medium); }
+
+/* VDGS : panneau noir, chiffres ambrés, comme au poste. */
+.ta-vdgs {
+  display: grid; gap: 6px; justify-items: center; padding: 14px; border-radius: 10px;
+  background: #050505; border: 3px solid #1f2937; color: #fbbf24;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
+.ta-vdgs-type { font-size: 0.86rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.ta-vdgs-distance { font-size: 2rem; font-weight: 800; letter-spacing: 0.06em; text-shadow: 0 0 10px rgba(251, 191, 36, 0.55); }
+.ta-vdgs[data-state="stop"] { color: #ef4444; }
+.ta-vdgs[data-state="stop"] .ta-vdgs-distance { text-shadow: 0 0 12px rgba(239, 68, 68, 0.7); }
+.ta-vdgs[data-state="idle"] { color: #4b5563; }
+.ta-vdgs-bar { width: 70%; height: 8px; border: 1px solid currentColor; border-radius: 2px; overflow: hidden; }
+.ta-vdgs-bar-fill { display: block; height: 100%; width: 0; background: currentColor; transition: width 0.4s linear; }
+.ta-vdgs-arrows { display: flex; gap: 18px; font-size: 1.1rem; }
+.ta-vdgs-arrow { opacity: 0.15; }
+.ta-vdgs-arrow[data-on="1"] { opacity: 1; animation: ta-blink 0.8s steps(2) infinite; }
+@keyframes ta-blink { 50% { opacity: 0.25; } }
+.ground-vdgs { position: absolute; right: 16px; bottom: 56px; width: 190px; z-index: 3; }
+.ground-vdgs[hidden] { display: none; }
+
+/* Résumé compact dans le Suivi du vol. */
+.flight-gsx-summary-row {
+  display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+}
+.flight-gsx-summary-copy { flex: 1; min-width: 0; }
+.flight-gsx-summary-text { font-weight: 600; margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ta-vehicle, .ta-jetway, .ta-seat, .ta-bar-fill { transition: none; }
+  .ta-hose, .ta-bag-flow, .ta-pax-flow, .ta-vdgs-arrow[data-on="1"] { animation: none; }
+}
+.ta-payload-warning { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 0.84rem; font-weight: 600; color: var(--medium); background: color-mix(in srgb, var(--medium) 12%, transparent); border: 1px solid color-mix(in srgb, var(--medium) 35%, transparent); }
+.ta-payload-warning[hidden] { display: none; }
+
+/* Silhouettes plane-watch et véhicules dans le même style : aplat blanc,
+   contour noir, quelle que soit l'échelle. */
+.ta-silhouette { fill: #ffffff; stroke: #000000; stroke-width: 1.6px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ta-shape { fill: #ffffff; stroke: #000000; stroke-width: 1.1px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ta-detail { stroke: #000000; stroke-width: 0.6px; vector-effect: non-scaling-stroke; }
+.ta-glass { fill: #1f2937; stroke: #000000; stroke-width: 0.6px; vector-effect: non-scaling-stroke; }
+.ta-cable { stroke: #111827; stroke-width: 1.2px; vector-effect: non-scaling-stroke; stroke-dasharray: 2 1.5; }
+.ta-fuel-tank { fill: var(--accent); opacity: 0.5; transition: width 0.8s ease, x 0.8s ease; }
+.ta-seat { fill: #d7dde6; transition: fill 0.35s ease, stroke 0.35s ease; }
+/* Une place prévue reste neutre jusqu'à l'arrivée effective du passager. */
+.ta-seat[data-state="reserved"] { fill: #94a3b8; }
+.ta-seat[data-state="occupied"] {
+  fill: var(--high);
+  stroke: color-mix(in srgb, var(--high) 70%, #ffffff);
+  stroke-width: 0.25px;
+}
+.ta-credit { font: 500 7px Inter, system-ui, sans-serif; fill: var(--text-faint); text-anchor: end; }
+
+/* --------------------------------------------- barres de la carte et du roulage */
+
+/*
+ * Une seule ligne, sobre : aérodromes en commutateur, commandes de vue
+ * accolées, puis deux menus — Affichage et Trafic — qui rangent les options
+ * au lieu de les étaler. Les boutons gardent leurs identifiants : la logique
+ * existante ne change pas.
+ */
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; margin: -1px;
+}
+.map-bar.map-toolbar { padding: 6px 8px; gap: 0; border: 1px solid var(--border); }
+.map-toolbar-main { gap: 8px; }
+.map-primary-actions { gap: 8px; }
+.map-toolbar .icon-btn, .map-toolbar select {
+  min-height: 32px; font-size: 0.8rem; padding-block: 0; border-radius: 8px;
+}
+.map-toolbar .icon-btn { padding-inline: 10px; }
+.map-toolbar .ground-clearance { min-height: 32px; font-size: 0.82rem; }
+.map-toolbar .ground-clearance-apply { width: 28px; height: 28px; }
+
+/* Aérodromes : un commutateur à deux positions plutôt que deux grosses pastilles. */
+.map-airports {
+  gap: 0; padding: 2px; border: 1px solid var(--border); border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 50%, transparent);
+}
+.map-airports .airport-btn {
+  min-height: 28px; padding: 2px 10px; border: 0; border-radius: 8px;
+  background: transparent; font-size: 0.82rem; line-height: 1.1;
+}
+.map-airports .airport-btn small { font-size: 0.68rem; }
+.map-airports .airport-btn.active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Groupes : plus de cadres étiquetés, des boutons accolés. */
+.map-toolbar .map-control-group { padding: 0; border: 0; background: none; gap: 0; flex-wrap: nowrap; }
+.map-view-group > .icon-btn, .map-view-group .map-zoom-controls .icon-btn { border-radius: 0; margin-left: -1px; }
+.map-view-group > .icon-btn:first-of-type { border-radius: 8px 0 0 8px; margin-left: 0; }
+.map-view-group .map-zoom-controls { margin-left: 8px; }
+.map-view-group .map-zoom-controls .icon-btn:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.map-view-group .map-zoom-controls .icon-btn:last-child { border-radius: 0 8px 8px 0; }
+.map-view-group > .icon-btn:last-of-type { border-radius: 0 8px 8px 0; }
+.map-toolbar .map-zoom-controls .icon-btn { width: 32px; min-width: 32px; font-size: 1rem; }
+.map-clearance-group { gap: 6px !important; }
+
+/* Menus Affichage et Trafic. */
+.map-menu { position: relative; }
+.map-menu > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.map-menu > summary::-webkit-details-marker { display: none; }
+.map-menu > summary::after { content: "▾"; font-size: 0.7rem; color: var(--text-dim); transition: transform 0.15s ease; }
+.map-menu[open] > summary { border-color: var(--accent); color: var(--text); }
+.map-menu[open] > summary::after { transform: rotate(180deg); }
+.map-menu-count {
+  min-width: 18px; padding: 0 5px; border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+  background: var(--accent-soft); color: var(--accent); text-align: center;
+}
+.map-menu-count:empty { display: none; }
+.map-menu-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.map-menu[data-active="1"] .map-menu-dot { background: var(--high); box-shadow: 0 0 0 3px color-mix(in srgb, var(--high) 25%, transparent); }
+.map-menu-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 250px;
+  display: grid; gap: 2px; padding: 6px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  background: var(--surface-solid); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.map-menu-row { display: grid; gap: 4px; }
+/* Une option par ligne, avec un petit interrupteur à droite. */
+.map-menu-panel .icon-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 34px; border: 0; background: transparent; text-align: left;
+  color: var(--text);
+}
+.map-menu-panel .icon-btn:hover { background: color-mix(in srgb, var(--surface-raised) 70%, transparent); }
+.map-menu-panel .icon-btn[aria-pressed]::after {
+  content: ""; flex: 0 0 auto; width: 28px; height: 16px; border-radius: 999px;
+  background: var(--border-strong) radial-gradient(circle at 8px 8px, #f8fafc 5px, transparent 5.5px);
+  transition: background 0.15s ease;
+}
+.map-menu-panel .icon-btn[aria-pressed="true"]::after {
+  background: var(--accent) radial-gradient(circle at 20px 8px, #f8fafc 5px, transparent 5.5px);
+}
+.map-menu-panel .icon-btn.active { background: transparent; box-shadow: none; }
+.map-menu-panel select { width: 100%; max-width: none; }
+.map-menu-panel .traffic-source-credit, .map-menu-panel .traffic-map-only { padding: 2px 8px; font-size: 0.74rem; }
+.map-toolbar .traffic-map-only { font-size: 0.74rem; }
+@media (max-width: 900px) {
+  .map-menu-panel { position: fixed; left: 16px; right: 16px; top: auto; min-width: 0; }
+}
+.map-clearance-group .ground-clearance-field { flex: 0 1 170px; min-width: 120px; }
+.map-clearance-group .ground-clearance { width: 100%; }
+
+/* Légende turbulence : ruban de risque prévu et triangle de compte rendu. */
+.key.turbulence { width: 22px; height: 8px; margin-right: 10px; flex: 0 0 22px; border-radius: 4px; background: linear-gradient(90deg, var(--map-turbulence-light) 0 50%, var(--map-turbulence-moderate) 50% 100%); opacity: 0.8; position: relative; }
+.key.turbulence::after { content: ""; position: absolute; right: -10px; top: -2px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--map-turbulence-severe); }
+
+/* ------------------------------------------------ boutons : un style plus fin */
+
+/*
+ * Bouton principal : couleur unie, sans dégradé ni halo, et boutons
+ * secondaires plus fins. Le relief vient du contraste, pas de l'épaisseur.
+ * Les écrans tactiles gardent leur cible de 44 px (règle plus bas, qui l'emporte).
+ */
+.btn-primary {
+  min-height: 34px; padding: 6px 14px; border-radius: 8px;
+  background: var(--accent); color: #041020;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 12px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+.btn-primary:hover { transform: none; filter: brightness(1.08); }
+.icon-btn {
+  padding: 6px 11px; border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+.icon-btn:hover { background: var(--surface-raised); }
+
+/* Bandeau guidé : le module recommandé et les cartes, en un seul groupe. */
+.flight-context-actions { gap: 0; padding: 8px; }
+.flight-context-actions button { min-height: 32px; font-size: 0.78rem; font-weight: 600; }
+#context-primary {
+  border-radius: 8px 0 0 8px;
+  background: var(--accent-soft); color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+#context-primary::before { content: "→"; font-weight: 700; }
+#context-primary:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); filter: none; }
+#context-charts { border-radius: 0 8px 8px 0; margin-left: -1px; }
+/* Petits écrans tactiles : la cible de 44 px reste la règle, après l'affinage des boutons. */
+@media (max-width: 760px) {
+  button, .icon-btn, .btn-primary, select, input { min-height: 44px; }
+  .flight-context-actions button { min-height: 44px; }
+}
+
+/* Audio du cockpit, section à part entière : plus besoin de son ancien cadre. */
+.settings-section-audio .settings-audio { border: 0; padding: 0; background: none; box-shadow: none; }
+
+/* Chronologie d'escale en barres de progression : pleine et verte une fois le service terminé. */
+.ta-gantt-row { grid-template-columns: 112px 1fr 104px; }
+.ta-gantt-done { left: 0; transition: width 0.8s ease; }
+.ta-gantt-row[data-state="done"] .ta-gantt-done { background: var(--high); }
+.ta-gantt-row[data-state="done"] .ta-gantt-eta { color: var(--high); }
+.ta-gantt-eta { white-space: nowrap; }

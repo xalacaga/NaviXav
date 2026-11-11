@@ -57,10 +57,29 @@ ctypes client with the official Microsoft SDK DLL.
 
 Voice announcements and ATC radio ambience
 (navixav/web/static/voice, navixav/web/static/chatter)
-  The distribution contains pre-recorded audio files only. No speech
-  synthesis engine or voice model is included; the files were produced once
-  with scripts/generate_voice_bank.py and scripts/generate_chatter_bank.py.
+  The standard distribution contains pre-recorded audio files only, produced
+  once with scripts/generate_voice_bank.py, scripts/generate_chatter_bank.py
+  and scripts/generate_tower_bank.py. It includes no speech synthesis engine.
   The ATC radio ambience uses Kokoro-82M English voices only.
+  The offline tower (navixav/web/static/tower) uses the Kokoro-82M voices
+  bm_daniel (English) and ff_siwis (French).
+
+Optional natural tower voice (installer option, folder voice_engine)
+  Installed only when chosen in the installer, or unpacked from the separate
+  NaviXav-<version>-voice-engine.zip archive. It synthesizes the offline tower
+  messages on this computer, without any network access. Built with
+  scripts/fetch_voice_engine.py; its own licence texts and source references
+  are in voice_engine/licenses.
+    Kokoro-82M v1.0 (int8)      Apache License 2.0
+    https://huggingface.co/hexgrad/Kokoro-82M
+    eSpeak NG 1.52.0            GNU General Public License v3
+    https://github.com/espeak-ng/espeak-ng
+      Shipped and run as a separate program (espeak-ng.exe) that NaviXav
+      calls to convert text to phonemes; it is not linked into NaviXav.
+      Corresponding source:
+      https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz
+    onnxruntime                 MIT
+    numpy                       BSD 3-Clause
   English, French, Spanish, Italian
     Kokoro-82M                  Apache License 2.0
     https://huggingface.co/hexgrad/Kokoro-82M
@@ -72,6 +91,18 @@ Voice announcements and ATC radio ambience
                                 pl_PL-bass-high: Apache License 2.0
     https://huggingface.co/rhasspy/piper-voices
 
+Aircraft silhouettes (navixav/web/static/silhouettes.js)
+  Top-view aircraft silhouettes and the baggage tug drawing used by the
+  Turnaround module, adapted from plane-watch/pw-silhouettes: only the
+  outline paths are kept, without the reference artwork layer.
+    plane-watch/pw-silhouettes  Creative Commons Attribution-NonCommercial-
+                                ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+    Copyright (c) 2026 Plane Watch Contributors
+    https://github.com/plane-watch/pw-silhouettes
+    https://creativecommons.org/licenses/by-nc-sa/4.0/
+  This adapted file is distributed under CC BY-NC-SA 4.0, not under the
+  NaviXav licence, and is excluded from any NaviXav commercial licence. The
+  ground vehicles other than the baggage tug are NaviXav's own drawings.
 Online weather data services (data is fetched at runtime, not distributed)
   AviationWeather.gov          U.S. National Weather Service aviation data
   https://aviationweather.gov/data/api/

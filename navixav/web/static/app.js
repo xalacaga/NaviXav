@@ -244,6 +244,7 @@ let liveTimer = null;
 let fmsTimer = null;
 // Plan actif du FMS de l'avion, quand il le publie (Fenix). Null sinon.
 let latestFms = null;
+let latestAircraftPayload = null;
 let simulatorTimer = null;
 let weatherTimer = null;
 // SIGMET en vigueur près de la route, rafraîchis indépendamment des METAR.
@@ -319,7 +320,9 @@ const LIVE_INTERVAL_MS = 1000;
 const FMS_INTERVAL_MS = 4000;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const SIGMET_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
-const RADAR_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+// Appel local et bon marché : le service décide lui-même quand relire
+// RainViewer. Toutes les deux minutes, l'image nouvelle apparaît vite.
+const RADAR_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 // Distance devant l'avion où un SIGMET traversé à son niveau est annoncé.
 const SIGMET_LOOKAHEAD_NM = 60;
 const SIGMET_LOOKAHEAD_STEP_NM = 5;
@@ -446,9 +449,27 @@ function needsCheck(choice) {
 
 /* ----------------------------------------------------------------- status */
 
+/*
+ * Le module Escale n'existe que pour qui a GSX Pro : installé d'après le
+ * service, ou vu en marche dans le simulateur pendant la session. Sinon
+ * l'onglet disparaît, et l'on quitte le module s'il était affiché.
+ */
+let gsxSeenRunning = false;
+
+function syncTurnaroundAvailability(aircraft = latestAircraft) {
+  if (aircraft?.ground_services) gsxSeenRunning = true;
+  const available = Boolean(latestStatus?.gsx_installed) || gsxSeenRunning;
+  const button = document.querySelector('.tabs button[data-tab="turnaround"]');
+  if (!button) return;
+  show(button, available);
+  if (!available && button.classList.contains("active")) selectTab("terminal");
+}
+
 async function loadStatus() {
   const status = await fetch("/api/status").then((r) => r.json());
   latestStatus = status;
+  syncTurnaroundAvailability();
+  announceTowerEngineOnce(status);
 
   $("footer-version").textContent = `NaviXav ${status.version}`;
   const msfsPlan = status.plan_source === "msfs";
@@ -646,6 +667,7 @@ const GUIDE_TERM_KEYS = {
   },
   settings: {
     general: "settings_section_general", flight: "settings_section_flight",
+    audio: "settings_audio_title",
     display: "settings_section_display", traffic: "settings_section_traffic",
     msfs_panel: "settings_section_msfs_panel", connections: "settings_section_connections",
     aircraft_procedures: "aircraft_settings_title", about: "settings_section_about",
@@ -1086,6 +1108,9 @@ async function scaffoldAircraft(aircraft, button) {
 }
 
 async function openSettings() {
+  // Le clic d'ouverture sert aussi à préparer l'essai ATC. Le modèle naturel
+  // se charge pendant que les réglages s'affichent, pas après « Écouter ».
+  prepareTowerTest();
   const message = $("settings-message");
   message.textContent = "";
   message.className = "settings-message";
@@ -1917,6 +1942,7 @@ function renderPlan(plan) {
   startLiveLoop();
   startWeatherLoop();
   startSigmetLoop();
+  startTurbulenceLoop();
   startRadarLoop();
   startVatsimLoop();
   startTrafficLoop();
@@ -2682,6 +2708,8 @@ function updateGuidedContext(
   ) {
     primaryTab = "flight";
   }
+  // Au poste avec GSX, avant le repoussage, c'est l'escale qui compte.
+  if (TURNAROUND.relevant(aircraft)) primaryTab = "turnaround";
   const departure = currentPlan.departure?.icao || "----";
   const arrival = currentPlan.arrival?.icao || "----";
 
@@ -3265,6 +3293,7 @@ async function pollFms() {
   if (!poll) return;
   try {
     const data = await poll.json("/api/fms");
+    latestAircraftPayload = data.payload || null;
     const changed = JSON.stringify(data.legs || null) !== JSON.stringify(latestFms?.legs || null)
       || Boolean(data.available) !== Boolean(latestFms?.available);
     latestFms = data.available ? data : null;
@@ -3799,6 +3828,7 @@ function flightContext(aircraft, projection, phase, constraint, descent = null) 
   };
   context.stability = stabilityState(context);
   context.sigmet = sigmetAhead(aircraft);
+  context.turbulence = turbulenceAhead(aircraft, projection);
   return context;
 }
 
@@ -4086,6 +4116,15 @@ const ALERT_RULES = [
       c.sigmet.distanceNm ? `${c.sigmet.distanceNm} NM` : t("sigmet_inside"),
     ].filter(Boolean).join(" · "),
   },
+  {
+    // Information, pas une alarme : prévenir la cabine, attacher les
+    // passagers, envisager un autre niveau.
+    id: "turbulence_ahead",
+    severity: "info",
+    armed: (c) => !c.onGround && Boolean(c.turbulence),
+    when: () => true,
+    detail: (c) => turbulenceDetail(c.turbulence),
+  },
 ];
 
 /** Motif d'inhibition globale, ou null si les alarmes doivent être évaluées. */
@@ -4205,13 +4244,15 @@ function announceAlerts(active) {
   const current = new Set(active.map((alert) => alert.id));
   for (const alert of active) {
     if (voiceMemory.alerts.has(alert.id)) continue;
-    VOICE.announce(
-      [
+    // Une information se dit seule : la faire précéder de MASTER CAUTION
+    // l'élèverait au rang d'une alarme qu'elle n'est pas.
+    const parts = alert.severity === "info"
+      ? [{ key: `alert_${alert.id}` }]
+      : [
         { key: alert.severity === "danger" ? "master_warning" : "master_caution" },
         { key: `alert_${alert.id}` },
-      ],
-      { priority: alert.severity === "danger" }
-    );
+      ];
+    VOICE.announce(parts, { priority: alert.severity === "danger" });
   }
   voiceMemory.alerts = current;
 }
@@ -5162,6 +5203,9 @@ function updateFlightSummary(aircraft) {
     // La chronologie commence au roulage, avant que le résumé n'existe : elle
     // est rattachée entière au vol terminé, pas seulement depuis le décollage.
     completed.events = storedFlightEvents();
+    // Temps d'escale au départ, s'il a été suivi avec GSX.
+    const turnaround = TURNAROUND.report();
+    if (turnaround) completed.turnaround = turnaround;
     storeCompletedFlightSummary(completed);
     activeFlightSummary = null;
     lastFlightSummaryAt = 0;
@@ -5988,6 +6032,50 @@ function updateConfigurationBlock(aircraft) {
   updateLights(configuration);
 }
 
+/* ---------------------------------------------------- services d'escale GSX */
+
+/*
+ * Le détail de l'escale vit dans le module Escale. Le Suivi du vol n'en garde
+ * qu'une ligne — le service en cours et son avancement — et un accès au
+ * module ; elle n'apparaît qu'au sol, quand GSX tourne.
+ */
+const GSX_SUMMARY_ORDER = ["deboarding", "boarding", "refueling", "catering", "departure"];
+
+function gsxSummaryText(services) {
+  const running = GSX_SUMMARY_ORDER.find(
+    (key) => services[key] === "active" || services[key] === "requested"
+  );
+  const parts = [];
+  if (running) {
+    parts.push(`${t(`gsx_${running}`)} · ${t(`gsx_state_${services[running]}`)}`);
+    const planned = finiteOr(services.passengers_planned);
+    if (running === "boarding" && planned) {
+      parts.push(`${Math.round(finiteOr(services.passengers_boarded, 0))}/${planned} pax`);
+      const cargo = finiteOr(services.cargo_boarded_pct);
+      if (cargo !== null) parts.push(t("gsx_cargo").replace("{value}", Math.round(cargo)));
+    }
+    if (running === "deboarding" && planned) {
+      parts.push(`${Math.round(finiteOr(services.passengers_deboarded, 0))}/${planned} pax`);
+    }
+    if (running === "refueling" && services.fuel_hose_connected === true) parts.push(t("gsx_hose"));
+  } else if (services.boarding === "completed") {
+    parts.push(`${t("gsx_boarding")} · ${t("gsx_state_completed")}`);
+  } else {
+    parts.push(t("ta_gsx_idle"));
+  }
+  return parts.join(" · ");
+}
+
+function updateGroundServicesBlock(aircraft) {
+  const section = $("flight-gsx");
+  if (!section) return;
+  const services = aircraft?.ground_services || null;
+  show(section, Boolean(services));
+  if (!services) return;
+  const summary = $("flight-gsx-summary");
+  if (summary) summary.textContent = gsxSummaryText(services);
+}
+
 /* ------------------------------------------------------ chronologie du vol */
 
 /*
@@ -6798,6 +6886,7 @@ function updateFlightPanel(aircraft) {
   updateCalculatedMapPoints(climb, descent);
 
   updateConfigurationBlock(aircraft);
+  updateGroundServicesBlock(aircraft);
   updateFlightEvents(aircraft, phaseKey);
   renderFlightEvents();
   const context = flightContext(aircraft, projection, phase, constraint, descent);
@@ -6999,6 +7088,31 @@ function buildFlightVoiceToggle() {
   return switchLabel;
 }
 
+/** Interrupteur rapide de l'ATC hors ligne, lié au même choix que les Paramètres. */
+function buildFlightAtcToggle() {
+  const switchLabel = el("label", "switch flight-atc-toggle");
+  const input = el("input");
+  input.type = "checkbox";
+  input.id = "flight-atc-toggle";
+  input.checked = TOWER.enabled();
+  input.addEventListener("change", () => TOWER.setEnabled(input.checked));
+  switchLabel.append(input);
+  const track = el("span", "switch-track");
+  track.append(el("span", "switch-thumb"));
+  switchLabel.append(track);
+  switchLabel.append(el("span", "switch-label", t("atc_quick_toggle")));
+  switchLabel.title = t("atc_quick_toggle_title");
+  return switchLabel;
+}
+
+function syncTowerSettings() {
+  const enabled = TOWER.enabled();
+  const settingsToggle = $("settings-tower");
+  const flightToggle = $("flight-atc-toggle");
+  if (settingsToggle) settingsToggle.checked = enabled;
+  if (flightToggle) flightToggle.checked = enabled;
+}
+
 /** Remplit le choix de voix et aligne les interrupteurs sur la préférence. */
 function syncVoiceSettings() {
   const toggle = $("settings-voice");
@@ -7039,6 +7153,117 @@ function initChatterSettings() {
   slider.addEventListener("input", () => CHATTER.setVolume(Number(slider.value) / 100));
 }
 
+/*
+ * Voix naturelle de la tour : le moteur vocal facultatif. L'installateur le
+ * propose ; qui a déjà NaviXav le télécharge ici, car une mise à jour reprend
+ * les choix d'origine et ne l'ajouterait jamais.
+ */
+let towerEnginePoll = null;
+
+async function syncTowerEngine() {
+  const note = $("settings-tower-engine");
+  const button = $("settings-tower-engine-install");
+  if (!note || !button) return;
+  let state;
+  try {
+    state = await fetch("/api/voice-engine", { cache: "no-store" }).then((r) => r.json());
+  } catch (_error) {
+    return;
+  }
+  if (state.installed) {
+    if (latestStatus) latestStatus.voice_engine = true;
+    note.textContent = t("tower_engine_installed");
+    note.dataset.state = "installed";
+    show(button, false);
+  } else if (state.state === "downloading") {
+    const percent = state.size ? Math.round((state.received / state.size) * 100) : 0;
+    note.textContent = tf("tower_engine_downloading", { percent });
+    note.dataset.state = "busy";
+    show(button, false);
+  } else if (state.state === "installing") {
+    note.textContent = t("tower_engine_installing");
+    note.dataset.state = "busy";
+    show(button, false);
+  } else {
+    note.textContent = state.state === "error"
+      ? tf("tower_engine_error", { error: state.error || "?" })
+      : t("tower_engine_recorded");
+    note.dataset.state = state.state === "error" ? "error" : "recorded";
+    // Une tablette connectée en réseau local ne peut pas installer sur le PC.
+    show(button, !latestStatus?.remote_client);
+  }
+  const working = state.state === "downloading" || state.state === "installing";
+  if (working && !towerEnginePoll) {
+    towerEnginePoll = window.setInterval(syncTowerEngine, 1000);
+  } else if (!working && towerEnginePoll) {
+    window.clearInterval(towerEnginePoll);
+    towerEnginePoll = null;
+  }
+}
+
+/** Fait savoir une fois, après la mise à jour, que la voix naturelle existe. */
+function announceTowerEngineOnce(status) {
+  const key = "navixav-voice-engine-notice";
+  try {
+    if (status?.voice_engine || status?.remote_client || localStorage.getItem(key)) return;
+  } catch (_error) {
+    return;
+  }
+  // Au démarrage, le chargement du plan occupe le bandeau : l'annonce attend
+  // qu'il soit libre, et n'est marquée vue qu'une fois réellement affichée.
+  window.setTimeout(() => {
+    if (!$("banner").classList.contains("hidden")) return;
+    try {
+      localStorage.setItem(key, "1");
+    } catch (_error) {
+      // Préférence non retenue : l'annonce reviendra au prochain lancement.
+    }
+    // Le chemin reprend les libellés réels de l'interface, dans sa langue.
+    const path = [t("settings"), t("settings_audio_title"), t("tower_toggle"), t("tower_engine_download")]
+      .join(" > ");
+    showBanner("info", t("tower_engine_notice_title"), [tf("tower_engine_notice_body", { path })]);
+  }, 8000);
+}
+
+/** Tour hors ligne : préférence de l'appareil, comme l'ambiance radio. */
+function initTowerSettings() {
+  $("settings-tower-engine-install")?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/voice-engine/install", { method: "POST" });
+    } finally {
+      syncTowerEngine();
+    }
+  });
+  window.addEventListener("navixav:languagechange", syncTowerEngine);
+  syncTowerEngine();
+  const toggle = $("settings-tower");
+  if (!toggle) return;
+  toggle.addEventListener("change", () => TOWER.setEnabled(toggle.checked));
+  TOWER.onChange(syncTowerSettings);
+  syncTowerSettings();
+  // L'essai prend le vol chargé s'il y en a un, sinon un vol d'exemple.
+  $("settings-tower-test").addEventListener("click", () => {
+    TOWER.test(towerTestContext()).catch(() => {});
+  });
+}
+
+function towerTestContext() {
+  const context = latestAircraft ? towerContext(latestAircraft) : {};
+  return {
+    callsign: context.callsign || "AFR6142",
+    runway: context.runway || "32R",
+    departureIcao: context.departureIcao || (currentPlan?.departure?.icao ?? "LFBO"),
+    windDirection: context.windDirection ?? 320,
+    windSpeed: context.windSpeed ?? 8,
+    magVar: context.magVar ?? 0,
+    engine: Boolean(latestStatus?.voice_engine),
+  };
+}
+
+function prepareTowerTest() {
+  TOWER.prepareTest(towerTestContext());
+}
+
 function initVoiceSettings() {
   $("settings-voice").addEventListener("change", (event) => {
     VOICE.setEnabled(event.target.checked);
@@ -7047,6 +7272,12 @@ function initVoiceSettings() {
     VOICE.setPreferredName(event.target.value);
   });
   $("settings-voice-test").addEventListener("click", () => VOICE.test());
+  // Le curseur règle aussi le bip de survitesse au roulage : il reste actif
+  // même annonces coupées. Relâché, il fait entendre le niveau choisi.
+  const volume = $("settings-voice-volume");
+  volume.value = String(Math.round(VOICE.volume() * 100));
+  volume.addEventListener("input", () => VOICE.setVolume(Number(volume.value) / 100));
+  volume.addEventListener("change", () => VOICE.test());
   VOICE.onChange(syncVoiceSettings);
   window.addEventListener("navixav:languagechange", syncVoiceSettings);
   syncVoiceSettings();
@@ -7144,6 +7375,24 @@ function buildConfigurationSection() {
   return section;
 }
 
+function buildGroundServicesSection() {
+  // Une ligne et un accès : le détail de l'escale est dans le module Escale.
+  const section = el("section", "flight-gsx-summary-row hidden");
+  section.id = "flight-gsx";
+  const mark = el("span", "flight-config-heading-mark", "◎");
+  mark.setAttribute("aria-hidden", "true");
+  const copy = el("div", "flight-gsx-summary-copy");
+  copy.append(el("div", "card-kicker", t("gsx_kicker")));
+  const summary = el("div", "flight-gsx-summary-text", "—");
+  summary.id = "flight-gsx-summary";
+  copy.append(summary);
+  const open = el("button", "icon-btn", t("ta_open_module"));
+  open.type = "button";
+  open.addEventListener("click", () => selectTab("turnaround", true));
+  section.append(mark, copy, open);
+  return section;
+}
+
 function renderFlightPanel(plan) {
   if (activeFlightSummary?.plan_key !== flightSummaryPlanKey(plan)) {
     activeFlightSummary = null;
@@ -7175,6 +7424,7 @@ function renderFlightPanel(plan) {
   const pills = el("div", "flight-panel-pills");
   pills.append(buildFlightAlertsToggle());
   pills.append(buildFlightVoiceToggle());
+  pills.append(buildFlightAtcToggle());
   const master = el("span", "flight-alert-pill", t("alerts_none"));
   master.id = "flight-alert-master";
   master.dataset.severity = "none";
@@ -7233,6 +7483,7 @@ function renderFlightPanel(plan) {
   panel.append(grid);
 
   panel.append(buildConfigurationSection());
+  panel.append(buildGroundServicesSection());
   panel.append(buildFlightEventsSection());
 
   const journal = el("section", "flight-summary");
@@ -8582,7 +8833,9 @@ function ingestDispatchSample(aircraft) {
       state.block_fuel_kg = fuelKg;
       state.samples = [];
     }
-    if (state.off_block_sim_s === null && groundSpeedKt > 3) {
+    // Le repoussage GSX ou MSFS marque la sortie du poste dès son début :
+    // un tracteur pousse à moins de 3 kt.
+    if (state.off_block_sim_s === null && (groundSpeedKt > 3 || TURNAROUND.pushbackActive(aircraft))) {
       state.off_block_sim_s = state.sim_seconds;
     }
   }
@@ -10330,7 +10583,11 @@ function updateGroundHud() {
       call = { key, values: { taxiway: guidance.next_name } };
     }
     if (call) hud.append(el("div", `ground-call is-${kind}`, tf(call.key, call.values)));
-    announceTaxi(call);
+    // Aligné sur la piste au départ, le roulage est fini : la voix se tait pour
+    // laisser la place au décollage. La consigne reste écrite à l'écran.
+    const onDepartureRunway = currentMapRole === "departure"
+      && Boolean(latestAircraft?.on_ground) && GROUND.onRunway(latestAircraft);
+    announceTaxi(onDepartureRunway ? null : call);
   }
 
   // Le repoussage est la première consigne du départ, et la seule que le
@@ -10466,6 +10723,9 @@ function taxiSpeedState(aircraft, guidance) {
  */
 function taxiAlarmBeep(level) {
   if (!taxiSpeedLimits.sound) return;
+  // Même réglage que les annonces : un seul curseur pour tout ce qui alerte.
+  const peakGain = 0.09 * VOICE.volume();
+  if (peakGain < 0.0002) return;
   try {
     const Audio = window.AudioContext || window.webkitAudioContext;
     if (!Audio) return;
@@ -10478,7 +10738,7 @@ function taxiAlarmBeep(level) {
     oscillator.frequency.value = level === "over" ? 880 : 587;
     // Attaque et extinction douces : un créneau brut claque dans le casque.
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
     oscillator.connect(gain).connect(taxiAlarmContext.destination);
     oscillator.start(start);
@@ -10689,6 +10949,141 @@ function updateHud(aircraft) {
   }
 }
 
+/** Ce que le module Escale doit savoir du plan, ramené en kilogrammes. */
+function turnaroundContext(aircraft) {
+  const dispatch = currentPlan?.dispatch || {};
+  const weight = (value) => ofpFuelKg(currentPlan, value);
+  return {
+    aircraft,
+    fms: latestFms,
+    // Chargement réel publié par l'avion (EFB du Fenix), même sans plan FMGC.
+    payload: latestAircraftPayload,
+    planKey: currentPlan ? flightSummaryPlanKey(currentPlan) : null,
+    ofp: {
+      pax: finiteOr(dispatch.passengers),
+      zfwKg: plannedZfwKg(currentPlan),
+      towKg: weight(dispatch.takeoff_weight),
+      blockFuelKg: weight(dispatch.block_fuel),
+      taxiFuelKg: weight(dispatch.taxi_fuel),
+      zfwcg: finiteOr(dispatch.zfwcg),
+      offBlock: dispatch.off_block || null,
+      callsign: currentPlan?.callsign || "",
+      departure: currentPlan?.departure?.icao || "",
+      arrival: currentPlan?.arrival?.icao || "",
+      type: currentPlan?.aircraft || "",
+      registration: dispatch.registration || "",
+    },
+    targetStand: currentTaxiPlan?.parking?.label || null,
+    arrival: Boolean(aircraft) && (
+      currentMapRole === "arrival"
+      || detectFlightPhaseKey(aircraft, projectAircraftOnFlightPath(aircraft)) === "phase_taxi_in"
+    ),
+    groundVdgs: $("ground-vdgs"),
+    openTab: (tab) => selectTab(tab, true),
+  };
+}
+
+function updateTurnaround(aircraft) {
+  syncTurnaroundAvailability(aircraft);
+  try {
+    TURNAROUND.update(turnaroundContext(aircraft));
+  } catch (error) {
+    // L'escale est un confort : une erreur de rendu ne coupe jamais le suivi.
+    console.error("Module Escale", error);
+  }
+}
+
+/* Jalons d'escale annoncés à la voix, si la banque sait les dire. */
+const TURNAROUND_VOICE_KEYS = {
+  boarding_completed: "voice_gsx_boarding_done",
+  deboarding_completed: "voice_gsx_deboarding_done",
+  refueling_completed: "voice_gsx_refuel_done",
+  cargo_completed: "voice_gsx_cargo_done",
+  pushback_completed: "voice_gsx_pushback_done",
+};
+
+TURNAROUND.onEvent((event) => {
+  const key = TURNAROUND_VOICE_KEYS[event.type];
+  if (key) VOICE.announce([{ key }]);
+  // Les mêmes jalons, dits par l'équipage et le sol à la radio ou à
+  // l'interphone. Un repoussage GSX a déjà la voix de son équipage.
+  const gsxPushback = Boolean(event.aircraft?.ground_services);
+  TOWER.notify(event.type, { gsxPushback });
+});
+
+/** Fréquence de départ publiée par MSFS, si elle est unique ; sinon l'approche. */
+function towerDepartureMhz() {
+  const rows = currentPlan?.departure?.frequencies || [];
+  for (const code of ["DEP", "APP"]) {
+    const row = rows.find((entry) => entry.code === code);
+    if (row?.stations?.length === 1) return row.stations[0].mhz;
+  }
+  return null;
+}
+
+/*
+ * Nom de la destination dit dans la clairance : la ville de l'aérodrome, lue
+ * une fois dans la base de navigation, à défaut son nom.
+ */
+const towerPlaceNames = new Map();
+
+function towerDestination(icao) {
+  const code = String(icao || "").toUpperCase();
+  if (!code) return "";
+  if (!towerPlaceNames.has(code)) {
+    towerPlaceNames.set(code, "");
+    fetch(`/api/airport/${encodeURIComponent(code)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((airport) => {
+        const place = String(airport?.city || airport?.name || "").trim();
+        // Les noms MSFS sont en capitales : la voix les lit mieux en casse normale.
+        towerPlaceNames.set(code, place.toLowerCase().replace(/(^|[\s'’-])\p{L}/gu, (m) => m.toUpperCase()));
+      })
+      .catch(() => {});
+  }
+  return towerPlaceNames.get(code);
+}
+
+/** Ce que la tour hors ligne sait du vol chargé. */
+function towerContext(aircraft) {
+  const trueHeading = finiteOr(aircraft?.heading_true_deg);
+  const magneticHeading = finiteOr(aircraft?.heading_magnetic_deg);
+  // Déclinaison est positive, tirée de l'avion lui-même : cap vrai moins cap
+  // magnétique. Aucune convention de signe d'une autre source à deviner.
+  const magVar = trueHeading !== null && magneticHeading !== null
+    ? ((trueHeading - magneticHeading + 540) % 360) - 180
+    : 0;
+  const source = latestStatus?.traffic_source;
+  return {
+    aircraft,
+    guidance: currentTaxiGuidance,
+    role: currentMapRole,
+    onRunway: Boolean(aircraft?.on_ground) && GROUND.onRunway(aircraft),
+    planKey: currentPlan ? flightSummaryPlanKey(currentPlan) : null,
+    callsign: currentPlan?.callsign || (latestFms?.available ? latestFms.flight_number : ""),
+    runway: currentPlan?.departure?.runway?.value || "",
+    departureIcao: currentPlan?.departure?.icao || "",
+    windDirection: aircraft?.configuration?.wind_direction_deg,
+    windSpeed: aircraft?.configuration?.wind_speed_kt,
+    magVar,
+    departureMhz: towerDepartureMhz(),
+    // Moteur vocal facultatif installé : phrases entières, préparées à l'avance.
+    engine: Boolean(latestStatus?.voice_engine),
+    destination: towerDestination(currentPlan?.arrival?.icao),
+    sid: currentPlan?.departure?.sid?.value || "",
+    passengers: finiteOr(aircraft?.ground_services?.passengers_boarded),
+    pushbackHeading: finiteOr(currentTaxiPlan?.pushback?.heading),
+    taxiways: currentTaxiPlan?.via || [],
+    stand: currentMapRole === "arrival" ? currentTaxiPlan?.parking?.label || "" : "",
+    standDistance: aircraft?.on_ground ? GROUND.nearestParking(aircraft)?.distance_m ?? null : null,
+    gsxDeparture: aircraft?.ground_services?.departure || null,
+    pushbackActive: TURNAROUND.pushbackActive(aircraft),
+    docked: TURNAROUND.docked(),
+    // Un vrai contrôleur est sur la fréquence : la tour fictive se tait.
+    online: Boolean(latestStatus?.traffic_enabled) && (source === "vatsim" || source === "ivao"),
+  };
+}
+
 function applyAircraftState(aircraft) {
   latestAircraft = aircraft;
   if (currentPlan && String(aircraft?.title || "").trim() !== renderedAircraftTitle) {
@@ -10711,6 +11106,8 @@ function applyAircraftState(aircraft) {
   renderTaxiSpeed(aircraft);
   updateRouteStripProgress(aircraft);
   updateFlightPanel(aircraft);
+  updateTurnaround(aircraft);
+  if (!replayActive) TOWER.update(towerContext(aircraft)).catch(() => {});
   updateDispatchLive(aircraft);
   recordCurrentFlightTrail(aircraft);
   updateFlightSummary(aircraft);
@@ -10747,6 +11144,7 @@ async function pollLive() {
         latestAircraft = null;
         if (currentPlan && renderedAircraftTitle) renderAircraft(currentPlan, null);
         updateFlightPanel(null);
+        updateTurnaround(null);
         updateDispatchLive(null);
         renderProcedurePanel(currentProcedures, null);
         return;
@@ -11271,6 +11669,130 @@ function startSigmetLoop() {
   sigmetTimer = setInterval(() => refreshSigmets(), SIGMET_REFRESH_INTERVAL_MS);
 }
 
+/*
+ * Turbulence : le risque prévu vient de l'OFP (cisaillement par point), les
+ * comptes rendus de pilotes du service, relus toutes les cinq minutes.
+ */
+const TURBULENCE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+let turbulenceTimer = null;
+let turbulenceRequest = 0;
+let currentTurbulenceReports = [];
+
+function syncTurbulenceLayer() {
+  const profile = currentPlan?.dispatch?.turbulence_profile || [];
+  MAP.setTurbulence({ profile, reports: currentTurbulenceReports });
+  const hasData = profile.some((point) => point.risk) || currentTurbulenceReports.length > 0;
+  show($("legend-turbulence"), MAP.turbulenceShown && hasData);
+}
+
+async function refreshTurbulence() {
+  if (!currentPlan) return;
+  const request = ++turbulenceRequest;
+  try {
+    const response = await fetch("/api/weather/turbulence", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (request !== turbulenceRequest) return;
+    currentTurbulenceReports = Array.isArray(payload.reports) ? payload.reports : [];
+  } catch (error) {
+    // Les comptes rendus précédents restent affichés ; ils valent des heures.
+    console.warn("Turbulence refresh failed", error);
+  }
+  syncTurbulenceLayer();
+}
+
+function startTurbulenceLoop() {
+  if (turbulenceTimer) clearInterval(turbulenceTimer);
+  currentTurbulenceReports = [];
+  syncTurbulenceLayer();
+  void refreshTurbulence();
+  turbulenceTimer = setInterval(() => refreshTurbulence(), TURBULENCE_REFRESH_INTERVAL_MS);
+}
+
+const TURBULENCE_LOOKAHEAD_NM = 60;
+const TURBULENCE_REPORT_RADIUS_NM = 20;
+const TURBULENCE_LEVEL_MARGIN_FT = 4000;
+const TURBULENCE_REPORT_MAX_AGE_S = 2 * 3600;
+
+function distanceNmBetween(lat1, lon1, lat2, lon2) {
+  const radians = Math.PI / 180;
+  const h = Math.sin(((lat2 - lat1) * radians) / 2) ** 2
+    + Math.cos(lat1 * radians) * Math.cos(lat2 * radians) * Math.sin(((lon2 - lon1) * radians) / 2) ** 2;
+  return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Turbulence devant l'avion, à son niveau : un tronçon de risque modéré ou
+ * fort prévu par l'OFP, ou un compte rendu de pilote récent, modéré ou plus,
+ * près de la trajectoire. Rend la plus proche, ou null.
+ */
+function turbulenceAhead(aircraft, projection) {
+  if (!aircraft || aircraft.on_ground) return null;
+  const level = finiteOr(aircraft.configuration?.pressure_altitude_ft, finiteOr(aircraft.altitude_ft));
+  if (level === null) return null;
+  const found = [];
+
+  const profile = currentPlan?.dispatch?.turbulence_profile || [];
+  const remaining = finiteOr(projection?.remainingNm);
+  if (profile.length && remaining !== null && flightRouteTotalNm) {
+    // Le profil est indexé sur la longueur de la route SimBrief : mise à
+    // l'échelle sur celle que suit NaviXav, comme pour le carburant.
+    const profileTotal = finiteOr(currentPlan?.dispatch?.route_distance_nm, profile[0].remaining_nm);
+    const scaled = remaining * (profileTotal / flightRouteTotalNm);
+    for (const point of profile) {
+      if (point.risk !== "MOD" && point.risk !== "SEV") continue;
+      const ahead = scaled - point.remaining_nm;
+      if (ahead < 0 || ahead > TURBULENCE_LOOKAHEAD_NM) continue;
+      const altitude = finiteOr(point.altitude_ft);
+      if (altitude !== null && Math.abs(altitude - level) > TURBULENCE_LEVEL_MARGIN_FT) continue;
+      found.push({ source: "forecast", risk: point.risk, distanceNm: Math.round(ahead), shear: point.shear, ident: point.ident });
+    }
+  }
+
+  const latitude = finiteOr(aircraft.latitude);
+  const longitude = finiteOr(aircraft.longitude);
+  const heading = finiteOr(aircraft.heading_true_deg);
+  const now = Date.now() / 1000;
+  if (latitude !== null && longitude !== null && heading !== null) {
+    for (const report of currentTurbulenceReports) {
+      if (report.rank < 2 || now - report.observed > TURBULENCE_REPORT_MAX_AGE_S) continue;
+      const reportLevel = finiteOr(report.level_ft);
+      const inBand = report.base_ft != null && report.top_ft != null
+        ? level >= report.base_ft - TURBULENCE_LEVEL_MARGIN_FT && level <= report.top_ft + TURBULENCE_LEVEL_MARGIN_FT
+        : reportLevel !== null && Math.abs(reportLevel - level) <= TURBULENCE_LEVEL_MARGIN_FT;
+      if (!inBand) continue;
+      for (let distance = 0; distance <= TURBULENCE_LOOKAHEAD_NM; distance += 5) {
+        const [lat, lon] = distance ? pointAlong(latitude, longitude, heading, distance) : [latitude, longitude];
+        if (distanceNmBetween(lat, lon, report.latitude, report.longitude) <= TURBULENCE_REPORT_RADIUS_NM) {
+          found.push({
+            source: "report",
+            risk: report.rank >= 3 ? "SEV" : "MOD",
+            // La distance du compte rendu lui-même, pas celle du premier
+            // point de trajectoire qui entre dans son rayon.
+            distanceNm: Math.round(distanceNmBetween(latitude, longitude, report.latitude, report.longitude)),
+            level: reportLevel,
+            ageMin: Math.round((now - report.observed) / 60),
+            kind: report.kind,
+          });
+          break;
+        }
+      }
+    }
+  }
+  if (!found.length) return null;
+  return found.sort((a, b) => a.distanceNm - b.distanceNm || (b.risk === "SEV") - (a.risk === "SEV"))[0];
+}
+
+function turbulenceDetail(hit) {
+  const intensity = t(hit.risk === "SEV" ? "turb_severe" : "turb_moderate");
+  if (hit.source === "forecast") {
+    return [intensity, tf("turb_forecast_detail", { shear: hit.shear, distance: hit.distanceNm })].join(" · ");
+  }
+  const level = hit.level ? `FL${String(Math.round(hit.level / 100)).padStart(3, "0")}` : "";
+  return [intensity, tf("turb_report_detail", { kind: hit.kind, minutes: hit.ageMin, distance: hit.distanceNm }), level]
+    .filter(Boolean).join(" · ");
+}
+
 function weatherStation(report, point) {
   if (!report || !point) return null;
   const latitude = Number(point.lat);
@@ -11451,7 +11973,7 @@ function selectTab(name, scrollToModule = false) {
   }
   syncRouteStripVisibility(name);
   show($("terminal"), name === "terminal");
-  for (const key of ["map", "ground", "procedures", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
+  for (const key of ["turnaround", "map", "ground", "procedures", "flight", "constraints", "dispatch", "aircraft", "sia", "mcdu", "weather"]) {
     show($(`panel-${key}`), key === name);
   }
   // Le canvas doit être mesuré une fois visible, sinon il reste à zéro.
@@ -11495,6 +12017,46 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
   if (button) selectTab(button.dataset.tab, true);
 });
 
+/*
+ * Menus Affichage et Trafic des barres de la carte et du roulage : un seul
+ * ouvert à la fois, fermé d'un clic ailleurs ou par Échap. Leur bouton résume
+ * l'état : nombre de calques allumés, voyant du trafic. Le résumé suit les
+ * boutons eux-mêmes, quel que soit le code qui les bascule.
+ */
+function initMapMenus() {
+  const menus = [...document.querySelectorAll("details.map-menu")];
+  const summarize = (menu) => {
+    const toggles = [...menu.querySelectorAll(".map-menu-panel [aria-pressed]")]
+      .filter((button) => !button.classList.contains("hidden"));
+    const on = toggles.filter((button) => button.getAttribute("aria-pressed") === "true").length;
+    const count = menu.querySelector(".map-menu-count");
+    if (count) count.textContent = toggles.length ? String(on) : "";
+    menu.dataset.active = on > 0 ? "1" : "0";
+  };
+  for (const menu of menus) {
+    menu.addEventListener("toggle", () => {
+      if (menu.open) for (const other of menus) if (other !== menu) other.open = false;
+    });
+    new MutationObserver(() => summarize(menu)).observe(menu.querySelector(".map-menu-panel"), {
+      attributes: true,
+      attributeFilter: ["aria-pressed", "class"],
+      subtree: true,
+    });
+    summarize(menu);
+  }
+  document.addEventListener("pointerdown", (event) => {
+    for (const menu of menus) if (menu.open && !menu.contains(event.target)) menu.open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const open = menus.find((menu) => menu.open);
+    if (!open) return;
+    open.open = false;
+    open.querySelector("summary")?.focus();
+  });
+}
+initMapMenus();
+
 $("module-menu-toggle").addEventListener("click", () => {
   setModuleMenuOpen($("module-menu-toggle").getAttribute("aria-expanded") !== "true");
 });
@@ -11530,6 +12092,16 @@ $("map-follow").addEventListener("click", () => MAP.toggleFollow());
 $("map-basemap").addEventListener("click", () => MAP.toggleBasemap());
 $("map-constraints").addEventListener("click", () => MAP.toggleConstraints());
 $("map-sigmet").addEventListener("click", () => MAP.toggleSigmets());
+$("map-turbulence")?.addEventListener("click", () => {
+  MAP.toggleTurbulence();
+  syncTurbulenceLayer();
+});
+{
+  // État initial de l'interrupteur, retenu sur cet appareil.
+  const button = $("map-turbulence");
+  button?.classList.toggle("active", MAP.turbulenceShown);
+  button?.setAttribute("aria-pressed", String(MAP.turbulenceShown));
+}
 $("map-radar").addEventListener("click", () => {
   const visible = MAP.toggleRadar();
   persistSetting({ map_weather_radar: visible });
@@ -11578,6 +12150,7 @@ $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
 initVoiceSettings();
 initChatterSettings();
+initTowerSettings();
 $("chartfox-connect").addEventListener("click", connectChartFox);
 $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
 $("update-install").addEventListener("click", handleUpdateButton);
@@ -11587,6 +12160,7 @@ $("guide-close").addEventListener("click", () => $("guide-dialog").close());
 window.addEventListener("navixav:languagechange", () => {
   if ($("guide-dialog").open) renderGuide();
 });
+window.addEventListener("navixav:languagechange", () => TURNAROUND.rebuild());
 $("changelog-close").addEventListener("click", () => $("changelog-dialog").close());
 $("landing-close").addEventListener("click", () => $("landing-dialog").close());
 $("landing-copy").addEventListener("click", copyLandingCard);

@@ -32,11 +32,28 @@ SetupIconFile=..\assets\navixav.ico
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
+; La voix naturelle de la tour est une option : un moteur de synthèse vocale
+; (Kokoro, eSpeak NG comme programme séparé) que l'installation standard ne
+; contient pas. Une mise à jour silencieuse reprend le choix précédent.
+[Types]
+Name: "standard"; Description: "Installation standard"
+Name: "naturalvoice"; Description: "Installation avec la voix naturelle de la tour ATC"
+Name: "custom"; Description: "Installation personnalisée"; Flags: iscustom
+
+[Components]
+Name: "main"; Description: "NaviXav"; Types: standard naturalvoice custom; Flags: fixed
+Name: "towervoice"; Description: "Voix naturelle de la tour ATC (moteur vocal hors ligne, environ 170 Mo)"; Types: naturalvoice
+
 [Tasks]
 Name: "desktopicon"; Description: "Créer un raccourci sur le bureau"; GroupDescription: "Raccourcis :"; Flags: unchecked
 
 [Files]
-Source: "..\dist\NaviXav\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\NaviXav\*"; DestDir: "{app}"; Components: main; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\voice_engine\*"; DestDir: "{app}\voice_engine"; Components: towervoice; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Option décochée lors d'une réinstallation : le moteur n'a plus à rester.
+Type: filesandordirs; Name: "{app}\voice_engine"; Components: not towervoice
 Source: "assets\MicrosoftEdgeWebView2Setup.exe"; Flags: dontcopy
 
 [Icons]

@@ -166,6 +166,26 @@ Il TOD mostrato è una stima SimBrief o NaviXav, non una lettura del MCDU. Il pr
 
 Il monitoraggio e il pannello nel simulatore mostrano «Discesa in corso» al posto del TOD durante la discesa, poi «Avvicinamento». I tratti livellati mantengono l’indicazione se la perdita di quota conferma la discesa. Lo stato proviene dalla telemetria, non dalla modalità DES del FMS.
 
+### Scalo, radio e turbolenza
+
+- **Modulo Scalo con GSX Pro** (visibile solo se GSX Pro è installato): vista
+  dall’alto in diretta dell’aereo in piazzola con le sagome plane-watch, la
+  cabina che si riempie durante l’imbarco, stive e serbatoi che si caricano, e
+  pontile, scale, catering, autocisterna, nastri bagagli, GPU e trattore che
+  arrivano e ripartono. Ogni servizio ha la sua barra di avanzamento, la TOBT
+  stimata è confrontata con la partenza dell’OFP e un foglio di carico e
+  centraggio finale segnala ogni LMC. Posti, stive e baricentro reali sono
+  letti dall’aereo quando li pubblica (EFB del Fenix, stazioni di carico MSFS).
+- **Radio e interfono offline**: autorizzazione in piazzola, fine imbarco
+  annunciata dalla cabina, foglio di carico pronto, pushback approvato,
+  rullaggio lungo il percorso calcolato, allineamento e decollo con il vento,
+  trasferimento alle partenze, e all’arrivo piazzola assegnata e tacchi. Tutto
+  viene dal volo caricato; tace con il traffico VATSIM o IVAO. Non è un
+  servizio di controllo.
+- **Turbolenza**: rischio di turbolenza in aria chiara previsto lungo la rotta
+  dal wind shear dell’OFP, e turbolenza segnalata dai piloti (PIREP, AIREP)
+  vicino alla rotta, con un avviso quando si trova davanti al vostro livello.
+
 ### Scheda MCDU
 
 La scheda **Scheda MCDU** adatta le pagine al tipo di aeromobile: MCDU Airbus,
@@ -424,6 +444,14 @@ diritti di amministratore.
 È disponibile anche un archivio portatile: estrarre
 `NaviXav-<versione>-windows-x64-portable.zip`, quindi avviare `NaviXav.exe`. Su
 una macchina priva di WebView2, utilizzare prima l'installer completo.
+
+L’installer offre inoltre, come opzione, una **voce ATC naturale** (circa
+170 MB): un motore di sintesi vocale offline (Kokoro, con eSpeak NG fornito come
+programma separato con la sua licenza GPL) che pronuncia i messaggi di radio e
+interfono in frasi intere. Le installazioni esistenti possono scaricarla da
+**Impostazioni > Audio del cockpit**; la versione portatile usa l’archivio
+separato `NaviXav-<version>-voice-engine.zip`, da estrarre accanto a
+`NaviXav.exe`. Senza di essa, la torre usa frasi registrate.
 
 ### Dai sorgenti
 

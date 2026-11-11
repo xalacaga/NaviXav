@@ -202,7 +202,10 @@ if ($LASTEXITCODE -eq 0) {
 
 $Installer = "release\NaviXav-Setup-$Version.exe"
 $Portable = "release\NaviXav-$Version-windows-x64-portable.zip"
-$Packages = @($Installer, "$Installer.sha256", $Portable, "$Portable.sha256")
+# Moteur vocal facultatif : téléchargé depuis les Paramètres par ceux qui ont
+# déjà NaviXav, ou dézippé à côté de la version portable.
+$VoiceEngine = "release\NaviXav-$Version-voice-engine.zip"
+$Packages = @($Installer, "$Installer.sha256", $Portable, "$Portable.sha256", $VoiceEngine, "$VoiceEngine.sha256")
 if ($Packages | Where-Object { -not (Test-Path -LiteralPath $_) }) {
     Write-Host "Les paquets sont absents : reconstruction de v$Version." -ForegroundColor Yellow
     & (Join-Path $PSScriptRoot "build_windows.ps1")

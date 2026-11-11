@@ -8,7 +8,12 @@ import pytest
 
 from navixav.config import Settings
 from navixav.live import fenix_fms
-from navixav.live.fenix_fms import FenixFmsReader, parse_flight_plan_xml, parse_mcdu_display
+from navixav.live.fenix_fms import (
+    FenixFmsReader,
+    parse_flight_plan_xml,
+    parse_mcdu_display,
+    parse_payload,
+)
 from navixav.web.app import create_app
 
 FIXTURE = Path(__file__).parent / "data" / "fenix_fms_lfpo_dtta.xml"
@@ -91,9 +96,45 @@ def test_the_reader_tolerates_a_missing_gateway_and_retries_slowly():
     first = reader.read()
     second = reader.read()
 
-    assert first == {"available": False, "source": "fenix", "reason": "gateway_unavailable"}
+    assert first == {
+        "available": False, "source": "fenix", "reason": "gateway_unavailable", "payload": None,
+    }
     assert second == first
     assert len(probes) == 1
+
+
+def test_the_payload_travels_even_without_an_fmgc_plan():
+    """L'embarquement précède souvent l'initialisation du FMS."""
+    values = {
+        "aircraft.passengers.seatOccupation.string": "true,false,true",
+        "aircraft.cargo.forward.amount": "1200",
+        "aircraft.cargo.forward.capacity": "3074",
+        "aircraft.cargo.aft.amount": "800",
+        "aircraft.cargo.aft.capacity": "4256",
+        "aircraft.cargo.bulk.amount": "0",
+        "aircraft.cargo.bulk.capacity": "1497",
+        "aircraft.cg": "25.9",
+        "fenix.efb.boardingStatus": "completed",
+        "fenix.efb.finalLoadsheet": '{"editionNumber":2,"zfw":{"value":61450.0,"unit":"Kg"},'
+                                    '"tow":{"value":71200.0,"unit":"Kg"},"macZfw":26.7,"macTow":25.9}',
+    }
+    reader = FenixFmsReader(reader=lambda: values, listening=lambda: True)
+
+    data = reader.read()
+
+    assert data["available"] is False
+    payload = data["payload"]
+    assert payload["seats"] == [True, False, True]
+    assert payload["cargo"]["forward"] == {"amount_kg": 1200.0, "capacity_kg": 3074.0}
+    assert payload["cargo"]["bulk"]["amount_kg"] == 0.0
+    assert payload["cg_percent_mac"] == 25.9
+    assert payload["loadsheet"] == {
+        "edition": 2, "zfw_kg": 61450.0, "tow_kg": 71200.0, "mac_zfw": 26.7, "mac_tow": 25.9,
+    }
+
+
+def test_no_payload_is_reported_when_the_aircraft_publishes_none():
+    assert parse_payload({}) is None
 
 
 def test_the_reader_merges_gateway_values_and_serves_the_plan(monkeypatch):

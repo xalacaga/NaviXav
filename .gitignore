@@ -86,3 +86,8 @@ navixav/web/container.py
 # vit dans le paquet livre.
 msfs-panel/build/Packages/
 msfs-panel/build/_Temp/
+
+# Moteur vocal facultatif de la tour, construit par scripts/fetch_voice_engine.py
+voice_engine/
+voice_engine.off/
+voice_engine.new/

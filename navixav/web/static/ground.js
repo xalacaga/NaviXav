@@ -39,6 +39,9 @@ const GROUND = (() => {
   let trafficFrom = new Map();
   let trafficReceivedAt = 0;
   let trafficFrame = null;
+  // Couche « rampe » posée par le module Escale : repoussage GSX ou MSFS.
+  let rampOverlay = null;
+  let rampFrame = null;
 
   function trafficPosition(entry, now = performance.now()) {
     const previous = trafficFrom.get(entry.object_id);
@@ -213,6 +216,7 @@ const GROUND = (() => {
     drawRoute();
     drawRouteLabels();
     drawTraffic();
+    drawRampOverlay();
     drawAircraft();
     drawScaleBar();
     drawNorthArrow();
@@ -663,6 +667,61 @@ const GROUND = (() => {
     context.restore();
   }
 
+  /**
+   * Repoussage en cours : le tracteur devant le nez et le sens de la poussée.
+   *
+   * Le tracteur est dessiné à sa place réelle, une dizaine de mètres devant le
+   * point de référence de l'avion, mais jamais plus petit qu'une pastille
+   * lisible : à l'échelle du terrain entier, il disparaîtrait sous l'avion.
+   */
+  function drawRampOverlay() {
+    if (!aircraft || !rampOverlay?.pushback) return;
+    const position = toLocal(aircraft.latitude, aircraft.longitude);
+    if (!position) return;
+    const heading = ((Number(aircraft.heading_true_deg) || 0) * Math.PI) / 180;
+    const forward = { x: Math.sin(heading), y: Math.cos(heading) };
+    const [ax, ay] = toScreen(position.x, position.y);
+    const pixelsAhead = Math.max(22, 14 * view.scale);
+    const tugX = ax + forward.x * pixelsAhead;
+    const tugY = ay - forward.y * pixelsAhead;
+    const tail = Math.max(46, 45 * view.scale);
+
+    context.save();
+    // Sens du repoussage : vers l'arrière de l'avion, en tirets animés.
+    context.setLineDash([6, 5]);
+    context.lineDashOffset = -((performance.now() / 60) % 11);
+    context.strokeStyle = css("--ground-pushback") || "#f2a33a";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(ax, ay);
+    context.lineTo(ax - forward.x * tail, ay + forward.y * tail);
+    context.stroke();
+    context.setLineDash([]);
+
+    context.translate(tugX, tugY);
+    context.rotate(heading);
+    context.fillStyle = css("--ground-pushback") || "#f2a33a";
+    context.strokeStyle = css("--ground-bg");
+    context.lineWidth = 1.5;
+    roundRect(-5, -7, 10, 14, 2.5);
+    context.fill();
+    context.stroke();
+    context.restore();
+
+    context.save();
+    context.font = "700 10px 'Inter', system-ui, sans-serif";
+    context.fillStyle = css("--ground-pushback") || "#f2a33a";
+    context.textAlign = "left";
+    context.fillText(rampOverlay.label || "PUSH", tugX + 10, tugY - 8);
+    context.restore();
+    if (rampFrame === null) {
+      rampFrame = requestAnimationFrame(() => {
+        rampFrame = null;
+        draw();
+      });
+    }
+  }
+
   function drawAircraft() {
     if (!aircraft) return;
     const position = toLocal(aircraft.latitude, aircraft.longitude);
@@ -915,6 +974,21 @@ const GROUND = (() => {
     },
     onParkingSelect(callback) {
       parkingListener = typeof callback === "function" ? callback : null;
+    },
+    /** Position de l'avion en mètres locaux du terrain affiché, ou null. */
+    localPosition(state) {
+      return state?.latitude != null ? toLocal(state.latitude, state.longitude) : null;
+    },
+    /** Postes du terrain affiché : libellé, position locale, cap et rayon. */
+    parkings() {
+      return chart?.parkings || [];
+    },
+    /** Couche rampe : {pushback: bool, label} ou null pour l'effacer. */
+    setRampOverlay(overlay) {
+      const next = overlay?.pushback ? overlay : null;
+      if (JSON.stringify(next) === JSON.stringify(rampOverlay)) return;
+      rampOverlay = next;
+      draw();
     },
     nearestParking(state) {
       const position = state?.latitude != null

@@ -56,6 +56,22 @@ FMS_DATAREFS = (
     "fenix.cids.flightNumber",
     "aircraft.mcdu1.display",
     "aircraft.mcdu2.display",
+    *(
+        # Chargement réel de l'avion, tel que l'EFB le tient : un booléen par
+        # siège, le fret par soute, le centrage et le devis de masse du Fenix.
+        # Noms relevés dans le code de l'EFB servi par la passerelle.
+        "aircraft.passengers.seatOccupation.string",
+        "aircraft.cargo.forward.amount",
+        "aircraft.cargo.forward.capacity",
+        "aircraft.cargo.aft.amount",
+        "aircraft.cargo.aft.capacity",
+        "aircraft.cargo.bulk.amount",
+        "aircraft.cargo.bulk.capacity",
+        "aircraft.cg",
+        "fenix.efb.boardingStatus",
+        "fenix.efb.deboardingStatus",
+        "fenix.efb.finalLoadsheet",
+    ),
 )
 
 # Codes de mise en forme de l'affichage MCDU : une lettre minuscule change la
@@ -317,6 +333,53 @@ def parse_flight_plan_xml(text: str, *, phase: str = "", read_at: float = 0.0) -
 # --------------------------------------------------------------------------- #
 
 
+def parse_payload(values: dict[str, Any]) -> dict[str, Any] | None:
+    """Chargement réel lu dans l'EFB du Fenix, ou None s'il n'est pas publié.
+
+    Les sièges arrivent en une chaîne « true,false,… », un booléen par siège
+    dans l'ordre de la cabine. Le devis final est un JSON dont seuls les
+    centrages et les masses sont retenus.
+    """
+    raw_seats = str(values.get("aircraft.passengers.seatOccupation.string") or "").strip()
+    seats = [part.strip().lower() == "true" for part in raw_seats.split(",")] if raw_seats else []
+    cargo = {}
+    for hold in ("forward", "aft", "bulk"):
+        capacity = _number_or_none(values.get(f"aircraft.cargo.{hold}.capacity"))
+        if capacity:
+            cargo[hold] = {
+                "amount_kg": _number_or_none(values.get(f"aircraft.cargo.{hold}.amount")) or 0.0,
+                "capacity_kg": capacity,
+            }
+    if not seats and not cargo:
+        return None
+    loadsheet = None
+    try:
+        final = json.loads(values.get("fenix.efb.finalLoadsheet") or "null")
+    except (TypeError, ValueError):
+        final = None
+    if isinstance(final, dict):
+        def mass(key: str) -> float | None:
+            entry = final.get(key)
+            return _number_or_none(entry.get("value")) if isinstance(entry, dict) else None
+
+        loadsheet = {
+            "edition": final.get("editionNumber"),
+            "zfw_kg": mass("zfw"),
+            "tow_kg": mass("tow"),
+            "mac_zfw": _number_or_none(final.get("macZfw")),
+            "mac_tow": _number_or_none(final.get("macTow")),
+        }
+    return {
+        "source": "fenix",
+        "seats": seats,
+        "cargo": cargo,
+        "cg_percent_mac": _number_or_none(values.get("aircraft.cg")),
+        "boarding_status": str(values.get("fenix.efb.boardingStatus") or ""),
+        "deboarding_status": str(values.get("fenix.efb.deboardingStatus") or ""),
+        "loadsheet": loadsheet,
+    }
+
+
 def gateway_listening(host: str = GATEWAY_HOST, port: int = GATEWAY_PORT) -> bool:
     """Vrai si un service écoute sur la passerelle (simple test TCP local)."""
     try:
@@ -351,6 +414,9 @@ class FenixFmsReader:
         self._listening = listening
         self._lock = threading.Lock()
         self._plan: FmsPlan | None = None
+        # Le chargement existe avant tout plan FMGC : l'embarquement précède
+        # souvent l'initialisation du FMS. Il voyage donc à part.
+        self._payload: dict[str, Any] | None = None
         self._last_read = 0.0
         self._next_probe = 0.0
         self._available = False
@@ -362,8 +428,15 @@ class FenixFmsReader:
             if now - self._last_read >= MIN_INTERVAL_S:
                 self._refresh(now)
             if self._plan is None:
-                return {"available": False, "source": "fenix", "reason": "gateway_unavailable" if not self._available else "no_plan"}
-            return self._plan.to_dict()
+                return {
+                    "available": False,
+                    "source": "fenix",
+                    "reason": "gateway_unavailable" if not self._available else "no_plan",
+                    "payload": self._payload,
+                }
+            data = self._plan.to_dict()
+            data["payload"] = self._payload
+            return data
 
     def _refresh(self, now: float) -> None:
         self._last_read = now
@@ -374,6 +447,7 @@ class FenixFmsReader:
             self._available = self._listening()
             if not self._available:
                 self._plan = None
+                self._payload = None
                 return
         try:
             values = self._read()
@@ -381,7 +455,9 @@ class FenixFmsReader:
             logger.info("Plan FMGC Fenix illisible (%s)", type(exc).__name__)
             self._available = False
             self._plan = None
+            self._payload = None
             return
+        self._payload = parse_payload(values)
         xml = values.get("aircraft.fms.flightPlanXml") or ""
         plan = parse_flight_plan_xml(
             xml, phase=str(values.get("aircraft.fms.flightPhase") or ""), read_at=time.time()

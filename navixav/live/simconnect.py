@@ -14,6 +14,7 @@ bloc secondaire qui échoue est simplement mis en sommeil.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 
@@ -21,7 +22,9 @@ from navixav.live.base import (
     AircraftCapabilities,
     AircraftConfiguration,
     AircraftState,
+    GroundServices,
     PositionUnavailable,
+    RampState,
     TouchdownSample,
     TrafficReport,
 )
@@ -194,6 +197,107 @@ _FENIX_CONTROL_VARIABLES = (
     ("L:S_OH_PNEUMATIC_ENG2_ANTI_ICE", "Number"),
 )
 
+# GSX Pro publie l'état de ses services d'escale dans des LVars qui lui sont
+# propres, indépendantes de l'avion chargé : elles sont lues pour tout appareil,
+# au sol uniquement. Une LVar inconnue se lit 0 ; c'est donc
+# FSDT_GSX_COUATL_STARTED qui dit si GSX tourne réellement.
+_GSX_RUNNING = "L:FSDT_GSX_COUATL_STARTED"
+_GSX_SERVICE_VARIABLES = {
+    "boarding": "L:FSDT_GSX_BOARDING_STATE",
+    "deboarding": "L:FSDT_GSX_DEBOARDING_STATE",
+    "catering": "L:FSDT_GSX_CATERING_STATE",
+    "refueling": "L:FSDT_GSX_REFUELING_STATE",
+    "departure": "L:FSDT_GSX_DEPARTURE_STATE",
+    "water": "L:FSDT_GSX_WATER_STATE",
+    "lavatory": "L:FSDT_GSX_LAVATORY_STATE",
+    "jetway": "L:FSDT_GSX_JETWAY",
+    "stairs": "L:FSDT_GSX_STAIRS",
+    "gpu": "L:FSDT_GSX_GPU_STATE",
+}
+_GSX_PUSHBACK_STATUS = "L:FSDT_GSX_PUSHBACK_STATUS"
+_GSX_PASSENGERS = "L:FSDT_GSX_NUMPASSENGERS"
+_GSX_PASSENGERS_BOARDED = "L:FSDT_GSX_NUMPASSENGERS_BOARDING_TOTAL"
+_GSX_PASSENGERS_DEBOARDED = "L:FSDT_GSX_NUMPASSENGERS_DEBOARDING_TOTAL"
+_GSX_CARGO_BOARDED = "L:FSDT_GSX_BOARDING_CARGO_PERCENT"
+_GSX_CARGO_DEBOARDED = "L:FSDT_GSX_DEBOARDING_CARGO_PERCENT"
+_GSX_FUEL_HOSE = "L:FSDT_GSX_FUELHOSE_CONNECTED"
+_GSX_VARIABLES = tuple(
+    (name, "Number")
+    for name in (
+        _GSX_RUNNING,
+        *_GSX_SERVICE_VARIABLES.values(),
+        _GSX_PASSENGERS,
+        _GSX_PASSENGERS_BOARDED,
+        _GSX_PASSENGERS_DEBOARDED,
+        _GSX_CARGO_BOARDED,
+        _GSX_CARGO_DEBOARDED,
+        _GSX_FUEL_HOSE,
+        _GSX_PUSHBACK_STATUS,
+    )
+)
+# Codes d'état documentés par GSX pour chaque service.
+_GSX_STATES = {
+    1: "available",
+    2: "unavailable",
+    3: "bypassed",
+    4: "requested",
+    5: "active",
+    6: "completed",
+}
+
+# État de l'avion au poste lu dans MSFS lui-même, utile avec ou sans GSX :
+# centrage pour le devis de masse, GPU, repoussage natif. Relevé en direct sur
+# MSFS 2024 (Fenix A320) : toutes ces SimVars répondent.
+_RAMP_VARIABLES = (
+    ("CG PERCENT", "Percent"),
+    ("EXTERNAL POWER ON:1", "Bool"),
+    ("PUSHBACK STATE", "Enum"),
+    ("PUSHBACK ATTACHED", "Bool"),
+)
+
+# Zones de chargement (« payload stations ») : leurs noms décrivent la
+# configuration réelle de l'avion — « OA 1-9 » pour une zone de cabine,
+# « CP1 » pour une soute sur le Fenix. Les noms ne sont lus qu'une fois par
+# appareil, les masses au plus toutes les cinq secondes au sol.
+_STATION_LIMIT = 30
+_STATION_REFRESH_S = 5.0
+_STATION_IGNORED = re.compile(
+    r"crew|pilot|captain|\bf/?o\b|first officer|jump|observer|attendant|galley|water|waste|"
+    r"unused|fuel|catering|potable|lav",
+    re.IGNORECASE,
+)
+_STATION_CARGO = re.compile(
+    r"cargo|hold|baggage|\bbags?\b|bulk|compartment|fret|lower deck|\bcp ?\d|\bc\d\b",
+    re.IGNORECASE,
+)
+_STATION_CARGO_FORWARD = re.compile(r"fwd|forward|front|\bcp ?[12]\b|\bc[12]\b|\b1\b", re.IGNORECASE)
+_STATION_CABIN = re.compile(
+    r"pax|passeng|cabin|business|economy|\beco\b|first|premium|\brows?\b|zone|seat|class|"
+    r"^[a-z]{1,3} ?\d+ ?- ?\d+",
+    re.IGNORECASE,
+)
+_STATION_ROWS = re.compile(r"(\d+)\s*-\s*(\d+)")
+
+
+def classify_payload_station(name: str) -> dict[str, Any] | None:
+    """Zone de cabine ou soute, d'après son nom ; None pour le reste."""
+    label = str(name or "").strip()
+    if not label or _STATION_IGNORED.search(label):
+        return None
+    if _STATION_CARGO.search(label):
+        return {
+            "kind": "cargo",
+            "position": "forward" if _STATION_CARGO_FORWARD.search(label) else "aft",
+        }
+    if _STATION_CABIN.search(label):
+        rows = _STATION_ROWS.search(label)
+        return {
+            "kind": "cabin",
+            "rows": [int(rows.group(1)), int(rows.group(2))] if rows else None,
+        }
+    return None
+
+
 # Une connexion qui vient d'échouer n'est pas retentée immédiatement.
 _RETRY_DELAY_S = 5.0
 
@@ -242,6 +346,12 @@ class SimConnectSource:
         self._traffic_disabled_until = 0.0
         self._touchdown_window_until = 0.0
         self._touchdown_disabled_until = 0.0
+        self._ground_services_disabled_until = 0.0
+        self._ramp_disabled_until = 0.0
+        self._stations: list[dict[str, Any]] | None = None
+        self._stations_title: str | None = None
+        self._stations_read_at = 0.0
+        self._stations_disabled_until = 0.0
         # État du lien, pour ne journaliser que ses changements : chaque
         # coupure laisse une trace datée avec sa raison et sa durée.
         self._link_up_since: float | None = None
@@ -407,6 +517,8 @@ class SimConnectSource:
                 source=self.name,
                 configuration=self._read_configuration(client),
                 touchdown=self._read_touchdown(client, on_ground),
+                ground_services=self._read_ground_services(client, on_ground),
+                ramp=self._read_ramp(client, on_ground),
             )
 
     def traffic(self, radius_m: int = _TRAFFIC_RADIUS_M, *, strict: bool = False) -> list[TrafficReport]:
@@ -542,6 +654,124 @@ class SimConnectSource:
             pitch_deg=-values["PLANE TOUCHDOWN PITCH DEGREES"],
             bank_deg=values["PLANE TOUCHDOWN BANK DEGREES"],
         )
+
+    def _read_ground_services(
+        self, client: SimConnectClient, on_ground: bool
+    ) -> GroundServices | None:
+        """État des services GSX Pro, au sol et seulement si GSX tourne."""
+        now = time.monotonic()
+        if not on_ground or now < self._ground_services_disabled_until:
+            return None
+        try:
+            values = client.read_simvars(_GSX_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S)
+        except SimConnectError as exc:
+            self._ground_services_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info("Services GSX indisponibles (%s)", exc)
+            return None
+        if not values.get(_GSX_RUNNING):
+            return None
+
+        def state(name: str) -> str | None:
+            raw = values.get(name)
+            return _GSX_STATES.get(int(round(raw))) if raw is not None else None
+
+        def count(name: str) -> int | None:
+            raw = values.get(name)
+            return max(0, int(round(raw))) if raw is not None else None
+
+        def percent(name: str) -> float | None:
+            raw = values.get(name)
+            return max(0.0, min(100.0, float(raw))) if raw is not None else None
+
+        hose = values.get(_GSX_FUEL_HOSE)
+        services = {key: state(name) for key, name in _GSX_SERVICE_VARIABLES.items()}
+        planned = count(_GSX_PASSENGERS)
+        boarded = count(_GSX_PASSENGERS_BOARDED)
+        deboarded = count(_GSX_PASSENGERS_DEBOARDED)
+        cargo_boarded = percent(_GSX_CARGO_BOARDED)
+        cargo_deboarded = percent(_GSX_CARGO_DEBOARDED)
+        # Relevé en direct : une fois l'embarquement fini, GSX remet son état à
+        # « disponible » au lieu de « terminé ». Les compteurs, eux, restent :
+        # c'est d'eux que se déduit un service achevé.
+        if (
+            services["boarding"] == "available" and planned and boarded is not None
+            and boarded >= planned and (cargo_boarded is None or cargo_boarded >= 100)
+        ):
+            services["boarding"] = "completed"
+        if (
+            services["deboarding"] == "available" and planned and deboarded is not None
+            and deboarded >= planned and (cargo_deboarded is None or cargo_deboarded >= 100)
+        ):
+            services["deboarding"] = "completed"
+        return GroundServices(
+            **services,
+            pushback_status=count(_GSX_PUSHBACK_STATUS),
+            passengers_planned=planned,
+            passengers_boarded=boarded,
+            passengers_deboarded=deboarded,
+            cargo_boarded_pct=cargo_boarded,
+            cargo_deboarded_pct=cargo_deboarded,
+            fuel_hose_connected=bool(hose) if hose is not None else None,
+        )
+
+    def _read_ramp(self, client: SimConnectClient, on_ground: bool) -> RampState | None:
+        """Centrage, GPU et repoussage natif, au sol uniquement."""
+        now = time.monotonic()
+        if not on_ground or now < self._ramp_disabled_until:
+            return None
+        try:
+            values = client.read_simvars(_RAMP_VARIABLES, timeout_s=_OPTIONAL_TIMEOUT_S)
+        except SimConnectError as exc:
+            self._ramp_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            logger.info("État de rampe indisponible (%s)", exc)
+            return None
+        pushback = values.get("PUSHBACK STATE")
+        return RampState(
+            cg_percent_mac=values.get("CG PERCENT"),
+            external_power_on=bool(values.get("EXTERNAL POWER ON:1")),
+            pushback_state=int(round(pushback)) if pushback is not None else None,
+            pushback_attached=bool(values.get("PUSHBACK ATTACHED")),
+            payload_stations=self._read_payload_stations(client, now),
+        )
+
+    def _read_payload_stations(self, client: SimConnectClient, now: float) -> list[dict[str, Any]]:
+        """Zones de cabine et soutes de l'avion chargé, avec leur masse."""
+        if now < self._stations_disabled_until:
+            return []
+        title = self._aircraft_title
+        if self._stations is not None and self._stations_title == title:
+            if now - self._stations_read_at < _STATION_REFRESH_S:
+                return [dict(station) for station in self._stations if "weight_kg" in station]
+        reader = getattr(client, "read_string_simvar", None)
+        try:
+            if self._stations is None or self._stations_title != title:
+                stations = []
+                if callable(reader):
+                    count = client.read_simvars(
+                        (("PAYLOAD STATION COUNT", "Number"),), timeout_s=_OPTIONAL_TIMEOUT_S
+                    ).get("PAYLOAD STATION COUNT") or 0
+                    for index in range(1, min(int(count), _STATION_LIMIT) + 1):
+                        name = str(reader(f"PAYLOAD STATION NAME:{index}", timeout_s=_OPTIONAL_TIMEOUT_S)).strip()
+                        kind = classify_payload_station(name)
+                        if kind:
+                            stations.append({"index": index, "name": name, **kind})
+                self._stations = stations
+                self._stations_title = title
+            if self._stations:
+                weights = client.read_simvars(
+                    tuple((f"PAYLOAD STATION WEIGHT:{station['index']}", "Kilograms") for station in self._stations),
+                    timeout_s=_OPTIONAL_TIMEOUT_S,
+                )
+                for station in self._stations:
+                    weight = weights.get(f"PAYLOAD STATION WEIGHT:{station['index']}")
+                    station["weight_kg"] = round(max(0.0, weight), 1) if weight is not None else 0.0
+            self._stations_read_at = now
+        except SimConnectError as exc:
+            self._stations_disabled_until = now + _OPTIONAL_RETRY_DELAY_S
+            self._stations = None
+            logger.info("Zones de chargement indisponibles (%s)", exc)
+            return []
+        return [dict(station) for station in self._stations if "weight_kg" in station]
 
     def _read_paused(self, client: SimConnectClient) -> bool | None:
         """Indique la pause normale ou active, si MSFS expose cet état."""

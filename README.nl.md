@@ -166,6 +166,27 @@ De getoonde TOD is een SimBrief- of NaviXav-schatting, geen uitlezing van de MCD
 
 Vluchtvolging en het paneel in de simulator tonen tijdens de daling “Daling bezig” in plaats van TOD, daarna “Nadering”. Horizontale segmenten behouden de melding wanneer het hoogteverlies de daling bevestigt. De status komt uit telemetrie, niet uit de DES-modus van het FMS.
 
+### Turnaround, radio en turbulentie
+
+- **Turnaround-module met GSX Pro** (alleen zichtbaar als GSX Pro is
+  geïnstalleerd): live bovenaanzicht van het vliegtuig op de standplaats met
+  de plane-watch-silhouetten, de cabine die vol raakt tijdens het boarden,
+  ruimen en tanks die worden geladen, en slurf, trappen, catering, tankwagen,
+  bagagebanden, GPU en trekker die komen en gaan. Elke dienst heeft een
+  voortgangsbalk, de geschatte TOBT wordt vergeleken met het vertrek uit de
+  OFP en een definitief beladings- en balansblad meldt elke LMC. Echte stoel-,
+  ruim- en zwaartepuntgegevens worden uit het vliegtuig gelezen als het die
+  publiceert (Fenix-EFB, MSFS-laadstations).
+- **Radio en intercom offline**: klaring op de standplaats, einde boarding
+  vanuit de cabine, beladingsblad klaar, pushback goedgekeurd, taxiklaring
+  langs de berekende route, opstellen en start met de wind, overdracht aan
+  departure, en bij aankomst de standplaats en de blokken. Alles komt uit de
+  geladen vlucht; het zwijgt bij VATSIM- of IVAO-verkeer. Het is geen
+  luchtverkeersleidingsdienst.
+- **Turbulentie**: risico op clear-air turbulentie langs de route op basis van
+  de windschering in de OFP, en door piloten gemelde turbulentie (PIREP,
+  AIREP) nabij de route, met een melding als die vóór u op uw hoogte ligt.
+
 ### MCDU-kaart
 
 Het tabblad **MCDU-kaart** past de pagina's aan het vliegtuigtype aan: Airbus
@@ -424,6 +445,14 @@ en vereist normaal gezien geen beheerdersrechten.
 Er is ook een draagbaar archief beschikbaar: pak
 `NaviXav-<versie>-windows-x64-portable.zip` uit en start `NaviXav.exe`. Gebruik
 op een machine zonder WebView2 eerst het volledige installatieprogramma.
+
+Het installatieprogramma biedt daarnaast optioneel een **natuurlijke
+ATC-stem** (ongeveer 170 MB): een offline spraaksynthese (Kokoro, met eSpeak NG
+meegeleverd als afzonderlijk programma onder zijn GPL-licentie) die de radio- en
+intercomberichten in hele zinnen uitspreekt. Bestaande installaties kunnen hem
+downloaden via **Instellingen > Cockpitaudio**; de draagbare versie gebruikt het
+afzonderlijke archief `NaviXav-<version>-voice-engine.zip`, uitgepakt naast
+`NaviXav.exe`. Zonder deze stem gebruikt de toren opgenomen zinnen.
 
 ### Vanaf de broncode
 

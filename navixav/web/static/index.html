@@ -167,6 +167,7 @@
 
   <nav class="tabs hidden" id="tabs" aria-label="Modules">
     <button data-tab="terminal" class="active">Plan de vol</button>
+    <button data-tab="turnaround" class="hidden">Escale</button>
     <button data-tab="map">Carte</button>
     <button data-tab="ground">Roulage</button>
     <button data-tab="procedures">Procédures</button>
@@ -184,22 +185,20 @@
       <div class="map-toolbar-main">
         <div class="map-airports" id="map-airports"></div>
         <div class="map-actions map-primary-actions">
-        <div class="map-control-group" role="group" aria-labelledby="map-view-label">
-        <span class="map-group-label" id="map-view-label">Vue</span>
+        <!-- Vue : commandes de navigation, toujours à portée de main. -->
+        <div class="map-control-group map-view-group" role="group" aria-labelledby="map-view-label">
+        <span class="map-group-label visually-hidden" id="map-view-label">Vue</span>
         <button id="map-route" class="icon-btn" title="Voir toute la route">Route complète</button>
         <button id="map-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
         <button id="map-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
         <div class="map-zoom-controls">
         <button id="map-zoom-out" class="icon-btn" title="Dézoomer">−</button>
-        <button id="map-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div></div>
-        <span class="live-pill" id="live-pill">
-          <span class="live-dot"></span>
-        <span id="live-text">Recherche du simulateur…</span>
-        </span>
-      </div>
-      <div class="map-actions map-toolbar-options">
-        <div class="map-control-group" role="group" aria-labelledby="map-layers-label">
-        <span class="map-group-label" id="map-layers-label">Affichage</span>
+        <button id="map-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div>
+        <!-- Calques et trafic : rangés dans deux menus, ouverts à la demande. -->
+        <details class="map-menu" id="map-layers-menu">
+        <summary class="icon-btn map-menu-toggle"><span id="map-layers-label">Affichage</span><span class="map-menu-count" aria-hidden="true"></span></summary>
+        <div class="map-menu-panel" role="group" aria-labelledby="map-layers-label">
+        <div class="map-menu-row">
         <button id="map-basemap" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer le fond OpenStreetMap">Fond carte</button>
         <select id="map-basemap-style" class="map-basemap-style"
@@ -207,7 +206,7 @@
                 title="Choisir le fond de carte affiché">
           <option value="osm">OpenStreetMap Standard</option>
           <option value="opentopo">OpenTopoMap</option>
-        </select>
+        </select></div>
         <button id="map-constraints" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les contraintes d'altitude et de vitesse">Contraintes</button>
         <button id="map-sigmet" class="icon-btn active" aria-pressed="true"
@@ -216,12 +215,16 @@
                 title="Afficher ou masquer le radar de précipitations">Radar</button>
         <button id="map-weather-stations" class="icon-btn active" aria-pressed="true"
                 title="Afficher ou masquer les METAR et barbules de vent">METAR / vent</button>
+        <button id="map-turbulence" class="icon-btn active" aria-pressed="true"
+                title="Afficher ou masquer la turbulence prévue le long de la route et celle signalée par les pilotes">Turbulences</button>
         <button id="map-fms-alternate" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher le plan de dégagement du FMGC">Dégagement FMGC</button>
         <button id="map-sia" class="icon-btn hidden" aria-pressed="false"
                 title="Afficher la carte officielle géoréférencée de cet aérodrome">Calque officiel</button></div>
-        <div class="map-control-group" role="group" aria-labelledby="map-traffic-group-label">
-        <span class="map-group-label" id="map-traffic-group-label">Trafic</span>
+        </details>
+        <details class="map-menu" id="map-traffic-menu">
+        <summary class="icon-btn map-menu-toggle"><span class="map-menu-dot" aria-hidden="true"></span><span id="map-traffic-group-label">Trafic</span></summary>
+        <div class="map-menu-panel" role="group" aria-labelledby="map-traffic-group-label">
         <button id="map-traffic" class="icon-btn" type="button" aria-pressed="false"
                 title="Afficher ou masquer le trafic du réseau VATSIM">Trafic VATSIM</button>
         <select id="map-traffic-source" class="traffic-source-select"
@@ -232,9 +235,15 @@
           <option value="opensky">Trafic réel · OpenSky</option>
           <option value="static">Trafic statique · MSFS</option>
         </select>
-        <span id="map-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span>
         <a id="map-traffic-source-credit" class="traffic-source-credit hidden"
-           href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a></div></div>
+           href="https://opensky-network.org/" target="_blank" rel="noreferrer">OpenSky Network</a></div>
+        </details>
+        <span id="map-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span></div>
+        <span class="live-pill" id="live-pill">
+          <span class="live-dot"></span>
+        <span id="live-text">Recherche du simulateur…</span>
+        </span>
+      </div>
     </div>
     <div class="map-stage">
       <canvas id="chart-canvas"></canvas>
@@ -266,6 +275,7 @@
         <span id="legend-sigmet" class="hidden"><i class="key sigmet"></i>SIGMET</span>
         <span id="legend-radar" class="hidden"><i class="key radar"></i>précipitations</span>
         <span id="legend-weather-stations" class="hidden"><i class="key weather-station"></i>METAR / vent</span>
+        <span id="legend-turbulence" class="hidden"><i class="key turbulence"></i><span id="legend-turbulence-label">turbulence prévue · signalée</span></span>
       </div>
       <div id="map-weather-status" class="map-weather-status hidden" role="status"></div>
       <a id="map-weather-attribution" class="map-attribution map-weather-attribution hidden"
@@ -285,8 +295,9 @@
       <div class="map-toolbar-main">
         <div class="map-airports" id="ground-airports"></div>
         <div class="map-actions map-primary-actions">
-        <div class="map-control-group" role="group" aria-labelledby="ground-clearance-group-label">
-        <span class="map-group-label" id="ground-clearance-group-label">Clairance</span>
+        <!-- Clairance : la saisie principale du roulage, toujours visible. -->
+        <div class="map-control-group map-clearance-group" role="group" aria-labelledby="ground-clearance-group-label">
+        <span class="map-group-label visually-hidden" id="ground-clearance-group-label">Clairance</span>
         <span class="ground-clearance-field">
           <input id="ground-clearance" class="ground-clearance" type="text"
                  autocomplete="off" spellcheck="false" placeholder="Clairance : N D B"
@@ -298,27 +309,24 @@
         </span>
         <button id="ground-plan" class="icon-btn" title="Cadrer sur l'itinéraire de roulage">Itinéraire</button>
         <button id="ground-clear" class="icon-btn" title="Effacer l'itinéraire de roulage">Effacer</button></div>
-        <div class="map-control-group" role="group" aria-labelledby="ground-view-label">
-        <span class="map-group-label" id="ground-view-label">Vue</span>
+        <div class="map-control-group map-view-group" role="group" aria-labelledby="ground-view-label">
+        <span class="map-group-label visually-hidden" id="ground-view-label">Vue</span>
         <button id="ground-follow" class="icon-btn" title="Suivre l'avion">Suivre</button>
         <button id="ground-fit" class="icon-btn" title="Voir tout le terrain">Ajuster</button>
         <div class="map-zoom-controls">
         <button id="ground-zoom-out" class="icon-btn" title="Dézoomer">−</button>
-        <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div></div>
-        <span class="live-pill" id="ground-live-pill">
-          <span class="live-dot"></span>
-        <span id="ground-live-text">Recherche du simulateur…</span>
-        </span>
-      </div>
-      <div class="map-actions map-toolbar-options">
-        <div class="map-control-group" role="group" aria-labelledby="ground-layers-label">
-        <span class="map-group-label" id="ground-layers-label">Affichage</span>
+        <button id="ground-zoom-in" class="icon-btn" title="Zoomer">+</button></div></div>
+        <details class="map-menu" id="ground-layers-menu">
+        <summary class="icon-btn map-menu-toggle"><span id="ground-layers-label">Affichage</span><span class="map-menu-count" aria-hidden="true"></span></summary>
+        <div class="map-menu-panel" role="group" aria-labelledby="ground-layers-label">
         <button id="ground-secondary" class="icon-btn" type="button"
                 aria-pressed="false" title="Afficher les voies secondaires et les accès aux postes">Secondaires</button>
         <button id="ground-alarm" class="icon-btn active" type="button"
                 aria-pressed="true" title="Alarme sonore de vitesse de roulage">Alarme</button></div>
-        <div class="map-control-group" role="group" aria-labelledby="ground-traffic-group-label">
-        <span class="map-group-label" id="ground-traffic-group-label">Trafic</span>
+        </details>
+        <details class="map-menu" id="ground-traffic-menu">
+        <summary class="icon-btn map-menu-toggle"><span class="map-menu-dot" aria-hidden="true"></span><span id="ground-traffic-group-label">Trafic</span></summary>
+        <div class="map-menu-panel" role="group" aria-labelledby="ground-traffic-group-label">
         <button id="ground-traffic" class="icon-btn" type="button" aria-pressed="false"
                 title="Afficher ou masquer le trafic lu dans le simulateur">Trafic simulateur</button>
         <select id="ground-traffic-source" class="traffic-source-select"
@@ -329,8 +337,14 @@
           <option value="opensky">Trafic réel · OpenSky</option>
           <option value="static">Trafic statique · MSFS</option>
         </select>
-        <span id="ground-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span>
-        <span id="ground-traffic-freshness" class="traffic-map-only hidden" role="status" aria-live="polite"></span></div></div>
+        <span id="ground-traffic-freshness" class="traffic-map-only hidden" role="status" aria-live="polite"></span></div>
+        </details>
+        <span id="ground-traffic-injection" class="traffic-map-only hidden" role="status" aria-live="polite"></span></div>
+        <span class="live-pill" id="ground-live-pill">
+          <span class="live-dot"></span>
+        <span id="ground-live-text">Recherche du simulateur…</span>
+        </span>
+      </div>
     </div>
     <div class="map-stage ground-stage">
       <canvas id="ground-canvas"></canvas>
@@ -341,9 +355,12 @@
         dépassement.
       -->
       <div class="ground-speed hidden" id="ground-speed"></div>
+      <!-- Guidage d'accostage estimé, posé par le module Escale à l'arrivée au poste. -->
+      <div class="ground-vdgs" id="ground-vdgs" hidden></div>
     </div>
   </section>
 
+  <section id="panel-turnaround" class="panel hidden ta-panel"></section>
   <section id="panel-flight" class="panel hidden"></section>
   <section id="panel-procedures" class="panel hidden procedure-panel" aria-live="polite"></section>
   <section id="panel-constraints" class="panel hidden"></section>
@@ -479,31 +496,74 @@
         <span class="switch-track"><span class="switch-thumb"></span></span>
         <span class="switch-label" id="settings-rnp-label">Avion compatible RNP</span>
       </label>
-      <div class="settings-voice settings-wide">
+      </div>
+    </details>
+    <details class="settings-section settings-section-audio" name="settings-group">
+      <summary class="settings-section-summary">
+        <span>
+          <strong id="settings-audio-title">Audio du cockpit</strong>
+          <small id="settings-audio-intro">Réglez séparément les annonces, l’ambiance radio et l’ATC hors ligne.</small>
+        </span>
+        <span class="settings-section-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="settings-section-body">
+      <section class="settings-audio" aria-labelledby="settings-audio-title">
+        <div class="settings-audio-grid">
+      <article class="settings-audio-card settings-voice">
+        <div class="settings-audio-card-head">
         <label class="switch settings-switch">
           <input type="checkbox" id="settings-voice" />
           <span class="switch-track"><span class="switch-thumb"></span></span>
           <span class="switch-label" id="settings-voice-label">Annonces vocales</span>
         </label>
+        <button type="button" class="icon-btn settings-listen" id="settings-voice-test">Écouter</button>
+        </div>
+        <div class="settings-audio-controls">
         <label class="field" for="settings-voice-name">
           <span id="settings-voice-name-label">Voix</span>
           <select id="settings-voice-name"></select>
         </label>
-        <button type="button" class="icon-btn" id="settings-voice-test">Écouter</button>
+        <label class="field" for="settings-voice-volume">
+          <span id="settings-voice-volume-label">Volume des annonces et alarmes</span>
+          <input id="settings-voice-volume" type="range" min="0" max="100" step="5" value="100" />
+        </label>
+        </div>
         <p class="settings-note" id="settings-voice-help">Voix neuronale livrée avec NaviXav : elle fonctionne hors ligne, sans rien installer, et se règle sur cet appareil.</p>
-      </div>
-      <div class="settings-chatter settings-wide">
+      </article>
+      <article class="settings-audio-card settings-chatter">
+        <div class="settings-audio-card-head">
         <label class="switch settings-switch">
           <input type="checkbox" id="settings-chatter" />
           <span class="switch-track"><span class="switch-thumb"></span></span>
           <span class="switch-label" id="settings-chatter-label">Ambiance radio ATC</span>
         </label>
+        </div>
         <label class="field" for="settings-chatter-volume">
           <span id="settings-chatter-volume-label">Volume de l’ambiance</span>
           <input id="settings-chatter-volume" type="range" min="0" max="100" step="5" value="35" />
         </label>
         <p class="settings-note" id="settings-chatter-help">Échanges radio en anglais joués en fond selon la phase du vol : sol, tour, approche ou centre. Ils ne concernent pas votre avion et se taisent pendant les annonces NaviXav.</p>
-      </div>
+      </article>
+      <article class="settings-audio-card settings-tower">
+        <div class="settings-audio-card-head">
+        <label class="switch settings-switch">
+          <input type="checkbox" id="settings-tower" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="switch-label" id="settings-tower-label">ATC et interphone hors ligne</span>
+        </label>
+        <button type="button" class="icon-btn settings-listen" id="settings-tower-test">Écouter</button>
+        </div>
+        <div class="settings-engine-status">
+        <p class="settings-note settings-tower-engine" id="settings-tower-engine" aria-live="polite"></p>
+        <button type="button" class="icon-btn hidden" id="settings-tower-engine-install">Télécharger la voix naturelle</button>
+        </div>
+        <details class="settings-audio-more">
+          <summary id="settings-audio-more">Fonctionnement de l’ATC hors ligne</summary>
+          <p class="settings-note" id="settings-tower-help">Au départ, une tour fictive s’adresse à votre vol : alignement au point d’arrêt, autorisation de décollage avec le vent, puis transfert vers le départ. Elle utilise l’indicatif, la piste et les fréquences du vol chargé, et se tait quand le trafic VATSIM ou IVAO est choisi.</p>
+        </details>
+      </article>
+        </div>
+      </section>
       </div>
     </details>
     <details class="settings-section" name="settings-group">
@@ -809,10 +869,14 @@
 <script src="/static/i18n.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/voice.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/chatter.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/tower.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/aircraft-icon.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/map.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/ground.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/silhouettes.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/turnaround.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/aircraft-documents.js?v=__NAVIXAV_VERSION__"></script>
+<script src="/static/guide.js?v=__NAVIXAV_VERSION__"></script>
 <script src="/static/app.js?v=__NAVIXAV_VERSION__"></script>
 </body>
 </html>

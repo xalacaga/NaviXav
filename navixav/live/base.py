@@ -143,6 +143,60 @@ class TouchdownSample:
 
 
 @dataclass(frozen=True)
+class GroundServices:
+    """Services d'escale publiés par GSX Pro, quel que soit l'avion chargé.
+
+    GSX expose son état dans des variables locales du simulateur, pas dans
+    celles de l'appareil : la lecture vaut pour tout avion. Chaque service est
+    décrit par un état normalisé (`available`, `unavailable`, `bypassed`,
+    `requested`, `active`, `completed`) ou None s'il n'est pas publié.
+    """
+
+    boarding: str | None = None
+    deboarding: str | None = None
+    catering: str | None = None
+    refueling: str | None = None
+    # Repoussage et départ, le « Departure » du menu GSX.
+    departure: str | None = None
+    water: str | None = None
+    lavatory: str | None = None
+    # Matériel au poste, mêmes codes d'état que les services.
+    jetway: str | None = None
+    stairs: str | None = None
+    gpu: str | None = None
+    # Phase du repoussage GSX, brute. Relevé en direct : elle reste à 11 une
+    # fois le repoussage terminé ; elle ne dit donc pas s'il est en cours.
+    pushback_status: int | None = None
+    passengers_planned: int | None = None
+    passengers_boarded: int | None = None
+    passengers_deboarded: int | None = None
+    cargo_boarded_pct: float | None = None
+    cargo_deboarded_pct: float | None = None
+    fuel_hose_connected: bool | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RampState:
+    """Ce que MSFS dit de l'avion au poste, avec ou sans GSX."""
+
+    # Centrage de l'avion complet, carburant compris, en % de corde moyenne.
+    cg_percent_mac: float | None = None
+    external_power_on: bool | None = None
+    # Repoussage natif de MSFS : 3 signifie aucun repoussage en cours.
+    pushback_state: int | None = None
+    pushback_attached: bool | None = None
+    # Zones de chargement MSFS utiles à l'escale : cabine (avec ses rangées
+    # quand le nom les donne) et soutes avant ou arrière, masse en kg.
+    payload_stations: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class AircraftState:
     latitude: float
     longitude: float
@@ -160,6 +214,10 @@ class AircraftState:
     configuration: AircraftConfiguration | None = None
     # Lu seulement dans les secondes qui suivent un passage de l'air au sol.
     touchdown: TouchdownSample | None = None
+    # Présent seulement au sol et quand GSX Pro tourne.
+    ground_services: GroundServices | None = None
+    # Lu au sol seulement.
+    ramp: RampState | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -23,6 +23,9 @@ RAINVIEWER_MANIFEST_URL = "https://api.rainviewer.com/public/weather-maps.json"
 DEFAULT_TIMEOUT = 12
 CACHE_SECONDS = 600
 RETRY_SECONDS = 60
+# Cadence des images RainViewer, et délai observé avant leur publication.
+FRAME_INTERVAL_SECONDS = 600
+PUBLICATION_DELAY_SECONDS = 90
 
 
 def _safe_host(value: Any) -> str | None:
@@ -81,10 +84,31 @@ class RadarFeed:
     _fetched_at: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def current(self, *, monotonic: float | None = None) -> dict[str, object]:
+    def _due(self, now: float, wall: float) -> bool:
+        """Faut-il relire le manifeste ?
+
+        RainViewer publie une image toutes les dix minutes. Relire à heure
+        fixe toutes les dix minutes laissait jusqu'à vingt minutes de retard
+        quand le relevé tombait juste avant la nouvelle image. Le manifeste
+        est donc relu dès que l'image suivante doit exister (dix minutes après
+        la dernière, plus une marge de publication), et au plus toutes les
+        minutes en attendant qu'elle paraisse.
+        """
+        if not self._fetched_at:
+            return True
+        elapsed = now - self._fetched_at
+        if elapsed >= self.cache_seconds:
+            return True
+        stamp = (self._frame or {}).get("time")
+        if isinstance(stamp, int) and wall >= stamp + FRAME_INTERVAL_SECONDS + PUBLICATION_DELAY_SECONDS:
+            return elapsed >= RETRY_SECONDS
+        return False
+
+    def current(self, *, monotonic: float | None = None, wall: float | None = None) -> dict[str, object]:
         now = time.monotonic() if monotonic is None else monotonic
+        wall_now = time.time() if wall is None else wall
         with self._lock:
-            if not self._fetched_at or now - self._fetched_at >= self.cache_seconds:
+            if self._due(now, wall_now):
                 started = time.perf_counter()
                 try:
                     response = self.session.get(

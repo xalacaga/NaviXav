@@ -45,6 +45,13 @@ from navixav.ground import (
     replan,
     replan_needed,
 )
+from navixav.gsx import gsx_installed_cached
+from navixav.tower_phraseology import SPEAKERS as TOWER_SPEAKERS
+from navixav.tower_phraseology import speaker_for
+from navixav.tower_phraseology import TowerData
+from navixav.tower_phraseology import compose as compose_tower_message
+from navixav.voice_engine import VoiceEngine, default_engine_root
+from navixav.voice_engine_installer import VoiceEngineInstaller
 
 from navixav.config import (
     PLAN_SOURCES,
@@ -85,6 +92,8 @@ from navixav.vatsim import VatsimClient, VatsimError
 from navixav.updater import GitHubUpdater, UpdateError
 from navixav.weather.briefing import build_briefing
 from navixav.weather.radar import RadarFeed
+from navixav.weather.pirep import PirepFeed, bounding_box
+from navixav.weather.pirep import relate_to_route as relate_reports_to_route
 from navixav.weather.sigmet import SigmetFeed, relate_to_route
 
 STATIC_DIR = resource_path("navixav", "web", "static")
@@ -182,6 +191,29 @@ class SettingsRequest(BaseModel):
     lan_enabled: bool = False
 
 
+class TowerSpeechRequest(BaseModel):
+    """Un message de la tour hors ligne, décrit par les données du vol."""
+
+    kind: str = Field(
+        pattern="^(clearance|cabin_boarding|loadsheet|pushback_approved|pushback_start|"
+        "pushback_complete|taxi|lineup|takeoff|handoff|arrival_taxi|chocks)$"
+    )
+    language: str = Field(default="en", pattern="^(en|fr)$")
+    callsign: str = Field(max_length=12)
+    runway: str = Field(default="", max_length=4)
+    wind_direction: float | None = Field(default=None, ge=0, le=360)
+    wind_speed: float | None = Field(default=None, ge=0, le=200)
+    mag_var: float = Field(default=0.0, ge=-180, le=180)
+    departure_mhz: float | None = Field(default=None, ge=108, le=140)
+    destination: str = Field(default="", max_length=40)
+    sid: str = Field(default="", max_length=10)
+    squawk: str = Field(default="", pattern="^[0-7]{0,4}$")
+    passengers: int | None = Field(default=None, ge=0, le=999)
+    pushback_heading: float | None = Field(default=None, ge=0, le=360)
+    taxiways: list[str] = Field(default_factory=list, max_length=12)
+    stand: str = Field(default="", max_length=24)
+
+
 class AircraftScaffoldRequest(BaseModel):
     label: str = Field(min_length=1, max_length=300)
     package: str = Field(min_length=1, max_length=300)
@@ -245,11 +277,16 @@ def create_app(
         lambda: (lambda state: (state.latitude, state.longitude))(tracker.read())
     )
     sigmet_feed = SigmetFeed()
+    pirep_feed = PirepFeed()
     radar_feed = RadarFeed()
     current_plan_state: dict[str, Any] = {}
     panel_summary: dict[str, Any] = {}
     updater = GitHubUpdater(__version__)
     aircraft_matcher = AircraftMatcher()
+    # Moteur vocal facultatif de la tour : présent seulement s'il a été choisi
+    # à l'installation. Chargé à la première phrase, jamais au démarrage.
+    voice_engine = VoiceEngine()
+    voice_engine_installer = VoiceEngineInstaller(__version__, default_engine_root())
 
     def detect_configured_models():
         folders = (
@@ -347,6 +384,7 @@ def create_app(
         ivao.close()
         opensky.close()
         sigmet_feed.close()
+        pirep_feed.close()
         radar_feed.close()
         sia.session.close()
         faa.session.close()
@@ -501,6 +539,11 @@ def create_app(
         port = request.url.port or 80
         return {
             "version": __version__,
+            # Le module Escale ne s'affiche que si GSX Pro est installé.
+            "gsx_installed": gsx_installed_cached(),
+            # La tour parle avec le moteur vocal s'il est installé, sinon avec
+            # ses voix pré-enregistrées.
+            "voice_engine": voice_engine.available(),
             "simbrief_configured": bool(
                 settings.simbrief_pilot_id or settings.simbrief_username
             ),
@@ -985,6 +1028,37 @@ def create_app(
             "partial": live_reports < len(reports),
             "refreshed_at": refreshed_at,
             "refresh_interval_seconds": WEATHER_REFRESH_SECONDS,
+        }
+
+    @app.get("/api/weather/turbulence")
+    def current_turbulence() -> dict[str, Any]:
+        """Comptes rendus de turbulence des pilotes dans le couloir de la route."""
+        payload = current_plan_state.get("payload") or {}
+        enroute = payload.get("enroute") or {}
+        route = [
+            (float(point["lat"]), float(point["lon"]))
+            for point in enroute.get("route_path") or []
+            if isinstance(point, dict)
+            and isinstance(point.get("lat"), (int, float))
+            and isinstance(point.get("lon"), (int, float))
+        ]
+        if not route:
+            return {"reports": [], "route_filtered": False, "fetched_at": None, "source": "aviationweather.gov"}
+        try:
+            reports, fetched_at = pirep_feed.current(bounding_box(route))
+        except Exception as exc:  # noqa: BLE001 - la couche reste simplement vide
+            LOGGER.warning("Comptes rendus de turbulence indisponibles : %s", type(exc).__name__)
+            raise HTTPException(503, "Les comptes rendus de pilotes sont momentanément indisponibles.") from exc
+        cruise = enroute.get("cruise_altitude_ft")
+        reports = relate_reports_to_route(
+            reports, route, int(cruise) if isinstance(cruise, (int, float)) else None
+        )
+        return {
+            "reports": [report.to_dict() for report in reports],
+            "route_filtered": True,
+            "fetched_at": datetime.fromtimestamp(fetched_at, timezone.utc).isoformat()
+            if fetched_at else None,
+            "source": "aviationweather.gov",
         }
 
     @app.get("/api/weather/sigmets")
@@ -1478,6 +1552,60 @@ def create_app(
             provider.close()
 
     landing_monitor = LandingMonitor(landing_runways)
+
+    @app.get("/api/voice-engine")
+    def voice_engine_status() -> dict[str, Any]:
+        """Moteur vocal facultatif : installé ou non, et téléchargement en cours."""
+        return {"installed": voice_engine.available(), **voice_engine_installer.status()}
+
+    @app.post("/api/voice-engine/install")
+    def voice_engine_install(request: Request) -> dict[str, Any]:
+        """Télécharge le moteur de cette version ; réservé au PC lui-même."""
+        if not _is_loopback(request.client.host if request.client else None):
+            raise HTTPException(403, "Installation possible depuis le PC uniquement.")
+        if voice_engine.available():
+            return {"installed": True, **voice_engine_installer.status()}
+        voice_engine_installer.start()
+        return {"installed": False, **voice_engine_installer.status()}
+
+    @app.post("/api/tower/speech")
+    def tower_speech(request: TowerSpeechRequest) -> Response:
+        """Message de la tour synthétisé d'un seul souffle, en WAV.
+
+        404 quand le moteur facultatif n'est pas installé ou qu'il manque une
+        donnée au message : l'interface se rabat alors sur ses voix
+        pré-enregistrées.
+        """
+        if not voice_engine.available():
+            raise HTTPException(404, "Moteur vocal non installé.")
+        text = compose_tower_message(
+            request.kind,
+            TowerData(
+                callsign=request.callsign,
+                runway=request.runway,
+                wind_direction_true=request.wind_direction,
+                wind_speed_kt=request.wind_speed,
+                magnetic_variation=request.mag_var,
+                departure_mhz=request.departure_mhz,
+                destination=request.destination,
+                sid=request.sid,
+                squawk=request.squawk,
+                passengers=request.passengers,
+                pushback_heading=request.pushback_heading,
+                taxiways=tuple(name[:6] for name in request.taxiways),
+                stand=request.stand,
+            ),
+            request.language,
+        )
+        if not text:
+            raise HTTPException(404, "Message incomplet pour ce vol.")
+        voice, espeak_language, speed = TOWER_SPEAKERS[request.language][speaker_for(request.kind)]
+        try:
+            audio = voice_engine.synthesize(text, espeak_language, voice, speed)
+        except Exception as exc:  # noqa: BLE001 - la tour se rabat sur la banque
+            LOGGER.warning("Synthèse de la tour impossible : %s", type(exc).__name__)
+            raise HTTPException(503, "Synthèse vocale indisponible.") from exc
+        return Response(content=audio, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/live")
     def live(

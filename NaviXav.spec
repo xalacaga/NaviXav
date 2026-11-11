@@ -116,7 +116,9 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # Outil personnel d'administration : ne jamais l'inclure dans NaviXav.
-    excludes=["pytest", "navixav.release_dashboard"],
+    # numpy et onnxruntime appartiennent au moteur vocal facultatif de la tour,
+    # livré à part (voice_engine/) et chargé seulement s'il est installé.
+    excludes=["pytest", "navixav.release_dashboard", "numpy", "onnxruntime"],
     noarchive=False,
     optimize=1,
 )

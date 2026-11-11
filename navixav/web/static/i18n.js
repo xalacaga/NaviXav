@@ -4836,6 +4836,404 @@
   Object.assign(TRANSLATIONS.nl, { chatter_toggle: "ATC-radiosfeer", chatter_volume: "Volume van de sfeer", chatter_help: "Engelstalig radioverkeer dat op de achtergrond speelt volgens de vluchtfase: grond, toren, nadering of luchtverkeersleiding. Het gaat niet over uw vliegtuig en zwijgt tijdens de meldingen van NaviXav." });
   Object.assign(TRANSLATIONS.pl, { chatter_toggle: "Atmosfera radiowa ATC", chatter_volume: "Głośność atmosfery", chatter_help: "Angielska korespondencja radiowa odtwarzana w tle zależnie od fazy lotu: ziemia, wieża, zbliżanie lub kontrola obszaru. Nie dotyczy Twojego samolotu i milknie podczas komunikatów NaviXav." });
 
+  Object.assign(TRANSLATIONS.fr, { voice_volume: "Volume des annonces et alarmes" });
+  Object.assign(TRANSLATIONS.en, { voice_volume: "Callout and alarm volume" });
+  Object.assign(TRANSLATIONS.de, { voice_volume: "Lautstärke der Ansagen und Alarme" });
+  Object.assign(TRANSLATIONS.es, { voice_volume: "Volumen de avisos y alarmas" });
+  Object.assign(TRANSLATIONS.it, { voice_volume: "Volume di annunci e allarmi" });
+  Object.assign(TRANSLATIONS.pt, { voice_volume: "Volume dos avisos e alarmes" });
+  Object.assign(TRANSLATIONS.nl, { voice_volume: "Volume van meldingen en alarmen" });
+  Object.assign(TRANSLATIONS.pl, { voice_volume: "Głośność komunikatów i alarmów" });
+
+  // Services d'escale GSX Pro. « pax », GSX et OFP restent tels quels.
+  Object.assign(TRANSLATIONS.fr, {
+    gsx_kicker: "GSX Pro · lecture directe", gsx_title: "Services d’escale",
+    gsx_boarding: "Embarquement", gsx_deboarding: "Débarquement", gsx_catering: "Commissariat",
+    gsx_refueling: "Avitaillement", gsx_departure: "Repoussage", gsx_state_available: "Disponible", gsx_state_unavailable: "Indisponible", gsx_state_bypassed: "Ignoré",
+    gsx_state_requested: "Demandé", gsx_state_active: "En cours", gsx_state_completed: "Terminé",
+    gsx_cargo: "fret {value} %", gsx_hose: "flexible branché",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    gsx_kicker: "GSX Pro · live", gsx_title: "Ground services",
+    gsx_boarding: "Boarding", gsx_deboarding: "Deboarding", gsx_catering: "Catering",
+    gsx_refueling: "Refuelling", gsx_departure: "Pushback", gsx_state_available: "Available", gsx_state_unavailable: "Unavailable", gsx_state_bypassed: "Skipped",
+    gsx_state_requested: "Requested", gsx_state_active: "In progress", gsx_state_completed: "Completed",
+    gsx_cargo: "cargo {value}%", gsx_hose: "hose connected",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    gsx_kicker: "GSX Pro · live", gsx_title: "Bodendienste",
+    gsx_boarding: "Boarding", gsx_deboarding: "Deboarding", gsx_catering: "Catering",
+    gsx_refueling: "Betankung", gsx_departure: "Pushback", gsx_state_available: "Verfügbar", gsx_state_unavailable: "Nicht verfügbar", gsx_state_bypassed: "Übersprungen",
+    gsx_state_requested: "Angefordert", gsx_state_active: "Läuft", gsx_state_completed: "Abgeschlossen",
+    gsx_cargo: "Fracht {value} %", gsx_hose: "Schlauch angeschlossen",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    gsx_kicker: "GSX Pro · en directo", gsx_title: "Servicios de escala",
+    gsx_boarding: "Embarque", gsx_deboarding: "Desembarque", gsx_catering: "Catering",
+    gsx_refueling: "Repostaje", gsx_departure: "Pushback", gsx_state_available: "Disponible", gsx_state_unavailable: "No disponible", gsx_state_bypassed: "Omitido",
+    gsx_state_requested: "Solicitado", gsx_state_active: "En curso", gsx_state_completed: "Completado",
+    gsx_cargo: "carga {value} %", gsx_hose: "manguera conectada",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    gsx_kicker: "GSX Pro · in diretta", gsx_title: "Servizi di scalo",
+    gsx_boarding: "Imbarco", gsx_deboarding: "Sbarco", gsx_catering: "Catering",
+    gsx_refueling: "Rifornimento", gsx_departure: "Pushback", gsx_state_available: "Disponibile", gsx_state_unavailable: "Non disponibile", gsx_state_bypassed: "Saltato",
+    gsx_state_requested: "Richiesto", gsx_state_active: "In corso", gsx_state_completed: "Completato",
+    gsx_cargo: "merci {value}%", gsx_hose: "manichetta collegata",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    gsx_kicker: "GSX Pro · em direto", gsx_title: "Serviços de escala",
+    gsx_boarding: "Embarque", gsx_deboarding: "Desembarque", gsx_catering: "Catering",
+    gsx_refueling: "Abastecimento", gsx_departure: "Pushback", gsx_state_available: "Disponível", gsx_state_unavailable: "Indisponível", gsx_state_bypassed: "Ignorado",
+    gsx_state_requested: "Pedido", gsx_state_active: "Em curso", gsx_state_completed: "Concluído",
+    gsx_cargo: "carga {value} %", gsx_hose: "mangueira ligada",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    gsx_kicker: "GSX Pro · live", gsx_title: "Afhandeling",
+    gsx_boarding: "Boarding", gsx_deboarding: "Deboarding", gsx_catering: "Catering",
+    gsx_refueling: "Tanken", gsx_departure: "Pushback", gsx_state_available: "Beschikbaar", gsx_state_unavailable: "Niet beschikbaar", gsx_state_bypassed: "Overgeslagen",
+    gsx_state_requested: "Aangevraagd", gsx_state_active: "Bezig", gsx_state_completed: "Voltooid",
+    gsx_cargo: "vracht {value}%", gsx_hose: "slang aangesloten",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    gsx_kicker: "GSX Pro · na żywo", gsx_title: "Obsługa naziemna",
+    gsx_boarding: "Wsiadanie", gsx_deboarding: "Wysiadanie", gsx_catering: "Catering",
+    gsx_refueling: "Tankowanie", gsx_departure: "Wypychanie", gsx_state_available: "Dostępne", gsx_state_unavailable: "Niedostępne", gsx_state_bypassed: "Pominięte",
+    gsx_state_requested: "Zamówione", gsx_state_active: "W toku", gsx_state_completed: "Zakończone",
+    gsx_cargo: "ładunek {value}%", gsx_hose: "wąż podłączony",
+  });
+
+  // Module Escale. TOBT, STD, LMC, ZFW, TOW, FOB, %MAC, A-CDM, STOP et
+  // TOO FAR restent tels quels : c'est la notation des escales et des VDGS.
+  Object.assign(TRANSLATIONS.fr, {
+    ta_seats_aircraft: "Sièges occupés lus dans l’EFB de l’avion.",
+    ta_seats_zones: "Répartition par zone de cabine lue dans MSFS ; la place dans chaque zone suit l’ordre d’embarquement.",
+    ta_cargo_estimated: "* Répartition avant/arrière estimée : GSX ne publie qu’un pourcentage de fret global.",
+    ta_payload_mismatch: "GSX a embarqué {gsx} passagers, l’avion n’en compte que {aircraft} : chargez-le depuis son EFB ou activez la synchronisation avec GSX.",
+    ta_next_request_deboarding: "À l’arrivée au poste, demandez le débarquement dans le menu GSX.",
+    tab_turnaround: "Escale", ta_open_module: "Ouvrir l’escale", ta_gsx_idle: "Aucun service en cours",
+    ta_kicker: "GSX Pro · rampe en direct", ta_title: "Escale", ta_gsx_off: "GSX arrêté",
+    ta_waiting: "En attente de GSX Pro : lancez GSX dans MSFS, l’avion au sol.",
+    ta_ramp: "Vue de rampe", ta_generic_layout: "gabarit générique",
+    ta_pax: "Passagers", ta_hold_fwd: "Soute avant", ta_hold_aft: "Soute arrière", ta_fuel: "Carburant",
+    ta_seats_note: "Nombre de passagers réel ; leur place dans la cabine est illustrative, GSX ne la publie pas.",
+    ta_next: "Prochaine étape", ta_timeline: "Chronologie d’escale",
+    ta_tobt: "TOBT estimée", ta_std: "Départ OFP",
+    ta_tobt_note: "Fin de chaque service au rythme mesuré ; ~ durée moyenne de vos escales précédentes, * durée forfaitaire tant qu’aucune n’a été mesurée. La TOBT ajoute 3 min pour la fermeture des portes.",
+    ta_on_time: "À l’heure", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "Horaire OFP non suivi", ta_ready: "Avion prêt au départ",
+    ta_critical: "Chemin critique : {service}", ta_timeline_empty: "La chronologie démarre avec le premier service GSX.",
+    ta_now: "maintenant", ta_service_cargo: "Fret",
+    gsx_water: "Eau potable", gsx_lavatory: "Toilettes",
+    ta_loadsheet: "Devis de masse et centrage",
+    ta_loadsheet_pending: "Émis à la fin de l’embarquement et du chargement, une fois l’avitaillement terminé.",
+    ta_lmc: "LMC : {detail}", ta_lmc_none: "Aucune LMC : conforme à l’OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, à reporter au FMS",
+    ta_source_fms: "masses lues dans l’EFB de l’avion", ta_source_msfs: "masses lues dans MSFS",
+    ta_cg_note: "CG avion complet, carburant compris, lu dans MSFS",
+    ta_vdgs: "Guidage d’accostage", ta_vdgs_note: "Point d’arrêt estimé d’après le poste MSFS ; suivez le marquage et le VDGS de la scène.",
+    ta_next_request_boarding: "Demandez l’embarquement dans le menu GSX.",
+    ta_next_before_start: "Escale terminée : checklist Before start, puis demandez le repoussage dans GSX.",
+    ta_pushback_active: "Repoussage en cours",
+    ta_next_taxi: "Repoussage terminé : le guidage de roulage prend le relais.",
+    ta_next_arrival_done: "Débarquement terminé : escale d’arrivée close.",
+    voice_gsx_boarding_done: "Embarquement terminé", voice_gsx_deboarding_done: "Débarquement terminé",
+    voice_gsx_refuel_done: "Avitaillement terminé", voice_gsx_cargo_done: "Chargement terminé",
+    voice_gsx_pushback_done: "Repoussage terminé",
+  });
+  Object.assign(TRANSLATIONS.en, {
+    ta_seats_aircraft: "Occupied seats read from the aircraft EFB.",
+    ta_seats_zones: "Cabin zone split read from MSFS; seats within each zone follow the boarding order.",
+    ta_cargo_estimated: "* Forward/aft split estimated: GSX only publishes an overall cargo percentage.",
+    ta_payload_mismatch: "GSX boarded {gsx} passengers but the aircraft counts only {aircraft}: load it from its EFB or enable GSX synchronisation.",
+    ta_next_request_deboarding: "At the stand, request deboarding from the GSX menu.",
+    tab_turnaround: "Turnaround", ta_open_module: "Open turnaround", ta_gsx_idle: "No service in progress",
+    ta_kicker: "GSX Pro · live ramp", ta_title: "Turnaround", ta_gsx_off: "GSX stopped",
+    ta_waiting: "Waiting for GSX Pro: start GSX in MSFS with the aircraft on the ground.",
+    ta_ramp: "Ramp view", ta_generic_layout: "generic layout",
+    ta_pax: "Passengers", ta_hold_fwd: "Forward hold", ta_hold_aft: "Aft hold", ta_fuel: "Fuel",
+    ta_seats_note: "Passenger count is real; their place in the cabin is illustrative, as GSX does not publish it.",
+    ta_next: "Next step", ta_timeline: "Turnaround timeline",
+    ta_tobt: "Estimated TOBT", ta_std: "OFP departure",
+    ta_tobt_note: "Each service ends at its measured rate; ~ average duration of your previous turnarounds, * standard duration until one has been measured. TOBT adds 3 min for door closing.",
+    ta_on_time: "On time", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "OFP schedule not followed", ta_ready: "Aircraft ready for departure",
+    ta_critical: "Critical path: {service}", ta_timeline_empty: "The timeline starts with the first GSX service.",
+    ta_now: "now", ta_service_cargo: "Cargo",
+    gsx_water: "Potable water", gsx_lavatory: "Lavatory",
+    ta_loadsheet: "Load and trim sheet",
+    ta_loadsheet_pending: "Issued at the end of boarding and loading, once refuelling is complete.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "No LMC: matches the OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, update the FMS",
+    ta_source_fms: "weights read from the aircraft EFB", ta_source_msfs: "weights read from MSFS",
+    ta_cg_note: "whole-aircraft CG including fuel, read from MSFS",
+    ta_vdgs: "Docking guidance", ta_vdgs_note: "Stop point estimated from the MSFS stand; follow the markings and the scenery VDGS.",
+    ta_next_request_boarding: "Request boarding from the GSX menu.",
+    ta_next_before_start: "Turnaround complete: Before start checklist, then request pushback in GSX.",
+    ta_pushback_active: "Pushback in progress",
+    ta_next_taxi: "Pushback complete: taxi guidance takes over.",
+    ta_next_arrival_done: "Deboarding complete: arrival turnaround closed.",
+    voice_gsx_boarding_done: "Boarding completed", voice_gsx_deboarding_done: "Deboarding completed",
+    voice_gsx_refuel_done: "Refuelling completed", voice_gsx_cargo_done: "Loading completed",
+    voice_gsx_pushback_done: "Pushback completed",
+  });
+  Object.assign(TRANSLATIONS.de, {
+    ta_seats_aircraft: "Belegte Sitze aus dem EFB des Flugzeugs gelesen.",
+    ta_seats_zones: "Aufteilung nach Kabinenzonen aus MSFS; innerhalb jeder Zone folgen die Plätze der Boarding-Reihenfolge.",
+    ta_cargo_estimated: "* Aufteilung vorn/hinten geschätzt: GSX veröffentlicht nur einen Gesamtprozentsatz der Fracht.",
+    ta_payload_mismatch: "GSX hat {gsx} Passagiere eingestiegen, das Flugzeug zählt nur {aircraft}: über das EFB beladen oder die GSX-Synchronisierung aktivieren.",
+    ta_next_request_deboarding: "An der Parkposition Deboarding im GSX-Menü anfordern.",
+    tab_turnaround: "Abfertigung", ta_open_module: "Abfertigung öffnen", ta_gsx_idle: "Kein Dienst aktiv",
+    ta_kicker: "GSX Pro · Vorfeld live", ta_title: "Abfertigung", ta_gsx_off: "GSX gestoppt",
+    ta_waiting: "Warten auf GSX Pro: GSX in MSFS starten, Flugzeug am Boden.",
+    ta_ramp: "Vorfeldansicht", ta_generic_layout: "generisches Layout",
+    ta_pax: "Passagiere", ta_hold_fwd: "Vorderer Frachtraum", ta_hold_aft: "Hinterer Frachtraum", ta_fuel: "Treibstoff",
+    ta_seats_note: "Die Passagierzahl ist real; die Sitzplätze sind illustrativ, GSX veröffentlicht sie nicht.",
+    ta_next: "Nächster Schritt", ta_timeline: "Abfertigungsablauf",
+    ta_tobt: "Geschätzte TOBT", ta_std: "Abflug laut OFP",
+    ta_tobt_note: "Ende jedes Dienstes im gemessenen Tempo; ~ durchschnittliche Dauer Ihrer bisherigen Abfertigungen, * Standarddauer, solange keine gemessen wurde. Die TOBT enthält 3 min für das Schließen der Türen.",
+    ta_on_time: "Pünktlich", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "OFP-Zeitplan nicht eingehalten", ta_ready: "Flugzeug abflugbereit",
+    ta_critical: "Kritischer Pfad: {service}", ta_timeline_empty: "Der Ablauf beginnt mit dem ersten GSX-Dienst.",
+    ta_now: "jetzt", ta_service_cargo: "Fracht",
+    gsx_water: "Trinkwasser", gsx_lavatory: "Toiletten",
+    ta_loadsheet: "Ladeblatt",
+    ta_loadsheet_pending: "Wird nach Boarding und Beladung ausgestellt, sobald die Betankung abgeschlossen ist.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Keine LMC: entspricht dem OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, im FMS anpassen",
+    ta_source_fms: "Massen aus dem EFB des Flugzeugs", ta_source_msfs: "Massen aus MSFS",
+    ta_cg_note: "Schwerpunkt des ganzen Flugzeugs inkl. Treibstoff, aus MSFS",
+    ta_vdgs: "Andockführung", ta_vdgs_note: "Haltepunkt aus der MSFS-Parkposition geschätzt; Markierung und VDGS der Szenerie folgen.",
+    ta_next_request_boarding: "Boarding im GSX-Menü anfordern.",
+    ta_next_before_start: "Abfertigung beendet: Checkliste Before start, dann Pushback in GSX anfordern.",
+    ta_pushback_active: "Pushback läuft",
+    ta_next_taxi: "Pushback beendet: die Rollführung übernimmt.",
+    ta_next_arrival_done: "Deboarding beendet: Ankunftsabfertigung abgeschlossen.",
+    voice_gsx_boarding_done: "Boarding abgeschlossen", voice_gsx_deboarding_done: "Deboarding abgeschlossen",
+    voice_gsx_refuel_done: "Betankung abgeschlossen", voice_gsx_cargo_done: "Beladung abgeschlossen",
+    voice_gsx_pushback_done: "Pushback abgeschlossen",
+  });
+  Object.assign(TRANSLATIONS.es, {
+    ta_seats_aircraft: "Asientos ocupados leídos en el EFB del avión.",
+    ta_seats_zones: "Reparto por zona de cabina leído en MSFS; dentro de cada zona, los asientos siguen el orden de embarque.",
+    ta_cargo_estimated: "* Reparto delantero/trasero estimado: GSX solo publica un porcentaje de carga global.",
+    ta_payload_mismatch: "GSX ha embarcado {gsx} pasajeros, pero el avión solo cuenta {aircraft}: cárguelo desde su EFB o active la sincronización con GSX.",
+    ta_next_request_deboarding: "En el puesto, solicite el desembarque en el menú de GSX.",
+    tab_turnaround: "Escala", ta_open_module: "Abrir la escala", ta_gsx_idle: "Ningún servicio en curso",
+    ta_kicker: "GSX Pro · plataforma en directo", ta_title: "Escala", ta_gsx_off: "GSX detenido",
+    ta_waiting: "Esperando a GSX Pro: inicie GSX en MSFS con el avión en tierra.",
+    ta_ramp: "Vista de plataforma", ta_generic_layout: "plantilla genérica",
+    ta_pax: "Pasajeros", ta_hold_fwd: "Bodega delantera", ta_hold_aft: "Bodega trasera", ta_fuel: "Combustible",
+    ta_seats_note: "El número de pasajeros es real; su asiento es ilustrativo, GSX no lo publica.",
+    ta_next: "Siguiente paso", ta_timeline: "Cronología de la escala",
+    ta_tobt: "TOBT estimada", ta_std: "Salida del OFP",
+    ta_tobt_note: "Fin de cada servicio al ritmo medido; ~ duración media de sus escalas anteriores, * duración estándar mientras no se haya medido ninguna. La TOBT añade 3 min para el cierre de puertas.",
+    ta_on_time: "A la hora", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "Horario del OFP no seguido", ta_ready: "Avión listo para la salida",
+    ta_critical: "Camino crítico: {service}", ta_timeline_empty: "La cronología empieza con el primer servicio de GSX.",
+    ta_now: "ahora", ta_service_cargo: "Carga",
+    gsx_water: "Agua potable", gsx_lavatory: "Aseos",
+    ta_loadsheet: "Hoja de carga y centrado",
+    ta_loadsheet_pending: "Se emite al terminar el embarque y la carga, una vez acabado el repostaje.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Sin LMC: conforme al OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, actualizar el FMS",
+    ta_source_fms: "masas leídas en el EFB del avión", ta_source_msfs: "masas leídas en MSFS",
+    ta_cg_note: "CG del avión completo con combustible, leído en MSFS",
+    ta_vdgs: "Guiado de atraque", ta_vdgs_note: "Punto de parada estimado a partir del puesto de MSFS; siga las marcas y el VDGS del escenario.",
+    ta_next_request_boarding: "Solicite el embarque en el menú de GSX.",
+    ta_next_before_start: "Escala terminada: lista Before start y luego solicite el pushback en GSX.",
+    ta_pushback_active: "Pushback en curso",
+    ta_next_taxi: "Pushback terminado: el guiado de rodaje toma el relevo.",
+    ta_next_arrival_done: "Desembarque terminado: escala de llegada cerrada.",
+    voice_gsx_boarding_done: "Embarque completado", voice_gsx_deboarding_done: "Desembarque completado",
+    voice_gsx_refuel_done: "Repostaje completado", voice_gsx_cargo_done: "Carga completada",
+    voice_gsx_pushback_done: "Pushback completado",
+  });
+  Object.assign(TRANSLATIONS.it, {
+    ta_seats_aircraft: "Posti occupati letti nell’EFB dell’aereo.",
+    ta_seats_zones: "Ripartizione per zona di cabina letta in MSFS; i posti in ogni zona seguono l’ordine d’imbarco.",
+    ta_cargo_estimated: "* Ripartizione anteriore/posteriore stimata: GSX pubblica solo una percentuale complessiva delle merci.",
+    ta_payload_mismatch: "GSX ha imbarcato {gsx} passeggeri, ma l’aereo ne conta solo {aircraft}: caricarlo dal suo EFB o attivare la sincronizzazione con GSX.",
+    ta_next_request_deboarding: "In piazzola, richiedere lo sbarco dal menu GSX.",
+    tab_turnaround: "Scalo", ta_open_module: "Apri lo scalo", ta_gsx_idle: "Nessun servizio in corso",
+    ta_kicker: "GSX Pro · piazzale in diretta", ta_title: "Scalo", ta_gsx_off: "GSX fermo",
+    ta_waiting: "In attesa di GSX Pro: avviare GSX in MSFS con l’aereo a terra.",
+    ta_ramp: "Vista del piazzale", ta_generic_layout: "schema generico",
+    ta_pax: "Passeggeri", ta_hold_fwd: "Stiva anteriore", ta_hold_aft: "Stiva posteriore", ta_fuel: "Carburante",
+    ta_seats_note: "Il numero di passeggeri è reale; il loro posto è illustrativo, GSX non lo pubblica.",
+    ta_next: "Prossimo passo", ta_timeline: "Cronologia dello scalo",
+    ta_tobt: "TOBT stimata", ta_std: "Partenza OFP",
+    ta_tobt_note: "Fine di ogni servizio al ritmo misurato; ~ durata media dei vostri scali precedenti, * durata standard finché nessuna è stata misurata. La TOBT aggiunge 3 min per la chiusura delle porte.",
+    ta_on_time: "In orario", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "Orario OFP non seguito", ta_ready: "Aereo pronto alla partenza",
+    ta_critical: "Percorso critico: {service}", ta_timeline_empty: "La cronologia inizia con il primo servizio GSX.",
+    ta_now: "ora", ta_service_cargo: "Merci",
+    gsx_water: "Acqua potabile", gsx_lavatory: "Toilette",
+    ta_loadsheet: "Foglio di carico e centraggio",
+    ta_loadsheet_pending: "Emesso al termine di imbarco e carico, a rifornimento concluso.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Nessuna LMC: conforme all’OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, aggiornare l’FMS",
+    ta_source_fms: "masse lette nell’EFB dell’aereo", ta_source_msfs: "masse lette in MSFS",
+    ta_cg_note: "CG dell’aereo completo con carburante, letto in MSFS",
+    ta_vdgs: "Guida all’attracco", ta_vdgs_note: "Punto di arresto stimato dalla piazzola MSFS; seguire la segnaletica e il VDGS dello scenario.",
+    ta_next_request_boarding: "Richiedere l’imbarco dal menu GSX.",
+    ta_next_before_start: "Scalo concluso: checklist Before start, poi richiedere il pushback in GSX.",
+    ta_pushback_active: "Pushback in corso",
+    ta_next_taxi: "Pushback concluso: la guida al rullaggio prende il comando.",
+    ta_next_arrival_done: "Sbarco concluso: scalo di arrivo chiuso.",
+    voice_gsx_boarding_done: "Imbarco completato", voice_gsx_deboarding_done: "Sbarco completato",
+    voice_gsx_refuel_done: "Rifornimento completato", voice_gsx_cargo_done: "Carico completato",
+    voice_gsx_pushback_done: "Pushback completato",
+  });
+  Object.assign(TRANSLATIONS.pt, {
+    ta_seats_aircraft: "Lugares ocupados lidos no EFB da aeronave.",
+    ta_seats_zones: "Distribuição por zona de cabina lida no MSFS; em cada zona, os lugares seguem a ordem de embarque.",
+    ta_cargo_estimated: "* Distribuição dianteira/traseira estimada: o GSX só publica uma percentagem global de carga.",
+    ta_payload_mismatch: "O GSX embarcou {gsx} passageiros, mas a aeronave só conta {aircraft}: carregue-a no EFB ou ative a sincronização com o GSX.",
+    ta_next_request_deboarding: "Na posição, peça o desembarque no menu do GSX.",
+    tab_turnaround: "Escala", ta_open_module: "Abrir a escala", ta_gsx_idle: "Nenhum serviço em curso",
+    ta_kicker: "GSX Pro · placa em direto", ta_title: "Escala", ta_gsx_off: "GSX parado",
+    ta_waiting: "A aguardar o GSX Pro: inicie o GSX no MSFS com a aeronave no solo.",
+    ta_ramp: "Vista da placa", ta_generic_layout: "modelo genérico",
+    ta_pax: "Passageiros", ta_hold_fwd: "Porão dianteiro", ta_hold_aft: "Porão traseiro", ta_fuel: "Combustível",
+    ta_seats_note: "O número de passageiros é real; o lugar de cada um é ilustrativo, o GSX não o publica.",
+    ta_next: "Próximo passo", ta_timeline: "Cronologia da escala",
+    ta_tobt: "TOBT estimada", ta_std: "Partida do OFP",
+    ta_tobt_note: "Fim de cada serviço ao ritmo medido; ~ duração média das suas escalas anteriores, * duração padrão enquanto nenhuma tiver sido medida. A TOBT acrescenta 3 min para o fecho das portas.",
+    ta_on_time: "À hora", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "Horário do OFP não seguido", ta_ready: "Aeronave pronta para a partida",
+    ta_critical: "Caminho crítico: {service}", ta_timeline_empty: "A cronologia começa com o primeiro serviço GSX.",
+    ta_now: "agora", ta_service_cargo: "Carga",
+    gsx_water: "Água potável", gsx_lavatory: "Lavabos",
+    ta_loadsheet: "Folha de carga e centragem",
+    ta_loadsheet_pending: "Emitida no fim do embarque e da carga, com o abastecimento concluído.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Sem LMC: conforme o OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, atualizar o FMS",
+    ta_source_fms: "massas lidas no EFB da aeronave", ta_source_msfs: "massas lidas no MSFS",
+    ta_cg_note: "CG da aeronave completa com combustível, lido no MSFS",
+    ta_vdgs: "Guiamento de estacionamento", ta_vdgs_note: "Ponto de paragem estimado a partir da posição MSFS; siga as marcas e o VDGS do cenário.",
+    ta_next_request_boarding: "Peça o embarque no menu do GSX.",
+    ta_next_before_start: "Escala concluída: checklist Before start, depois peça o pushback no GSX.",
+    ta_pushback_active: "Pushback em curso",
+    ta_next_taxi: "Pushback concluído: o guiamento de rolagem assume.",
+    ta_next_arrival_done: "Desembarque concluído: escala de chegada encerrada.",
+    voice_gsx_boarding_done: "Embarque concluído", voice_gsx_deboarding_done: "Desembarque concluído",
+    voice_gsx_refuel_done: "Abastecimento concluído", voice_gsx_cargo_done: "Carga concluída",
+    voice_gsx_pushback_done: "Pushback concluído",
+  });
+  Object.assign(TRANSLATIONS.nl, {
+    ta_seats_aircraft: "Bezette stoelen gelezen uit de EFB van het vliegtuig.",
+    ta_seats_zones: "Verdeling per cabinezone gelezen uit MSFS; binnen elke zone volgen de stoelen de boardingvolgorde.",
+    ta_cargo_estimated: "* Verdeling voor/achter geschat: GSX publiceert alleen een totaalpercentage vracht.",
+    ta_payload_mismatch: "GSX heeft {gsx} passagiers laten instappen, maar het vliegtuig telt er maar {aircraft}: laad het via de EFB of schakel de GSX-synchronisatie in.",
+    ta_next_request_deboarding: "Vraag op de standplaats deboarding aan via het GSX-menu.",
+    tab_turnaround: "Turnaround", ta_open_module: "Turnaround openen", ta_gsx_idle: "Geen dienst bezig",
+    ta_kicker: "GSX Pro · platform live", ta_title: "Turnaround", ta_gsx_off: "GSX gestopt",
+    ta_waiting: "Wachten op GSX Pro: start GSX in MSFS met het vliegtuig op de grond.",
+    ta_ramp: "Platformweergave", ta_generic_layout: "generieke indeling",
+    ta_pax: "Passagiers", ta_hold_fwd: "Voorste ruim", ta_hold_aft: "Achterste ruim", ta_fuel: "Brandstof",
+    ta_seats_note: "Het aantal passagiers is echt; hun plaats in de cabine is illustratief, GSX publiceert die niet.",
+    ta_next: "Volgende stap", ta_timeline: "Turnaround-tijdlijn",
+    ta_tobt: "Geschatte TOBT", ta_std: "Vertrek volgens OFP",
+    ta_tobt_note: "Einde van elke dienst in het gemeten tempo; ~ gemiddelde duur van uw vorige turnarounds, * standaardduur zolang er nog geen gemeten is. De TOBT telt 3 min op voor het sluiten van de deuren.",
+    ta_on_time: "Op tijd", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "OFP-schema niet gevolgd", ta_ready: "Vliegtuig klaar voor vertrek",
+    ta_critical: "Kritiek pad: {service}", ta_timeline_empty: "De tijdlijn begint met de eerste GSX-dienst.",
+    ta_now: "nu", ta_service_cargo: "Vracht",
+    gsx_water: "Drinkwater", gsx_lavatory: "Toiletten",
+    ta_loadsheet: "Beladings- en balansblad",
+    ta_loadsheet_pending: "Uitgegeven aan het einde van boarding en belading, zodra het tanken klaar is.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Geen LMC: komt overeen met de OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, FMS bijwerken",
+    ta_source_fms: "gewichten uit de EFB van het vliegtuig", ta_source_msfs: "gewichten uit MSFS",
+    ta_cg_note: "zwaartepunt van het hele vliegtuig inclusief brandstof, uit MSFS",
+    ta_vdgs: "Parkeergeleiding", ta_vdgs_note: "Stoppunt geschat op basis van de MSFS-standplaats; volg de markering en de VDGS van de scenery.",
+    ta_next_request_boarding: "Vraag boarding aan via het GSX-menu.",
+    ta_next_before_start: "Turnaround klaar: checklist Before start, vraag daarna pushback aan in GSX.",
+    ta_pushback_active: "Pushback bezig",
+    ta_next_taxi: "Pushback klaar: de taxigeleiding neemt het over.",
+    ta_next_arrival_done: "Deboarding klaar: aankomst-turnaround afgesloten.",
+    voice_gsx_boarding_done: "Boarding voltooid", voice_gsx_deboarding_done: "Deboarding voltooid",
+    voice_gsx_refuel_done: "Tanken voltooid", voice_gsx_cargo_done: "Belading voltooid",
+    voice_gsx_pushback_done: "Pushback voltooid",
+  });
+  Object.assign(TRANSLATIONS.pl, {
+    ta_seats_aircraft: "Zajęte miejsca odczytane z EFB samolotu.",
+    ta_seats_zones: "Podział na strefy kabiny odczytany z MSFS; miejsca w każdej strefie zgodnie z kolejnością wsiadania.",
+    ta_cargo_estimated: "* Podział przód/tył szacowany: GSX publikuje tylko łączny procent ładunku.",
+    ta_payload_mismatch: "GSX wpuścił {gsx} pasażerów, a samolot liczy tylko {aircraft}: załaduj go z EFB lub włącz synchronizację z GSX.",
+    ta_next_request_deboarding: "Na stanowisku zamów wysiadanie w menu GSX.",
+    tab_turnaround: "Obsługa postoju", ta_open_module: "Otwórz obsługę postoju", ta_gsx_idle: "Brak trwającej usługi",
+    ta_kicker: "GSX Pro · płyta na żywo", ta_title: "Obsługa postoju", ta_gsx_off: "GSX zatrzymany",
+    ta_waiting: "Oczekiwanie na GSX Pro: uruchom GSX w MSFS, samolot na ziemi.",
+    ta_ramp: "Widok płyty", ta_generic_layout: "układ ogólny",
+    ta_pax: "Pasażerowie", ta_hold_fwd: "Luk przedni", ta_hold_aft: "Luk tylny", ta_fuel: "Paliwo",
+    ta_seats_note: "Liczba pasażerów jest rzeczywista; ich miejsca są poglądowe, GSX ich nie publikuje.",
+    ta_next: "Następny krok", ta_timeline: "Przebieg obsługi",
+    ta_tobt: "Szacowany TOBT", ta_std: "Odlot wg OFP",
+    ta_tobt_note: "Koniec każdej usługi w zmierzonym tempie; ~ średni czas Twoich poprzednich obsług, * czas standardowy, dopóki żaden nie został zmierzony. TOBT dolicza 3 min na zamknięcie drzwi.",
+    ta_on_time: "Punktualnie", ta_delay: "+{minutes} min", ta_early: "−{minutes} min",
+    ta_schedule_unrelated: "Rozkład OFP nie jest realizowany", ta_ready: "Samolot gotowy do odlotu",
+    ta_critical: "Ścieżka krytyczna: {service}", ta_timeline_empty: "Przebieg zaczyna się od pierwszej usługi GSX.",
+    ta_now: "teraz", ta_service_cargo: "Ładunek",
+    gsx_water: "Woda pitna", gsx_lavatory: "Toalety",
+    ta_loadsheet: "Arkusz załadunku i wyważenia",
+    ta_loadsheet_pending: "Wystawiany po zakończeniu wsiadania i załadunku, gdy tankowanie jest skończone.",
+    ta_lmc: "LMC: {detail}", ta_lmc_none: "Brak LMC: zgodne z OFP",
+    ta_lmc_pax: "PAX {delta}", ta_lmc_zfw: "ZFW {delta}, zaktualizuj FMS",
+    ta_source_fms: "masy odczytane z EFB samolotu", ta_source_msfs: "masy odczytane z MSFS",
+    ta_cg_note: "środek ciężkości całego samolotu z paliwem, odczytany z MSFS",
+    ta_vdgs: "Naprowadzanie na stanowisko", ta_vdgs_note: "Punkt zatrzymania oszacowany na podstawie stanowiska MSFS; kieruj się oznakowaniem i VDGS scenerii.",
+    ta_next_request_boarding: "Zamów wsiadanie w menu GSX.",
+    ta_next_before_start: "Obsługa zakończona: checklista Before start, potem zamów wypychanie w GSX.",
+    ta_pushback_active: "Wypychanie w toku",
+    ta_next_taxi: "Wypychanie zakończone: prowadzenie kołowania przejmuje kontrolę.",
+    ta_next_arrival_done: "Wysiadanie zakończone: obsługa przylotu zamknięta.",
+    voice_gsx_boarding_done: "Wsiadanie zakończone", voice_gsx_deboarding_done: "Wysiadanie zakończone",
+    voice_gsx_refuel_done: "Tankowanie zakończone", voice_gsx_cargo_done: "Załadunek zakończony",
+    voice_gsx_pushback_done: "Wypychanie zakończone",
+  });
+
+  // Tour hors ligne.
+  Object.assign(TRANSLATIONS.fr, { tower_toggle: "Radio et interphone hors ligne", tower_test: "Écouter", tower_help: "De la préparation à l’arrivée, le contrôle et l’équipe au sol s’adressent à votre vol : clairance au poste, fin d’embarquement annoncée par la cabine, devis de masse prêt, repoussage approuvé puis roulage, alignement et décollage avec le vent, transfert au départ ; à l’arrivée, poste attribué et cales en place. Indicatif, SID, piste, voies et poste viennent du vol chargé. Les contrôleurs parlent à la radio, la cabine et le mécanicien à l’interphone ; français sur un aérodrome français, anglais ailleurs. Tout se tait quand le trafic VATSIM ou IVAO est choisi. Ce n’est pas un service de contrôle." });
+  Object.assign(TRANSLATIONS.en, { tower_toggle: "Offline radio and interphone", tower_test: "Listen", tower_help: "From preparation to arrival, ATC and the ground crew talk to your flight: clearance at the stand, boarding completed from the cabin, loadsheet ready, pushback approved then taxi, line-up and takeoff with the wind, handoff to departure; on arrival, stand assignment and chocks in. Callsign, SID, runway, taxiways and stand come from the loaded flight. Controllers speak on the radio, the cabin and the ground crew on the interphone. Everything falls silent when VATSIM or IVAO traffic is selected. It is not an air traffic control service." });
+  Object.assign(TRANSLATIONS.de, { tower_toggle: "Funk und Interphone offline", tower_test: "Anhören", tower_help: "Von der Vorbereitung bis zur Ankunft sprechen Lotsen und Bodenpersonal Ihren Flug an: Freigabe an der Parkposition, Boarding-Ende aus der Kabine, Ladeblatt bereit, Pushback genehmigt und Rollfreigabe, Aufrollen und Start mit dem Wind, Übergabe an Departure; bei der Ankunft Parkposition und Bremsklötze. Rufzeichen, SID, Piste, Rollwege und Parkposition stammen aus dem geladenen Flug. Lotsen sprechen über Funk, Kabine und Bodenpersonal über die Interphone. Alles schweigt, wenn VATSIM- oder IVAO-Verkehr gewählt ist. Es ist kein Flugverkehrskontrolldienst." });
+  Object.assign(TRANSLATIONS.es, { tower_toggle: "Radio e interfono sin conexión", tower_test: "Escuchar", tower_help: "De la preparación a la llegada, el control y el personal de tierra se dirigen a su vuelo: autorización en el puesto, fin del embarque anunciado por la cabina, hoja de carga lista, pushback aprobado y rodaje, alineación y despegue con el viento, transferencia a salidas; a la llegada, puesto asignado y calzos puestos. Indicativo, SID, pista, calles de rodaje y puesto vienen del vuelo cargado. Los controladores hablan por radio, la cabina y el personal de tierra por interfono. Todo se calla cuando se elige el tráfico de VATSIM o IVAO. No es un servicio de control." });
+  Object.assign(TRANSLATIONS.it, { tower_toggle: "Radio e interfono offline", tower_test: "Ascolta", tower_help: "Dalla preparazione all’arrivo, il controllo e il personale di terra si rivolgono al vostro volo: autorizzazione in piazzola, fine imbarco annunciata dalla cabina, foglio di carico pronto, pushback approvato poi rullaggio, allineamento e decollo con il vento, trasferimento alle partenze; all’arrivo, piazzola assegnata e tacchi inseriti. Nominativo, SID, pista, raccordi e piazzola vengono dal volo caricato. I controllori parlano via radio, la cabina e il personale di terra all’interfono. Tutto tace quando è scelto il traffico VATSIM o IVAO. Non è un servizio di controllo." });
+  Object.assign(TRANSLATIONS.pt, { tower_toggle: "Rádio e intercomunicador offline", tower_test: "Ouvir", tower_help: "Da preparação à chegada, o controlo e a equipa de terra dirigem-se ao seu voo: autorização na posição, fim do embarque anunciado pela cabina, folha de carga pronta, pushback aprovado e rolagem, alinhamento e descolagem com o vento, transferência para as partidas; à chegada, posição atribuída e calços colocados. Indicativo, SID, pista, caminhos de rolagem e posição vêm do voo carregado. Os controladores falam por rádio, a cabina e a equipa de terra pelo intercomunicador. Tudo se cala quando o tráfego VATSIM ou IVAO é escolhido. Não é um serviço de controlo." });
+  Object.assign(TRANSLATIONS.nl, { tower_toggle: "Radio en intercom offline", tower_test: "Beluisteren", tower_help: "Van voorbereiding tot aankomst spreken de verkeersleiding en het grondpersoneel uw vlucht aan: klaring op de standplaats, einde boarding vanuit de cabine, beladingsblad klaar, pushback goedgekeurd en daarna taxiën, opstellen en start met de wind, overdracht aan departure; bij aankomst toegewezen standplaats en blokken geplaatst. Roepnaam, SID, baan, taxibanen en standplaats komen uit de geladen vlucht. Verkeersleiders spreken via de radio, cabine en grondpersoneel via de intercom. Alles zwijgt als VATSIM- of IVAO-verkeer is gekozen. Het is geen luchtverkeersleidingsdienst." });
+  Object.assign(TRANSLATIONS.pl, { tower_toggle: "Radio i interkom offline", tower_test: "Odsłuchaj", tower_help: "Od przygotowania do przylotu kontrola i obsługa naziemna zwracają się do Twojego lotu: zgoda na stanowisku, koniec wsiadania zgłoszony przez kabinę, gotowy arkusz załadunku, zgoda na wypychanie i kołowanie, zajęcie pasa i start z wiatrem, przekazanie do odlotów; po przylocie przydzielone stanowisko i założone klocki. Znak wywoławczy, SID, pas, drogi kołowania i stanowisko pochodzą z wczytanego lotu. Kontrolerzy mówią przez radio, kabina i obsługa naziemna przez interkom. Wszystko milknie, gdy wybrano ruch VATSIM lub IVAO. Nie jest to służba kontroli ruchu." });
+
+  // Voix naturelle de la tour (moteur vocal facultatif).
+  Object.assign(TRANSLATIONS.fr, {"tower_engine_installed": "Voix naturelle installée : la tour dit ses phrases entières, synthétisées sur cet ordinateur.", "tower_engine_recorded": "Voix enregistrée. Une voix naturelle, plus fluide, est disponible en option (environ 90 Mo à télécharger, hors ligne ensuite). Sans elle, seule la tour parle ; clairance, sol, cabine et équipe au sol demandent la voix naturelle.", "tower_engine_download": "Télécharger la voix naturelle", "tower_engine_downloading": "Téléchargement de la voix naturelle… {percent} %", "tower_engine_installing": "Installation de la voix naturelle…", "tower_engine_error": "Téléchargement impossible ({error}). La voix enregistrée reste utilisée.", "tower_engine_notice_title": "Nouveau : la tour hors ligne parle au vol chargé", "tower_engine_notice_body": "Une voix naturelle est proposée en option : {path}."});
+  Object.assign(TRANSLATIONS.en, {"tower_engine_installed": "Natural voice installed: the tower speaks whole sentences, synthesized on this computer.", "tower_engine_recorded": "Recorded voice. A smoother natural voice is available as an option (about 90 MB to download, offline afterwards). Without it, only the tower speaks; clearance, ground, cabin and ground crew need the natural voice.", "tower_engine_download": "Download the natural voice", "tower_engine_downloading": "Downloading the natural voice… {percent}%", "tower_engine_installing": "Installing the natural voice…", "tower_engine_error": "Download failed ({error}). The recorded voice stays in use.", "tower_engine_notice_title": "New: the offline tower talks to your loaded flight", "tower_engine_notice_body": "A natural voice is available as an option: {path}."});
+  Object.assign(TRANSLATIONS.de, {"tower_engine_installed": "Natürliche Stimme installiert: Der Turm spricht ganze Sätze, auf diesem Computer erzeugt.", "tower_engine_recorded": "Aufgenommene Stimme. Eine flüssigere natürliche Stimme ist optional verfügbar (etwa 90 MB Download, danach offline). Ohne sie spricht nur der Turm; Freigabe, Rollkontrolle, Kabine und Bodenpersonal brauchen die natürliche Stimme.", "tower_engine_download": "Natürliche Stimme herunterladen", "tower_engine_downloading": "Natürliche Stimme wird heruntergeladen… {percent} %", "tower_engine_installing": "Natürliche Stimme wird installiert…", "tower_engine_error": "Download fehlgeschlagen ({error}). Die aufgenommene Stimme bleibt aktiv.", "tower_engine_notice_title": "Neu: Der Offline-Turm spricht Ihren geladenen Flug an", "tower_engine_notice_body": "Eine natürliche Stimme ist optional verfügbar: {path}."});
+  Object.assign(TRANSLATIONS.es, {"tower_engine_installed": "Voz natural instalada: la torre dice frases enteras, sintetizadas en este ordenador.", "tower_engine_recorded": "Voz grabada. Hay una voz natural más fluida disponible como opción (unos 90 MB de descarga, luego sin conexión). Sin ella solo habla la torre; autorización, rodadura, cabina y personal de tierra necesitan la voz natural.", "tower_engine_download": "Descargar la voz natural", "tower_engine_downloading": "Descargando la voz natural… {percent} %", "tower_engine_installing": "Instalando la voz natural…", "tower_engine_error": "No se pudo descargar ({error}). Se sigue usando la voz grabada.", "tower_engine_notice_title": "Novedad: la torre sin conexión habla a su vuelo cargado", "tower_engine_notice_body": "Hay una voz natural disponible como opción: {path}."});
+  Object.assign(TRANSLATIONS.it, {"tower_engine_installed": "Voce naturale installata: la torre pronuncia frasi intere, sintetizzate su questo computer.", "tower_engine_recorded": "Voce registrata. Una voce naturale più fluida è disponibile come opzione (circa 90 MB da scaricare, poi offline). Senza di essa parla solo la torre; autorizzazione, terra, cabina e personale di terra richiedono la voce naturale.", "tower_engine_download": "Scarica la voce naturale", "tower_engine_downloading": "Download della voce naturale… {percent}%", "tower_engine_installing": "Installazione della voce naturale…", "tower_engine_error": "Download non riuscito ({error}). Resta in uso la voce registrata.", "tower_engine_notice_title": "Novità: la torre offline parla al volo caricato", "tower_engine_notice_body": "Una voce naturale è disponibile come opzione: {path}."});
+  Object.assign(TRANSLATIONS.pt, {"tower_engine_installed": "Voz natural instalada: a torre diz frases inteiras, sintetizadas neste computador.", "tower_engine_recorded": "Voz gravada. Está disponível como opção uma voz natural mais fluida (cerca de 90 MB a transferir, depois offline). Sem ela só a torre fala; autorização, solo, cabina e equipa de terra precisam da voz natural.", "tower_engine_download": "Transferir a voz natural", "tower_engine_downloading": "A transferir a voz natural… {percent} %", "tower_engine_installing": "A instalar a voz natural…", "tower_engine_error": "Transferência falhou ({error}). Continua a ser usada a voz gravada.", "tower_engine_notice_title": "Novidade: a torre offline fala com o voo carregado", "tower_engine_notice_body": "Está disponível como opção uma voz natural: {path}."});
+  Object.assign(TRANSLATIONS.nl, {"tower_engine_installed": "Natuurlijke stem geïnstalleerd: de toren spreekt hele zinnen uit, gemaakt op deze computer.", "tower_engine_recorded": "Opgenomen stem. Een vloeiendere natuurlijke stem is optioneel beschikbaar (ongeveer 90 MB downloaden, daarna offline). Zonder deze stem spreekt alleen de toren; klaring, grondverkeersleiding, cabine en grondpersoneel hebben de natuurlijke stem nodig.", "tower_engine_download": "Natuurlijke stem downloaden", "tower_engine_downloading": "Natuurlijke stem downloaden… {percent}%", "tower_engine_installing": "Natuurlijke stem installeren…", "tower_engine_error": "Download mislukt ({error}). De opgenomen stem blijft in gebruik.", "tower_engine_notice_title": "Nieuw: de offline toren spreekt uw geladen vlucht aan", "tower_engine_notice_body": "Een natuurlijke stem is optioneel beschikbaar: {path}."});
+  Object.assign(TRANSLATIONS.pl, {"tower_engine_installed": "Naturalny głos zainstalowany: wieża mówi całymi zdaniami, syntezowanymi na tym komputerze.", "tower_engine_recorded": "Głos nagrany. Opcjonalnie dostępny jest płynniejszy, naturalny głos (około 90 MB do pobrania, potem offline). Bez niego mówi tylko wieża; zgoda, kontrola naziemna, kabina i obsługa naziemna wymagają naturalnego głosu.", "tower_engine_download": "Pobierz naturalny głos", "tower_engine_downloading": "Pobieranie naturalnego głosu… {percent}%", "tower_engine_installing": "Instalowanie naturalnego głosu…", "tower_engine_error": "Pobieranie nie powiodło się ({error}). Nadal używany jest głos nagrany.", "tower_engine_notice_title": "Nowość: wieża offline zwraca się do wczytanego lotu", "tower_engine_notice_body": "Opcjonalnie dostępny jest naturalny głos: {path}."});
+
+  // Ergonomie audio et commande ATC rapide.
+  Object.assign(TRANSLATIONS.fr, { settings_audio_title: "Audio du cockpit", settings_audio_intro: "Réglez séparément les annonces, l’ambiance radio et l’ATC hors ligne.", settings_audio_more: "Fonctionnement de l’ATC hors ligne", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Activer ou couper rapidement l’ATC et l’interphone hors ligne" });
+  Object.assign(TRANSLATIONS.en, { settings_audio_title: "Cockpit audio", settings_audio_intro: "Set callouts, radio ambience and offline ATC separately.", settings_audio_more: "How offline ATC works", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Quickly turn offline ATC and interphone on or off" });
+  Object.assign(TRANSLATIONS.de, { settings_audio_title: "Cockpit-Audio", settings_audio_intro: "Ansagen, Funkatmosphäre und Offline-ATC getrennt einstellen.", settings_audio_more: "So funktioniert Offline-ATC", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Offline-ATC und Interphone schnell ein- oder ausschalten" });
+  Object.assign(TRANSLATIONS.es, { settings_audio_title: "Audio de cabina", settings_audio_intro: "Ajusta por separado los avisos, el ambiente de radio y el ATC sin conexión.", settings_audio_more: "Cómo funciona el ATC sin conexión", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Activar o desactivar rápidamente el ATC y el interfono sin conexión" });
+  Object.assign(TRANSLATIONS.it, { settings_audio_title: "Audio del cockpit", settings_audio_intro: "Regola separatamente annunci, atmosfera radio e ATC offline.", settings_audio_more: "Come funziona l’ATC offline", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Attiva o disattiva rapidamente ATC e interfono offline" });
+  Object.assign(TRANSLATIONS.pt, { settings_audio_title: "Áudio do cockpit", settings_audio_intro: "Regule separadamente os avisos, o ambiente de rádio e o ATC offline.", settings_audio_more: "Como funciona o ATC offline", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Ativar ou desativar rapidamente o ATC e o intercomunicador offline" });
+  Object.assign(TRANSLATIONS.nl, { settings_audio_title: "Cockpitaudio", settings_audio_intro: "Stel meldingen, radiosfeer en offline-ATC afzonderlijk in.", settings_audio_more: "Zo werkt offline-ATC", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Offline-ATC en intercom snel in- of uitschakelen" });
+  Object.assign(TRANSLATIONS.pl, { settings_audio_title: "Dźwięk w kokpicie", settings_audio_intro: "Ustaw osobno komunikaty, atmosferę radiową i ATC offline.", settings_audio_more: "Jak działa ATC offline", atc_quick_toggle: "ATC", atc_quick_toggle_title: "Szybko włącz lub wyłącz ATC offline i interkom" });
+
+  // Turbulence prévue (cisaillement de l'OFP) et signalée (PIREP, AIREP).
+  Object.assign(TRANSLATIONS.fr, {"map_turbulence": "Turbulences", "map_turbulence_title": "Afficher ou masquer la turbulence prévue le long de la route et celle signalée par les pilotes", "map_legend_turbulence": "turbulence prévue · signalée", "alert_turbulence_ahead": "Turbulence devant", "alert_turbulence_ahead_action": "Prévenir la cabine, consignes ceintures", "turb_moderate": "modérée", "turb_severe": "forte", "turb_forecast_detail": "prévue (cisaillement {shear} kt/1 000 ft) dans {distance} NM", "turb_report_detail": "signalée par un {kind} il y a {minutes} min, à {distance} NM"});
+  Object.assign(TRANSLATIONS.en, {"map_turbulence": "Turbulence", "map_turbulence_title": "Show or hide turbulence forecast along the route and reported by pilots", "map_legend_turbulence": "turbulence forecast · reported", "alert_turbulence_ahead": "Turbulence ahead", "alert_turbulence_ahead_action": "Advise the cabin, seat belts", "turb_moderate": "moderate", "turb_severe": "severe", "turb_forecast_detail": "forecast (shear {shear} kt/1,000 ft) in {distance} NM", "turb_report_detail": "reported by a {kind} {minutes} min ago, {distance} NM ahead"});
+  Object.assign(TRANSLATIONS.de, {"map_turbulence": "Turbulenzen", "map_turbulence_title": "Entlang der Route vorhergesagte und von Piloten gemeldete Turbulenzen ein- oder ausblenden", "map_legend_turbulence": "Turbulenz vorhergesagt · gemeldet", "alert_turbulence_ahead": "Turbulenzen voraus", "alert_turbulence_ahead_action": "Kabine informieren, Anschnallzeichen", "turb_moderate": "mäßig", "turb_severe": "stark", "turb_forecast_detail": "vorhergesagt (Scherung {shear} kt/1.000 ft) in {distance} NM", "turb_report_detail": "gemeldet durch {kind} vor {minutes} min, {distance} NM voraus"});
+  Object.assign(TRANSLATIONS.es, {"map_turbulence": "Turbulencias", "map_turbulence_title": "Mostrar u ocultar la turbulencia prevista en la ruta y la notificada por los pilotos", "map_legend_turbulence": "turbulencia prevista · notificada", "alert_turbulence_ahead": "Turbulencia por delante", "alert_turbulence_ahead_action": "Avisar a la cabina, cinturones", "turb_moderate": "moderada", "turb_severe": "fuerte", "turb_forecast_detail": "prevista (cizalladura {shear} kt/1000 ft) a {distance} NM", "turb_report_detail": "notificada por un {kind} hace {minutes} min, a {distance} NM"});
+  Object.assign(TRANSLATIONS.it, {"map_turbulence": "Turbolenze", "map_turbulence_title": "Mostrare o nascondere la turbolenza prevista lungo la rotta e quella segnalata dai piloti", "map_legend_turbulence": "turbolenza prevista · segnalata", "alert_turbulence_ahead": "Turbolenza davanti", "alert_turbulence_ahead_action": "Avvisare la cabina, cinture", "turb_moderate": "moderata", "turb_severe": "forte", "turb_forecast_detail": "prevista (wind shear {shear} kt/1.000 ft) a {distance} NM", "turb_report_detail": "segnalata da un {kind} {minutes} min fa, a {distance} NM"});
+  Object.assign(TRANSLATIONS.pt, {"map_turbulence": "Turbulência", "map_turbulence_title": "Mostrar ou ocultar a turbulência prevista ao longo da rota e a reportada pelos pilotos", "map_legend_turbulence": "turbulência prevista · reportada", "alert_turbulence_ahead": "Turbulência à frente", "alert_turbulence_ahead_action": "Avisar a cabina, cintos", "turb_moderate": "moderada", "turb_severe": "forte", "turb_forecast_detail": "prevista (cisalhamento {shear} kt/1000 ft) a {distance} NM", "turb_report_detail": "reportada por um {kind} há {minutes} min, a {distance} NM"});
+  Object.assign(TRANSLATIONS.nl, {"map_turbulence": "Turbulentie", "map_turbulence_title": "Turbulentie tonen of verbergen die langs de route is voorspeld of door piloten is gemeld", "map_legend_turbulence": "turbulentie voorspeld · gemeld", "alert_turbulence_ahead": "Turbulentie vooruit", "alert_turbulence_ahead_action": "Cabine waarschuwen, gordels", "turb_moderate": "matig", "turb_severe": "zwaar", "turb_forecast_detail": "voorspeld (windschering {shear} kt/1000 ft) over {distance} NM", "turb_report_detail": "gemeld door een {kind} {minutes} min geleden, {distance} NM vooruit"});
+  Object.assign(TRANSLATIONS.pl, {"map_turbulence": "Turbulencje", "map_turbulence_title": "Pokaż lub ukryj turbulencje prognozowane wzdłuż trasy i zgłoszone przez pilotów", "map_legend_turbulence": "turbulencje prognozowane · zgłoszone", "alert_turbulence_ahead": "Turbulencje przed nami", "alert_turbulence_ahead_action": "Uprzedzić kabinę, pasy", "turb_moderate": "umiarkowane", "turb_severe": "silne", "turb_forecast_detail": "prognozowane (uskok wiatru {shear} kt/1000 ft) za {distance} NM", "turb_report_detail": "zgłoszone przez {kind} {minutes} min temu, {distance} NM przed nami"});
+
   const ELEMENTS = {
     "#map-view-label": "map_group_view",
     "#map-layers-label": "map_group_layers",
@@ -4859,6 +5257,7 @@
     "#shutdown .toolbar-label": "quit",
     "#refresh span": "complete",
     '[data-tab="terminal"]': "tab_terminal",
+    '[data-tab="turnaround"]': "tab_turnaround",
     '[data-tab="map"]': "tab_map",
     '[data-tab="ground"]': "tab_ground",
     '[data-tab="procedures"]': "tab_procedures",
@@ -4883,6 +5282,8 @@
     "#map-sigmet": "map_sigmet",
     "#map-radar": "map_radar",
     "#map-weather-stations": "map_weather_stations",
+    "#map-turbulence": "map_turbulence",
+    "#legend-turbulence-label": "map_legend_turbulence",
     "#map-traffic": "map_traffic",
     "#ground-traffic": "ground_traffic",
     "#map-sia": "overlay",
@@ -4976,11 +5377,19 @@
     "#aircraft-covered-title": "aircraft_covered",
     "#aircraft-missing-title": "aircraft_missing",
     "#settings-rnp-label": "rnp_aircraft",
+    "#settings-audio-title": "settings_audio_title",
+    "#settings-audio-intro": "settings_audio_intro",
+    "#settings-audio-more": "settings_audio_more",
     "#settings-voice-label": "voice_settings_toggle",
     "#settings-voice-name-label": "voice_name",
     "#settings-voice-test": "voice_test",
     "#settings-chatter-label": "chatter_toggle",
     "#settings-chatter-volume-label": "chatter_volume",
+    "#settings-tower-label": "tower_toggle",
+    "#settings-tower-test": "tower_test",
+    "#settings-tower-help": "tower_help",
+    "#settings-tower-engine-install": "tower_engine_download",
+    "#settings-voice-volume-label": "voice_volume",
     "#settings-chatter-help": "chatter_help",
     "#settings-lan-label": "lan_access",
     "#settings-lan-title": "lan_address",
@@ -5038,6 +5447,7 @@
     "#map-sigmet": "map_sigmet_title",
     "#map-radar": "map_radar_title",
     "#map-weather-stations": "map_weather_stations_title",
+    "#map-turbulence": "map_turbulence_title",
     "#map-traffic": "map_traffic_title",
     "#ground-traffic": "ground_traffic_title",
     "#map-sia": "overlay_title",

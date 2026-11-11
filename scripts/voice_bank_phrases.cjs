@@ -29,6 +29,9 @@ const ANNOUNCED_KEYS = [
   "voice_stabilized",
   "taxi_arrived", "taxi_off_route", "taxi_hold_short",
   "taxi_turn_left", "taxi_turn_right", "taxi_continue",
+  // Jalons d'escale GSX, annoncés par le module Escale.
+  "voice_gsx_boarding_done", "voice_gsx_deboarding_done", "voice_gsx_refuel_done",
+  "voice_gsx_cargo_done", "voice_gsx_pushback_done",
 ];
 
 // Distances annoncées : le TOD n'est annoncé qu'à partir de 50 NM.

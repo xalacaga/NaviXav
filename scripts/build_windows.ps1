@@ -166,6 +166,21 @@ if ($LASTEXITCODE -ne 0) { throw "La collecte des licences a échoué." }
 $PortableArchive = Join-Path $ReleaseDir "NaviXav-$Version-windows-x64-portable.zip"
 New-PortableArchive (Join-Path $DistDir "*") $PortableArchive
 
+# Moteur vocal facultatif de la tour : dossier à part, proposé en option par
+# l'installateur et livré en archive séparée pour la version portable.
+Write-Step "Moteur vocal facultatif de la tour"
+$VoiceEngineDir = Join-Path $ProjectRoot "dist\voice_engine"
+$VoiceEngineCache = Join-Path $ProjectRoot "voice_engine"
+if (Test-Path -LiteralPath (Join-Path $VoiceEngineCache "VERSION.json")) {
+    if (Test-Path -LiteralPath $VoiceEngineDir) { Remove-Item -LiteralPath $VoiceEngineDir -Recurse -Force }
+    Copy-Item -LiteralPath $VoiceEngineCache -Destination $VoiceEngineDir -Recurse
+} else {
+    & $VenvPython (Join-Path $PSScriptRoot "fetch_voice_engine.py") --out $VoiceEngineDir
+    if ($LASTEXITCODE -ne 0) { throw "Le moteur vocal n'a pas pu être construit." }
+}
+$VoiceEngineArchive = Join-Path $ReleaseDir "NaviXav-$Version-voice-engine.zip"
+New-PortableArchive $VoiceEngineDir $VoiceEngineArchive
+
 if (-not $SkipInstaller) {
     $Iscc = Find-Iscc
     if (-not $Iscc -and -not $SkipToolInstall) {

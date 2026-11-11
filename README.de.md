@@ -203,6 +203,28 @@ Der angezeigte TOD ist eine SimBrief- oder NaviXav-Schätzung, kein MCDU-Messwer
 
 Flugverfolgung und Ingame-Panel zeigen im Sinkflug „Sinkflug läuft“ statt TOD, danach „Anflug“. Bei Zwischenhöhen bleibt die Anzeige erhalten, wenn der Höhenverlust den Sinkflug bestätigt. Der Status stammt aus der Telemetrie, nicht aus dem FMS-DES-Modus.
 
+### Abfertigung, Funk und Turbulenzen
+
+- **Abfertigungsmodul mit GSX Pro** (nur sichtbar, wenn GSX Pro installiert
+  ist): Live-Draufsicht des Flugzeugs an der Parkposition mit den
+  plane-watch-Silhouetten, die Kabine füllt sich beim Boarding, Frachträume und
+  Tanks werden beladen, Fluggastbrücke, Treppen, Catering, Tankwagen,
+  Gepäckbänder, GPU und Schlepper kommen und fahren. Jeder Dienst hat einen
+  Fortschrittsbalken, die geschätzte TOBT wird mit dem OFP-Abflug verglichen,
+  und ein finales Ladeblatt meldet jede LMC. Echte Sitz-, Fracht- und
+  Schwerpunktdaten werden vom Flugzeug gelesen, wenn es sie veröffentlicht
+  (Fenix-EFB, MSFS-Ladestationen).
+- **Funk und Interphone offline**: Freigabe an der Parkposition, Boarding-Ende
+  aus der Kabine, Ladeblatt bereit, Pushback genehmigt, Rollfreigabe entlang
+  der berechneten Route, Aufrollen und Start mit dem Wind, Übergabe an
+  Departure, bei der Ankunft Parkposition und Bremsklötze. Alles stammt aus
+  dem geladenen Flug; bei VATSIM- oder IVAO-Verkehr schweigt es. Es ist kein
+  Flugverkehrskontrolldienst.
+- **Turbulenzen**: aus der Windscherung des OFP vorhergesagtes Risiko klarer
+  Luftturbulenz entlang der Route und von Piloten gemeldete Turbulenzen (PIREP,
+  AIREP) nahe der Route, mit einem Hinweis, wenn sie voraus auf Ihrer Höhe
+  liegen.
+
 ### MCDU-Blatt
 
 Die Registerkarte **MCDU-Blatt** passt ihre Seiten an den Flugzeugtyp an:
@@ -471,6 +493,14 @@ Benutzer und erfordert normalerweise keine Administratorrechte.
 Ein portables Archiv steht ebenfalls bereit: `NaviXav-<Version>-windows-x64-portable.zip`
 entpacken, dann `NaviXav.exe` starten. Auf einem Rechner ohne WebView2 zuerst
 das vollständige Installationsprogramm verwenden.
+
+Das Installationsprogramm bietet außerdem optional eine **natürliche
+ATC-Stimme** (etwa 170 MB): eine Offline-Sprachsynthese (Kokoro, mit eSpeak NG
+als separatem Programm unter seiner GPL-Lizenz), die Funk- und
+Interphone-Meldungen in ganzen Sätzen spricht. Bestehende Installationen können
+sie unter **Einstellungen > Cockpit-Audio** herunterladen; die portable Version
+nutzt das separate Archiv `NaviXav-<version>-voice-engine.zip`, entpackt neben
+`NaviXav.exe`. Ohne sie verwendet der Turm aufgenommene Sätze.
 
 ### Aus den Quellen
 

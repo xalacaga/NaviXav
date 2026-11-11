@@ -22,6 +22,7 @@
 const VOICE = (() => {
   const ENABLED_KEY = "navixav-voice-enabled";
   const NAME_KEY = "navixav-voice-name";
+  const VOLUME_KEY = "navixav-voice-volume";
   const BANK_ROOT = "/static/voice";
   const BANK_PREFIX = "bank:";
   // Une même phrase ne revient pas avant ce délai : une valeur qui oscille
@@ -52,6 +53,14 @@ const VOICE = (() => {
   // Vide : la voix par défaut de la langue. « bank:<dossier> » : une autre voix
   // NaviXav de la même langue. Un ancien nom de voix Windows vaut le défaut.
   let preferredName = read(NAME_KEY) || "";
+  // Volume des annonces et des alarmes sonores, de 0 à 1. Pleine échelle par
+  // défaut : c'est le niveau auquel la banque a été enregistrée.
+  const clampVolume = (value) => Math.min(1, Math.max(0, Number(value)));
+  const storedVolume = read(VOLUME_KEY);
+  let volume = storedVolume !== null && Number.isFinite(Number(storedVolume))
+    ? clampVolume(storedVolume)
+    : 1;
+  let masterGain = null;
   const recent = new Map();
   const listeners = new Set();
 
@@ -172,6 +181,9 @@ const VOICE = (() => {
       const Context = window.AudioContext || window.webkitAudioContext;
       if (!Context) return null;
       audioContext = new Context();
+      masterGain = audioContext.createGain();
+      masterGain.gain.value = volume;
+      masterGain.connect(audioContext.destination);
     }
     // Un contexte créé avant tout geste démarre suspendu dans un navigateur.
     if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
@@ -222,7 +234,7 @@ const VOICE = (() => {
     for (const clip of decoded) {
       const source = audio.createBufferSource();
       source.buffer = clip;
-      source.connect(audio.destination);
+      source.connect(masterGain || audio.destination);
       source.start(start);
       source.addEventListener("ended", () => {
         playing = playing.filter((item) => item !== source);
@@ -285,6 +297,14 @@ const VOICE = (() => {
       preferredName = String(name || "");
       write(NAME_KEY, preferredName);
       loadBank();
+      notify();
+    },
+    /** Volume des annonces et des alarmes sonores, de 0 à 1. */
+    volume: () => volume,
+    setVolume(value) {
+      volume = clampVolume(Number.isFinite(Number(value)) ? value : 1);
+      write(VOLUME_KEY, String(volume));
+      if (masterGain) masterGain.gain.value = volume;
       notify();
     },
     /** La voix retenue pour la langue affichée, ou null tant qu'elle manque. */

@@ -39,6 +39,17 @@ const MAP = (() => {
   let radarFrame = null;
   let radarVisible = true;
   let weatherStations = [];
+  // Turbulence : risque prévu le long de la route (cisaillement de l'OFP) et
+  // comptes rendus de pilotes près de la route.
+  let turbulenceProfile = [];
+  let turbulenceReports = [];
+  let turbulenceVisible = (() => {
+    try {
+      return localStorage.getItem("navixav-map-turbulence") !== "0";
+    } catch (_error) {
+      return true;
+    }
+  })();
   let weatherStationsVisible = true;
   let dragging = null;
   let basemapVisible = true;
@@ -412,11 +423,14 @@ const MAP = (() => {
     if (basemapVisible) drawBasemap();
     if (radarVisible) drawRadar();
     if (sigmetsVisible) drawSigmets();
-    if (weatherStationsVisible) drawWeatherStations();
     drawRunways();
     drawFmsAlternate();
     drawRoute();
     drawFmsRoute();
+    // Au-dessus de la route et des pistes : les stations sont posées sur les
+    // aérodromes, là où tout s'empile, et disparaissaient dessous.
+    if (weatherStationsVisible) drawWeatherStations();
+    if (turbulenceVisible) drawTurbulence();
     drawTrail();
     drawTraffic();
     drawAircraft();
@@ -766,70 +780,187 @@ const MAP = (() => {
     LIFR: "#d946ef",
   };
 
+  /** Trait de barbule doublé d'un liseré sombre : lisible sur tout fond. */
+  function haloStroke(path) {
+    context.strokeStyle = "rgba(2, 6, 23, 0.85)";
+    context.lineWidth = 4;
+    path();
+    context.stroke();
+    context.strokeStyle = "#f8fafc";
+    context.lineWidth = 1.8;
+    path();
+    context.stroke();
+  }
+
   function drawWindBarb(station, x, y) {
     const direction = Number(station.wind?.direction_deg);
     const speed = Number(station.wind?.speed_kt);
     if (!Number.isFinite(speed)) return;
     context.save();
     context.translate(x, y);
-    context.strokeStyle = "#f8fafc";
-    context.fillStyle = "#f8fafc";
-    context.lineWidth = 1.6;
+    context.lineCap = "round";
     if (speed < 3 || !Number.isFinite(direction)) {
-      context.beginPath();
-      context.arc(0, 0, 5, 0, Math.PI * 2);
-      context.stroke();
+      // Vent calme ou variable : un double cercle, comme sur une carte météo.
+      haloStroke(() => {
+        context.beginPath();
+        context.arc(0, 0, 11, 0, Math.PI * 2);
+      });
       context.restore();
       return;
     }
     context.rotate((direction * Math.PI) / 180);
-    context.beginPath();
-    context.moveTo(0, 0);
-    context.lineTo(0, -27);
-    context.stroke();
+    const segments = [[0, -8, 0, -34]];
     let remaining = Math.round(speed / 5) * 5;
-    let offset = -26;
-    while (remaining >= 10 && offset < -8) {
-      context.beginPath();
-      context.moveTo(0, offset);
-      context.lineTo(8, offset + 5);
-      context.stroke();
+    let offset = -34;
+    while (remaining >= 50 && offset < -16) {
+      segments.push([0, offset, 10, offset + 4, 0, offset + 8]);
+      remaining -= 50;
+      offset += 9;
+    }
+    while (remaining >= 10 && offset < -14) {
+      segments.push([0, offset, 10, offset + 5]);
       remaining -= 10;
       offset += 5;
     }
-    if (remaining >= 5) {
+    if (remaining >= 5) segments.push([0, offset, 6, offset + 3]);
+    haloStroke(() => {
       context.beginPath();
-      context.moveTo(0, offset);
-      context.lineTo(5, offset + 3);
-      context.stroke();
-    }
+      for (const points of segments) {
+        context.moveTo(points[0], points[1]);
+        for (let index = 2; index < points.length; index += 2) {
+          context.lineTo(points[index], points[index + 1]);
+        }
+      }
+    });
     context.restore();
   }
 
-  /** Cercle de catégorie de vol, indicatif et barbule de vent du METAR. */
+  function windText(wind) {
+    const speed = Number(wind?.speed_kt);
+    if (!Number.isFinite(speed)) return "";
+    const gust = Number(wind?.gust_kt) ? `G${Math.round(wind.gust_kt)}` : "";
+    if (speed < 3 && !gust) return "CALM";
+    const direction = Number(wind?.direction_deg);
+    const from = wind?.variable || !Number.isFinite(direction)
+      ? "VRB"
+      : `${String(Math.round(direction)).padStart(3, "0")}°`;
+    return `${from}/${Math.round(speed)}${gust} kt`;
+  }
+
+  /**
+   * Station METAR : pastille de catégorie de vol, barbule de vent et vent en
+   * clair. Elle est décalée à côté de l'aérodrome, reliée par un trait : sur
+   * le point même, la route, l'étiquette du terrain et l'avion la masquaient.
+   */
   function drawWeatherStations() {
     if (!weatherStations.length) return;
     context.save();
     for (const station of weatherStations) {
-      const [x, y] = toScreen(nearestX(station.x, view.centerX), station.y);
-      if (x < -60 || y < -60 || x > canvas.clientWidth + 60 || y > canvas.clientHeight + 60) {
+      const [ax, ay] = toScreen(nearestX(station.x, view.centerX), station.y);
+      const x = ax + 34;
+      const y = ay - 30;
+      if (x < -80 || y < -80 || x > canvas.clientWidth + 80 || y > canvas.clientHeight + 80) {
         continue;
       }
       const colour = WEATHER_CATEGORY_COLOURS[station.flight_category] || "#94a3b8";
       context.globalAlpha = station.stale ? 0.58 : 1;
+      context.setLineDash([3, 3]);
+      context.strokeStyle = "rgba(148, 163, 184, 0.8)";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(ax, ay);
+      context.lineTo(x, y);
+      context.stroke();
+      context.setLineDash([]);
+      drawWindBarb(station, x, y);
       context.fillStyle = css("--label-bg") || "#0f172a";
       context.strokeStyle = colour;
-      context.lineWidth = 2;
+      context.lineWidth = 2.5;
       context.beginPath();
       context.arc(x, y, 7, 0, Math.PI * 2);
       context.fill();
       context.stroke();
-      drawWindBarb(station, x, y);
+      const label = [station.icao, windText(station.wind)].filter(Boolean).join("  ");
       context.font = "700 10px 'Inter', system-ui, sans-serif";
-      context.textAlign = "center";
-      context.textBaseline = "top";
+      context.textAlign = "left";
+      context.textBaseline = "middle";
+      const width = context.measureText(label).width;
+      context.fillStyle = "rgba(2, 6, 23, 0.78)";
+      roundRect(x + 12, y + 8, width + 10, 16, 4);
+      context.fill();
       context.fillStyle = colour;
-      context.fillText(station.icao, x, y + 10);
+      context.fillText(station.icao, x + 17, y + 16);
+      context.fillStyle = "#f8fafc";
+      context.fillText(label.slice(station.icao.length), x + 17 + context.measureText(station.icao).width, y + 16);
+    }
+    context.restore();
+  }
+
+
+  function turbulenceColour(risk) {
+    const variables = {
+      NEG: "--rwy",
+      LGT: "--map-turbulence-light",
+      MOD: "--map-turbulence-moderate",
+      SEV: "--map-turbulence-severe",
+    };
+    return css(variables[risk] || variables.LGT);
+  }
+  const TURBULENCE_BY_RANK = ["NEG", "LGT", "MOD", "SEV", "SEV"];
+
+  /**
+   * Turbulence prévue et signalée. Le risque prévu est un ruban translucide
+   * posé sous la route entre les points de l'OFP dont le cisaillement le
+   * justifie ; chaque compte rendu de pilote est un triangle à la couleur de
+   * son intensité, plus grand et cerclé quand il est proche du niveau de
+   * croisière.
+   */
+  function drawTurbulence() {
+    context.save();
+    context.lineCap = "round";
+    for (let index = 1; index < turbulenceProfile.length; index += 1) {
+      const from = turbulenceProfile[index - 1];
+      const to = turbulenceProfile[index];
+      const risk = to.risk || from.risk;
+      if (!risk) continue;
+      const [x1, y1] = toScreen(nearestX(from.x, view.centerX), from.y);
+      const [x2, y2] = toScreen(nearestX(to.x, view.centerX), to.y);
+      context.strokeStyle = turbulenceColour(risk);
+      context.globalAlpha = risk === "LGT" ? 0.32 : 0.48;
+      context.lineWidth = risk === "LGT" ? 12 : 16;
+      context.beginPath();
+      context.moveTo(x1, y1);
+      context.lineTo(x2, y2);
+      context.stroke();
+    }
+    context.globalAlpha = 1;
+    for (const report of turbulenceReports) {
+      const [x, y] = toScreen(nearestX(report.x, view.centerX), report.y);
+      if (x < -20 || y < -20 || x > canvas.clientWidth + 20 || y > canvas.clientHeight + 20) continue;
+      const colour = turbulenceColour(TURBULENCE_BY_RANK[report.rank] || "LGT");
+      const size = report.near_level ? 8 : 5.5;
+      context.globalAlpha = report.near_level ? 1 : 0.7;
+      context.beginPath();
+      context.moveTo(x, y - size);
+      context.lineTo(x + size * 0.9, y + size * 0.6);
+      context.lineTo(x - size * 0.9, y + size * 0.6);
+      context.closePath();
+      context.fillStyle = colour;
+      context.strokeStyle = "rgba(2, 6, 23, 0.85)";
+      context.lineWidth = 1.5;
+      context.fill();
+      context.stroke();
+      if (report.near_level && report.level_ft) {
+        context.font = "700 9px 'Inter', system-ui, sans-serif";
+        context.textAlign = "left";
+        context.textBaseline = "middle";
+        context.fillStyle = "#f8fafc";
+        context.strokeStyle = "rgba(2, 6, 23, 0.85)";
+        context.lineWidth = 3;
+        const label = `FL${String(Math.round(report.level_ft / 100)).padStart(3, "0")}`;
+        context.strokeText(label, x + size + 2, y);
+        context.fillText(label, x + size + 2, y);
+      }
     }
     context.restore();
   }
@@ -1651,6 +1782,30 @@ const MAP = (() => {
       return radarVisible;
     },
     get radarShown() { return radarVisible; },
+    setTurbulence({ profile = [], reports = [] } = {}) {
+      const place = (item, lat, lon) => ({ ...item, ...project(lat, lon) });
+      turbulenceProfile = (Array.isArray(profile) ? profile : [])
+        .filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lon))
+        .map((point) => place(point, point.lat, point.lon));
+      turbulenceReports = (Array.isArray(reports) ? reports : [])
+        .filter((report) => Number.isFinite(report?.latitude) && Number.isFinite(report?.longitude))
+        .map((report) => place(report, report.latitude, report.longitude));
+      draw();
+    },
+    toggleTurbulence() {
+      turbulenceVisible = !turbulenceVisible;
+      try {
+        localStorage.setItem("navixav-map-turbulence", turbulenceVisible ? "1" : "0");
+      } catch (_error) {
+        // Préférence non retenue : la session garde le choix.
+      }
+      const button = document.getElementById("map-turbulence");
+      button?.classList.toggle("active", turbulenceVisible);
+      button?.setAttribute("aria-pressed", String(turbulenceVisible));
+      draw();
+      return turbulenceVisible;
+    },
+    get turbulenceShown() { return turbulenceVisible; },
     setWeatherStations(list) {
       weatherStations = (Array.isArray(list) ? list : [])
         .filter((station) => (
