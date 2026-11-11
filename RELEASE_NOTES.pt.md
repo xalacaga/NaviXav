@@ -1,15 +1,30 @@
-# NaviXav 1.9.0
+# NaviXav 2.0.0
 
-Publicado em 2026-11-08.
+Publicado em 2026-11-11.
 
 ## Novidades
 
-- Guia de utilização: um ícone de ponto de interrogação no topo das definições abre um guia de cada menu, módulo e definição, com configuração passo a passo e resolução de problemas, nas oito línguas da interface.
-- Ambiente de rádio ATC: comunicações de rádio em inglês opcionais tocam em fundo conforme a fase do voo — placa, torre, aproximação ou controlo — com efeito de rádio VHF e várias vozes de controladores e tripulações, totalmente offline; calam-se durante os avisos do NaviXav e o volume ajusta-se nas definições.
-- Mapa meteorológico em direto: radar de precipitação RainViewer opcional, SIGMET ativos e barbelas de vento METAR da partida e chegada são sobrepostos diretamente no mapa de voo, com interruptores de camada guardados localmente, hora visível e atribuição das fontes.
+- As definições de áudio do cockpit estão agora agrupadas em cartões claros para avisos, ambiente de rádio e ATC offline, com as explicações longas recolhidas; um novo interruptor ATC no Acompanhamento do voo ativa ou desativa imediatamente o ATC e o intercomunicador offline e mantém-se sincronizado com as Definições.
+- Módulo Escala com o GSX Pro: vista de cima em direto da aeronave na posição, para qualquer aeronave — a cabina enche-se fila a fila durante o embarque, porões e depósitos das asas são carregados, e escadas, manga, catering, camião-cisterna, tapetes de bagagem, GPU e trator de pushback chegam e partem; uma cronologia da escala mede o ritmo de cada serviço e estima a TOBT face à hora de partida do OFP, com o caminho crítico; uma folha de carga e centragem final compara passageiros, ZFW, combustível e TOW com o OFP e assinala qualquer LMC; à chegada, um guiamento de estacionamento estimado mostra a distância ao ponto de paragem, também no plano de rolagem; o pushback é desenhado no plano de rolagem, inicia a hora de calços fora e os tempos de escala ficam no diário de voo; o Acompanhamento do voo mantém um resumo GSX numa linha.
+- Volume dos avisos e alarmes: um cursor nas definições de voz regula o volume dos avisos de voz e do sinal sonoro de excesso de velocidade na rolagem, guardado neste dispositivo; ao soltá-lo, é reproduzido um exemplo no nível escolhido.
+- Site oficial: são mantidas a identidade visual, a disposição e a navegação originais; uma secção Novidades bilingue integrada no design existente resume as versões 1.5 a 1.9 e a próxima versão, e o site indica agora compatibilidade exclusiva com o MSFS 2024.
+- Torre offline: na partida, um controlador simulado com efeito de rádio VHF dirige-se ao voo carregado — alinhar e aguardar no ponto de espera, autorização de descolagem com o vento medido depois de alinhado e transferência para a frequência de partidas após a descolagem; usa o indicativo do OFP (com o indicativo rádio da companhia quando conhecido), a pista prevista e as frequências do aeródromo, e cala-se quando o tráfego VATSIM ou IVAO é escolhido; interruptor e botão Ouvir nas definições; está disponível como opção uma voz natural — no instalador e, para instalações existentes, para transferir a partir das definições (cerca de 90 MB, depois offline): a torre diz então frases inteiras sintetizadas no computador, com a entoação de um controlador; sem ela são usadas frases gravadas.
+- Rádio e intercomunicador durante todo o voo, com a voz natural: autorização na posição (destino, SID, pista, código transponder), fim do embarque anunciado pela tripulação de cabina, folha de carga pronta anunciada pela placa, pushback aprovado pelo solo e autorização de rolagem pelo percurso calculado pelo NaviXav, e à chegada a posição atribuída e os calços; os controladores falam por rádio com efeito VHF, a cabina e a equipa de terra pelo intercomunicador, cada um com a sua voz; a equipa de terra só acompanha os pushback nativos do MSFS, pois o GSX já tem as suas vozes.
+- Barras de ferramentas do mapa e da rolagem mais leves: uma só linha com os dois aeródromos como comutador, os comandos de vista agrupados e dois menus — Visualização e Tráfego — com as camadas como pequenos interruptores, o número de camadas ativas e um indicador de tráfego.
+- Turbulência no mapa e à frente da aeronave: risco de turbulência de ar limpo previsto ao longo da rota a partir do cisalhamento do vento do OFP SimBrief (faixas ligeira, moderada, forte), e turbulência realmente reportada pelos pilotos (PIREP e AIREP das últimas três horas, de aviationweather.gov) no corredor da rota, destacada perto do nível de cruzeiro; um aviso informativo anuncia turbulência moderada ou forte prevista ou reportada nos próximos 60 NM ao seu nível, sem MASTER CAUTION.
+- Botões mais leves em toda a interface: botão principal de cor sólida, sem degradê nem halo, botões secundários mais finos, e o módulo recomendado e as cartas da barra guiada reunidos num controlo compacto; os ecrãs táteis mantêm os alvos de 44 píxeis.
+- O áudio do cockpit tem a sua própria secção nas definições, separada de Voo e meteorologia: avisos de voz, volume, ambiente de rádio ATC, ATC e intercomunicador offline, e transferência da voz natural.
 
-## Alterações
+## Correções
 
-- Ajout meteo dans carte et ambiance ATC.
+- Cada elemento do mapa tem agora uma cor própria nos temas escuro e claro: pista selecionada, SID, segmento em rota, STAR, aproximação, rota FMGC, alternativa e estações METAR deixam de reutilizar as mesmas cores, enquanto a turbulência mantém a sua escala de intensidade.
+- O botão Ouvir do ATC offline prepara agora o teste de voz natural enquanto as Definições abrem e reproduz imediatamente o teste gravado se a síntese ainda estiver a terminar, sem deixar um atraso silencioso após o clique.
+- A legenda de turbulência no mapa reserva agora espaço para a faixa de previsão e para o triângulo de turbulência reportada, impedindo que o símbolo se sobreponha ao texto.
+- Durante o embarque e desembarque GSX, os lugares da cabina passam agora de cinzento neutro a verde ao ritmo do contador de passageiros em direto; uma aeronave que publique antecipadamente a carga final já não pode mostrar toda a cabina ocupada antes do embarque.
+- O guiamento de rolagem por voz cala-se assim que a aeronave está na pista de partida; a instrução continua no ecrã.
+- O vento METAR volta a ver-se no mapa: a estação é desenhada por cima da rota, ao lado do aeródromo com uma linha de ligação, a sua barba de vento tem um contorno escuro legível sobre qualquer fundo e o vento aparece também escrito (320°/8 kt).
+- O radar de precipitação acompanha de perto o RainViewer: uma nova imagem é obtida assim que é publicada, em vez de mostrar uma imagem com até vinte minutos.
+- Vista da placa da escala: a manga, as escadas e os veículos de serviço desaparecem assim que o pushback começa ou a aeronave deixa a posição, mesmo que o GSX ainda os indique em serviço; só o trator fica durante o pushback.
+- Cronologia da escala: cada serviço é agora uma barra de progresso que se enche à medida que avança e fica cheia e verde quando termina, com a percentagem e a hora de fim prevista ou real; um embarque ou uma carga concluídos já não parecem a meio.
 
 O instalador é verificado através da sua soma de verificação SHA-256 antes de qualquer atualização automática.

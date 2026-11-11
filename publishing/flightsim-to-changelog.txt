@@ -2,6 +2,49 @@
 
     🔒 Security Note: Starting from version 1.4.11, the installer is systematically verified against its SHA-256 checksum before any automatic update.
 
+🚀 [2.0.0] - 2026-11-11
+✨ Added
+
+    Cockpit audio settings are now grouped into clear cards for callouts, radio ambience and offline ATC, with long explanations tucked away; a new ATC switch in Flight tracking turns offline ATC and interphone on or off immediately and stays synchronized with Settings.
+
+    Turnaround module with GSX Pro: a live top view of the aircraft at its stand, for any aircraft — the cabin fills row by row as passengers board, holds and wing tanks load, and stairs, jetway, catering, fuel truck, belt loaders, GPU and pushback tug come and go; a turnaround timeline measures each service's rate and estimates the TOBT against the OFP departure time with the critical path; a final load and trim sheet compares passengers, ZFW, fuel and TOW with the OFP and flags any LMC; on arrival, estimated docking guidance shows the distance to the stop point, also on the taxi diagram; pushback is drawn on the taxi diagram, starts the block-off time, and the turnaround times are kept in the logbook; Flight tracking keeps a one-line GSX summary; seats and holds come from the aircraft itself when it publishes them (Fenix EFB, or MSFS payload stations), with a warning when GSX boarded passengers the aircraft has not loaded; docking guidance uses the stop point measured on your own aircraft; service durations GSX does not publish are learned from your turnarounds; milestones are announced by voice; the Turnaround tab only appears when GSX Pro is installed.
+
+    Callout and alarm volume: a slider in the voice settings sets the volume of voice callouts and of the taxi overspeed beep, saved on this device; releasing it plays a sample at the chosen level.
+
+    Official website: the original visual identity, layout and navigation are retained; a bilingual Updates section in the established design summarizes versions 1.5 through 1.9 and the pending release, and the site now states MSFS 2024-only compatibility.
+
+    Offline tower: on departure, a simulated controller with a VHF radio effect talks to the loaded flight — line up and wait at the holding point, takeoff clearance with the measured wind once lined up, then handoff to the departure frequency after takeoff; it uses the OFP callsign (with the airline's radio callsign when known), the planned runway and the airport frequencies, speaks French at French airports when the interface is in French and English elsewhere, and stays silent when VATSIM or IVAO traffic is selected; a switch and a Listen button are in the settings; a natural voice is available as an option — offered by the installer, and downloadable from the settings for existing installations (about 90 MB, offline afterwards): the tower then speaks whole sentences synthesized on the computer, with the controller's natural phrasing; without it, recorded phrases are used.
+
+    Radio and interphone for the whole flight, with the natural voice: clearance delivery at the stand (destination, SID, runway, squawk), boarding completed from the cabin crew, loadsheet ready from the ramp, pushback approved by ground then taxi clearance along the route NaviXav computed, and on arrival the stand assignment and chocks in; controllers speak on the radio with a VHF effect, the cabin and ground crew on the interphone, each with their own voice; the ground crew only accompanies native MSFS pushbacks, as GSX already voices its own.
+
+    Lighter map and taxi toolbars: a single row with the two airports as a switch, view controls grouped together, and two menus — Display and Traffic — listing the layers with small switches, the number of active layers and a traffic indicator.
+
+    Turbulence on the map and ahead of the aircraft: clear-air turbulence risk forecast along the route from the wind shear in the SimBrief OFP (light, moderate, severe bands), and turbulence actually reported by pilots (PIREP and AIREP of the last three hours, from aviationweather.gov) within the route corridor, highlighted near the cruise level; an information alert announces moderate or severe turbulence forecast or reported within 60 NM at the aircraft's level, without MASTER CAUTION.
+
+    Lighter buttons throughout the interface: a solid primary button without gradient or glow, slimmer secondary buttons, and the guided bar's recommended module and charts grouped into one compact control; touch screens keep their 44-pixel targets.
+
+    Cockpit audio has its own section in the settings, separate from Flight & weather: voice callouts, volume, ATC radio ambience, offline ATC and interphone, and the natural voice download.
+
+🛠️ Fixed
+
+    Every map display now has its own colour in both dark and light themes: the selected runway, SID, en-route segment, STAR, approach, FMGC route, alternate and METAR stations no longer reuse one another’s colours, while turbulence keeps its severity scale.
+
+    The Listen button for offline ATC now prepares the natural-voice test while Settings opens and plays the recorded test immediately if synthesis is still finishing, instead of leaving a silent delay after the click.
+
+    The turbulence legend on the map now reserves space for both its forecast band and reported-turbulence triangle, so the symbol no longer overlaps its label.
+
+    During GSX boarding and deboarding, cabin seats now change from neutral grey to green in step with the live passenger counter; an aircraft that publishes its final payload early can no longer make the whole cabin appear occupied before passengers board.
+
+    Taxi voice guidance falls silent once the aircraft is on the runway for departure; the instruction stays on screen.
+
+    METAR wind on the map is visible again: the station is drawn above the route, beside the airport with a leader line, its wind barb has a dark outline readable on any background, and the wind is also written out (320°/8 kt).
+
+    The precipitation radar follows RainViewer closely: a new image is fetched as soon as it is published, instead of showing an image up to twenty minutes old.
+
+    Turnaround ramp view: the jetway, stairs and service vehicles leave as soon as pushback starts or the aircraft has left its stand, even when GSX still reports them in service; only the pushback tug remains during the push.
+
+    Turnaround timeline: each service is now a progress bar that fills up as it advances and turns full and green once complete, with its percentage and expected or actual end time; finished boarding and cargo no longer look half done.
+
 🚀 [1.9.0] - 2026-11-08
 ✨ Added
 

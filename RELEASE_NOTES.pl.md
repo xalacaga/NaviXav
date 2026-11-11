@@ -1,15 +1,30 @@
-# NaviXav 1.9.0
+# NaviXav 2.0.0
 
-Opublikowano 2026-11-08.
+Opublikowano 2026-11-11.
 
 ## Nowości
 
-- Przewodnik użytkownika: ikona znaku zapytania u góry ustawień otwiera przewodnik po każdym menu, module i ustawieniu, z konfiguracją krok po kroku i rozwiązywaniem problemów, we wszystkich ośmiu językach interfejsu.
-- Atmosfera radiowa ATC: opcjonalna angielska korespondencja radiowa gra w tle zależnie od fazy lotu — ziemia, wieża, zbliżanie lub kontrola obszaru — z efektem radia VHF i kilkoma głosami kontrolerów i załóg, całkowicie offline; milknie podczas komunikatów NaviXav, a głośność ustawia się w ustawieniach.
-- Mapa pogody na żywo: opcjonalny radar opadów RainViewer, aktywne SIGMET oraz chorągiewki wiatru METAR dla odlotu i przylotu są nakładane bezpośrednio na mapę lotu, z lokalnie zapamiętywanymi przełącznikami warstw, widocznym czasem i oznaczeniem źródeł.
+- Ustawienia dźwięku w kokpicie są teraz pogrupowane w czytelne karty komunikatów, atmosfery radiowej i ATC offline, a dłuższe objaśnienia można zwinąć; nowy przełącznik ATC w Śledzeniu lotu natychmiast włącza lub wyłącza ATC offline i interkom oraz pozostaje zsynchronizowany z Ustawieniami.
+- Moduł Obsługa postoju z GSX Pro: widok z góry na żywo samolotu na stanowisku, dla każdego samolotu — kabina zapełnia się rząd po rzędzie podczas wsiadania, luki i zbiorniki w skrzydłach są ładowane, a schody, rękaw, catering, cysterna, taśmy bagażowe, GPU i ciągnik do wypychania przyjeżdżają i odjeżdżają; przebieg obsługi mierzy tempo każdej usługi i szacuje TOBT względem godziny odlotu z OFP, ze ścieżką krytyczną; końcowy arkusz załadunku i wyważenia porównuje pasażerów, ZFW, paliwo i TOW z OFP i sygnalizuje każdą LMC; po przylocie szacowane naprowadzanie pokazuje odległość do punktu zatrzymania, także na planie kołowania; wypychanie jest rysowane na planie kołowania, rozpoczyna czas odblokowania, a czasy obsługi trafiają do dziennika lotów; Śledzenie lotu zachowuje jednowierszowe podsumowanie GSX; miejsca i luki pochodzą z samego samolotu, gdy je publikuje (EFB Fenixa lub stacje załadunku MSFS), z ostrzeżeniem, gdy GSX wpuścił pasażerów, których samolot nie załadował; naprowadzanie używa punktu zatrzymania zmierzonego na Twoim samolocie; czasy usług, których GSX nie publikuje, są wyuczane z Twoich obsług; etapy są zapowiadane głosowo; karta Obsługa postoju pojawia się tylko, gdy zainstalowano GSX Pro.
+- Głośność komunikatów i alarmów: suwak w ustawieniach głosu reguluje głośność komunikatów głosowych i sygnału przekroczenia prędkości kołowania, zapisaną na tym urządzeniu; po zwolnieniu odtwarzany jest przykład na wybranym poziomie.
+- Oficjalna witryna: zachowano pierwotną identyfikację wizualną, układ i nawigację; dwujęzyczna sekcja Nowości zintegrowana z dotychczasowym projektem podsumowuje wersje od 1.5 do 1.9 oraz nadchodzącą wersję, a witryna wskazuje teraz wyłączną zgodność z MSFS 2024.
+- Wieża offline: przy odlocie symulowany kontroler z efektem radia VHF zwraca się do wczytanego lotu — zajmij pas i czekaj w punkcie oczekiwania, zgoda na start z mierzonym wiatrem po ustawieniu na pasie, potem przekazanie na częstotliwość odlotów po starcie; używa znaku wywoławczego z OFP (z radiowym znakiem linii, jeśli jest znany), planowanego pasa i częstotliwości lotniska i milknie, gdy wybrano ruch VATSIM lub IVAO; przełącznik i przycisk Odsłuchaj w ustawieniach; opcjonalnie dostępny jest naturalny głos — w instalatorze, a dla istniejących instalacji do pobrania z ustawień (około 90 MB, potem offline): wieża mówi wtedy całymi zdaniami syntezowanymi na komputerze, z naturalną intonacją kontrolera; bez niego używane są nagrane zdania.
+- Radio i interkom przez cały lot, z naturalnym głosem: zgoda na stanowisku (cel, SID, pas, kod transpondera), koniec wsiadania zgłoszony przez załogę kabinową, gotowy arkusz załadunku zgłoszony przez płytę, zgoda na wypychanie od kontroli naziemnej i zgoda na kołowanie po trasie wyznaczonej przez NaviXav, a po przylocie przydzielone stanowisko i klocki; kontrolerzy mówią przez radio z efektem VHF, kabina i obsługa naziemna przez interkom, każdy własnym głosem; obsługa naziemna towarzyszy tylko natywnemu wypychaniu MSFS, bo GSX ma już własne głosy.
+- Lżejsze paski narzędzi mapy i kołowania: jeden wiersz z dwoma lotniskami jako przełącznikiem, zgrupowane przyciski widoku i dwa menu — Wyświetlanie i Ruch — z warstwami jako małymi przełącznikami, liczbą aktywnych warstw i wskaźnikiem ruchu.
+- Turbulencje na mapie i przed samolotem: ryzyko turbulencji w czystym powietrzu prognozowane wzdłuż trasy na podstawie uskoku wiatru z OFP SimBrief (pasma lekkie, umiarkowane, silne) oraz turbulencje faktycznie zgłoszone przez pilotów (PIREP i AIREP z ostatnich trzech godzin, z aviationweather.gov) w korytarzu trasy, wyróżnione blisko poziomu przelotowego; komunikat informacyjny zapowiada umiarkowane lub silne turbulencje prognozowane lub zgłoszone w promieniu 60 NM na Twoim poziomie, bez MASTER CAUTION.
+- Lżejsze przyciski w całym interfejsie: jednolity przycisk główny bez gradientu i poświaty, smuklejsze przyciski dodatkowe, a zalecany moduł i mapy z paska trybu prowadzonego połączone w jedną kompaktową kontrolkę; ekrany dotykowe zachowują cele 44 pikseli.
+- Dźwięk w kokpicie ma własną sekcję w ustawieniach, oddzieloną od Lot i pogoda: komunikaty głosowe, głośność, atmosfera radiowa ATC, ATC i interkom offline oraz pobieranie naturalnego głosu.
 
-## Zmiany
+## Poprawki
 
-- Ajout meteo dans carte et ambiance ATC.
+- Każdy element mapy ma teraz własny kolor w ciemnym i jasnym motywie: wybrany pas, SID, odcinek trasowy, STAR, podejście, trasa FMGC, trasa zapasowa i stacje METAR nie używają już tych samych kolorów, a turbulencja zachowuje skalę intensywności.
+- Przycisk Posłuchaj dla ATC offline przygotowuje teraz test naturalnego głosu podczas otwierania Ustawień i natychmiast odtwarza nagrany test, jeśli synteza jeszcze trwa, bez ciszy po kliknięciu.
+- Legenda turbulencji na mapie rezerwuje teraz miejsce zarówno na pas prognozy, jak i trójkąt zgłoszonej turbulencji, dzięki czemu symbol nie nachodzi już na tekst.
+- Podczas wsiadania i wysiadania GSX fotele w kabinie zmieniają teraz kolor z neutralnego szarego na zielony zgodnie z bieżącym licznikiem pasażerów; samolot publikujący końcowy ładunek z wyprzedzeniem nie może już pokazać całej kabiny jako zajętej przed wejściem pasażerów.
+- Głosowe prowadzenie kołowania milknie, gdy samolot jest na pasie startowym przed odlotem; polecenie pozostaje na ekranie.
+- Wiatr METAR jest znów widoczny na mapie: stacja jest rysowana nad trasą, obok lotniska z linią odniesienia, jej chorągiewka ma ciemny obrys czytelny na każdym tle, a wiatr jest też zapisany tekstem (320°/8 kt).
+- Radar opadów nadąża za RainViewer: nowy obraz jest pobierany zaraz po publikacji, zamiast pokazywać obraz sprzed nawet dwudziestu minut.
+- Widok płyty obsługi postoju: rękaw, schody i pojazdy obsługi znikają, gdy zaczyna się wypychanie lub samolot opuścił stanowisko, nawet jeśli GSX nadal zgłasza je jako aktywne; podczas wypychania zostaje tylko ciągnik.
+- Przebieg obsługi: każda usługa to teraz pasek postępu, który wypełnia się w miarę postępu i po zakończeniu staje się pełny i zielony, z procentem i przewidywaną lub rzeczywistą godziną końca; zakończone wsiadanie i załadunek nie wyglądają już na w połowie zrobione.
 
 Instalator jest weryfikowany za pomocą sumy kontrolnej SHA-256 przed każdą automatyczną aktualizacją.
