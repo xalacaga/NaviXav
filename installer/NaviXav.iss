@@ -50,11 +50,11 @@ Name: "desktopicon"; Description: "Créer un raccourci sur le bureau"; GroupDesc
 [Files]
 Source: "..\dist\NaviXav\*"; DestDir: "{app}"; Components: main; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\dist\voice_engine\*"; DestDir: "{app}\voice_engine"; Components: towervoice; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "assets\MicrosoftEdgeWebView2Setup.exe"; Flags: dontcopy
 
 [InstallDelete]
 ; Option décochée lors d'une réinstallation : le moteur n'a plus à rester.
 Type: filesandordirs; Name: "{app}\voice_engine"; Components: not towervoice
-Source: "assets\MicrosoftEdgeWebView2Setup.exe"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\NaviXav"; Filename: "{app}\{#MyAppExeName}"

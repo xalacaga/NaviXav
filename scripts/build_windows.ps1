@@ -33,6 +33,24 @@ function Find-Iscc {
     return $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 }
 
+function Invoke-NativeTool([scriptblock]$Command) {
+    # PyInstaller, pip et ISCC écrivent leur journal ordinaire sur stderr.
+    # Sous Windows PowerShell 5.1, dès que stderr est redirigé (exécution en
+    # tâche de fond, publish_release.ps1 capturé), chaque ligne devient une
+    # NativeCommandError, fatale avec ErrorActionPreference = Stop. Seul le
+    # code de sortie, contrôlé par l'appelant via $LASTEXITCODE, fait foi.
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command 2>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { $_ }
+        } | Out-Host
+    }
+    finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+}
+
 function Test-PythonImports([string]$Imports) {
     $PreviousPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -119,10 +137,10 @@ Test-Msfs2024SimConnect $ModernSimConnect
 
 Write-Step "Contrôle des bibliothèques du projet"
 if (-not (Test-PythonImports "fastapi, requests, uvicorn, pydantic, pypdf")) {
-    & $VenvPython -m pip install --disable-pip-version-check -e $ProjectRoot
+    Invoke-NativeTool { & $VenvPython -m pip install --disable-pip-version-check -e $ProjectRoot }
 }
 if (-not (Test-PythonImports "webview")) {
-    & $VenvPython -m pip install --disable-pip-version-check -e $ProjectRoot
+    Invoke-NativeTool { & $VenvPython -m pip install --disable-pip-version-check -e $ProjectRoot }
 }
 
 if (-not (Test-PythonImports "PyInstaller")) {
@@ -130,7 +148,7 @@ if (-not (Test-PythonImports "PyInstaller")) {
         throw "PyInstaller est absent. Relance sans -SkipToolInstall pour l'installer."
     }
     Write-Step "Installation automatique de PyInstaller"
-    & $VenvPython -m pip install --disable-pip-version-check "pyinstaller>=6.10,<7"
+    Invoke-NativeTool { & $VenvPython -m pip install --disable-pip-version-check "pyinstaller>=6.10,<7" }
 }
 
 Write-Step "Contrôle du composant Microsoft WebView2"
@@ -148,11 +166,11 @@ if (
 
 Write-Step "Tests automatisés"
 $TestTemp = Join-Path $env:TEMP "NaviXav-tests-$PID"
-& $VenvPython -m pytest -m "not live_msfs" --basetemp $TestTemp -p no:cacheprovider
+Invoke-NativeTool { & $VenvPython -m pytest -m "not live_msfs" --basetemp $TestTemp -p no:cacheprovider }
 if ($LASTEXITCODE -ne 0) { throw "Les tests ont échoué ; distribution annulée." }
 
 Write-Step "Construction de l'application autonome"
-& $VenvPython -m PyInstaller --noconfirm --clean (Join-Path $ProjectRoot "NaviXav.spec")
+Invoke-NativeTool { & $VenvPython -m PyInstaller --noconfirm --clean (Join-Path $ProjectRoot "NaviXav.spec") }
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller n'a pas produit l'application." }
 
 New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
@@ -175,7 +193,7 @@ if (Test-Path -LiteralPath (Join-Path $VoiceEngineCache "VERSION.json")) {
     if (Test-Path -LiteralPath $VoiceEngineDir) { Remove-Item -LiteralPath $VoiceEngineDir -Recurse -Force }
     Copy-Item -LiteralPath $VoiceEngineCache -Destination $VoiceEngineDir -Recurse
 } else {
-    & $VenvPython (Join-Path $PSScriptRoot "fetch_voice_engine.py") --out $VoiceEngineDir
+    Invoke-NativeTool { & $VenvPython (Join-Path $PSScriptRoot "fetch_voice_engine.py") --out $VoiceEngineDir }
     if ($LASTEXITCODE -ne 0) { throw "Le moteur vocal n'a pas pu être construit." }
 }
 $VoiceEngineArchive = Join-Path $ReleaseDir "NaviXav-$Version-voice-engine.zip"
@@ -195,7 +213,7 @@ if (-not $SkipInstaller) {
         throw "Inno Setup 6 est absent. Utilise -SkipInstaller ou autorise son installation."
     }
     Write-Step "Construction de l'installateur Windows"
-    & $Iscc "/DMyAppVersion=$Version" (Join-Path $ProjectRoot "installer\NaviXav.iss")
+    Invoke-NativeTool { & $Iscc "/DMyAppVersion=$Version" (Join-Path $ProjectRoot "installer\NaviXav.iss") }
     if ($LASTEXITCODE -ne 0) { throw "La compilation de l'installateur a échoué." }
 }
 
