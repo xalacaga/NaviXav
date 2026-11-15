@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.5.0] - 2026-11-15
+
+### Added
+
+- Cinematic camera: a Camera button, now on the left of the toolbar next to Turbulence and showing the shot on air, opens a compact control room that films your aircraft in MSFS 2024. The auto director picks shots to match the flight phase — orbit at the stand, a spotter by the runway on the takeoff roll, a camera waiting at the predicted touchdown point on short final, fly-bys and chase near the ground, formation flight en route — and cuts at liftoff or as soon as the aircraft has flown past. A Tower shot films from the real control tower of your departure or arrival airport and zooms in as the aircraft moves away. You can lock one of six shots, cut to the next one, hold the current shot, choose a calm, normal or lively pace, pick which shots the director may use, switch from hard cuts to tracking moves that swing around the aircraft, and give the view back to the pilot in one click, returning to the external view if that is where you were. Distances follow the wingspan, fly-bys aim where the aircraft will actually be, fixed cameras never go below the ground, and a tablet on the local network can run the camera too. A Framing section sets the distance, height and angle of each shot live, with a reset for one shot or all of them. The camera keeps the field of view of your own MSFS view, so the picture is never bent like a fisheye, and the default distances are those of an airliner camera ship: orbit 35 to 80 m, chase 25 to 55 m, formation about 30 m, scaled to the size of the aircraft. Each pace and transition choice explains itself under its buttons, with the length of the shots it gives.
+- Felt turbulence: NaviXav can now make you feel turbulence in MSFS. The intensity comes from the wind shear forecast in the OFP, recent PIREP and AIREP near the route, what the simulator shows (cloud, precipitation, wind shear, strong low-level wind) and the terrain upwind, which raises mountain waves in strong wind. Each gust lifts or drops the aircraft, from light bumps to severe jolts, with levels calibrated by measurement in flight. Off by default, adjustable from 25 to 200 %, never on the ground and faded in between 200 and 500 ft AGL; writing stops at once if the aircraft ever takes an abnormal attitude, nothing is written during MSFS active pause, and the Turbulence window shows the effect measured in the simulator.
+- Turbulence can be switched on and adjusted in flight from a new button in the toolbar, without opening the settings, and comes with cabin sounds created for NaviXav: a structural rumble that follows the intensity and, at each marked jolt, a thump in the floor, rattling overhead bins and creaking panels. The sounds are adjusted on each device and fall silent on the ground or when paused.
+
+### Fixed
+
+- Faster opening: with some arrivals, such as Paris-Orly, the plan took more than 30 seconds to appear at every launch because NaviXav kept asking MSFS again for a runway-based approach fix it had already ruled out; it now remembers it and the plan appears in about two seconds.
+- During GSX deboarding at the arrival stand, the ramp view now shows the jet bridge, stairs and baggage belts again, and seats empty from the doors inwards as passengers leave, instead of the aircraft being treated as having left its departure stand.
+- A tidier top bar: Settings stays at hand while appearance, update check, support and Quit move into a ⋯ menu, an available update shows up in the bar on its own, the icons are larger with a thin line, and in the cockpit audio settings the voice list no longer runs under the volume slider.
+
+The installer is verified against its SHA-256 checksum before any automatic update.
+
 ## [2.0.0] - 2026-11-11
 
 ### Added
