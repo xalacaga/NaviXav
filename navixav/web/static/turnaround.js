@@ -273,6 +273,12 @@ const TURNAROUND = (() => {
     }
 
     const derived = derive(gsx);
+    // Le débarquement ouvre l'escale suivante : le repoussage du départ
+    // précédent ne dit plus rien de cet avion, arrêté à son poste d'arrivée.
+    if (running(derived.deboarding) && !running(previousDerived.deboarding)) {
+      pushbackSeen = false;
+      pushbackDone = false;
+    }
     for (const [service, state] of Object.entries(derived)) {
       const track = serviceTrack(service);
       const running = state === "active" || state === "requested";
@@ -1128,10 +1134,9 @@ const TURNAROUND = (() => {
       const scaled = planned > dom.seats.size ? Math.round((onboard / planned) * dom.seats.size) : onboard;
       if (followingGsxProgress) {
         // Un siège devient vert uniquement quand le compteur GSX gagne un pax.
-        // Au débarquement, la cabine se vide dans l'ordre inverse.
-        filled = new Set(
-          derived.deboarding === "active" ? order.slice(order.length - scaled) : order.slice(0, scaled)
-        );
+        // Au débarquement, la cabine se vide dans l'ordre inverse : les
+        // derniers assis, les plus proches des portes, sortent les premiers.
+        filled = new Set(order.slice(0, scaled));
       } else if (cabin.source === "zones") {
         // Répartition réelle par zone lue dans MSFS ; la place dans la zone
         // reste celle de l'ordre d'embarquement.
@@ -1145,9 +1150,7 @@ const TURNAROUND = (() => {
           }).slice(0, count).forEach((seat) => filled.add(seat));
         }
       } else {
-        filled = new Set(
-          derived.deboarding === "active" ? order.slice(order.length - scaled) : order.slice(0, scaled)
-        );
+        filled = new Set(order.slice(0, scaled));
       }
     }
     for (const [id, node] of dom.seats) {
@@ -1171,8 +1174,11 @@ const TURNAROUND = (() => {
     // avant que l'avion soit arrêté au poste.
     const pushing = pushbackActive(aircraft);
     const moving = (finite(aircraft?.ground_speed_kt) || 0) >= 1;
-    const departed = !context.arrival && (pushing || pushbackDone || awayFromStand(aircraft));
-    const services = Boolean(aircraft?.on_ground) && !departed && !(context.arrival && (moving || awayFromStand(aircraft)));
+    // Avion arrêté au poste d'arrivée : la phase de vol n'est plus « roulage »,
+    // mais un débarquement GSX dit sans ambiguïté que c'est l'escale d'arrivée.
+    const arrival = context.arrival || running(derived.deboarding) || derived.deboarding === "completed";
+    const departed = !arrival && (pushing || pushbackDone || awayFromStand(aircraft));
+    const services = Boolean(aircraft?.on_ground) && !departed && !(arrival && (moving || awayFromStand(aircraft)));
     const boardingRunning = services && running(derived.boarding);
     const deboardingRunning = services && running(derived.deboarding);
     const stairsOn = services && (gsx.stairs === "active" || gsx.stairs === "requested");

@@ -2,6 +2,10 @@
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
+    # Numéro imposé (par exemple 2.5.0) : remplace -Bump pour une version
+    # que l'on veut mettre en avant. Il doit dépasser la version actuelle.
+    [ValidatePattern('^(\d+\.\d+\.\d+)?$')]
+    [string]$TargetVersion = "",
     [switch]$SkipToolInstall,
     # Publication sans changement visible : voir prepare_release.ps1.
     [switch]$AllowGenericNotes
@@ -156,6 +160,7 @@ if ($Resume) {
 } else {
     try {
         $PrepareParams = @{ Bump = $Bump }
+        if ($TargetVersion) { $PrepareParams.Add("TargetVersion", $TargetVersion) }
         if ($AllowGenericNotes) { $PrepareParams.Add("AllowGenericNotes", $true) }
         $VersionOutput = & (Join-Path $PSScriptRoot "prepare_release.ps1") @PrepareParams
         if ($LASTEXITCODE -ne 0) {

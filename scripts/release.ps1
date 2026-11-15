@@ -2,6 +2,10 @@
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
+    # Numéro imposé (par exemple 2.5.0) : remplace -Bump pour une version
+    # que l'on veut mettre en avant. Il doit dépasser la version actuelle.
+    [ValidatePattern('^(\d+\.\d+\.\d+)?$')]
+    [string]$TargetVersion = "",
     [int]$KeepReleases = 0, # Nombre d'anciennes versions à conserver en plus de la nouvelle (0 = conserve uniquement la dernière)
     [switch]$SkipToolInstall,
     [switch]$Force,
@@ -120,6 +124,7 @@ if (-not (Test-Path -LiteralPath $PublishScript)) {
 $PublishParams = @{
     Bump = $Bump
 }
+if ($TargetVersion) { $PublishParams.Add("TargetVersion", $TargetVersion) }
 if ($SkipToolInstall) { $PublishParams.Add("SkipToolInstall", $true) }
 if ($AllowGenericNotes) { $PublishParams.Add("AllowGenericNotes", $true) }
 

@@ -219,6 +219,36 @@ Le suivi du vol et le panneau en jeu affichent « Descente en cours » à la pla
   d’après le cisaillement de vent de l’OFP, et turbulence signalée par les
   pilotes (PIREP, AIREP) près de la route, avec une information quand elle se
   trouve devant vous à votre niveau.
+- **Turbulence ressentie** : turbulence que l’on sent dans MSFS, désactivée par
+  défaut. Son intensité vient du cisaillement de vent de l’OFP, des comptes
+  rendus de pilotes proches, de ce que montre le simulateur (nuages,
+  précipitations, cisaillement, vent fort à basse altitude) et du relief au
+  vent. Chaque rafale soulève ou enfonce l’avion, des petits à-coups de la
+  turbulence légère aux fortes secousses de la sévère, avec des niveaux calibrés
+  par une mesure en vol. Un bouton de la barre d’outils l’active et la règle de
+  25 à 200 % en vol, avec des sons de cabine facultatifs. Elle n’agit jamais au
+  sol, monte progressivement entre 200 et 500 ft sol, s’arrête aussitôt si
+  l’avion prend une attitude anormale et se tait pendant la pause active de MSFS
+  ; la fenêtre Turbulence affiche l’effet réellement mesuré dans le simulateur.
+
+### Caméra cinématique (MSFS 2024)
+
+Un bouton Caméra, à gauche de la barre d’outils, ouvre une régie compacte qui
+filme votre avion avec l’API caméra de MSFS 2024. Un réalisateur automatique
+choisit les plans selon la phase du vol : orbite au parking, spectateur au bord
+de la piste pendant la course au décollage, caméra qui attend l’avion au point
+de toucher prévu en courte finale, passages et poursuite près du sol, patrouille
+en route, et la vraie tour de contrôle de l’aérodrome de départ ou d’arrivée,
+qui zoome à mesure que l’avion s’éloigne.
+
+Vous pouvez fixer l’un des six plans, passer au suivant, garder le plan en
+cours, choisir un rythme posé, normal ou nerveux, choisir les plans permis au
+réalisateur et remplacer les coupes franches par des travellings autour de
+l’avion. La section Cadrage règle en direct la distance, la hauteur et l’angle
+de chaque plan, avec une remise à zéro pour un plan ou pour tous. La caméra
+garde le champ de vision de votre propre vue MSFS, si bien que l’image n’est
+jamais déformée, et un clic rend la vue au pilote. Une tablette du réseau local
+peut aussi tenir la régie.
 
 ### Fiche MCDU
 

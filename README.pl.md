@@ -184,6 +184,34 @@ Wyświetlany TOD jest szacunkiem SimBrief lub NaviXav, a nie odczytem MCDU. Prof
   trasy na podstawie uskoku wiatru z OFP oraz turbulencje zgłoszone przez
   pilotów (PIREP, AIREP) w pobliżu trasy, z komunikatem, gdy są przed Tobą na
   Twoim poziomie.
+- **Odczuwalna turbulencja**: turbulencja, którą czuć w MSFS, domyślnie
+  wyłączona. Jej siła wynika z uskoku wiatru w OFP, raportów pobliskich pilotów,
+  tego, co pokazuje symulator (chmury, opady, uskok wiatru, silny wiatr przy
+  ziemi), oraz terenu po stronie nawietrznej. Każdy podmuch unosi lub opuszcza
+  samolot, od lekkich wstrząsów po silne szarpnięcia, z poziomami skalibrowanymi
+  pomiarem w locie. Przycisk na pasku narzędzi włącza ją i reguluje w locie od
+  25 do 200 %, z opcjonalnymi dźwiękami kabiny. Nigdy nie działa na ziemi,
+  narasta stopniowo między 200 a 500 ft nad ziemią, zatrzymuje się natychmiast
+  przy nienormalnym położeniu samolotu i milknie podczas aktywnej pauzy MSFS;
+  okno Turbulencja pokazuje efekt faktycznie zmierzony w symulatorze.
+
+### Kamera filmowa (MSFS 2024)
+
+Przycisk Kamera po lewej stronie paska narzędzi otwiera kompaktową reżyserkę,
+która filmuje samolot za pomocą API kamery MSFS 2024. Automatyczny reżyser
+dobiera ujęcia do fazy lotu: orbita na stanowisku, obserwator przy pasie podczas
+rozbiegu, kamera czekająca w przewidywanym punkcie przyziemienia na krótkiej
+prostej, przeloty i pościg przy ziemi, lot w formacji na trasie oraz prawdziwa
+wieża kontroli lotniska wylotu lub przylotu, która przybliża obraz, gdy samolot
+się oddala.
+
+Możesz zablokować jedno z sześciu ujęć, przejść do następnego, zatrzymać
+bieżące, wybrać tempo spokojne, normalne lub żywe, wskazać dozwolone ujęcia i
+zastąpić ostre cięcia jazdami kamery wokół samolotu. Sekcja Kadrowanie ustawia
+na żywo odległość, wysokość i kąt każdego ujęcia, z przywracaniem jednego lub
+wszystkich. Kamera zachowuje pole widzenia Twojego własnego widoku MSFS, więc
+obraz nigdy nie jest zniekształcony, a jedno kliknięcie oddaje widok pilotowi.
+Kamerą może też sterować tablet w sieci lokalnej.
 
 ### Karta MCDU
 

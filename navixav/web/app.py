@@ -94,6 +94,14 @@ from navixav.weather.briefing import build_briefing
 from navixav.weather.radar import RadarFeed
 from navixav.weather.pirep import PirepFeed, bounding_box
 from navixav.weather.pirep import relate_to_route as relate_reports_to_route
+from navixav.camera.service import MODES as CAMERA_MODES
+from navixav.camera.service import PACES as CAMERA_PACES
+from navixav.camera.service import TRANSITIONS as CAMERA_TRANSITIONS
+from navixav.camera.shots import SHOTS as CAMERA_SHOTS
+from navixav.camera.service import CameraService
+from navixav.turbulence.model import Sources as TurbulenceSources
+from navixav.turbulence.service import TurbulenceService
+from navixav.turbulence.terrain import TerrainProbe
 from navixav.weather.sigmet import SigmetFeed, relate_to_route
 
 STATIC_DIR = resource_path("navixav", "web", "static")
@@ -189,6 +197,29 @@ class SettingsRequest(BaseModel):
     aig_path: str = Field(default="", max_length=1000)
     aircraft_community_path: str = Field(default="", max_length=1000)
     lan_enabled: bool = False
+    turbulence_enabled: bool = False
+    turbulence_intensity_pct: int = Field(default=100, ge=25, le=200)
+
+
+class CameraFramingRequest(BaseModel):
+    shot: str = Field(min_length=2, max_length=20)
+    distance: float | None = None
+    height: float | None = None
+    angle: float | None = None
+
+
+class CameraRequest(BaseModel):
+    # « auto » confie la caméra au réalisateur, un nom de plan le fixe,
+    # « off » la rend au pilote. Chaque champ absent laisse l'état tel quel.
+    mode: str | None = Field(default=None, min_length=2, max_length=20)
+    pace: str | None = Field(default=None, max_length=20)
+    next: bool = False
+    playlist: list[str] | None = Field(default=None, max_length=12)
+    transition: str | None = Field(default=None, max_length=20)
+    held: bool | None = None
+    # Cadrages réglés par plan, et remise à zéro (« all » ou un nom de plan).
+    framing: list[CameraFramingRequest] | None = Field(default=None, max_length=12)
+    reset_framing: str | None = Field(default=None, max_length=20)
 
 
 class TowerSpeechRequest(BaseModel):
@@ -352,6 +383,49 @@ def create_app(
             values.navdata_store if values.traffic_source == "static" else None,
         )
 
+    def plan_route() -> tuple[list[tuple[float, float]], int | None]:
+        """Tracé et niveau de croisière du plan chargé, vides sans plan."""
+        payload = current_plan_state.get("payload") or {}
+        enroute = payload.get("enroute") or {}
+        route = [
+            (float(point["lat"]), float(point["lon"]))
+            for point in enroute.get("route_path") or []
+            if isinstance(point, dict)
+            and isinstance(point.get("lat"), (int, float))
+            and isinstance(point.get("lon"), (int, float))
+        ]
+        cruise = enroute.get("cruise_altitude_ft")
+        return route, int(cruise) if isinstance(cruise, (int, float)) else None
+
+    def turbulence_sources() -> TurbulenceSources:
+        """Prévision de l'OFP et comptes rendus récents dans le couloir de la route."""
+        ofp = current_plan_state.get("ofp")
+        profile = getattr(getattr(ofp, "dispatch", None), "turbulence_profile", None) or []
+        route, _cruise = plan_route()
+        reports = []
+        if route:
+            try:
+                reports, _fetched = pirep_feed.current(bounding_box(route))
+            except Exception as exc:  # noqa: BLE001 - la prévision reste utilisable
+                LOGGER.info("Comptes rendus indisponibles pour la turbulence : %s", type(exc).__name__)
+        return TurbulenceSources.build(profile, reports)
+
+    turbulence = TurbulenceService(turbulence_sources, terrain=TerrainProbe())
+    def camera_airports() -> tuple[str, ...]:
+        """Départ et arrivée du plan chargé : leurs tours servent au plan « Tour »."""
+        ofp = current_plan_state.get("ofp")
+        return tuple(
+            code for code in (getattr(ofp, "origin_icao", None), getattr(ofp, "destination_icao", None)) if code
+        )
+
+    camera = CameraService(airports=camera_airports)
+
+    def configure_turbulence() -> None:
+        turbulence.configure(
+            enabled=settings.turbulence_enabled,
+            intensity_pct=settings.turbulence_intensity_pct,
+        )
+
     configured_traffic: tuple | None = None
 
     def configure_traffic_injection() -> None:
@@ -377,6 +451,9 @@ def create_app(
             return
         resources_closed = True
         LOGGER.info("Fermeture des connexions et sessions NaviXav")
+        # La caméra d'abord : quitter NaviXav rend la vue au pilote.
+        camera.close()
+        turbulence.close()
         traffic.close()
         tracker.close()
         fms_reader.close()
@@ -409,7 +486,10 @@ def create_app(
     # démarrer un serveur ASGI. Ils doivent néanmoins emprunter le même chemin
     # de fermeture que le cycle de vie FastAPI.
     app.state.close_resources = close_resources
+    app.state.turbulence = turbulence
+    app.state.camera = camera
     configure_traffic_injection()
+    configure_turbulence()
 
     @app.middleware("http")
     async def log_relevant_requests(request: Request, call_next):
@@ -569,6 +649,8 @@ def create_app(
             "taxi_turn_speed_limit_kt": settings.taxi_turn_speed_limit_kt,
             "taxi_speed_alarm_sound": settings.taxi_speed_alarm_sound,
             "vatsim_enabled": settings.vatsim_enabled,
+            "turbulence_enabled": settings.turbulence_enabled,
+            "turbulence_intensity_pct": settings.turbulence_intensity_pct,
             "traffic_enabled": settings.traffic_enabled,
             "traffic_injection_active": traffic.active,
             "traffic_injection": traffic.status,
@@ -836,6 +918,7 @@ def create_app(
             settings.effective_metar_source,
         )
         configure_traffic_injection()
+        configure_turbulence()
         values = settings.user_values()
         values["lan_restart_required"] = settings.lan_enabled != lan_active
         return values
@@ -917,6 +1000,10 @@ def create_app(
             panel_summary.clear()
             current_plan_state["payload"] = copy.deepcopy(payload)
             current_plan_state["ofp"] = ofp
+            if settings.turbulence_enabled:
+                threading.Thread(
+                    target=turbulence.refresh_sources, name="navixav-turbulence-plan", daemon=True
+                ).start()
             LOGGER.info(
                 "Complétion MSFS terminée en %.2f s "
                 "(cache avant: %s terrain(s), %s procédure(s); total %.2f s)",
@@ -1030,18 +1117,60 @@ def create_app(
             "refresh_interval_seconds": WEATHER_REFRESH_SECONDS,
         }
 
+    @app.get("/api/camera/status")
+    def camera_status() -> dict[str, Any]:
+        """Caméra cinématique : mode demandé, état et plan en cours."""
+        return camera.status()
+
+    @app.post("/api/camera")
+    def camera_command(request: CameraRequest) -> dict[str, Any]:
+        """Lance le réalisateur, fixe un plan ou rend la caméra au pilote.
+
+        Ouvert aux tablettes du réseau local : piloter la caméra depuis un
+        second écran ne touche ni aux réglages ni au vol.
+        """
+        if request.mode is not None and request.mode not in CAMERA_MODES:
+            raise HTTPException(400, "Plan de caméra inconnu.")
+        if request.pace is not None and request.pace not in CAMERA_PACES:
+            raise HTTPException(400, "Rythme de caméra inconnu.")
+        if request.transition is not None and request.transition not in CAMERA_TRANSITIONS:
+            raise HTTPException(400, "Transition de caméra inconnue.")
+        if request.playlist is not None and (
+            not request.playlist or not set(request.playlist) <= set(CAMERA_SHOTS)
+        ):
+            raise HTTPException(400, "Sélection de plans invalide.")
+        framed = [item.shot for item in request.framing or []]
+        if request.reset_framing not in (None, "all"):
+            framed.append(request.reset_framing)
+        if any(name not in CAMERA_SHOTS for name in framed):
+            raise HTTPException(400, "Plan de caméra inconnu.")
+        if request.reset_framing is not None:
+            camera.reset_framing(None if request.reset_framing == "all" else request.reset_framing)
+        for item in request.framing or []:
+            camera.set_framing(item.shot, distance=item.distance, height=item.height, angle=item.angle)
+        if request.pace is not None:
+            camera.set_pace(request.pace)
+        if request.transition is not None:
+            camera.set_transition(request.transition)
+        if request.playlist is not None:
+            camera.set_playlist(request.playlist)
+        if request.held is not None:
+            camera.set_held(request.held)
+        if request.mode is not None:
+            camera.start(request.mode)
+        if request.next:
+            camera.next_shot()
+        return camera.status()
+
+    @app.get("/api/turbulence/status")
+    def turbulence_status() -> dict[str, Any]:
+        """Turbulence ressentie : état du service et intensité à la position."""
+        return turbulence.status()
+
     @app.get("/api/weather/turbulence")
     def current_turbulence() -> dict[str, Any]:
         """Comptes rendus de turbulence des pilotes dans le couloir de la route."""
-        payload = current_plan_state.get("payload") or {}
-        enroute = payload.get("enroute") or {}
-        route = [
-            (float(point["lat"]), float(point["lon"]))
-            for point in enroute.get("route_path") or []
-            if isinstance(point, dict)
-            and isinstance(point.get("lat"), (int, float))
-            and isinstance(point.get("lon"), (int, float))
-        ]
+        route, cruise = plan_route()
         if not route:
             return {"reports": [], "route_filtered": False, "fetched_at": None, "source": "aviationweather.gov"}
         try:
@@ -1049,10 +1178,7 @@ def create_app(
         except Exception as exc:  # noqa: BLE001 - la couche reste simplement vide
             LOGGER.warning("Comptes rendus de turbulence indisponibles : %s", type(exc).__name__)
             raise HTTPException(503, "Les comptes rendus de pilotes sont momentanément indisponibles.") from exc
-        cruise = enroute.get("cruise_altitude_ft")
-        reports = relate_reports_to_route(
-            reports, route, int(cruise) if isinstance(cruise, (int, float)) else None
-        )
+        reports = relate_reports_to_route(reports, route, cruise)
         return {
             "reports": [report.to_dict() for report in reports],
             "route_filtered": True,
@@ -2028,6 +2154,7 @@ def create_app(
             # il tiendra jusqu'à la fermeture, et le journal garde la trace.
             LOGGER.warning("Réglage du panneau non enregistré : %s", exc)
         configure_traffic_injection()
+        configure_turbulence()
         return _panel_state()
 
     @app.get("/api/panel/state")

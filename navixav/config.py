@@ -169,6 +169,11 @@ class Settings:
     # jeton : le lien affiché sur le PC suffit. Les commandes sensibles
     # (paramètres, mise à jour, arrêt) restent réservées à la machine hôte.
     lan_enabled: bool = False
+    # Turbulence ressentie : NaviXav agit alors sur l'avion du joueur. C'est
+    # un consentement explicite, désactivé par défaut. L'intensité multiplie
+    # le mouvement calculé, de 25 à 200 %.
+    turbulence_enabled: bool = False
+    turbulence_intensity_pct: int = 100
 
     @classmethod
     def load(cls, env_file: Path | str | None = None) -> "Settings":
@@ -362,6 +367,13 @@ class Settings:
                 Path(raw_community).expanduser() if raw_community else None
             ),
             lan_enabled=lan_enabled,
+            turbulence_enabled=bool(
+                values.get("turbulence_enabled", self.turbulence_enabled)
+            ),
+            turbulence_intensity_pct=int(_clamp_float(
+                values.get("turbulence_intensity_pct", self.turbulence_intensity_pct),
+                self.turbulence_intensity_pct, 25, 200,
+            )),
         )
 
     def user_values(self) -> dict[str, object]:
@@ -395,6 +407,8 @@ class Settings:
                 str(self.aircraft_community_path) if self.aircraft_community_path else ""
             ),
             "lan_enabled": self.lan_enabled,
+            "turbulence_enabled": self.turbulence_enabled,
+            "turbulence_intensity_pct": self.turbulence_intensity_pct,
         }
 
 

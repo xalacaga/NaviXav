@@ -4739,3 +4739,576 @@ body.remote-client .toolbar {
 .ta-gantt-row[data-state="done"] .ta-gantt-done { background: var(--high); }
 .ta-gantt-row[data-state="done"] .ta-gantt-eta { color: var(--high); }
 .ta-gantt-eta { white-space: nowrap; }
+
+/* Turbulence ressentie : réglage rapide depuis la barre, valable sur tous les onglets. */
+.turbulence-toggle { width: auto; min-width: 34px; display: inline-flex; gap: 5px; padding: 7px 8px; }
+.turbulence-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.turbulence-toggle.is-on { color: var(--accent); }
+.turbulence-toggle.is-on .turbulence-badge { color: var(--accent); }
+.turbulence-toggle.is-shaking { color: var(--medium); }
+.turbulence-toggle.is-shaking .turbulence-badge { color: var(--medium); }
+.turbulence-popover {
+  position: fixed;
+  z-index: 60;
+  width: min(300px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.turbulence-popover > strong { font-size: 0.86rem; }
+.turbulence-popover input[type="range"],
+#settings-turbulence-intensity,
+#settings-cabin-volume { width: 100%; accent-color: var(--accent); }
+.field > .range-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.range-head output {
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.turbulence-popover-status { margin: 0; font-size: 0.76rem; color: var(--text-dim); }
+.turbulence-popover input:disabled,
+#settings-cabin-volume:disabled { opacity: 0.45; }
+
+
+/*
+ * Caméra cinématique : une régie compacte. L'écran « à l'image » montre le
+ * plan tourné, la phase du vol et le temps avant la coupe ; le voyant rouge
+ * pulse tant que NaviXav tient la caméra. Utilisable depuis une tablette.
+ */
+.camera-toggle { position: relative; }
+.camera-toggle.is-on::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--low);
+  box-shadow: 0 0 0 2px var(--surface-solid);
+  animation: camera-rec 1.6s ease-in-out infinite;
+}
+.camera-panel {
+  position: fixed;
+  z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface-solid);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transform-origin: top right;
+  animation: camera-pop 0.18s ease-out;
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+}
+.camera-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.camera-head strong { font-size: 0.9rem; }
+.camera-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+}
+.camera-chip[data-state="active"] { color: var(--low); background: color-mix(in srgb, var(--low) 14%, transparent); }
+.camera-chip[data-state="waiting"],
+.camera-chip[data-state="taken"] { color: var(--medium); background: color-mix(in srgb, var(--medium) 14%, transparent); }
+.camera-chip[data-state="refused"],
+.camera-chip[data-state="blocked"],
+.camera-chip[data-state="unsupported"] { color: var(--low); background: color-mix(in srgb, var(--low) 10%, transparent); }
+
+/* Écran de contrôle : toujours sombre, comme un moniteur de régie. */
+.camera-live {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 112px;
+  padding: 12px 14px 16px;
+  overflow: hidden;
+  border-radius: 12px;
+  color: #e8eef7;
+  background:
+    radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 60%),
+    linear-gradient(160deg, #0b1626, #050a12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.camera-live::before {
+  /* Repères de cadrage aux quatre coins. */
+  content: "";
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  background:
+    linear-gradient(#ffffff40, #ffffff40) top left / 12px 1px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) top left / 1px 12px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) top right / 12px 1px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) top right / 1px 12px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) bottom left / 12px 1px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) bottom left / 1px 12px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) bottom right / 12px 1px no-repeat,
+    linear-gradient(#ffffff40, #ffffff40) bottom right / 1px 12px no-repeat;
+}
+.camera-live-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9fb0c6;
+}
+.camera-rec { width: 8px; height: 8px; border-radius: 50%; background: #475569; }
+.camera-live[data-state="active"] .camera-rec { background: #ef4444; animation: camera-rec 1.6s ease-in-out infinite; }
+.camera-live[data-state="waiting"] .camera-rec { background: #f59e0b; }
+.camera-live-phase { margin-left: auto; font-weight: 700; color: #e8eef7; }
+.camera-live-shot { font-size: 1.45rem; font-weight: 750; letter-spacing: -0.01em; line-height: 1.15; }
+.camera-live-shot.is-cut { animation: camera-cut 0.35s ease-out; }
+.camera-live-hint { font-size: 0.76rem; color: #9fb0c6; }
+.camera-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.camera-progress > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), #ef4444);
+}
+
+.camera-actions { display: flex; gap: 8px; }
+.camera-director,
+.camera-next,
+.camera-shot,
+.camera-release,
+.camera-segmented button {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.camera-director:hover,
+.camera-next:hover:not(:disabled),
+.camera-shot:hover,
+.camera-segmented button:hover { background: var(--surface-raised); }
+.camera-director:active,
+.camera-shot:active,
+.camera-next:active:not(:disabled) { transform: scale(0.97); }
+.camera-director {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+.camera-director > span { display: flex; flex-direction: column; gap: 1px; }
+.camera-director small { font-size: 0.7rem; font-weight: 400; color: var(--text-dim); }
+.camera-director svg,
+.camera-next svg,
+.camera-release svg { width: 18px; height: 18px; flex: none; fill: currentColor; }
+.camera-director[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: #041020; }
+.camera-director[aria-pressed="true"] small { color: color-mix(in srgb, #041020 70%, transparent); }
+/* En thème clair, l'accent est foncé : le texte passe en blanc. */
+:root[data-theme="light"] .camera-director[aria-pressed="true"] { color: #ffffff; }
+:root[data-theme="light"] .camera-director[aria-pressed="true"] small { color: rgba(255, 255, 255, 0.82); }
+.camera-next { width: 48px; display: grid; place-items: center; border-radius: 12px; }
+.camera-next:disabled { opacity: 0.4; cursor: default; }
+
+.camera-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.camera-pace { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.camera-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+.camera-segmented button {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.camera-segmented button[aria-pressed="true"] {
+  background: var(--surface-solid);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.camera-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.camera-shots .camera-section-title { grid-column: 1 / -1; }
+.camera-shot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 2px 7px;
+  border-radius: 12px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+.camera-shot svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.camera-shot .camera-shot-dot { fill: currentColor; stroke: none; }
+.camera-shot[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* Sous le réalisateur, le plan qu'il a choisi s'allume plus discrètement. */
+.camera-shot.is-live:not([aria-pressed="true"]) {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.camera-release {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.camera-release:not(:disabled) { border-color: color-mix(in srgb, var(--low) 45%, transparent); color: var(--low); }
+.camera-release:not(:disabled):hover { background: color-mix(in srgb, var(--low) 12%, transparent); }
+.camera-release:disabled { opacity: 0.45; cursor: default; }
+
+@keyframes camera-rec { 50% { opacity: 0.35; } }
+@keyframes camera-pop { from { opacity: 0; transform: translateY(-6px) scale(0.98); } }
+@keyframes camera-cut { from { opacity: 0; transform: translateX(10px); } }
+@media (prefers-reduced-motion: reduce) {
+  .camera-panel,
+  .camera-live-shot.is-cut,
+  .camera-toggle.is-on::after,
+  .camera-live[data-state="active"] .camera-rec { animation: none; }
+}
+
+/*
+ * Modules hors pilotage (caméra, turbulence) : en tête de barre, à gauche,
+ * sous forme de pastilles libellées. La barre s'étend pour que le reste des
+ * commandes garde sa place à droite.
+ */
+.topbar > .toolbar { flex: 1 1 auto; }
+.toolbar-features {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-raised) 45%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.feature-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 13px 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.2s;
+}
+.feature-pill svg { width: 17px; height: 17px; flex: none; fill: currentColor; }
+.feature-pill:hover { background: var(--surface-raised); color: var(--text); }
+.feature-pill[aria-expanded="true"] { background: var(--surface-solid); color: var(--text); border-color: var(--border-strong); }
+.feature-pill.is-on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.feature-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.feature-pill.is-on .feature-badge { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.turbulence-toggle.feature-pill { width: auto; min-width: 0; }
+.turbulence-toggle.feature-pill.is-shaking { color: var(--medium); border-color: color-mix(in srgb, var(--medium) 45%, transparent); }
+/* En tournage, la pastille caméra porte un voyant rouge et s'éclaire doucement. */
+.camera-toggle.feature-pill.is-on::after { top: 3px; right: 4px; }
+.camera-toggle.feature-pill.is-on {
+  animation: feature-glow 2.4s ease-in-out infinite;
+}
+@keyframes feature-glow {
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+}
+@media (max-width: 980px) {
+  .feature-label { display: none; }
+  .feature-pill { padding: 5px 10px; }
+}
+@media (max-width: 760px) {
+  .toolbar > .toolbar-features { flex: 0 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camera-toggle.feature-pill.is-on { animation: none; }
+}
+
+/* Régie : épingle, montage repliable, sélection du réalisateur. */
+.camera-shot { flex-direction: column; justify-content: center; align-items: center; gap: 4px; min-width: 0; padding: 8px 4px 7px; font-size: 0.72rem; text-align: center; }
+/* Un nom de plan ne se coupe jamais au milieu d'un mot ; s'il le faut, au trait d'union. */
+.camera-shot > span { max-width: 100%; line-height: 1.15; overflow-wrap: normal; word-break: normal; hyphens: auto; }
+.camera-shot svg { flex: none; }
+.camera-shot svg { width: 22px; height: 22px; }
+.camera-hold[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--medium) 55%, transparent);
+  background: color-mix(in srgb, var(--medium) 16%, transparent);
+  color: var(--medium);
+}
+.camera-more { border-top: 1px solid var(--border); padding-top: 8px; }
+.camera-more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.camera-more > summary::-webkit-details-marker { display: none; }
+.camera-more > summary::after { content: "▾"; transition: transform 0.15s; }
+.camera-more[open] > summary::after { transform: rotate(180deg); }
+.camera-more-body { display: flex; flex-direction: column; gap: 12px; padding-top: 10px; }
+.camera-playlist { display: flex; flex-direction: column; gap: 6px; }
+.camera-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.camera-chips button {
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.camera-chips button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+}
+.camera-chips button[aria-pressed="true"]::before { content: "✓ "; }
+
+/* Cadrage par plan : curseurs appliqués en direct, remise à zéro. */
+.camera-framing-shot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.camera-framing-shot select {
+  min-height: 30px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.camera-slider { display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; color: var(--text-dim); }
+.camera-slider input[type="range"] { width: 100%; accent-color: var(--accent); }
+.camera-slider output { font-size: 0.74rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.camera-slider.is-changed output { color: var(--accent); }
+.camera-framing-note { margin: 0; font-size: 0.7rem; color: var(--text-faint); }
+.camera-framing-note:empty { display: none; }
+.camera-framing-actions { display: flex; gap: 6px; }
+.camera-framing-actions button {
+  flex: 1;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.camera-framing-actions button:hover:not(:disabled) { background: var(--surface-raised); color: var(--text); }
+.camera-framing-actions button:disabled { opacity: 0.45; cursor: default; }
+.camera-slider > .range-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.camera-slider input[type="range"] { margin: 0; min-height: 0; height: 18px; padding: 0; }
+.camera-framing .camera-more-body { gap: 8px; }
+
+/*
+ * Icônes de la barre : tracé fin et arrondi, comme le soleil du thème,
+ * plutôt que des formes pleines qui paraissent lourdes à côté du texte.
+ */
+.topbar svg.line-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.topbar .feature-pill svg.line-icon { width: 17px; height: 17px; }
+.topbar .btn-primary svg.line-icon { stroke-width: 1.9; }
+
+/* Cartes audio : la liste des voix reste dans sa colonne et le curseur de volume s'aligne sur elle. */
+.settings-audio-card select { min-width: 0; width: 100%; }
+.settings-audio-controls { align-items: end; }
+.settings-audio-controls .field input[type="range"] { height: 38px; margin: 0; }
+.settings-audio-card .field > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/*
+ * Barre du haut : seules les actions fréquentes restent visibles. Thème,
+ * recherche de mise à jour, soutien et sortie vivent dans le menu « ⋯ » ;
+ * une mise à jour disponible apparaît dans la barre et marque le menu.
+ */
+.topbar .toolbar-icon { width: 38px; min-width: 38px; height: 38px; padding: 9px; }
+.topbar .toolbar-icon svg.line-icon { width: 19px; height: 19px; stroke-width: 1.75; }
+.toolbar-menu { position: relative; display: flex; }
+#toolbar-more.has-update::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2dd4bf;
+  box-shadow: 0 0 0 2px var(--surface-solid);
+}
+.toolbar-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 70;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow);
+}
+.toolbar-menu-panel.hidden { display: none; }
+.toolbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+.toolbar-menu-item svg { flex: none; width: 18px; height: 18px; color: var(--text-dim); }
+.toolbar-menu-item svg.line-icon,
+.toolbar-menu-item .theme-icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.toolbar-menu-item:hover,
+.toolbar-menu-item:focus-visible { background: var(--surface-raised); outline: none; }
+.toolbar-menu-item:hover svg { color: var(--text); }
+.toolbar-menu-item:disabled { opacity: 0.55; cursor: progress; }
+.toolbar-menu-item.support-toolbar-btn svg { color: #fbbf24; }
+.toolbar-menu-item.shutdown-btn:hover,
+.toolbar-menu-item.shutdown-btn:focus-visible { color: var(--low); background: color-mix(in srgb, var(--low) 10%, transparent); }
+.toolbar-menu-item.shutdown-btn:hover svg { color: var(--low); }
+.toolbar-menu-item.update-btn.available { color: #2dd4bf; background: transparent; border: 0; animation: none; }
+.toolbar-menu-separator { margin: 4px 6px; border: 0; border-top: 1px solid var(--border); }
+.update-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+.update-ready.hidden { display: none; }
+.update-ready svg.line-icon { width: 16px; height: 16px; }
+
+.topbar .toolbar-menu-item svg.line-icon { width: 18px; height: 18px; stroke-width: 1.7; }
+:root[data-theme="light"] .update-ready.available {
+  color: #0f5f57;
+  border-color: #14b8a680;
+  background: #ccfbf1;
+}
+:root[data-theme="light"] .update-ready.available:hover { background: #99f6e4; }
+
+/* Explication du choix sélectionné, sous les boutons Rythme et Enchaînement. */
+.camera-pace { flex-wrap: wrap; }
+.camera-choice-hint {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-faint);
+}

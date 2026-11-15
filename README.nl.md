@@ -186,6 +186,36 @@ Vluchtvolging en het paneel in de simulator tonen tijdens de daling “Daling be
 - **Turbulentie**: risico op clear-air turbulentie langs de route op basis van
   de windschering in de OFP, en door piloten gemelde turbulentie (PIREP,
   AIREP) nabij de route, met een melding als die vóór u op uw hoogte ligt.
+- **Gevoelde turbulentie**: turbulentie die u voelt in MSFS, standaard uit. De
+  sterkte komt van de windschering in het OFP, meldingen van piloten in de
+  buurt, wat de simulator toont (wolken, neerslag, windschering, harde wind laag
+  bij de grond) en het terrein bovenwinds. Elke windstoot tilt het toestel op of
+  laat het zakken, van lichte schokjes tot zware klappen, met niveaus
+  gekalibreerd door een meting tijdens de vlucht. Een knop in de werkbalk zet
+  haar aan en stelt haar tijdens de vlucht in van 25 tot 200 %, met optionele
+  cabinegeluiden. Ze werkt nooit op de grond, neemt geleidelijk toe tussen 200
+  en 500 ft boven de grond, stopt meteen bij een abnormale stand en zwijgt
+  tijdens de actieve pauze van MSFS; het venster Turbulentie toont het werkelijk
+  in de simulator gemeten effect.
+
+### Filmcamera (MSFS 2024)
+
+Een Camera-knop links in de werkbalk opent een compacte regiekamer die uw
+toestel filmt met de camera-API van MSFS 2024. Een automatische regisseur kiest
+de shots per vluchtfase: een rondje bij de standplaats, een toeschouwer naast de
+baan tijdens de startaanloop, een camera die wacht op het voorspelde
+landingspunt in korte finale, overvluchten en achtervolging dicht bij de grond,
+formatievliegen onderweg en de echte verkeerstoren van het vertrek- of
+aankomstvliegveld, die inzoomt naarmate het toestel zich verwijdert.
+
+U kunt een van de zes shots vastzetten, naar het volgende schakelen, het huidige
+vasthouden, een rustig, normaal of levendig tempo kiezen, de toegestane shots
+kiezen en harde wissels vervangen door camerabewegingen rond het toestel. Het
+onderdeel Kadrering stelt afstand, hoogte en hoek van elk shot live in, met
+herstellen voor één shot of voor alle. De camera houdt het gezichtsveld van uw
+eigen MSFS-weergave aan, zodat het beeld nooit vervormt, en één klik geeft het
+beeld terug aan de piloot. Ook een tablet op het lokale netwerk kan de camera
+bedienen.
 
 ### MCDU-kaart
 

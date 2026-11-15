@@ -224,6 +224,36 @@ Flugverfolgung und Ingame-Panel zeigen im Sinkflug „Sinkflug läuft“ statt T
   Luftturbulenz entlang der Route und von Piloten gemeldete Turbulenzen (PIREP,
   AIREP) nahe der Route, mit einem Hinweis, wenn sie voraus auf Ihrer Höhe
   liegen.
+- **Gefühlte Turbulenz**: in MSFS spürbare Turbulenz, standardmäßig aus. Die
+  Stärke ergibt sich aus der Windscherung des OFP, Pilotenmeldungen in der Nähe,
+  dem, was der Simulator zeigt (Wolken, Niederschlag, Windscherung, starker Wind
+  in Bodennähe), und dem Gelände im Luv. Jede Böe hebt oder senkt das Flugzeug,
+  von leichten Stößen bis zu schweren Schlägen, mit im Flug gemessen
+  kalibrierten Stufen. Eine Schaltfläche in der Werkzeugleiste schaltet sie ein
+  und stellt sie im Flug von 25 bis 200 % ein, mit optionalen Kabinengeräuschen.
+  Sie wirkt nie am Boden, wird zwischen 200 und 500 ft über Grund eingeblendet,
+  stoppt sofort bei einer abnormalen Fluglage und schweigt während der aktiven
+  Pause von MSFS; das Turbulenzfenster zeigt die im Simulator tatsächlich
+  gemessene Wirkung.
+
+### Kinokamera (MSFS 2024)
+
+Eine Kamera-Schaltfläche links in der Werkzeugleiste öffnet eine kompakte Regie,
+die Ihr Flugzeug mit der Kamera-API von MSFS 2024 filmt. Ein automatischer
+Regisseur wählt die Einstellungen nach Flugphase: Orbit an der Parkposition, ein
+Zuschauer am Pistenrand beim Startlauf, eine Kamera am vorhergesagten
+Aufsetzpunkt im kurzen Endanflug, Vorbeiflüge und Verfolgung in Bodennähe,
+Formationsflug im Reiseflug und der echte Kontrollturm des Abflug- oder
+Zielflughafens, der heranzoomt, während sich das Flugzeug entfernt.
+
+Sie können eine der sechs Einstellungen festlegen, zur nächsten schneiden, die
+aktuelle halten, ein ruhiges, normales oder lebhaftes Tempo wählen, die
+erlaubten Einstellungen auswählen und harte Schnitte durch Kamerafahrten um das
+Flugzeug ersetzen. Der Bereich Bildausschnitt stellt Abstand, Höhe und Winkel
+jeder Einstellung live ein, mit Zurücksetzen für eine oder alle. Die Kamera
+behält das Sichtfeld Ihrer eigenen MSFS-Ansicht, sodass das Bild nie verzerrt
+ist, und ein Klick gibt die Ansicht dem Piloten zurück. Auch ein Tablet im
+lokalen Netzwerk kann die Kamera steuern.
 
 ### MCDU-Blatt
 

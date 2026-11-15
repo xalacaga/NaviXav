@@ -397,6 +397,16 @@ def _purge_pseudo_fixes(connection: sqlite3.Connection) -> None:
     des pistes ou de la géométrie de la procédure ; les entrées polluées
     doivent disparaître des bases déjà constituées.
     """
+    # Réparation unique : la répéter à chaque ouverture effaçait aussi les
+    # repères correctement relus depuis (bornés au terrain de leur procédure)
+    # et le souvenir des échecs, si bien que chaque lancement les redemandait
+    # à MSFS — plus de 30 s d'attente pour l'arrivée d'Orly.
+    done = connection.execute(
+        "SELECT 1 FROM meta WHERE key = 'pseudo_fix_purge'"
+    ).fetchone()
+    if done:
+        return
+    connection.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('pseudo_fix_purge', '1')")
     removed = 0
     for pattern in _PSEUDO_FIX_PATTERNS:
         removed += connection.execute(

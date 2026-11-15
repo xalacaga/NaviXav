@@ -188,6 +188,37 @@ El seguimiento y el panel del simulador muestran «Descenso en curso» en lugar 
   partir de la cizalladura del viento del OFP, y turbulencia notificada por los
   pilotos (PIREP, AIREP) cerca de la ruta, con un aviso informativo cuando está
   por delante a su nivel.
+- **Turbulencia sentida**: turbulencia que se siente en MSFS, desactivada por
+  defecto. Su intensidad procede de la cizalladura del OFP, de los informes de
+  pilotos cercanos, de lo que muestra el simulador (nubes, precipitación,
+  cizalladura, viento fuerte a baja altura) y del relieve a barlovento. Cada
+  ráfaga eleva o hunde el avión, desde pequeños golpes hasta sacudidas severas,
+  con niveles calibrados mediante una medición en vuelo. Un botón de la barra de
+  herramientas la activa y la ajusta de 25 a 200 % en vuelo, con sonidos de
+  cabina opcionales. Nunca actúa en tierra, aumenta progresivamente entre 200 y
+  500 ft sobre el suelo, se detiene al instante si el avión adopta una actitud
+  anormal y calla durante la pausa activa de MSFS; la ventana Turbulencia
+  muestra el efecto realmente medido en el simulador.
+
+### Cámara cinematográfica (MSFS 2024)
+
+Un botón Cámara, a la izquierda de la barra de herramientas, abre una
+realización compacta que filma su avión con la API de cámara de MSFS 2024. Un
+realizador automático elige los planos según la fase del vuelo: órbita en el
+estacionamiento, un espectador junto a la pista durante la carrera de despegue,
+una cámara que espera en el punto de toma previsto en final corta, pasadas y
+persecución cerca del suelo, vuelo en formación en ruta y la torre de control
+real del aeropuerto de salida o de llegada, que se acerca con el zoom a medida
+que el avión se aleja.
+
+Puede fijar uno de los seis planos, pasar al siguiente, mantener el actual,
+elegir un ritmo pausado, normal o dinámico, escoger los planos permitidos y
+sustituir los cortes secos por travellings alrededor del avión. La sección
+Encuadre ajusta en directo la distancia, la altura y el ángulo de cada plano,
+con un restablecimiento para uno o para todos. La cámara conserva el campo de
+visión de su propia vista de MSFS, de modo que la imagen nunca se deforma, y un
+clic devuelve la vista al piloto. Una tableta de la red local también puede
+manejar la cámara.
 
 ### Ficha MCDU
 

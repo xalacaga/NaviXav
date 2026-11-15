@@ -19,14 +19,15 @@ binaire correspondant exactement aux champs déclarés pour ce type.
 from __future__ import annotations
 
 import ctypes as ct
+import math
 import os
 import struct
 import time
 from ctypes import wintypes
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import Any, Callable, Iterator, Sequence
 
-from navixav.msfs.fields import TYPE_NAMES, Field
+from navixav.msfs.fields import TYPE_AIRPORT, TYPE_NAMES, Field
 from navixav.paths import resource_path
 
 RECV_ID_EXCEPTION = 1
@@ -37,6 +38,9 @@ RECV_ID_ASSIGNED_OBJECT_ID = 12
 RECV_ID_CLIENT_DATA = 16
 RECV_ID_FACILITY_DATA = 28
 RECV_ID_FACILITY_DATA_END = 29
+RECV_ID_CAMERA_DATA = 40
+RECV_ID_CAMERA_STATUS = 41
+RECV_ID_CAMERA_WORLD_LOCKER = 44
 
 # En-tête SIMCONNECT_RECV (3 DWORD) + 7 DWORD, identique pour FACILITY_DATA
 # et SIMOBJECT_DATA.
@@ -46,7 +50,9 @@ DATATYPE_FLOAT64 = 4
 DATATYPE_STRING32 = 6
 DATATYPE_STRING256 = 9
 DATATYPE_INITPOSITION = 12
+PERIOD_NEVER = 0
 PERIOD_ONCE = 1
+PERIOD_SIM_FRAME = 3
 OBJECT_ID_USER = 0
 SIMCONNECT_UNUSED = 0xFFFFFFFF
 SIMCONNECT_OPEN_CONFIGINDEX_LOCAL = 0xFFFFFFFF
@@ -75,6 +81,34 @@ MSFS2024_REQUIRED_EXPORTS = (
     "SimConnect_EnumerateSimObjectsAndLiveries",
 )
 
+# API caméra de MSFS 2024. Elle est facultative : une DLL qui ne la porte pas
+# reste utilisable pour tout le reste, seule la caméra est alors indisponible.
+CAMERA_EXPORTS = (
+    "SimConnect_CameraAcquire",
+    "SimConnect_CameraRelease",
+    "SimConnect_CameraSet",
+    "SimConnect_CameraGetStatus",
+    "SimConnect_CameraEnableFlag",
+    "SimConnect_SubscribeToCameraStatusUpdate",
+    "SimConnect_RequestCameraWorldLocker",
+    "SimConnect_DeleteCameraWorldLocker",
+)
+CAMERA_REFERENTIAL_SIMOBJECT = 1
+CAMERA_REFERENTIAL_WORLD = 2
+CAMERA_MASK_POSITION = 1
+CAMERA_MASK_ROTATION = 2
+CAMERA_MASK_TARGETED = 4
+CAMERA_MASK_FOV = 8
+# Le simulateur garde lui-même la caméra au-dessus du relief.
+CAMERA_FLAG_ABOVE_GROUND = 2
+CAMERA_AVAILABILITY_USER_DISABLED = 3
+CAMERA_LOCKER_FAIL = 4
+EXCEPTION_CAMERA_API = 46
+# SIMCONNECT_DATA_CAMERA, compactée sur 84 octets : position (3 double),
+# référentiel et objet, cible (3 double), tangage/inclinaison/cap (3 float),
+# référentiel et objet de la rotation, champ de vision (double).
+_CAMERA_LAYOUT = struct.Struct("<3diI3d3fiId")
+
 
 def _dll_candidates() -> tuple[Path, ...]:
     """Emplacements possibles de la DLL officielle SimConnect."""
@@ -99,6 +133,7 @@ EXCEPTION_NAMES = {
     1: "ERROR", 2: "SIZE_MISMATCH", 3: "UNRECOGNIZED_ID", 4: "UNOPENED",
     5: "VERSION_MISMATCH", 7: "NAME_UNRECOGNIZED", 18: "INVALID_DATA_TYPE",
     19: "INVALID_DATA_SIZE", 20: "DATA_ERROR", 21: "INVALID_ARRAY",
+    EXCEPTION_CAMERA_API: "CAMERA_API",
 }
 
 # Un refus du simulateur arrive avant les blocs déjà émis pour la même
@@ -217,6 +252,41 @@ class FacilityDefinition:
         while self._stack:
             self.close()
         return self
+
+
+def unpack_camera_fov(raw: bytes, header: int) -> float | None:
+    """Champ de vision contenu dans une réponse RECV_ID_CAMERA_DATA."""
+    if len(raw) < header + _CAMERA_LAYOUT.size:
+        return None
+    fov = _CAMERA_LAYOUT.unpack_from(raw, header)[-1]
+    return fov if math.isfinite(fov) and fov > 0 else None
+
+
+def pack_camera(
+    position: Sequence[float],
+    referential: int,
+    target: Sequence[float] = (0.0, 0.0, 0.0),
+    *,
+    object_id: int = OBJECT_ID_USER,
+    target_referential: int = CAMERA_REFERENTIAL_SIMOBJECT,
+    target_object_id: int = OBJECT_ID_USER,
+    fov_deg: float = 0.0,
+) -> bytes:
+    """Charge de SIMCONNECT_DATA_CAMERA : une position et un point visé.
+
+    En référentiel avion, la position est en mètres, x vers la droite, y vers
+    le haut, z vers l'avant. En référentiel monde, c'est latitude, longitude
+    en degrés et altitude en mètres. La cible, exprimée dans son propre
+    référentiel, oriente la caméra : MSFS calcule lui-même l'orientation.
+    """
+    x, y, z = (float(value) for value in position)
+    tx, ty, tz = (float(value) for value in target)
+    return _CAMERA_LAYOUT.pack(
+        x, y, z, int(referential), int(object_id),
+        tx, ty, tz,
+        0.0, 0.0, 0.0, int(target_referential), int(target_object_id),
+        float(fov_deg),
+    )
 
 
 def decode(payload: bytes, fields: Sequence[Field]) -> dict[str, Any]:
@@ -460,6 +530,192 @@ class SimConnectClient:
                 f"SimConnect a refusé la demande ({names}).", exceptions
             )
         raise SimConnectError("Aucune donnée de vol reçue du simulateur.")
+
+    def subscribe_simvars(self, variables: Sequence[tuple[str, str]]) -> int:
+        """Abonne la connexion aux variables de l'avion, une réponse par image.
+
+        À réserver à une connexion dédiée : chaque image de simulation dépose
+        un message dans la file, que seul `next_frame` sait vider. Une
+        connexion partagée verrait ses lectures ponctuelles noyées.
+        """
+        definition_id = self._definition_for(variables)
+        self._next_id += 1
+        request_id = self._next_id
+        result = self._dll.SimConnect_RequestDataOnSimObject(
+            self._handle, request_id, definition_id, OBJECT_ID_USER,
+            PERIOD_SIM_FRAME, 0, 0, 0, 0,
+        )
+        if result != 0:
+            self._forget_definition(variables)
+            raise SimConnectError("Impossible de s'abonner aux données de vol.")
+        return request_id
+
+    def next_frame(
+        self,
+        request_id: int,
+        variables: Sequence[tuple[str, str]],
+        timeout_s: float = 1.0,
+        on_message: Callable[[int, bytes], None] | None = None,
+    ) -> dict[str, float] | None:
+        """Dernière image reçue pour un abonnement, ou None si rien n'arrive.
+
+        La file est vidée jusqu'au message le plus récent : appliquer une
+        image en retard ferait réagir l'avion à un état déjà dépassé. Le
+        silence n'est pas une erreur — le simulateur en pause n'émet plus
+        d'image. Un refus, en revanche, remonte : il vise souvent une écriture.
+        Les autres messages (état de la caméra, par exemple) sont confiés à
+        `on_message`, avec leur identifiant et leurs octets complets.
+        """
+        expected = len(variables) * 8
+        pointer = ct.POINTER(_RECV)()
+        size = wintypes.DWORD()
+        deadline = time.monotonic() + timeout_s
+        latest: bytes | None = None
+        while True:
+            if self._dll.SimConnect_GetNextDispatch(
+                self._handle, ct.byref(pointer), ct.byref(size)
+            ) != 0:
+                if latest is not None or time.monotonic() >= deadline:
+                    break
+                time.sleep(0.001)
+                continue
+            recv = pointer.contents
+            if recv.dwID == RECV_ID_SIMOBJECT_DATA:
+                data = ct.cast(pointer, ct.POINTER(_RECV_SIMOBJECT_DATA)).contents
+                if data.dwRequestID == request_id:
+                    latest = ct.string_at(pointer, recv.dwSize)[_PAYLOAD_OFFSET:]
+            elif recv.dwID == RECV_ID_EXCEPTION:
+                exception = ct.cast(pointer, ct.POINTER(_RECV_EXCEPTION)).contents
+                name = EXCEPTION_NAMES.get(exception.dwException, str(exception.dwException))
+                raise SimConnectRefused(
+                    f"SimConnect a refusé une demande ({name}).", [exception.dwException]
+                )
+            elif recv.dwID == RECV_ID_QUIT:
+                raise SimConnectError("Le simulateur s'est fermé.")
+            elif on_message is not None:
+                on_message(recv.dwID, ct.string_at(pointer, recv.dwSize))
+        if latest is None:
+            return None
+        if len(latest) < expected:
+            raise SimConnectLayout(
+                f"Réponse de {len(latest)} octets pour {expected} attendus."
+            )
+        values = struct.unpack(f"<{len(variables)}d", latest[:expected])
+        return {name: value for (name, _unit), value in zip(variables, values)}
+
+    def write_simvars(
+        self, variables: Sequence[tuple[str, str]], values: Sequence[float]
+    ) -> None:
+        """Écrit des variables réglables sur l'avion du joueur, en FLOAT64.
+
+        L'envoi est sans accusé de réception : un refus du simulateur arrive
+        plus tard dans la file, sous forme d'exception, et c'est la boucle qui
+        la vide qui la signale.
+        """
+        if len(variables) != len(values):
+            raise ValueError("Autant de valeurs que de variables sont attendues.")
+        definition_id = self._definition_for(variables)
+        buffer = (ct.c_double * len(values))(*[float(value) for value in values])
+        result = self._dll.SimConnect_SetDataOnSimObject(
+            self._handle, definition_id, OBJECT_ID_USER, 0, 0,
+            ct.sizeof(buffer), ct.byref(buffer),
+        )
+        if result != 0:
+            raise SimConnectError("Impossible d'écrire les variables de l'avion.")
+
+    # ------------------------------------------------------------------ #
+    # Caméra MSFS 2024. Toutes ces commandes sont sans accusé de réception :
+    # un refus arrive plus tard dans la file, en exception CAMERA_API.
+
+    @property
+    def camera_supported(self) -> bool:
+        return all(hasattr(self._dll, name) for name in CAMERA_EXPORTS)
+
+    def _camera_call(self, name: str, *args: Any) -> None:
+        if not self.camera_supported:
+            raise SimConnectError("Cette DLL SimConnect ne porte pas l'API caméra.")
+        if getattr(self._dll, name)(self._handle, *args) != 0:
+            raise SimConnectError(f"Commande caméra refusée ({name}).")
+
+    def camera_acquire(self, client_name: str = "NaviXav") -> None:
+        self._camera_call("SimConnect_CameraAcquire", client_name.encode("ascii"))
+
+    def camera_release(self, camera_definition: str = "Pilot") -> None:
+        """Rend la caméra ; MSFS bascule sur la définition de caméra nommée."""
+        self._camera_call("SimConnect_CameraRelease", camera_definition.encode("ascii"))
+
+    def camera_subscribe_status(self) -> None:
+        """État de la caméra à chaque changement, puis tout de suite une fois."""
+        self._camera_call("SimConnect_SubscribeToCameraStatusUpdate")
+        self._camera_call("SimConnect_CameraGetStatus")
+
+    def camera_enable_flag(self, flag: int) -> None:
+        self._camera_call("SimConnect_CameraEnableFlag", int(flag))
+
+    def camera_set(
+        self,
+        position: Sequence[float],
+        referential: int,
+        target: Sequence[float] = (0.0, 0.0, 0.0),
+        fov_deg: float | None = None,
+    ) -> None:
+        """Place la caméra et la braque sur un point lié à l'avion du joueur.
+
+        Le champ de vision est exprimé dans l'unité de MSFS : celle que
+        renvoie `camera_get`. Une valeur posée reste en place dans le
+        simulateur pour les images suivantes.
+
+        Une structure de 84 octets passée « par valeur » est transmise, en
+        64 bits, par adresse d'une copie : on passe donc directement l'adresse
+        d'un tampon, sans dépendre de la façon dont ctypes traite une
+        structure compactée.
+        """
+        payload = pack_camera(position, referential, target, fov_deg=fov_deg or 0.0)
+        buffer = ct.create_string_buffer(payload, _CAMERA_LAYOUT.size)
+        mask = CAMERA_MASK_POSITION | CAMERA_MASK_TARGETED
+        if fov_deg is not None and fov_deg > 0:
+            mask |= CAMERA_MASK_FOV
+        self._camera_call("SimConnect_CameraSet", buffer, mask)
+
+    @property
+    def camera_get_supported(self) -> bool:
+        return self._dll is not None and hasattr(self._dll, "SimConnect_CameraGet")
+
+    def camera_get(self, referential: int = CAMERA_REFERENTIAL_SIMOBJECT) -> None:
+        """Demande l'état de la caméra active ; la réponse arrive en RECV_ID_CAMERA_DATA."""
+        self._camera_call("SimConnect_CameraGet", int(referential))
+
+    def camera_lock_world(self, latitude: float, longitude: float, altitude_m: float) -> None:
+        """Demande au simulateur de tenir chargé le décor autour d'un point fixe."""
+        point = ct.create_string_buffer(struct.pack("<3d", latitude, longitude, altitude_m), 24)
+        self._camera_call(
+            "SimConnect_RequestCameraWorldLocker", point, CAMERA_REFERENTIAL_WORLD, OBJECT_ID_USER
+        )
+
+    def camera_unlock_world(self) -> None:
+        self._camera_call("SimConnect_DeleteCameraWorldLocker")
+
+    def read_towers(self, icaos: Sequence[str], timeout_s: float = 5.0) -> dict[str, tuple[float, float, float]]:
+        """Position de la vigie de chaque aérodrome : latitude, longitude, altitude (m).
+
+        Un aérodrome sans tour connue de MSFS (coordonnées nulles) ou inconnu
+        est simplement absent du résultat.
+        """
+        fields = (Field("TOWER_LATITUDE", "f64"), Field("TOWER_LONGITUDE", "f64"), Field("TOWER_ALTITUDE", "f64"))
+        definition = FacilityDefinition().open("AIRPORT", TYPE_AIRPORT, fields).close_all()
+        towers: dict[str, tuple[float, float, float]] = {}
+        for icao in icaos:
+            try:
+                blocks = self.request(definition, icao, timeout_s)
+            except SimConnectError:
+                continue
+            for name, values in group_blocks(blocks, definition.layouts):
+                if name != "AIRPORT":
+                    continue
+                latitude, longitude = values["TOWER_LATITUDE"], values["TOWER_LONGITUDE"]
+                if abs(latitude) > 1e-6 or abs(longitude) > 1e-6:
+                    towers[icao] = (latitude, longitude, values["TOWER_ALTITUDE"])
+        return towers
 
     def read_client_data(self, name: str, size: int, timeout_s: float = 3.0) -> bytes:
         """Lit une zone ClientData d'un tiers, par exemple le CDU diffusé par PMDG.
@@ -1015,6 +1271,20 @@ def _declare(dll) -> None:
         ("SimConnect_ClearClientDataDefinition", [ct.c_void_p, ct.c_ulong]),
         ("SimConnect_Close", [ct.c_void_p]),
     ]
+    # Les structures passées par valeur (caméra, point du décor) le sont par
+    # adresse en 64 bits : c_void_p reçoit l'adresse du tampon.
+    camera_signatures = [
+        ("SimConnect_CameraAcquire", [ct.c_void_p, ct.c_char_p]),
+        ("SimConnect_CameraRelease", [ct.c_void_p, ct.c_char_p]),
+        ("SimConnect_CameraSet", [ct.c_void_p, ct.c_void_p, ct.c_ulong]),
+        ("SimConnect_CameraGetStatus", [ct.c_void_p]),
+        ("SimConnect_CameraGet", [ct.c_void_p, ct.c_ulong]),
+        ("SimConnect_CameraEnableFlag", [ct.c_void_p, ct.c_ulong]),
+        ("SimConnect_SubscribeToCameraStatusUpdate", [ct.c_void_p]),
+        ("SimConnect_RequestCameraWorldLocker", [ct.c_void_p, ct.c_void_p, ct.c_int, ct.c_ulong]),
+        ("SimConnect_DeleteCameraWorldLocker", [ct.c_void_p]),
+    ]
+    signatures += [entry for entry in camera_signatures if hasattr(dll, entry[0])]
     for name, argtypes in signatures:
         function = getattr(dll, name)
         function.restype = ct.c_long

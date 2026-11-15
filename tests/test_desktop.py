@@ -309,8 +309,26 @@ def test_turnaround_seats_follow_the_live_gsx_passenger_counter():
     assert 'cabin.source === "aircraft" && !followingGsxProgress' in javascript
     progress = javascript[javascript.index("if (followingGsxProgress) {") :]
     assert "order.slice(0, scaled)" in progress
+    # Le débarquement vide la cabine depuis les portes, à rebours de l'embarquement.
+    assert "order.slice(order.length - scaled)" not in javascript
     assert '.ta-seat[data-state="reserved"] { fill: #94a3b8; }' in css
     assert '.ta-seat[data-state="occupied"] {' in css
+
+
+def test_turnaround_deboarding_shows_the_ramp_equipment_at_the_arrival_stand():
+    static = Path(desktop.__file__).parent / "web" / "static"
+    javascript = (static / "turnaround.js").read_text(encoding="utf-8")
+
+    # Arrêté au poste, l'avion n'est plus en « roulage à l'arrivée » : le
+    # débarquement GSX suffit à dire que c'est l'escale d'arrivée, et le
+    # repoussage du départ précédent ne masque plus passerelle et tapis.
+    assert (
+        'const arrival = context.arrival || running(derived.deboarding) || derived.deboarding === "completed";'
+        in javascript
+    )
+    assert "const departed = !arrival && (pushing || pushbackDone || awayFromStand(aircraft));" in javascript
+    reset = javascript[javascript.index("if (running(derived.deboarding) && !running(previousDerived.deboarding)) {") :]
+    assert reset.index("pushbackDone = false;") < reset.index("for (const [service, state]")
 
 
 def test_procedure_header_status_and_phase_flow_are_compact():
@@ -954,7 +972,11 @@ def test_interface_checks_and_installs_verified_github_updates():
     assert 'fetch("/api/update/check"' in javascript
     assert '"X-NaviXav-Update": "install"' in javascript
     assert "checkForUpdates(true)" in javascript
-    assert 'class="icon-btn update-btn toolbar-icon"' in html
+    # La recherche manuelle vit dans le menu « ⋯ » ; une version disponible
+    # s'affiche aussi dans la barre.
+    assert 'class="toolbar-menu-item update-btn"' in html
+    assert 'id="update-ready"' in html
+    assert "installAvailableUpdate()" in javascript
 
 
 def test_version_history_opens_once_after_an_update():
@@ -989,8 +1011,14 @@ def test_topbar_prioritises_flight_actions_and_compacts_utilities():
     assert 'class="nav-source"' not in header
     assert 'id="theme-toggle"' in header
     assert 'class="icon-btn toolbar-secondary"' in header
-    for control in ("settings-open", "update-install", "support-open-toolbar", "shutdown"):
+    for control in ("settings-open", "update-install", "support-open-toolbar", "shutdown", "toolbar-more"):
         assert f'id="{control}"' in header
+    # Actions rares regroupées dans le menu « ⋯ » ; Paramètres reste visible.
+    menu = header[header.index('id="toolbar-more-menu"'):]
+    for control in ("theme-toggle", "update-install", "support-open-toolbar", "shutdown"):
+        assert f'id="{control}"' in menu
+    assert 'id="settings-open"' not in menu
+    assert 'role="menu"' in header
     assert ".toolbar-icon .toolbar-label" in css
     assert "min-height: 36px" in css
     assert '$("theme-toggle").addEventListener("click"' in javascript

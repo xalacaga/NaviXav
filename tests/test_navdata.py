@@ -268,6 +268,8 @@ def test_pseudo_fixes_are_purged_from_an_existing_store(tmp_path: Path, provider
             "VALUES ('CF02', 'LF', ?, ?)",
             CORSICA_CF02,
         )
+        # Base d'une version antérieure : la réparation n'y a jamais tourné.
+        connection.execute("DELETE FROM meta WHERE key = 'pseudo_fix_purge'")
     connection.close()
 
     with MsfsProvider(target, allow_fetch=False) as reopened:
@@ -275,3 +277,24 @@ def test_pseudo_fixes_are_purged_from_an_existing_store(tmp_path: Path, provider
             "SELECT COUNT(*) FROM waypoint WHERE ident GLOB 'CF[0-9]*'"
         ).fetchone()[0]
     assert remaining == 0
+
+
+def test_the_pseudo_fix_repair_runs_once_so_fixes_read_since_stay_cached(tmp_path: Path, provider):
+    """Répétée à chaque ouverture, la réparation effaçait les repères bien relus
+    depuis et le souvenir des échecs : chaque lancement les redemandait à MSFS,
+    avec plus de 30 s d'attente pour l'arrivée d'Orly."""
+    target = tmp_path / "navdata.sqlite"
+    shutil.copyfile(provider._path, target)  # noqa: SLF001 - copie de la base
+    with MsfsProvider(target, allow_fetch=False):
+        pass  # première ouverture : réparation faite et notée
+    connection = sqlite3.connect(target)
+    with connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO waypoint (ident, region, lat, lon) VALUES ('CF06', 'LF', 48.65, 2.25)"
+        )
+        connection.execute("INSERT OR REPLACE INTO lookup_miss (ident, kind) VALUES ('CF24', 'waypoint')")
+    connection.close()
+    with MsfsProvider(target, allow_fetch=False) as reopened:
+        conn = reopened._conn  # noqa: SLF001 - vérification du cache
+        assert conn.execute("SELECT COUNT(*) FROM waypoint WHERE ident = 'CF06'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM lookup_miss WHERE ident = 'CF24'").fetchone()[0] == 1

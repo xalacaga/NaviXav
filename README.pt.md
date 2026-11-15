@@ -187,6 +187,35 @@ O acompanhamento e o painel no simulador mostram «Descida em curso» em vez do 
 - **Turbulência**: risco de turbulência de ar limpo previsto ao longo da rota a
   partir do cisalhamento do vento do OFP, e turbulência reportada pelos pilotos
   (PIREP, AIREP) perto da rota, com um aviso quando está à frente ao seu nível.
+- **Turbulência sentida**: turbulência que se sente no MSFS, desativada por
+  predefinição. A intensidade vem do cisalhamento do OFP, dos relatórios de
+  pilotos próximos, do que o simulador mostra (nuvens, precipitação,
+  cisalhamento, vento forte a baixa altitude) e do relevo a barlavento. Cada
+  rajada levanta ou afunda o avião, de pequenos solavancos a sacudidelas
+  severas, com níveis calibrados por uma medição em voo. Um botão da barra de
+  ferramentas ativa-a e ajusta-a de 25 a 200 % em voo, com sons de cabina
+  opcionais. Nunca atua no solo, aumenta gradualmente entre 200 e 500 ft acima
+  do solo, para de imediato se o avião tomar uma atitude anormal e cala-se
+  durante a pausa ativa do MSFS; a janela Turbulência mostra o efeito realmente
+  medido no simulador.
+
+### Câmara cinematográfica (MSFS 2024)
+
+Um botão Câmara, à esquerda da barra de ferramentas, abre uma régie compacta que
+filma o seu avião com a API de câmara do MSFS 2024. Um realizador automático
+escolhe os planos conforme a fase do voo: órbita no estacionamento, um
+espectador junto à pista durante a corrida de descolagem, uma câmara à espera no
+ponto de toque previsto em final curta, passagens e perseguição perto do solo,
+voo em formação em rota e a verdadeira torre de controlo do aeroporto de partida
+ou de chegada, que faz zoom à medida que o avião se afasta.
+
+Pode fixar um dos seis planos, passar ao seguinte, manter o atual, escolher um
+ritmo calmo, normal ou dinâmico, escolher os planos permitidos e substituir os
+cortes secos por travellings à volta do avião. A secção Enquadramento ajusta em
+direto a distância, a altura e o ângulo de cada plano, com reposição para um ou
+para todos. A câmara mantém o campo de visão da sua própria vista do MSFS, pelo
+que a imagem nunca fica deformada, e um clique devolve a vista ao piloto. Um
+tablet da rede local também pode controlar a câmara.
 
 ### Ficha MCDU
 

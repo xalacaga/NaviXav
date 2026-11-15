@@ -186,3 +186,19 @@ def test_the_flightsim_to_changelog_leaves_out_repository_vocabulary():
     ]
     for version in empty:
         assert f"[{version}]" not in listing, f"{version} n'a rien à publier"
+
+
+def test_a_chosen_version_number_flows_through_every_release_script():
+    """Une version mise en avant (2.5.0) s'impose au lieu du saut automatique."""
+    scripts = PROJECT_ROOT / "scripts"
+    prepare = (scripts / "prepare_release.ps1").read_text(encoding="utf-8-sig")
+    publish = (scripts / "publish_release.ps1").read_text(encoding="utf-8-sig")
+    release = (scripts / "release.ps1").read_text(encoding="utf-8-sig")
+    for source in (prepare, publish, release):
+        assert '[string]$TargetVersion = ""' in source
+    assert "[version]$TargetVersion -le $Current" in prepare
+    assert "$Next = $TargetVersion" in prepare
+    assert '$PrepareParams.Add("TargetVersion", $TargetVersion)' in publish
+    assert '$PublishParams.Add("TargetVersion", $TargetVersion)' in release
+    for path in ("prepare_release.ps1", "publish_release.ps1", "release.ps1"):
+        assert (scripts / path).read_bytes().startswith(b"\xef\xbb\xbf"), path

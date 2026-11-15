@@ -2,6 +2,10 @@
 param(
     [ValidateSet("auto", "major", "minor", "patch")]
     [string]$Bump = "auto",
+    # Numéro imposé (par exemple 2.5.0) : remplace -Bump pour une version
+    # que l'on veut mettre en avant. Il doit dépasser la version actuelle.
+    [ValidatePattern('^(\d+\.\d+\.\d+)?$')]
+    [string]$TargetVersion = "",
     # Publication d'une version sans changement visible par l'utilisateur : les
     # notes reprennent alors les sujets de commit, faute de mieux.
     [switch]$AllowGenericNotes
@@ -494,8 +498,16 @@ $Commits = Get-ReleaseCommits $LastTag
 if ($Commits.Count -eq 0) {
     throw "Aucun nouveau commit depuis $LastTag."
 }
-$EffectiveBump = if ($Bump -eq "auto") { Get-AutomaticBump $Commits } else { $Bump }
-$Next = Get-NextVersion $Current $EffectiveBump
+if ($TargetVersion) {
+    if ([version]$TargetVersion -le $Current) {
+        throw "La version imposée $TargetVersion ne dépasse pas la version actuelle $Current."
+    }
+    $EffectiveBump = "imposée"
+    $Next = $TargetVersion
+} else {
+    $EffectiveBump = if ($Bump -eq "auto") { Get-AutomaticBump $Commits } else { $Bump }
+    $Next = Get-NextVersion $Current $EffectiveBump
+}
 $Date = Get-Date -Format "yyyy-MM-dd"
 $HighlightsPath = Join-Path $ProjectRoot "RELEASE_HIGHLIGHTS.json"
 $Highlights = Get-Highlights $HighlightsPath

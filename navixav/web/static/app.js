@@ -468,6 +468,7 @@ function syncTurnaroundAvailability(aircraft = latestAircraft) {
 async function loadStatus() {
   const status = await fetch("/api/status").then((r) => r.json());
   latestStatus = status;
+  syncTurbulenceFromStatus(status);
   syncTurnaroundAvailability();
   announceTowerEngineOnce(status);
 
@@ -508,6 +509,13 @@ function refreshUpdateButtonText() {
     ? `${t("update_available")} ${version}`
     : t("check_update");
   button.title = version ? t("update_title") : t("check_update_title");
+  const ready = $("update-ready");
+  if (ready) {
+    show(ready, Boolean(version));
+    ready.title = t("update_title");
+    $("update-ready-label").textContent = version ? `${t("update_available")} ${version}` : t("update_available");
+  }
+  $("toolbar-more")?.classList.toggle("has-update", Boolean(version));
 }
 
 async function checkForUpdates(manual = false) {
@@ -1174,6 +1182,14 @@ async function openSettings() {
     $("settings-language").value = window.I18N.getLanguage();
     $("settings-theme").value = window.THEME.getPreference();
     $("settings-interface").value = interfaceMode;
+    if (!turbulencePendingPatch) {
+      turbulenceSettings = {
+        enabled: Boolean(values.turbulence_enabled),
+        intensity: Number(values.turbulence_intensity_pct) || 100,
+      };
+    }
+    renderTurbulenceControls();
+    setTurbulencePopover(false);
     $("settings-dialog").showModal();
     loadMsfsPanelStatus();
     loadAircraftSurvey();
@@ -1235,6 +1251,9 @@ async function saveSettings(event) {
       aig_path: $("settings-aig-path").value.trim(),
       aircraft_community_path: $("settings-aircraft-community").value.trim(),
       lan_enabled: $("settings-lan-enabled").checked,
+      // Déjà enregistrés au fil des réglages ; renvoyés pour ne pas les perdre.
+      turbulence_enabled: turbulenceSettings.enabled,
+      turbulence_intensity_pct: turbulenceSettings.intensity,
     };
     const response = await fetch("/api/settings", {
       method: "PUT",
@@ -10853,6 +10872,598 @@ function applyMapPreferences(values) {
  * par défaut. Un client distant ne touche pas aux réglages du poste, mais son
  * affichage suit quand même le choix fait à l'écran.
  */
+/*
+ * Turbulence ressentie. Le service écrit dans MSFS à chaque image ; ici, on
+ * règle l'effet depuis la barre ou les paramètres, sans bouton Enregistrer,
+ * et l'on relève son état quatre fois par seconde pendant qu'il est actif :
+ * c'est ce relevé qui cale les sons de cabine sur les secousses.
+ */
+const TURBULENCE_POLL_MS = 250;
+const TURBULENCE_SAVE_DELAY_MS = 300;
+let turbulenceSettings = { enabled: false, intensity: 100 };
+let feltTurbulenceTimer = null;
+let feltTurbulenceBusy = false;
+let turbulenceSaveTimer = null;
+let turbulencePendingPatch = null;
+
+function turbulenceStatusText(status) {
+  if (!status?.enabled) return t("turbulence_status_off");
+  if (status.state === "refused") return t("turbulence_status_refused");
+  if (status.state !== "active") return t("turbulence_status_waiting");
+  if (!status.level) return t("turbulence_status_calm");
+  const text = tf("turbulence_status_active", {
+    level: t(`turbulence_level_${status.level}`),
+    source: status.dominant ? t(`turbulence_source_${status.dominant}`) : "",
+  });
+  // Ce que l'avion fait vraiment dans MSFS : la preuve que l'effet passe.
+  if (!Number.isFinite(status.felt_pitch_deg_s)) return text;
+  return `${text} · ${tf("turbulence_felt", {
+    pitch: status.felt_pitch_deg_s.toFixed(1),
+    roll: (status.felt_roll_deg_s ?? 0).toFixed(1),
+  })}`;
+}
+
+/** Les deux jeux de commandes (barre et paramètres) montrent les mêmes valeurs. */
+function renderTurbulenceControls() {
+  const { enabled, intensity } = turbulenceSettings;
+  for (const prefix of ["settings", "quick"]) {
+    const toggle = $(`${prefix}-turbulence`);
+    if (toggle) toggle.checked = enabled;
+    const slider = $(`${prefix}-turbulence-intensity`);
+    if (slider && document.activeElement !== slider) slider.value = String(intensity);
+    const output = $(`${prefix}-turbulence-intensity-value`);
+    if (output) output.textContent = `${intensity} %`;
+    const sound = $(`${prefix}-cabin-sound`);
+    if (sound) sound.checked = CABIN_SOUND.enabled();
+    const volume = $(`${prefix}-cabin-volume`);
+    if (volume) {
+      if (document.activeElement !== volume) volume.value = String(Math.round(CABIN_SOUND.volume() * 100));
+      volume.disabled = !CABIN_SOUND.enabled();
+    }
+  }
+  const button = $("turbulence-open");
+  button?.classList.toggle("is-on", enabled);
+  const badge = $("turbulence-open-value");
+  if (badge) badge.textContent = enabled ? `${intensity} %` : "—";
+}
+
+function applyTurbulenceStatus(status) {
+  const text = turbulenceStatusText(status);
+  for (const id of ["settings-turbulence-status", "quick-turbulence-status"]) {
+    const target = $(id);
+    if (target) target.textContent = text;
+  }
+  $("turbulence-open")?.classList.toggle(
+    "is-shaking", Boolean(status?.enabled && status.state === "active" && status.level)
+  );
+  CABIN_SOUND.update(status);
+}
+
+async function pollTurbulence() {
+  if (feltTurbulenceBusy) return;
+  feltTurbulenceBusy = true;
+  try {
+    const response = await fetch("/api/turbulence/status", { cache: "no-store" });
+    if (response.ok) applyTurbulenceStatus(await response.json());
+  } catch (_error) {
+    // Relevé manqué : le suivant arrive dans un quart de seconde.
+  } finally {
+    feltTurbulenceBusy = false;
+  }
+}
+
+function scheduleTurbulencePoll() {
+  if (feltTurbulenceTimer) clearInterval(feltTurbulenceTimer);
+  feltTurbulenceTimer = null;
+  if (!turbulenceSettings.enabled) {
+    applyTurbulenceStatus({ enabled: false });
+    return;
+  }
+  void pollTurbulence();
+  feltTurbulenceTimer = setInterval(pollTurbulence, TURBULENCE_POLL_MS);
+}
+
+/** Valeurs relues du service, sauf pendant qu'un réglage local part s'enregistrer. */
+function syncTurbulenceFromStatus(status) {
+  show($("turbulence-open"), !status?.remote_client);
+  if (status?.remote_client || turbulencePendingPatch) return;
+  const next = {
+    enabled: Boolean(status?.turbulence_enabled),
+    intensity: Number(status?.turbulence_intensity_pct) || 100,
+  };
+  const changed = next.enabled !== turbulenceSettings.enabled
+    || next.intensity !== turbulenceSettings.intensity;
+  turbulenceSettings = next;
+  renderTurbulenceControls();
+  if (changed || (next.enabled && !feltTurbulenceTimer)) scheduleTurbulencePoll();
+}
+
+/** Applique tout de suite à l'écran, enregistre un instant plus tard. */
+function commitTurbulence(patch) {
+  if ("turbulence_enabled" in patch) turbulenceSettings.enabled = patch.turbulence_enabled;
+  if ("turbulence_intensity_pct" in patch) turbulenceSettings.intensity = patch.turbulence_intensity_pct;
+  renderTurbulenceControls();
+  turbulencePendingPatch = { ...(turbulencePendingPatch || {}), ...patch };
+  if (turbulenceSaveTimer) clearTimeout(turbulenceSaveTimer);
+  turbulenceSaveTimer = setTimeout(async () => {
+    const pending = turbulencePendingPatch;
+    turbulenceSaveTimer = null;
+    const saved = await persistSetting(pending);
+    if (turbulencePendingPatch === pending) turbulencePendingPatch = null;
+    if (saved && latestStatus) {
+      latestStatus.turbulence_enabled = saved.turbulence_enabled;
+      latestStatus.turbulence_intensity_pct = saved.turbulence_intensity_pct;
+    }
+    scheduleTurbulencePoll();
+  }, TURBULENCE_SAVE_DELAY_MS);
+  if ("turbulence_enabled" in patch) scheduleTurbulencePoll();
+}
+
+function positionTurbulencePopover() {
+  const button = $("turbulence-open");
+  const popover = $("turbulence-popover");
+  if (!button || !popover) return;
+  const rect = button.getBoundingClientRect();
+  const width = popover.offsetWidth || 300;
+  const left = Math.min(Math.max(16, rect.right - width), window.innerWidth - width - 16);
+  popover.style.top = `${Math.round(rect.bottom + 8)}px`;
+  popover.style.left = `${Math.round(left)}px`;
+}
+
+function setTurbulencePopover(open) {
+  const popover = $("turbulence-popover");
+  const button = $("turbulence-open");
+  if (!popover || !button) return;
+  show(popover, open);
+  button.setAttribute("aria-expanded", String(open));
+  if (open) {
+    renderTurbulenceControls();
+    positionTurbulencePopover();
+    $("quick-turbulence")?.focus();
+  }
+}
+
+function initTurbulenceControls() {
+  for (const prefix of ["settings", "quick"]) {
+    $(`${prefix}-turbulence`)?.addEventListener("change", (event) => {
+      commitTurbulence({ turbulence_enabled: event.target.checked });
+    });
+    const slider = $(`${prefix}-turbulence-intensity`);
+    slider?.addEventListener("input", () => {
+      commitTurbulence({ turbulence_intensity_pct: Number(slider.value) || 100 });
+    });
+    $(`${prefix}-cabin-sound`)?.addEventListener("change", (event) => {
+      CABIN_SOUND.setEnabled(event.target.checked);
+      renderTurbulenceControls();
+    });
+    const volume = $(`${prefix}-cabin-volume`);
+    volume?.addEventListener("input", () => {
+      CABIN_SOUND.setVolume(Number(volume.value) / 100);
+      renderTurbulenceControls();
+    });
+  }
+  $("turbulence-open")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setTurbulencePopover($("turbulence-popover").classList.contains("hidden"));
+  });
+  document.addEventListener("pointerdown", (event) => {
+    const popover = $("turbulence-popover");
+    if (!popover || popover.classList.contains("hidden")) return;
+    if (popover.contains(event.target) || $("turbulence-open")?.contains(event.target)) return;
+    setTurbulencePopover(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || $("turbulence-popover")?.classList.contains("hidden")) return;
+    setTurbulencePopover(false);
+    $("turbulence-open")?.focus();
+  });
+  window.addEventListener("resize", positionTurbulencePopover);
+  renderTurbulenceControls();
+}
+
+/*
+ * Caméra cinématique. Le service pilote la caméra de MSFS image par image ;
+ * ici, la régie : confier la caméra au réalisateur ou fixer un plan, régler
+ * le rythme, couper tout de suite. L'état est relevé chaque seconde tant
+ * qu'elle filme, et le temps avant la coupe défile en continu entre deux
+ * relevés. Rien n'est enregistré : une tablette du réseau local peut aussi
+ * tenir la régie.
+ */
+const CAMERA_POLL_MS = 1000;
+const CAMERA_ATTENTION_STATES = new Set(["waiting", "taken", "blocked", "refused", "unsupported", "unavailable"]);
+const CAMERA_PREFS_KEY = "navixav-camera-prefs";
+const CAMERA_SHOTS = ["orbit", "chase", "wingman", "flyby", "spotter", "tower"];
+let cameraStatus = { mode: "off", state: "off", pace: "normal", transition: "cut", held: false, playlist: CAMERA_SHOTS };
+let cameraTimer = null;
+let cameraBusy = false;
+let cameraShownShot = null;
+let cameraCut = null; // { deadline, holdMs } en millisecondes de performance.now()
+let cameraFrame = null;
+const CAMERA_FRAMING_DEFAULT = { distance: 1, height: 0, angle: 0 };
+const CAMERA_ADJUSTABLE = {
+  orbit: ["distance", "height"], chase: ["distance", "height", "angle"], wingman: ["distance", "height", "angle"],
+  flyby: ["distance", "height"], spotter: ["distance"], tower: ["distance"],
+};
+let cameraFramingShot = "orbit";
+let cameraFramingTimer = null;
+let cameraFramingPending = {};
+
+/** Réglages de montage propres à chaque appareil (rythme, enchaînement, sélection). */
+function loadCameraPrefs() {
+  try {
+    const prefs = JSON.parse(localStorage.getItem(CAMERA_PREFS_KEY) || "{}");
+    const playlist = Array.isArray(prefs.playlist) ? prefs.playlist.filter((name) => CAMERA_SHOTS.includes(name)) : [];
+    const framing = {};
+    for (const shot of CAMERA_SHOTS) {
+      const saved = prefs.framing?.[shot] || {};
+      framing[shot] = {
+        distance: Number.isFinite(saved.distance) ? saved.distance : 1,
+        height: Number.isFinite(saved.height) ? saved.height : 0,
+        angle: Number.isFinite(saved.angle) ? saved.angle : 0,
+      };
+    }
+    return {
+      pace: ["calm", "normal", "dynamic"].includes(prefs.pace) ? prefs.pace : "normal",
+      transition: ["cut", "glide"].includes(prefs.transition) ? prefs.transition : "cut",
+      playlist: playlist.length ? playlist : CAMERA_SHOTS,
+      framing,
+    };
+  } catch (_error) {
+    return { pace: "normal", transition: "cut", playlist: CAMERA_SHOTS, framing: {} };
+  }
+}
+
+function saveCameraPrefs() {
+  try {
+    const { pace, transition, playlist, framing } = cameraStatus;
+    localStorage.setItem(CAMERA_PREFS_KEY, JSON.stringify({ pace, transition, playlist, framing }));
+  } catch (_error) {
+    // Stockage indisponible : les réglages valent pour cette session.
+  }
+}
+
+function cameraFramingOf(shot) {
+  return { ...CAMERA_FRAMING_DEFAULT, ...(cameraStatus.framing?.[shot] || {}) };
+}
+
+function isDefaultFraming(framing) {
+  return framing.distance === 1 && framing.height === 0 && framing.angle === 0;
+}
+
+/** Curseurs du plan réglé : seuls ceux qui ont un sens pour ce plan. */
+function renderCameraFraming() {
+  const select = $("camera-framing-shot");
+  if (!select) return;
+  if (document.activeElement !== select) select.value = cameraFramingShot;
+  const framing = cameraFramingOf(cameraFramingShot);
+  const adjustable = CAMERA_ADJUSTABLE[cameraFramingShot] || [];
+  const signed = (value, unit) => `${value > 0 ? "+" : ""}${value}${unit}`;
+  const display = {
+    distance: [Math.round(framing.distance * 100), `${Math.round(framing.distance * 100)} %`],
+    height: [Math.round(framing.height * 100), signed(Math.round(framing.height * 100), " %")],
+    angle: [Math.round(framing.angle), signed(Math.round(framing.angle), "°")],
+  };
+  for (const key of ["distance", "height", "angle"]) {
+    const row = document.querySelector(`.camera-slider[data-framing="${key}"]`);
+    if (!row) continue;
+    show(row, adjustable.includes(key));
+    const input = $(`camera-framing-${key}`);
+    if (input && document.activeElement !== input) input.value = String(display[key][0]);
+    const output = $(`camera-framing-${key}-value`);
+    if (output) output.textContent = display[key][1];
+    row.classList.toggle("is-changed", framing[key] !== CAMERA_FRAMING_DEFAULT[key]);
+  }
+  const distanceLabel = $("camera-framing-distance-label");
+  if (distanceLabel) {
+    distanceLabel.textContent = t(cameraFramingShot === "tower" ? "camera_framing_zoom" : "camera_framing_distance");
+  }
+  const note = $("camera-framing-note");
+  if (note) note.textContent = ["flyby", "spotter"].includes(cameraFramingShot) ? t("camera_framing_fixed_note") : "";
+  const reset = $("camera-framing-reset");
+  if (reset) reset.disabled = isDefaultFraming(framing);
+  const resetAll = $("camera-framing-reset-all");
+  if (resetAll) resetAll.disabled = CAMERA_SHOTS.every((shot) => isDefaultFraming(cameraFramingOf(shot)));
+}
+
+/** Applique un curseur tout de suite à l'écran, l'envoie au service un instant plus tard. */
+function adjustCameraFraming(key, value) {
+  const shot = cameraFramingShot;
+  const framing = { ...cameraFramingOf(shot), [key]: value };
+  cameraStatus.framing = { ...(cameraStatus.framing || {}), [shot]: framing };
+  cameraFramingPending[shot] = { ...(cameraFramingPending[shot] || {}), shot, [key]: value };
+  renderCameraFraming();
+  saveCameraPrefs();
+  if (cameraFramingTimer) clearTimeout(cameraFramingTimer);
+  cameraFramingTimer = setTimeout(() => {
+    const framingList = Object.values(cameraFramingPending);
+    cameraFramingPending = {};
+    cameraFramingTimer = null;
+    void commandCamera({ framing: framingList });
+  }, 120);
+}
+
+function resetCameraFraming(target) {
+  const framing = { ...(cameraStatus.framing || {}) };
+  for (const shot of target === "all" ? CAMERA_SHOTS : [target]) framing[shot] = { ...CAMERA_FRAMING_DEFAULT };
+  cameraStatus.framing = framing;
+  renderCameraFraming();
+  saveCameraPrefs();
+  void commandCamera({ reset_framing: target });
+}
+
+function cameraHint(status) {
+  const state = status?.state || "off";
+  if (state === "unavailable") return t(`camera_unavailable_${status.shot || "flyby"}`);
+  if (CAMERA_ATTENTION_STATES.has(state) || state === "off") return t(`camera_status_${state}`);
+  if (status.mode === "auto" && status.held) return t("camera_hint_held");
+  if (status.mode !== "auto") return t(`camera_hint_${status.shot || status.mode}`);
+  if (!cameraCut) return t("camera_hint_auto");
+  const seconds = Math.max(0, Math.ceil((cameraCut.deadline - performance.now()) / 1000));
+  return tf("camera_next_cut", { seconds });
+}
+
+function tickCameraProgress() {
+  cameraFrame = null;
+  const bar = $("camera-progress-bar");
+  const hint = $("camera-live-hint");
+  if (!cameraCut || cameraStatus.state !== "active") {
+    if (bar) bar.style.width = "0";
+    return;
+  }
+  const remaining = Math.max(0, cameraCut.deadline - performance.now());
+  if (bar) bar.style.width = `${Math.min(100, (1 - remaining / cameraCut.holdMs) * 100)}%`;
+  if (hint) hint.textContent = cameraHint(cameraStatus);
+  if (!$("camera-popover")?.classList.contains("hidden")) {
+    cameraFrame = requestAnimationFrame(tickCameraProgress);
+  }
+}
+
+function renderCamera(status) {
+  // Un curseur en cours de réglage garde sa valeur jusqu'à son envoi.
+  const incoming = cameraFramingTimer && status?.framing ? { ...status, framing: cameraStatus.framing } : status;
+  cameraStatus = { ...cameraStatus, ...(incoming || {}) };
+  const { mode = "off", state = "off", shot = null, phase = null } = cameraStatus;
+  const active = state === "active";
+  cameraCut = active && mode === "auto" && cameraStatus.next_cut_s != null && cameraStatus.hold_s
+    ? { deadline: performance.now() + cameraStatus.next_cut_s * 1000, holdMs: cameraStatus.hold_s * 1000 }
+    : null;
+
+  $("camera-open")?.classList.toggle("is-on", mode !== "off");
+  const badge = $("camera-open-value");
+  if (badge) {
+    badge.textContent = active && shot ? t(`camera_shot_${shot}`) : "";
+    show(badge, active && Boolean(shot));
+  }
+  const chip = $("camera-chip");
+  if (chip) {
+    const chipState = mode === "off" && state === "off" ? "off" : state;
+    chip.dataset.state = chipState;
+    chip.textContent = t(`camera_chip_${chipState}`);
+  }
+  const live = $("camera-live");
+  if (live) live.dataset.state = state;
+  const shotLabel = $("camera-live-shot");
+  if (shotLabel) {
+    const name = active && shot ? t(`camera_shot_${shot}`) : mode === "off" ? "—" : t("camera_shot_standby");
+    if (name !== shotLabel.textContent) {
+      shotLabel.textContent = name;
+      if (active && shot && shot !== cameraShownShot) {
+        shotLabel.classList.remove("is-cut");
+        void shotLabel.offsetWidth; // relance l'animation de coupe
+        shotLabel.classList.add("is-cut");
+      }
+    }
+  }
+  if (active && shot && shot !== cameraShownShot) cameraFramingShot = shot;
+  cameraShownShot = active ? shot : null;
+  const phaseLabel = $("camera-live-phase");
+  if (phaseLabel) phaseLabel.textContent = active && mode === "auto" && phase ? t(`camera_phase_${phase}`) : "";
+  const hint = $("camera-live-hint");
+  if (hint) hint.textContent = cameraHint(cameraStatus);
+
+  for (const button of document.querySelectorAll("[data-camera-mode]")) {
+    const own = button.dataset.cameraMode;
+    button.setAttribute("aria-pressed", String(own === mode));
+    button.classList.toggle("is-live", mode === "auto" && active && own === shot);
+  }
+  // Chaque choix s'explique : la ligne sous les boutons décrit l'option
+  // retenue, l'infobulle de chaque bouton décrit la sienne.
+  const pace = cameraStatus.pace || "normal";
+  for (const button of document.querySelectorAll("[data-camera-pace]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.cameraPace === pace));
+    button.title = t(`camera_pace_${button.dataset.cameraPace}_hint`);
+  }
+  const paceHint = $("camera-pace-hint");
+  if (paceHint) paceHint.textContent = t(`camera_pace_${pace}_hint`);
+  const transition = cameraStatus.transition || "cut";
+  for (const button of document.querySelectorAll("[data-camera-transition]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.cameraTransition === transition));
+    button.title = t(`camera_transition_${button.dataset.cameraTransition}_hint`);
+  }
+  const transitionHint = $("camera-transition-hint");
+  if (transitionHint) transitionHint.textContent = t(`camera_transition_${transition}_hint`);
+  const playlist = cameraStatus.playlist || CAMERA_SHOTS;
+  for (const button of document.querySelectorAll("[data-camera-playlist]")) {
+    button.setAttribute("aria-pressed", String(playlist.includes(button.dataset.cameraPlaylist)));
+  }
+  const towerTile = document.querySelector('[data-camera-mode="tower"]');
+  if (towerTile) {
+    const towers = cameraStatus.towers || [];
+    towerTile.title = towers.length ? tf("camera_tower_known", { airports: towers.join(" · ") }) : t("camera_tower_unknown");
+  }
+  const hold = $("camera-hold");
+  if (hold) {
+    hold.disabled = !(active && mode === "auto");
+    hold.setAttribute("aria-pressed", String(Boolean(cameraStatus.held)));
+  }
+  const next = $("camera-next");
+  if (next) next.disabled = !active;
+  const release = $("camera-release");
+  if (release) release.disabled = mode === "off";
+
+  renderCameraFraming();
+  if (cameraFrame) cancelAnimationFrame(cameraFrame);
+  cameraFrame = requestAnimationFrame(tickCameraProgress);
+}
+
+async function pollCamera() {
+  if (cameraBusy) return;
+  cameraBusy = true;
+  try {
+    const response = await fetch("/api/camera/status", { cache: "no-store" });
+    if (response.ok) renderCamera(await response.json());
+  } catch (_error) {
+    // Relevé manqué : le suivant arrive dans une seconde.
+  } finally {
+    cameraBusy = false;
+  }
+  scheduleCameraPoll();
+}
+
+function scheduleCameraPoll() {
+  const filming = (cameraStatus.mode || "off") !== "off";
+  if (filming && !cameraTimer) cameraTimer = setInterval(pollCamera, CAMERA_POLL_MS);
+  if (!filming && cameraTimer) {
+    clearInterval(cameraTimer);
+    cameraTimer = null;
+  }
+}
+
+/** Envoie une commande ; l'écran réagit tout de suite, le service confirme. */
+async function commandCamera(command) {
+  if ("mode" in command) {
+    renderCamera({
+      mode: command.mode,
+      state: command.mode === "off" ? "off" : "waiting",
+      shot: null, phase: null, next_cut_s: null, hold_s: null,
+    });
+  } else {
+    const local = {};
+    for (const key of ["pace", "transition", "playlist", "held"]) if (key in command) local[key] = command[key];
+    renderCamera(local);
+    if (["pace", "transition", "playlist"].some((key) => key in command)) saveCameraPrefs();
+  }
+  try {
+    const response = await fetch("/api/camera", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(command),
+    });
+    if (response.ok) renderCamera(await response.json());
+  } catch (_error) {
+    // Le relevé suivant remettra l'affichage d'accord avec le service.
+  }
+  scheduleCameraPoll();
+}
+
+function positionCameraPopover() {
+  const button = $("camera-open");
+  const popover = $("camera-popover");
+  if (!button || !popover) return;
+  const rect = button.getBoundingClientRect();
+  const width = popover.offsetWidth || 360;
+  const left = Math.min(Math.max(16, rect.right - width), window.innerWidth - width - 16);
+  popover.style.top = `${Math.round(rect.bottom + 8)}px`;
+  popover.style.left = `${Math.round(left)}px`;
+}
+
+function setCameraPopover(open) {
+  const popover = $("camera-popover");
+  const button = $("camera-open");
+  if (!popover || !button) return;
+  show(popover, open);
+  button.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setTurbulencePopover(false);
+    renderCamera(cameraStatus);
+    positionCameraPopover();
+    void pollCamera();
+    $("camera-mode-auto")?.focus();
+  }
+}
+
+function initCameraControls() {
+  for (const button of document.querySelectorAll("[data-camera-mode]")) {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.cameraMode;
+      // Un second appui sur le plan fixé le replace (nouvel angle, nouveau point de passage).
+      void commandCamera(mode === cameraStatus.mode ? { next: true } : { mode });
+    });
+  }
+  for (const button of document.querySelectorAll("[data-camera-pace]")) {
+    button.addEventListener("click", () => void commandCamera({ pace: button.dataset.cameraPace }));
+  }
+  for (const button of document.querySelectorAll("[data-camera-transition]")) {
+    button.addEventListener("click", () => void commandCamera({ transition: button.dataset.cameraTransition }));
+  }
+  for (const button of document.querySelectorAll("[data-camera-playlist]")) {
+    button.addEventListener("click", () => {
+      const current = new Set(cameraStatus.playlist || CAMERA_SHOTS);
+      const name = button.dataset.cameraPlaylist;
+      if (current.has(name)) current.delete(name);
+      else current.add(name);
+      // Le réalisateur garde toujours au moins un plan.
+      if (!current.size) return;
+      void commandCamera({ playlist: CAMERA_SHOTS.filter((shot) => current.has(shot)) });
+    });
+  }
+  $("camera-hold")?.addEventListener("click", () => void commandCamera({ held: !cameraStatus.held }));
+  $("camera-framing-shot")?.addEventListener("change", (event) => {
+    cameraFramingShot = event.target.value;
+    renderCameraFraming();
+  });
+  const framingScale = { distance: 100, height: 100, angle: 1 };
+  for (const key of ["distance", "height", "angle"]) {
+    $(`camera-framing-${key}`)?.addEventListener("input", (event) => {
+      adjustCameraFraming(key, Number(event.target.value) / framingScale[key]);
+    });
+  }
+  $("camera-framing-reset")?.addEventListener("click", () => resetCameraFraming(cameraFramingShot));
+  $("camera-framing-reset-all")?.addEventListener("click", () => resetCameraFraming("all"));
+  $("camera-next")?.addEventListener("click", () => void commandCamera({ next: true }));
+  $("camera-release")?.addEventListener("click", () => void commandCamera({ mode: "off" }));
+  $("camera-open")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setCameraPopover($("camera-popover").classList.contains("hidden"));
+  });
+  $("turbulence-open")?.addEventListener("click", () => setCameraPopover(false));
+  document.addEventListener("pointerdown", (event) => {
+    const popover = $("camera-popover");
+    if (!popover || popover.classList.contains("hidden")) return;
+    if (popover.contains(event.target) || $("camera-open")?.contains(event.target)) return;
+    setCameraPopover(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    const popover = $("camera-popover");
+    if (!popover || popover.classList.contains("hidden")) return;
+    if (event.key === "Escape") {
+      setCameraPopover(false);
+      $("camera-open")?.focus();
+      return;
+    }
+    // Raccourcis de régie, panneau ouvert : A réalisateur, 1 à 6 les plans,
+    // G garder le plan, espace plan suivant, Échap fermer.
+    if (event.target instanceof HTMLInputElement || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === "a" || event.key === "A") void commandCamera({ mode: "auto" });
+    else if (/^[1-6]$/.test(event.key)) void commandCamera({ mode: CAMERA_SHOTS[Number(event.key) - 1] });
+    else if ((event.key === "g" || event.key === "G") && cameraStatus.mode === "auto") {
+      void commandCamera({ held: !cameraStatus.held });
+    }
+    else if (event.key === " " && cameraStatus.state === "active") void commandCamera({ next: true });
+    else return;
+    event.preventDefault();
+  });
+  window.addEventListener("resize", positionCameraPopover);
+  window.addEventListener("navixav:languagechange", () => renderCamera(cameraStatus));
+  // Chaque appareil retrouve ses réglages de montage et les confie au service.
+  const prefs = loadCameraPrefs();
+  renderCamera(prefs);
+  const framing = CAMERA_SHOTS.filter((shot) => prefs.framing?.[shot] && !isDefaultFraming(prefs.framing[shot]))
+    .map((shot) => ({ shot, ...prefs.framing[shot] }));
+  const { pace, transition, playlist } = prefs;
+  void commandCamera({ pace, transition, playlist, ...(framing.length ? { framing } : {}) }).then(() => pollCamera());
+}
+
 async function persistSetting(patch) {
   if (latestStatus?.remote_client) return;
   try {
@@ -12150,6 +12761,8 @@ $("ground-zoom-out").addEventListener("click", () => GROUND.zoomOut());
 $("settings-open").addEventListener("click", openSettings);
 initVoiceSettings();
 initChatterSettings();
+initTurbulenceControls();
+initCameraControls();
 initTowerSettings();
 $("chartfox-connect").addEventListener("click", connectChartFox);
 $("chartfox-disconnect").addEventListener("click", disconnectChartFox);
@@ -12208,6 +12821,8 @@ function syncThemeToggle(theme = document.documentElement.dataset.theme || "dark
   button.title = label;
   button.setAttribute("aria-label", label);
   button.setAttribute("aria-pressed", String(theme === "dark"));
+  const themeLabel = $("theme-toggle-label");
+  if (themeLabel) themeLabel.textContent = label;
 }
 $("theme-toggle").addEventListener("click", () => {
   window.THEME.setPreference($("theme-toggle").dataset.targetTheme || "light");
@@ -12251,6 +12866,43 @@ $("settings-lan-copy").addEventListener("click", async () => {
   $("settings-message").textContent = t("lan_url_copied");
 });
 $("shutdown").addEventListener("click", shutdownApplication);
+$("update-ready")?.addEventListener("click", () => void installAvailableUpdate());
+
+/* Menu « ⋯ » de la barre : thème, mise à jour, soutien et sortie. */
+function setToolbarMenu(open) {
+  const button = $("toolbar-more");
+  const menu = $("toolbar-more-menu");
+  if (!button || !menu) return;
+  show(menu, open);
+  button.setAttribute("aria-expanded", String(open));
+  if (open) menu.querySelector(".toolbar-menu-item:not(:disabled)")?.focus();
+}
+$("toolbar-more")?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setToolbarMenu($("toolbar-more-menu").classList.contains("hidden"));
+});
+$("toolbar-more-menu")?.addEventListener("click", (event) => {
+  // Le thème se bascule sans refermer le menu : on voit le résultat aussitôt.
+  if (event.target.closest(".toolbar-menu-item") && !event.target.closest("#theme-toggle")) setToolbarMenu(false);
+});
+$("toolbar-more-menu")?.addEventListener("keydown", (event) => {
+  const items = [...event.currentTarget.querySelectorAll(".toolbar-menu-item:not(:disabled)")];
+  const index = items.indexOf(document.activeElement);
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    items[(index + step + items.length) % items.length]?.focus();
+  }
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".toolbar-menu")) setToolbarMenu(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("toolbar-more-menu")?.classList.contains("hidden")) {
+    setToolbarMenu(false);
+    $("toolbar-more")?.focus();
+  }
+});
 $("sim-status").addEventListener("click", pollSimulatorStatus);
 $("global-flight-alert").addEventListener("click", openActiveAlerts);
 initialiseStripScrolling();

@@ -582,6 +582,11 @@ class MsfsProvider:
         if self._allow_fetch and not self._missed(key, "waypoint"):
             seen = False
             for region in self._candidate_regions(key, icao):
+                if seen and not region and radius is not None:
+                    # Repère construit sur une piste (« CF02 ») : la région n'a
+                    # donné qu'un homonyme lointain, et la recherche mondiale
+                    # ne le trouve jamais (18 s d'attente pour rien).
+                    break
                 try:
                     found = extract_waypoint(self._client_or_open(), key, region)
                 except (NavdataError, SimConnectError):

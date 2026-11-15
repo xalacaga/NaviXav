@@ -1,6 +1,6 @@
 ✈️ NaviXav — IFR flight assistant for MSFS 2024
 
-NaviXav is a local Windows application that turns your latest SimBrief OFP into a complete IFR workflow: preparation, a live GSX Pro turnaround, MCDU/FMS entry, weather and turbulence, live flight monitoring, offline radio and interphone, ground taxi guidance, official charts — and live traffic injected into the simulator.
+NaviXav is a local Windows application that turns your latest SimBrief OFP into a complete IFR workflow: preparation, a live GSX Pro turnaround, MCDU/FMS entry, weather and turbulence you can feel, live flight monitoring, offline radio and interphone, ground taxi guidance, official charts, a cinematic camera — and live traffic injected into the simulator.
 
 Everything runs on your own computer. No account, no cloud, no subscription.
 
@@ -32,6 +32,8 @@ Departure, arrival and alternate METAR and TAF with graphical flight conditions,
 SIGMETs in force within 150 NM of your route — thunderstorms, turbulence, icing, volcanic ash, tropical cyclones — are listed with their levels, validity and full text, and the ones your route actually crosses at or below your cruise level come first. International and US SIGMETs are both covered, and the latest report stays on screen if aviationweather.gov stops answering.
 
 Turbulence gets its own layer: the clear-air turbulence risk forecast along your route from the OFP wind shear, and turbulence actually reported by pilots (PIREP and AIREP) near the route. When reported turbulence lies ahead at your level, an information alert tells you, without a master caution.
+
+And you can feel it. Felt turbulence, off by default, turns that intensity into gusts that lift and drop the aircraft in MSFS — light bumps, moderate jolts, severe shakes — with levels calibrated by measurement in flight and mountain waves raised by the terrain upwind in strong wind. A toolbar button sets it from 25 to 200 % during the flight, optional cabin sounds follow every jolt, and it never acts on the ground, fades in above 200 ft, stops at once if the aircraft takes an abnormal attitude and stays silent during active pause.
 
 On the map, an optional RainViewer precipitation radar, kept on the latest published frame, and METAR wind barbs with speed at the departure and arrival airports complete the picture, each with its own switch, a visible timestamp and its source attribution.
 
@@ -114,6 +116,8 @@ The card adapts to the aircraft family: MCDU for Airbus, CDU for Boeing, generic
 NaviXav talks to the simulator through SimConnect, using the native MSFS 2024 AI traffic API: connection state, live position, altitude and height above ground, heading, ground speed and vertical speed, STD versus QNH, open doors, and the airports, runways and their lighting, procedures, waypoints and navaids. Retrieved navigation data progressively builds a local database that remains available offline; the simulator must be running with a flight loaded to fetch anything new. Every loss and recovery of the SimConnect link is logged with its cause and duration, so a disconnection can be diagnosed from evidence.
 
 When the detailed SimBrief navlog already carries validated coordinates, NaviXav plots the en-route section immediately and queries MSFS Facilities only for what is missing — a much shorter first load, with route-corridor validation and the local MSFS cache still in place as safeguards.
+
+With MSFS 2024, NaviXav can also take the camera. A compact control room films your aircraft with an automatic director that picks the shot for the flight phase: orbit at the stand, a spotter by the runway on the takeoff roll, a camera waiting at the touchdown point on short final, fly-bys and chase near the ground, formation flight en route, and the real control tower of your departure or arrival airport, zooming in as you move away. Lock a shot, hold it, choose a calm, normal or lively pace, swap hard cuts for tracking moves, and adjust the distance, height and angle of every shot live. The camera keeps the field of view of your own MSFS view, gives the view back in one click, and can be run from a tablet on your local network.
 
 📓 Local logbook
 

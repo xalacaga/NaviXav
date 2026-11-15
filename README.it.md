@@ -185,6 +185,37 @@ Il monitoraggio e il pannello nel simulatore mostrano «Discesa in corso» al po
 - **Turbolenza**: rischio di turbolenza in aria chiara previsto lungo la rotta
   dal wind shear dell’OFP, e turbolenza segnalata dai piloti (PIREP, AIREP)
   vicino alla rotta, con un avviso quando si trova davanti al vostro livello.
+- **Turbolenza percepita**: turbolenza che si sente in MSFS, disattivata per
+  impostazione predefinita. L’intensità deriva dal wind shear dell’OFP, dai
+  rapporti dei piloti vicini, da ciò che mostra il simulatore (nubi,
+  precipitazioni, wind shear, vento forte a bassa quota) e dal rilievo
+  sopravento. Ogni raffica solleva o abbassa l’aereo, dai piccoli sobbalzi alle
+  scosse severe, con livelli tarati da una misura in volo. Un pulsante della
+  barra degli strumenti la attiva e la regola dal 25 al 200 % in volo, con suoni
+  di cabina facoltativi. Non agisce mai a terra, cresce gradualmente tra 200 e
+  500 ft dal suolo, si ferma subito se l’aereo assume un assetto anomalo e tace
+  durante la pausa attiva di MSFS; la finestra Turbolenza mostra l’effetto
+  realmente misurato nel simulatore.
+
+### Telecamera cinematografica (MSFS 2024)
+
+Un pulsante Telecamera, a sinistra della barra degli strumenti, apre una regia
+compatta che riprende il tuo aereo con l’API telecamera di MSFS 2024. Un regista
+automatico sceglie le inquadrature secondo la fase del volo: orbita al
+parcheggio, uno spettatore a bordo pista durante la corsa di decollo, una
+telecamera che attende al punto di contatto previsto in finale corto, passaggi e
+inseguimento vicino al suolo, volo in formazione in rotta e la vera torre di
+controllo dell’aeroporto di partenza o di arrivo, che zooma man mano che l’aereo
+si allontana.
+
+Puoi bloccare una delle sei inquadrature, passare alla successiva, mantenere
+quella attuale, scegliere un ritmo calmo, normale o vivace, decidere le
+inquadrature permesse e sostituire i tagli netti con carrellate intorno
+all’aereo. La sezione Inquadratura regola dal vivo distanza, altezza e angolo di
+ogni inquadratura, con un ripristino per una o per tutte. La telecamera mantiene
+il campo visivo della tua vista MSFS, così l’immagine non è mai deformata, e un
+clic restituisce la vista al pilota. Anche un tablet della rete locale può
+gestire la telecamera.
 
 ### Scheda MCDU
 

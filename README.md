@@ -211,6 +211,34 @@ Flight tracking and the in-game panel show “Descent in progress” instead of 
 - **Turbulence**: clear-air turbulence risk forecast along the route from the
   OFP wind shear, and turbulence reported by pilots (PIREP, AIREP) near the
   route, with an information alert when it lies ahead at your level.
+- **Felt turbulence**: turbulence you can feel in MSFS, off by default. Its
+  intensity comes from the OFP wind shear, nearby pilot reports, what the
+  simulator shows (cloud, precipitation, wind shear, strong low-level wind) and
+  the terrain upwind. Each gust lifts or drops the aircraft, from light bumps to
+  severe jolts, with levels calibrated by measurement in flight. A toolbar
+  button switches it on and sets it from 25 to 200 % during the flight, with
+  optional cabin sounds. It never acts on the ground, fades in between 200 and
+  500 ft AGL, stops at once if the aircraft takes an abnormal attitude and stays
+  silent during MSFS active pause; the Turbulence window shows the effect
+  actually measured in the simulator.
+
+### Cinematic camera (MSFS 2024)
+
+A Camera button on the left of the toolbar opens a compact control room that
+films your aircraft with the MSFS 2024 camera API. An automatic director chooses
+the shots for the flight phase: orbit at the stand, a spotter by the runway on
+the takeoff roll, a camera waiting at the predicted touchdown point on short
+final, fly-bys and chase near the ground, formation flight en route, and the
+real control tower of your departure or arrival airport, zooming in as the
+aircraft moves away.
+
+You can lock one of the six shots, cut to the next, hold the current shot,
+choose a calm, normal or lively pace, pick the shots the director may use, and
+replace hard cuts with tracking moves around the aircraft. The Framing section
+sets the distance, height and angle of each shot live, with a reset for one shot
+or all of them. The camera keeps the field of view of your own MSFS view, so the
+picture is never distorted, and one click gives the view back to the pilot. A
+tablet on the local network can run the camera too.
 
 ### MCDU card
 
